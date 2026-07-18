@@ -1,0 +1,26 @@
+// Override NProgress loading bar — primary union color
+#nprogress .bar {
+  background: #1B4D3E !important;
+  height: 4px !important;
+}
+
+#nprogress .peg {
+  box-shadow: 0 0 10px #1B4D3E, 0 0 5px #1B4D3E !important;
+}
+
+#nprogress .spinner-icon {
+  border-top-color: #1B4D3E !important;
+  border-left-color: #1B4D3E !important;
+}
+
+// Arabic font for the whole app
+body,
+.v-application {
+  font-family: 'Cairo', 'Tajawal', sans-serif !important;
+}
+
+// Status chip helpers
+.status-active   { color: #34D399 !important; }
+.status-pending  { color: #F59E0B !important; }
+.status-expired  { color: #FF4C51 !important; }
+.status-inactive { color: #9E9E9E !important; }

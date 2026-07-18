@@ -172,10 +172,7 @@ function formatDate(date: string) {
   return new Date(date).toLocaleDateString('ar-PS', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-// --- Ticket detail modal ---
-const isViewOpen = ref(false)
-const selectedTicket = ref<SupportTicket | null>(null)
-
+// --- Ticket detail modal --- (الحالة معرّفة أعلى الملف)
 function openTicketDetail(ticket: SupportTicket) {
   selectedTicket.value = ticket
   isTicketDetailOpen.value = true

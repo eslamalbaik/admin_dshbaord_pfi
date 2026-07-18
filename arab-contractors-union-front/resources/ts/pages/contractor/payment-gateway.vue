@@ -64,9 +64,34 @@ const membership = ref<Membership | null>(null)
 
 const form = ref({
   amount: '',
+  currency: 'ILS',
   receipt_file: null as File | null,
   notes: '',
 })
+
+const currencies = [
+  { value: 'ILS', label: 'شيكل ₪', symbol: '₪' },
+  { value: 'JOD', label: 'دينار أردني', symbol: 'د.أ' },
+  { value: 'USD', label: 'دولار $', symbol: '$' },
+]
+
+const currencySymbol = computed(() =>
+  currencies.find(c => c.value === form.value.currency)?.symbol ?? '₪')
+
+// أهلية التجديد — تُمنع مع ذمم مالية غير مسدَّدة
+const renewalBlocked = ref(false)
+const renewalIssues = ref<{ type: string; description: string; amount: number | null }[]>([])
+const outstandingDues = ref(0)
+
+async function checkEligibility() {
+  try {
+    const r = await axios.get(`${BASE}/api/v1/contractor/renewal-eligibility`, { headers: apiHeaders() })
+    renewalBlocked.value = !(r.data.items?.can_renew ?? true)
+    renewalIssues.value = r.data.items?.issues ?? []
+    outstandingDues.value = r.data.items?.outstanding_total_jod ?? 0
+  }
+  catch {}
+}
 
 const previewImage = ref<string | null>(null)
 const submitted = ref(false)
@@ -140,6 +165,10 @@ function copyIban(iban: string) {
 }
 
 async function submitPayment() {
+  if (renewalBlocked.value) {
+    errorMessage.value = 'لا يمكن تجديد العضوية قبل تسوية الذمم المالية المستحقّة.'
+    return
+  }
   if (!form.value.amount || !form.value.receipt_file) {
     errorMessage.value = 'الرجاء إدخال المبلغ وإرفاق صورة الإشعار'
     return
@@ -151,6 +180,7 @@ async function submitPayment() {
 
   const fd = new FormData()
   fd.append('amount', form.value.amount)
+  fd.append('currency', form.value.currency)
   fd.append('receipt_image', form.value.receipt_file)
   if (membership.value) fd.append('membership_id', String(membership.value.id))
   fd.append('notes', form.value.notes || 'دفع رسوم تجديد العضوية')
@@ -179,6 +209,7 @@ onMounted(async () => {
   token.value = getToken()
   if (!token.value) { authError.value = true; isLoading.value = false; return }
   await fetchGateway()
+  await checkEligibility()
 })
 
 const statusLabel: Record<string, string> = {
@@ -340,11 +371,51 @@ function fmtMoney(v: string | number | null) {
             </div>
 
             <form v-else @submit.prevent="submitPayment" class="payment-form">
+              <!-- تنبيه الذمم غير المسدَّدة -->
+              <div
+                v-if="renewalBlocked"
+                class="form-group"
+                style="background: #fff3e0; border: 1.5px solid #ffb74d; border-radius: 12px; padding: 1rem;"
+              >
+                <strong style="color: #e65100;">لا يمكن تجديد العضوية قبل تسوية الذمم المالية المستحقّة</strong>
+                <ul style="margin: .5rem 1rem 0 0; color: #6b7280; font-size: .88rem;">
+                  <li v-for="(iss, i) in renewalIssues" :key="i">
+                    {{ iss.description }}<template v-if="iss.amount"> — {{ iss.amount }} د.أ</template>
+                  </li>
+                </ul>
+                <p style="margin-top: .5rem; font-size: .85rem; color: #6b7280;">
+                  الإجمالي المستحق: <strong>{{ outstandingDues }} دينار أردني</strong> — يُرجى مراجعة الدائرة المالية في الاتحاد.
+                </p>
+              </div>
+
+              <!-- Currency -->
+              <div class="form-group">
+                <label>عملة الدفع *</label>
+                <div style="display: flex; gap: .6rem;">
+                  <button
+                    v-for="c in currencies"
+                    :key="c.value"
+                    type="button"
+                    class="form-input"
+                    style="cursor: pointer; text-align: center; flex: 1;"
+                    :style="form.currency === c.value
+                      ? 'border-color: var(--navy, #1a237e); background: #e8eaf6; font-weight: 700;'
+                      : ''"
+                    @click="form.currency = c.value"
+                  >
+                    {{ c.label }}
+                  </button>
+                </div>
+                <p v-if="form.currency !== 'JOD'" style="font-size: .8rem; color: #9ca3af; margin-top: .35rem;">
+                  رسوم الاشتراك مقوَّمة بالدينار الأردني — سيُحتسب المعادل بسعر الصرف المعتمد عند تأكيد المحاسب.
+                </p>
+              </div>
+
               <!-- Amount -->
               <div class="form-group">
                 <label>المبلغ المحول (رسوم الاشتراك) *</label>
                 <div class="amount-input-wrap">
-                  <span class="currency-symbol">₪</span>
+                  <span class="currency-symbol">{{ currencySymbol }}</span>
                   <input
                     v-model="form.amount"
                     type="number"
