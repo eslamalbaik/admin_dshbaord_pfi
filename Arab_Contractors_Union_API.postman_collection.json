@@ -88,6 +88,14 @@
 			"key": "phone",
 			"value": "",
 			"type": "string"
+		},
+		{
+			"key": "due_id",
+			"value": "1"
+		},
+		{
+			"key": "page_slug",
+			"value": "about-us"
 		}
 	],
 	"item": [
@@ -1150,6 +1158,106 @@
 								},
 								"description": "**GET** `/api/v1/contractor/payments/transfer` — *توكن المقاول*\n\nقائمة مدفوعات/تحويلات المقاول الحالي (مع الحالة: pending/paid/rejected وسبب الرفض إن وُجد). مُرقّمة `paginated`."
 							}
+						},
+						{
+							"name": "Renewal Eligibility",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/contractor/renewal-eligibility",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"contractor",
+										"renewal-eligibility"
+									]
+								},
+								"description": "هل يستطيع المقاول تجديد عضويته؟ يُمنع مع ذمم غير مسدَّدة",
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{contractor_token}}",
+											"type": "string"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Submit Transfer (with currency)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/contractor/payments/transfer",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"contractor",
+										"payments",
+										"transfer"
+									]
+								},
+								"description": "رفع إشعار تحويل مع تحديد العملة (JOD|ILS|USD) — السعر والمعادل بالدينار يُثبَّتان عند تأكيد المحاسب",
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{contractor_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "amount",
+											"value": "600",
+											"type": "text"
+										},
+										{
+											"key": "currency",
+											"value": "ILS",
+											"type": "text",
+											"description": "JOD | ILS | USD"
+										},
+										{
+											"key": "receipt_image",
+											"type": "file",
+											"src": []
+										},
+										{
+											"key": "membership_id",
+											"value": "",
+											"type": "text"
+										},
+										{
+											"key": "notes",
+											"value": "دفع رسوم تجديد العضوية",
+											"type": "text"
+										}
+									]
+								}
+							},
+							"response": []
 						}
 					]
 				},
@@ -1423,6 +1531,281 @@
 								},
 								"description": "**GET** `/api/v1/news/{slug}` — *عام*\n\nتفاصيل الخبر كاملة: العنوان، النص، الصورة، **رابط فيديو يوتيوب `video_url`**، **رابط خارجي `external_url`**، ومعرض صور `gallery`.\n\n**الأخطاء:** `404` إن لم يوجد الخبر أو لم يُنشر."
 							}
+						}
+					]
+				},
+				{
+					"name": "🏠 Landing & Public",
+					"item": [
+						{
+							"name": "Home Page (unified)",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/landing/home",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"landing",
+										"home"
+									]
+								},
+								"description": "كل بيانات الصفحة الرئيسية في نداء واحد: maintenance, union, contact, stats, latest_news"
+							},
+							"response": []
+						},
+						{
+							"name": "Maintenance Status",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/app/maintenance",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"app",
+										"maintenance"
+									]
+								},
+								"description": "حالة وضع الصيانة — لا يكشف slug المعاينة"
+							},
+							"response": []
+						},
+						{
+							"name": "Maintenance Preview Check",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/app/maintenance/preview/testing",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"app",
+										"maintenance",
+										"preview",
+										"testing"
+									]
+								},
+								"description": "التحقق من صلاحية slug المعاينة السري"
+							},
+							"response": []
+						},
+						{
+							"name": "Public Tenders (with filters)",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/tenders-public?status=open&category=&search=&updated_from=&updated_to=&sort=latest&per_page=15",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"tenders-public"
+									],
+									"query": [
+										{
+											"key": "status",
+											"value": "open"
+										},
+										{
+											"key": "category",
+											"value": ""
+										},
+										{
+											"key": "search",
+											"value": ""
+										},
+										{
+											"key": "updated_from",
+											"value": ""
+										},
+										{
+											"key": "updated_to",
+											"value": ""
+										},
+										{
+											"key": "sort",
+											"value": "latest"
+										},
+										{
+											"key": "per_page",
+											"value": "15"
+										}
+									]
+								},
+								"description": "قائمة عطاءات عامة بدون union_notes — فلاتر: status, category, search, updated_from, updated_to, sort (latest|updated_desc|deadline_asc|budget_desc), per_page"
+							},
+							"response": []
+						},
+						{
+							"name": "Public Tender Details",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/tenders-public/{{tender_id}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"tenders-public",
+										"{{tender_id}}"
+									]
+								},
+								"description": "تفاصيل عطاء عامة — تتضمن external_url إن وُجد"
+							},
+							"response": []
+						},
+						{
+							"name": "Dynamic Page by Slug",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/pages/{{page_slug}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"pages",
+										"{{page_slug}}"
+									]
+								},
+								"description": "صفحة CMS منشورة بحسب الـ slug"
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "🎓 Certificates الشهادات",
+					"item": [
+						{
+							"name": "List My Certificate Requests",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/contractor/certificate-requests",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"contractor",
+										"certificate-requests"
+									]
+								},
+								"description": "بيانات المقاول + المتطلبات + طلبات الشهادات السابقة",
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{contractor_token}}",
+											"type": "string"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Create Certificate Request (multipart)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/contractor/certificate-requests",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"contractor",
+										"certificate-requests"
+									]
+								},
+								"description": "الإرسال أصبح multipart/form-data — المرفق اختياري (صورة/PDF حتى 5MB)",
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{contractor_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "type",
+											"value": "membership",
+											"type": "text",
+											"description": "membership | good_standing | classification | experience"
+										},
+										{
+											"key": "notes",
+											"value": "أحتاج الشهادة لمناقصة حكومية",
+											"type": "text"
+										},
+										{
+											"key": "attachment",
+											"type": "file",
+											"src": [],
+											"description": "اختياري — png,jpg,webp,pdf حتى 5MB"
+										}
+									]
+								}
+							},
+							"response": []
 						}
 					]
 				}
@@ -2130,6 +2513,50 @@
 								},
 								"description": "**POST** `/api/v1/payments/transactions/{id}/reject` — *أدمن/محاسب*\n\nيرفض إشعار التحويل مع ذكر السبب → الحالة `rejected` ويصل إشعار للمقاول بالسبب.\n\n**الأخطاء:** `422` إذا كان `rejection_reason` فارغاً."
 							}
+						},
+						{
+							"name": "Confirm Payment (with exchange rate)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/payments/transactions/{{payment_id}}/confirm",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"payments",
+										"transactions",
+										"{{payment_id}}",
+										"confirm"
+									]
+								},
+								"description": "التأكيد يثبت سعر الصرف والمعادل بالدينار — exchange_rate اختياري لتجاوز السعر التلقائي",
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{admin_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"exchange_rate\": 0.233\n}"
+								}
+							},
+							"response": []
 						}
 					]
 				},
@@ -4083,6 +4510,652 @@
 								},
 								"description": "**DELETE** `/api/v1/dashboard/legal-files/{id}` — حذف الملف."
 							}
+						}
+					]
+				},
+				{
+					"name": "💵 Contractor Dues الذمم المالية",
+					"item": [
+						{
+							"name": "List Dues",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/dues?contractor_id=&status=&year=&search=",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"dues"
+									],
+									"query": [
+										{
+											"key": "contractor_id",
+											"value": ""
+										},
+										{
+											"key": "status",
+											"value": ""
+										},
+										{
+											"key": "year",
+											"value": ""
+										},
+										{
+											"key": "search",
+											"value": ""
+										}
+									]
+								},
+								"description": "فلاتر: contractor_id, status(unpaid|partially_paid|paid), year, source, search",
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{admin_token}}",
+											"type": "string"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Dues Grouped By Contractor",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/dues/by-contractor?search=&outstanding_only=1",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"dues",
+										"by-contractor"
+									],
+									"query": [
+										{
+											"key": "search",
+											"value": ""
+										},
+										{
+											"key": "outstanding_only",
+											"value": "1"
+										}
+									]
+								},
+								"description": "صف لكل شركة: الإجمالي/المسدَّد/المتبقي — فلاتر: search, outstanding_only",
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{admin_token}}",
+											"type": "string"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Dues Summary",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/dues/summary",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"dues",
+										"summary"
+									]
+								},
+								"description": "إجمالي القائم والمحصَّل وعدد المقاولين وتوزيع السنوات",
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{admin_token}}",
+											"type": "string"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Create Due",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/dues",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"dues"
+									]
+								},
+								"description": "إضافة ذمة يدوية بالدينار",
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{admin_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"contractor_id\": 1,\n  \"description\": \"رسوم اشتراك سنة 2022\",\n  \"amount_jod\": 600,\n  \"year\": 2022,\n  \"due_date\": null,\n  \"notes\": null\n}"
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Update Due",
+							"request": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/dues/{{due_id}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"dues",
+										"{{due_id}}"
+									]
+								},
+								"description": "",
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{admin_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"description\": \"رسوم اشتراك سنة 2022 (معدلة)\",\n  \"amount_jod\": 650\n}"
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Settle Due",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/dues/{{due_id}}/settle",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"dues",
+										"{{due_id}}",
+										"settle"
+									]
+								},
+								"description": "تسوية كاملة أو جزئية — اختيارياً بربط payment_id مؤكد",
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{admin_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"amount_jod\": 300,\n  \"payment_id\": null,\n  \"notes\": \"دفعة نقدية\"\n}"
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Delete Due",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/dues/{{due_id}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"dues",
+										"{{due_id}}"
+									]
+								},
+								"description": "",
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{admin_token}}",
+											"type": "string"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Pay For Contractor (auto-distribute)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/contractors/{{contractor_id}}/dues/pay",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"contractors",
+										"{{contractor_id}}",
+										"dues",
+										"pay"
+									]
+								},
+								"description": "تسجيل دفعة واردة من الشركة بأي عملة — توزع تلقائياً على ذممها الأقدم أولاً وتسجل كدفعة رسمية",
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{admin_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"amount\": 500,\n  \"currency\": \"ILS\",\n  \"exchange_rate\": null,\n  \"method\": \"cash\",\n  \"reference_number\": null,\n  \"notes\": null\n}"
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Import Dues From Excel",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/dues/import",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"dues",
+										"import"
+									]
+								},
+								"description": "رفع كشف إكسل بنفس بنية كشف الأرشفة — dry_run=1 للمعاينة، force=1 لاستبدال استيراد سابق، create_missing=1 لإنشاء الشركات غير الموجودة تلقائياً",
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{admin_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "file",
+											"type": "file",
+											"src": []
+										},
+										{
+											"key": "dry_run",
+											"value": "1",
+											"type": "text"
+										},
+										{
+											"key": "force",
+											"value": "0",
+											"type": "text"
+										},
+										{
+											"key": "create_missing",
+											"value": "1",
+											"type": "text"
+										}
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "💱 Exchange Rates أسعار الصرف",
+					"item": [
+						{
+							"name": "Latest Rates + History",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/exchange-rates",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"exchange-rates"
+									]
+								},
+								"description": "آخر سعر معتمد لكل عملة (ILS/USD الى JOD) + سجل آخر 60 تحديثاً — تجلب تلقائياً يومياً 06:00",
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{admin_token}}",
+											"type": "string"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Manual Rate Override",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/exchange-rates",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"exchange-rates"
+									]
+								},
+								"description": "اعتماد سعر يدوي يتقدم على السعر التلقائي",
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{admin_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"currency\": \"ILS\",\n  \"rate_to_jod\": 0.235\n}"
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "📄 Dynamic Pages الصفحات",
+					"item": [
+						{
+							"name": "List Pages",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/pages",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"pages"
+									]
+								},
+								"description": "",
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{admin_token}}",
+											"type": "string"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Create Page",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/pages",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"pages"
+									]
+								},
+								"description": "",
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{admin_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"slug\": \"about-us\",\n  \"title\": \"من نحن\",\n  \"content\": \"<h1>مرحبا</h1>\",\n  \"is_published\": true\n}"
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Update Page",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/pages/1",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"pages",
+										"1"
+									]
+								},
+								"description": "",
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{admin_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"title\": \"من نحن (محدثة)\",\n  \"is_published\": true\n}"
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Delete Page",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/pages/1",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"pages",
+										"1"
+									]
+								},
+								"description": "",
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{admin_token}}",
+											"type": "string"
+										}
+									]
+								}
+							},
+							"response": []
 						}
 					]
 				}
