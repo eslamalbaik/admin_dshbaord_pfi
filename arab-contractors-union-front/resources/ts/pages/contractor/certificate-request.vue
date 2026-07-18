@@ -64,6 +64,18 @@ const certificateTypes = [
 
 const BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
+// مرفق اختياري مع الطلب (صورة أو PDF حتى 5MB)
+const attachmentFile = ref<File | null>(null)
+
+function onAttachmentChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0] ?? null
+  if (file && file.size > 5 * 1024 * 1024) {
+    errorMessage.value = 'حجم المرفق يتجاوز 5 ميغابايت'
+    return
+  }
+  attachmentFile.value = file
+}
+
 function getToken() {
   return localStorage.getItem('contractor_token')
 }
@@ -79,7 +91,7 @@ function logout() {
 
 async function fetchData() {
   try {
-    const r = await axios.get(`${BASE}/api/v1/contractor/certificate-request`, { headers: apiHeaders() })
+    const r = await axios.get(`${BASE}/api/v1/contractor/certificate-requests`, { headers: apiHeaders() })
     contractor.value = r.data.items?.contractor ?? null
     requests.value = r.data.items?.requests ?? []
     requirementIssues.value = r.data.items?.requirement_issues ?? []
@@ -102,13 +114,20 @@ async function submitRequest() {
   successMessage.value = ''
 
   try {
-    const r = await axios.post(`${BASE}/api/v1/contractor/certificate-request/create`, form.value, {
-      headers: apiHeaders(),
+    // الإرسال بصيغة multipart/form-data (مع مرفق اختياري)
+    const fd = new FormData()
+    fd.append('type', form.value.type)
+    if (form.value.notes) fd.append('notes', form.value.notes)
+    if (attachmentFile.value) fd.append('attachment', attachmentFile.value)
+
+    const r = await axios.post(`${BASE}/api/v1/contractor/certificate-requests`, fd, {
+      headers: { ...apiHeaders(), 'Content-Type': 'multipart/form-data' },
     })
-    successMessage.value = 'تم تقديم طلب الشهادة بنجاح! سيتم إرسالها إلى بريدك الإلكتروني.'
+    successMessage.value = r.data.message ?? 'تم تقديم طلب الشهادة بنجاح.'
     form.value = { type: '', notes: '' }
+    attachmentFile.value = null
     showForm.value = false
-    requests.value.unshift(r.data.items?.request ?? {})
+    if (r.data.items) requests.value.unshift(r.data.items)
     setTimeout(() => { successMessage.value = '' }, 5000)
   } catch (e: any) {
     errorMessage.value = e?.response?.data?.message ?? 'حدث خطأ أثناء تقديم الطلب'
@@ -155,6 +174,22 @@ onMounted(async () => {
   if (!token.value) { authError.value = true; isLoading.value = false; return }
   await fetchData()
 })
+
+function requirementTypeLabel(type: string): string {
+  const labels: Record<string, string> = {
+    late_fees: 'غرامات التأخير',
+    overdue_subscription: 'رسوم الاشتراك المتأخرة',
+    pending_dispute: 'نزاع قيد المعالجة',
+    missing_documents: 'وثائق مفقودة',
+    other: 'متطلب آخر',
+  }
+  return labels[type] ?? type
+}
+
+function fmtMoney(v: string | number | null) {
+  if (!v) return '—'
+  return Number(v).toLocaleString('ar-PS') + ' ₪'
+}
 </script>
 
 <template>
@@ -164,7 +199,7 @@ onMounted(async () => {
       <img src="/logo.png" alt="الاتحاد" class="aw-logo" />
       <h2>يجب تسجيل الدخول أولاً</h2>
       <p>سجّل دخولك للوصول إلى خدمة طلب الشهادات.</p>
-      <RouterLink to="/landing" class="aw-btn">العودة للصفحة الرئيسية</RouterLink>
+      <RouterLink to="/contractor/login" class="aw-btn">تسجيل الدخول</RouterLink>
     </div>
 
     <!-- ─── Loading ─── -->
@@ -279,6 +314,21 @@ onMounted(async () => {
               />
             </div>
 
+            <!-- Attachment (اختياري) -->
+            <div class="form-group">
+              <label>مرفق داعم للطلب (اختياري — صورة أو PDF حتى 5MB)</label>
+              <input
+                type="file"
+                accept=".png,.jpg,.jpeg,.webp,.pdf"
+                class="form-textarea"
+                style="min-height: auto; padding: .6rem 1rem;"
+                @change="onAttachmentChange"
+              />
+              <p v-if="attachmentFile" class="notes-text" style="margin-top: .4rem;">
+                الملف المختار: {{ attachmentFile.name }}
+              </p>
+            </div>
+
             <!-- Submit -->
             <div class="form-actions">
               <button type="submit" class="submit-btn" :disabled="isSubmitting">
@@ -372,29 +422,6 @@ onMounted(async () => {
     </template>
   </div>
 </template>
-
-<script setup lang="ts">
-function requirementTypeLabel(type: string): string {
-  const labels: Record<string, string> = {
-    late_fees: 'غرامات التأخير',
-    overdue_subscription: 'رسوم الاشتراك المتأخرة',
-    pending_dispute: 'نزاع قيد المعالجة',
-    missing_documents: 'وثائق مفقودة',
-    other: 'متطلب آخر',
-  }
-  return labels[type] ?? type
-}
-
-function fmtDate(d: string | null) {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('ar-PS', { year: 'numeric', month: 'long', day: 'numeric' })
-}
-
-function fmtMoney(v: string | number | null) {
-  if (!v) return '—'
-  return Number(v).toLocaleString('ar-PS') + ' ₪'
-}
-</script>
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import {
-  ArrowRight, LogOut, DollarSign, Building2, Copy, Check,
-  AlertCircle, Upload, Send, Clock, CheckCircle,
+  LogOut, DollarSign, Building2, Copy, Check,
+  AlertCircle, Upload, Send, Clock, CheckCircle, FileText,
+  Award, CalendarDays, RefreshCw,
 } from 'lucide-vue-next'
 
 definePage({
@@ -16,34 +17,54 @@ const token = ref<string | null>(null)
 const authError = ref(false)
 const isLoading = ref(true)
 const isSending = ref(false)
-const copySuccess = ref(false)
+const copiedIban = ref<string | null>(null)
 
-interface UnionBank {
+interface BankAccount {
+  id: number
   bank_name: string
-  bank_icon_url: string
-  account_holder: string
+  bank_name_en: string | null
+  logo_url: string | null
   iban: string
-  swift_code: string | null
+  account_number: string | null
+  account_holder: string | null
+  swift: string | null
+  notes: string | null
 }
 
-interface PaymentRequest {
+interface Payment {
   id: number
   amount: string
-  reference_number: string | null
+  type: string
   status: string
+  method: string
+  reference_number: string | null
+  receipt_image_url: string | null
+  rejection_reason: string | null
   notes: string | null
-  proof_image_url: string | null
+  submitted_at: string | null
+  confirmed_at: string | null
+  paid_at: string | null
   created_at: string
-  verified_at: string | null
 }
 
-const unionBank = ref<UnionBank | null>(null)
-const currentPayment = ref<PaymentRequest | null>(null)
+interface Membership {
+  id: number
+  type: string
+  status: string
+  starts_at: string
+  expires_at: string | null
+  amount: string
+  expiring_soon: boolean
+}
+
+const bankAccounts = ref<BankAccount[]>([])
+const transfers = ref<Payment[]>([])
 const contractor = ref<{ name: string; membership_number: string } | null>(null)
+const membership = ref<Membership | null>(null)
 
 const form = ref({
   amount: '',
-  proof_file: null as File | null,
+  receipt_file: null as File | null,
   notes: '',
 })
 
@@ -51,6 +72,8 @@ const previewImage = ref<string | null>(null)
 const submitted = ref(false)
 const successMessage = ref('')
 const errorMessage = ref('')
+
+const currentPayment = computed<Payment | null>(() => transfers.value[0] ?? null)
 
 const BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
@@ -67,12 +90,20 @@ function logout() {
   router.push('/landing')
 }
 
-async function fetchPaymentGateway() {
+async function fetchGateway() {
   try {
-    const r = await axios.get(`${BASE}/api/v1/contractor/payment-gateway`, { headers: apiHeaders() })
-    unionBank.value = r.data.items?.union_bank ?? null
-    currentPayment.value = r.data.items?.current_payment ?? null
-    contractor.value = r.data.items?.contractor ?? null
+    const [dashRes, bankRes, trRes] = await Promise.all([
+      axios.get(`${BASE}/api/v1/contractor/dashboard`, { headers: apiHeaders() }),
+      axios.get(`${BASE}/api/v1/bank-accounts`),
+      axios.get(`${BASE}/api/v1/contractor/payments/transfer`, { headers: apiHeaders() }),
+    ])
+    contractor.value = dashRes.data.items?.contractor ?? null
+    membership.value = dashRes.data.items?.membership ?? null
+    bankAccounts.value = bankRes.data.items?.bank_accounts ?? []
+    transfers.value = trRes.data.items ?? []
+    // المبلغ يُملأ تلقائياً بقيمة اشتراك العضوية الحالية
+    if (membership.value?.amount && Number(membership.value.amount) > 0)
+      form.value.amount = String(Number(membership.value.amount))
   } catch (e: any) {
     if (e?.response?.status === 401) authError.value = true
   } finally {
@@ -85,30 +116,32 @@ function onFileSelected(event: Event) {
   const file = input.files?.[0]
   if (!file) return
 
-  if (!file.type.startsWith('image/')) {
-    errorMessage.value = 'الرجاء اختيار صورة فقط'
+  const okTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'application/pdf']
+  if (!okTypes.includes(file.type)) {
+    errorMessage.value = 'الرجاء اختيار صورة (PNG/JPG/WebP) أو ملف PDF'
     return
   }
 
-  form.value.proof_file = file
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    previewImage.value = e.target?.result as string
-  }
-  reader.readAsDataURL(file)
+  form.value.receipt_file = file
   errorMessage.value = ''
+  if (file.type.startsWith('image/')) {
+    const reader = new FileReader()
+    reader.onload = (e) => { previewImage.value = e.target?.result as string }
+    reader.readAsDataURL(file)
+  } else {
+    previewImage.value = null
+  }
 }
 
-function copyIBAN() {
-  if (!unionBank.value?.iban) return
-  navigator.clipboard.writeText(unionBank.value.iban)
-  copySuccess.value = true
-  setTimeout(() => { copySuccess.value = false }, 2000)
+function copyIban(iban: string) {
+  navigator.clipboard.writeText(iban)
+  copiedIban.value = iban
+  setTimeout(() => { if (copiedIban.value === iban) copiedIban.value = null }, 2000)
 }
 
 async function submitPayment() {
-  if (!form.value.amount || !form.value.proof_file) {
-    errorMessage.value = 'الرجاء ملء جميع الحقول المطلوبة'
+  if (!form.value.amount || !form.value.receipt_file) {
+    errorMessage.value = 'الرجاء إدخال المبلغ وإرفاق صورة الإشعار'
     return
   }
 
@@ -116,22 +149,27 @@ async function submitPayment() {
   errorMessage.value = ''
   successMessage.value = ''
 
-  const formData = new FormData()
-  formData.append('amount', form.value.amount)
-  formData.append('proof_image', form.value.proof_file)
-  if (form.value.notes) formData.append('notes', form.value.notes)
+  const fd = new FormData()
+  fd.append('amount', form.value.amount)
+  fd.append('receipt_image', form.value.receipt_file)
+  if (membership.value) fd.append('membership_id', String(membership.value.id))
+  fd.append('notes', form.value.notes || 'دفع رسوم تجديد العضوية')
 
   try {
-    const r = await axios.post(`${BASE}/api/v1/contractor/payment-submit`, formData, {
+    const r = await axios.post(`${BASE}/api/v1/contractor/payments/transfer`, fd, {
       headers: { ...apiHeaders(), 'Content-Type': 'multipart/form-data' },
     })
-    successMessage.value = 'تم إرسال إشعار الدفع بنجاح! سيتم التحقق منها قريباً.'
+    successMessage.value = r.data.message ?? 'تم إرسال إشعار التحويل بنجاح.'
     submitted.value = true
-    form.value = { amount: '', proof_file: null, notes: '' }
+    if (r.data.items) transfers.value.unshift(r.data.items)
+    form.value = { amount: '', receipt_file: null, notes: '' }
     previewImage.value = null
-    currentPayment.value = r.data.items?.payment ?? null
   } catch (e: any) {
-    errorMessage.value = e?.response?.data?.message ?? 'حدث خطأ أثناء إرسال الطلب'
+    if (e?.response?.status === 422 && e.response.data?.errors) {
+      errorMessage.value = Object.values(e.response.data.errors).flat().join(' — ')
+    } else {
+      errorMessage.value = e?.response?.data?.message ?? 'حدث خطأ أثناء إرسال الطلب'
+    }
   } finally {
     isSending.value = false
   }
@@ -140,8 +178,23 @@ async function submitPayment() {
 onMounted(async () => {
   token.value = getToken()
   if (!token.value) { authError.value = true; isLoading.value = false; return }
-  await fetchPaymentGateway()
+  await fetchGateway()
 })
+
+const statusLabel: Record<string, string> = {
+  pending: 'قيد المراجعة', paid: 'مؤكّد', rejected: 'مرفوض',
+  refunded: 'مُعاد', failed: 'فشل',
+}
+
+function fmtDate(d: string | null) {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('ar-PS', { year: 'numeric', month: 'long', day: 'numeric' })
+}
+
+function fmtMoney(v: string | number | null) {
+  if (!v) return '—'
+  return Number(v).toLocaleString('ar-PS') + ' ₪'
+}
 </script>
 
 <template>
@@ -150,14 +203,14 @@ onMounted(async () => {
     <div v-if="authError" class="auth-wall">
       <img src="/logo.png" alt="الاتحاد" class="aw-logo" />
       <h2>يجب تسجيل الدخول أولاً</h2>
-      <p>سجّل دخولك من الصفحة الرئيسية للوصول إلى بوابة الدفع.</p>
-      <RouterLink to="/landing" class="aw-btn">العودة للصفحة الرئيسية</RouterLink>
+      <p>سجّل دخولك لتجديد عضويتك ودفع رسوم الاشتراك.</p>
+      <RouterLink to="/contractor/login" class="aw-btn">تسجيل الدخول</RouterLink>
     </div>
 
     <!-- ─── Loading ─── -->
     <div v-else-if="isLoading" class="pg-loading">
       <div class="spinner" />
-      <p>جاري تحميل بوابة الدفع...</p>
+      <p>جاري تحميل صفحة تجديد العضوية...</p>
     </div>
 
     <!-- ─── Payment Gateway ─── -->
@@ -169,7 +222,7 @@ onMounted(async () => {
             <img src="/logo.png" alt="الاتحاد" class="hdr-logo" />
             <div>
               <span class="hdr-title">اتحاد المقاولين الفلسطينيين</span>
-              <span class="hdr-sub">بوابة الدفع</span>
+              <span class="hdr-sub">تجديد العضوية — دفع رسوم الاشتراك</span>
             </div>
           </RouterLink>
           <div class="hdr-user" v-if="contractor">
@@ -196,39 +249,74 @@ onMounted(async () => {
           <span>{{ successMessage }}</span>
         </div>
 
+        <!-- Membership being renewed -->
+        <div v-if="membership" class="renewal-banner" :class="{ expiring: membership.expiring_soon }">
+          <div class="rb-icon"><RefreshCw :size="24" /></div>
+          <div class="rb-info">
+            <p class="rb-title">تجديد العضوية الحالية</p>
+            <p class="rb-meta">
+              <Award :size="13" /> عضوية {{ membership.type === 'annual' ? 'سنوية' : membership.type === 'new' ? 'جديدة' : membership.type }}
+              <span class="rb-sep">·</span>
+              <CalendarDays :size="13" /> تنتهي في {{ fmtDate(membership.expires_at) }}
+            </p>
+            <p v-if="membership.expiring_soon" class="rb-warn">
+              <AlertCircle :size="13" /> عضويتك تنتهي قريباً — سارع بالتجديد
+            </p>
+          </div>
+          <div class="rb-amount">
+            <span class="rb-amount-val">{{ fmtMoney(membership.amount) }}</span>
+            <span class="rb-amount-label">رسوم الاشتراك</span>
+          </div>
+        </div>
+        <div v-else class="alert alert-error">
+          <AlertCircle :size="18" />
+          <span>لا توجد عضوية مسجّلة باسمك — تواصل مع إدارة الاتحاد لتفعيل عضويتك قبل الدفع.</span>
+        </div>
+
         <!-- Main Content -->
         <div class="pg-grid">
           <!-- Bank Info Section -->
           <section class="pg-section bank-section">
             <h2 class="pg-section-title"><Building2 :size="20" /> بيانات التحويل البنكي</h2>
 
-            <div v-if="unionBank" class="bank-card">
-              <div class="bank-header">
-                <img v-if="unionBank.bank_icon_url" :src="unionBank.bank_icon_url" :alt="unionBank.bank_name" class="bank-icon" />
-                <div v-else class="bank-icon-placeholder"><Building2 :size="32" /></div>
-                <div class="bank-info-text">
-                  <p class="bank-name">{{ unionBank.bank_name }}</p>
-                  <p class="account-holder">باسم: {{ unionBank.account_holder }}</p>
-                </div>
-              </div>
-
-              <div class="bank-details">
-                <!-- IBAN -->
-                <div class="detail-item">
-                  <span class="detail-label">رقم الحساب (IBAN)</span>
-                  <div class="detail-value-wrap">
-                    <span class="detail-value mono" dir="ltr">{{ unionBank.iban }}</span>
-                    <button class="copy-btn" @click="copyIBAN" :title="copySuccess ? 'تم النسخ!' : 'انسخ'">
-                      <Check v-if="copySuccess" :size="16" />
-                      <Copy v-else :size="16" />
-                    </button>
+            <div v-if="bankAccounts.length" class="bank-list">
+              <div v-for="b in bankAccounts" :key="b.id" class="bank-card">
+                <div class="bank-header">
+                  <img v-if="b.logo_url" :src="b.logo_url" :alt="b.bank_name" class="bank-icon" />
+                  <div v-else class="bank-icon-placeholder"><Building2 :size="32" /></div>
+                  <div class="bank-info-text">
+                    <p class="bank-name">{{ b.bank_name }}</p>
+                    <p v-if="b.account_holder" class="account-holder">باسم: {{ b.account_holder }}</p>
                   </div>
                 </div>
 
-                <!-- SWIFT (if available) -->
-                <div v-if="unionBank.swift_code" class="detail-item">
-                  <span class="detail-label">كود SWIFT</span>
-                  <span class="detail-value mono" dir="ltr">{{ unionBank.swift_code }}</span>
+                <div class="bank-details">
+                  <!-- IBAN -->
+                  <div class="detail-item">
+                    <span class="detail-label">رقم الآيبان (IBAN)</span>
+                    <div class="detail-value-wrap">
+                      <span class="detail-value mono" dir="ltr">{{ b.iban }}</span>
+                      <button class="copy-btn" @click="copyIban(b.iban)" :title="copiedIban === b.iban ? 'تم النسخ!' : 'انسخ'">
+                        <Check v-if="copiedIban === b.iban" :size="16" />
+                        <Copy v-else :size="16" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div v-if="b.account_number" class="detail-item">
+                    <span class="detail-label">رقم الحساب</span>
+                    <span class="detail-value mono" dir="ltr">{{ b.account_number }}</span>
+                  </div>
+
+                  <div v-if="b.swift" class="detail-item">
+                    <span class="detail-label">كود SWIFT</span>
+                    <span class="detail-value mono" dir="ltr">{{ b.swift }}</span>
+                  </div>
+
+                  <div v-if="b.notes" class="detail-item">
+                    <span class="detail-label">ملاحظات</span>
+                    <span class="detail-value">{{ b.notes }}</span>
+                  </div>
                 </div>
               </div>
 
@@ -237,23 +325,24 @@ onMounted(async () => {
                 <p>يُرجى التأكد من صحة البيانات قبل التحويل. احفظ إشعار التحويل للمراجعة.</p>
               </div>
             </div>
+            <div v-else class="empty-hint">لا توجد حسابات بنكية متاحة حالياً.</div>
           </section>
 
           <!-- Payment Form Section -->
           <section class="pg-section payment-form-section">
-            <h2 class="pg-section-title"><DollarSign :size="20" /> تسجيل الدفع</h2>
+            <h2 class="pg-section-title"><DollarSign :size="20" /> دفع رسوم تجديد العضوية</h2>
 
             <div v-if="submitted" class="success-state">
               <CheckCircle :size="48" class="success-ico" />
-              <h3>تم الإرسال بنجاح!</h3>
-              <p>سيتم مراجعة إشعار الدفع الخاص بك من قبل قسم المحاسبة خلال 24 ساعة.</p>
-              <button class="reset-btn" @click="submitted = false">إرسال دفع آخر</button>
+              <h3>تم إرسال طلب التجديد بنجاح!</h3>
+              <p>سيتم مراجعة إشعار الدفع من قبل قسم المحاسبة وتجديد عضويتك خلال 24 ساعة.</p>
+              <button class="reset-btn" @click="submitted = false">إرسال إشعار آخر</button>
             </div>
 
             <form v-else @submit.prevent="submitPayment" class="payment-form">
               <!-- Amount -->
               <div class="form-group">
-                <label>المبلغ المحول *</label>
+                <label>المبلغ المحول (رسوم الاشتراك) *</label>
                 <div class="amount-input-wrap">
                   <span class="currency-symbol">₪</span>
                   <input
@@ -268,17 +357,17 @@ onMounted(async () => {
                 </div>
               </div>
 
-              <!-- Proof Image -->
+              <!-- Receipt -->
               <div class="form-group">
                 <label>صورة إشعار التحويل *</label>
                 <div class="file-upload-area" @click="$refs.fileInput?.click()">
                   <Upload :size="32" class="upload-icon" />
-                  <p class="upload-text">اضغط هنا أو اسحب الصورة</p>
-                  <p class="upload-hint">PNG, JPG أو WebP (أقصى حجم 5MB)</p>
+                  <p class="upload-text">اضغط هنا لاختيار الملف</p>
+                  <p class="upload-hint">PNG, JPG, WebP أو PDF (أقصى حجم 5MB)</p>
                   <input
                     ref="fileInput"
                     type="file"
-                    accept="image/*"
+                    accept="image/*,application/pdf"
                     hidden
                     @change="onFileSelected"
                   />
@@ -286,10 +375,16 @@ onMounted(async () => {
 
                 <!-- Image Preview -->
                 <div v-if="previewImage" class="image-preview">
-                  <img :src="previewImage" :alt="form.amount" />
-                  <button type="button" class="remove-btn" @click="previewImage = null; form.proof_file = null">
+                  <img :src="previewImage" alt="receipt" />
+                  <button type="button" class="remove-btn" @click="previewImage = null; form.receipt_file = null">
                     ✕
                   </button>
+                </div>
+                <!-- Non-image file chip -->
+                <div v-else-if="form.receipt_file" class="file-chip">
+                  <FileText :size="16" />
+                  <span class="file-chip-name">{{ form.receipt_file.name }}</span>
+                  <button type="button" class="file-chip-remove" @click="form.receipt_file = null">✕</button>
                 </div>
               </div>
 
@@ -298,7 +393,7 @@ onMounted(async () => {
                 <label>ملاحظات إضافية (اختياري)</label>
                 <textarea
                   v-model="form.notes"
-                  placeholder="مثل: تحويل لتجديد الاشتراك..."
+                  placeholder="دفع رسوم تجديد العضوية"
                   class="form-textarea"
                 />
               </div>
@@ -307,7 +402,7 @@ onMounted(async () => {
               <button type="submit" class="submit-btn" :disabled="isSending">
                 <Send v-if="!isSending" :size="16" />
                 <span class="spinner-small" v-else></span>
-                {{ isSending ? 'جاري الإرسال...' : 'إرسال إشعار الدفع' }}
+                {{ isSending ? 'جاري الإرسال...' : 'إرسال طلب تجديد العضوية' }}
               </button>
             </form>
           </section>
@@ -331,11 +426,15 @@ onMounted(async () => {
               </div>
               <div class="detail">
                 <span class="label">التاريخ</span>
-                <span class="value">{{ fmtDate(currentPayment.created_at) }}</span>
+                <span class="value">{{ fmtDate(currentPayment.submitted_at ?? currentPayment.created_at) }}</span>
               </div>
-              <div v-if="currentPayment.verified_at" class="detail">
-                <span class="label">تم التحقق</span>
-                <span class="value">{{ fmtDate(currentPayment.verified_at) }}</span>
+              <div v-if="currentPayment.confirmed_at" class="detail">
+                <span class="label">تم التأكيد</span>
+                <span class="value">{{ fmtDate(currentPayment.confirmed_at) }}</span>
+              </div>
+              <div v-if="currentPayment.rejection_reason" class="detail full">
+                <span class="label">سبب الرفض</span>
+                <span class="value">{{ currentPayment.rejection_reason }}</span>
               </div>
               <div v-if="currentPayment.notes" class="detail full">
                 <span class="label">ملاحظات</span>
@@ -353,22 +452,6 @@ onMounted(async () => {
     </template>
   </div>
 </template>
-
-<script setup lang="ts">
-const statusLabel: Record<string, string> = {
-  pending: 'قيد الانتظار', verified: 'موثّق', rejected: 'مرفوض',
-}
-
-function fmtDate(d: string | null) {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('ar-PS', { year: 'numeric', month: 'long', day: 'numeric' })
-}
-
-function fmtMoney(v: string | number | null) {
-  if (!v) return '—'
-  return Number(v).toLocaleString('ar-PS') + ' ₪'
-}
-</script>
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
@@ -423,6 +506,20 @@ function fmtMoney(v: string | number | null) {
 .alert-error { background: var(--red-light); color: var(--red); border: 1px solid #ef9a9a; }
 .alert-success { background: var(--green-light); color: var(--green); border: 1px solid #a5d6a7; }
 
+/* Renewal Banner */
+.renewal-banner { display: flex; align-items: center; gap: 1.25rem; background: #fff; border: 1.5px solid var(--navy-light); border-right: 4px solid var(--navy); border-radius: 14px; padding: 1.25rem 1.5rem; margin-bottom: 1.75rem; }
+.renewal-banner.expiring { border-right-color: #e65100; background: #fffdf5; }
+.rb-icon { width: 48px; height: 48px; border-radius: 12px; background: var(--navy-light); color: var(--navy); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.renewal-banner.expiring .rb-icon { background: #fff8e1; color: #e65100; }
+.rb-info { flex: 1; }
+.rb-title { font-size: 1rem; font-weight: 800; color: var(--text-h); margin-bottom: .25rem; }
+.rb-meta { display: flex; align-items: center; gap: .4rem; font-size: .83rem; color: var(--text-m); flex-wrap: wrap; }
+.rb-sep { color: var(--border); }
+.rb-warn { display: flex; align-items: center; gap: .35rem; font-size: .8rem; color: #e65100; font-weight: 700; margin-top: .35rem; }
+.rb-amount { text-align: center; flex-shrink: 0; }
+.rb-amount-val { display: block; font-size: 1.3rem; font-weight: 800; color: var(--navy); }
+.rb-amount-label { display: block; font-size: .72rem; color: var(--text-m); margin-top: .15rem; }
+
 /* Body & Grid */
 .pg-body { padding: 2rem 1.5rem 3rem; }
 .pg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem; }
@@ -449,6 +546,11 @@ function fmtMoney(v: string | number | null) {
 .copy-btn:hover { background: var(--navy); color: #fff; }
 
 .bank-note { display: flex; align-items: flex-start; gap: .75rem; padding: 1rem; background: #fff8e1; border: 1px solid #ffca28; border-radius: 10px; color: #e65100; font-size: .85rem; line-height: 1.5; }
+.bank-list { display: flex; flex-direction: column; gap: 1rem; }
+.empty-hint { text-align: center; color: var(--text-m); font-size: .9rem; padding: 2rem 1rem; }
+.file-chip { display: flex; align-items: center; gap: .6rem; margin-top: 1rem; padding: .65rem .9rem; background: var(--navy-light); border-radius: 10px; font-size: .85rem; color: var(--navy); }
+.file-chip-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-chip-remove { width: 24px; height: 24px; border-radius: 50%; background: rgba(198,40,40,.9); color: #fff; border: none; cursor: pointer; flex-shrink: 0; }
 
 /* Payment Form */
 .payment-form { display: flex; flex-direction: column; gap: 1.5rem; }
@@ -492,12 +594,12 @@ function fmtMoney(v: string | number | null) {
 
 .payment-status-card { border: 1.5px solid var(--border); border-radius: 12px; padding: 1.5rem; background: #fff; }
 .payment-status-card.pending { border-color: #ffca28; background: #fffde7; }
-.payment-status-card.verified { border-color: #a5d6a7; background: var(--green-light); }
+.payment-status-card.paid { border-color: #a5d6a7; background: var(--green-light); }
 .payment-status-card.rejected { border-color: #ef9a9a; background: var(--red-light); }
 
 .status-badge { display: inline-block; padding: .35rem .75rem; border-radius: 50px; font-size: .8rem; font-weight: 700; margin-bottom: 1rem; }
 .status-badge.pending { background: #fff8e1; color: #e65100; }
-.status-badge.verified { background: var(--green-light); color: var(--green); }
+.status-badge.paid { background: var(--green-light); color: var(--green); }
 .status-badge.rejected { background: var(--red-light); color: var(--red); }
 
 .payment-details { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }

@@ -7,8 +7,7 @@ import {
   LogOut, Award, MapPin, Phone, Mail, Building2,
   CalendarDays, CheckCircle, AlertCircle, Clock,
   Download, RefreshCw, ChevronRight, Wallet,
-  FileCheck, FileClock, TrendingUp, BookOpen, Scale, Handshake, Files,
-  MessageSquare,
+  FileCheck, FileClock, TrendingUp, MessageSquare,
 } from 'lucide-vue-next'
 
 definePage({
@@ -67,35 +66,7 @@ const documents   = ref<Document[]>([])
 const stats       = ref<Stats | null>(null)
 
 const isLoading   = ref(true)
-const activeTab   = ref<'profile' | 'membership' | 'payments' | 'documents' | 'legal'>('profile')
-
-// ─── Legal Library ───────────────────────────────────────────────────────────
-interface LegalGroup {
-  category: string
-  category_label: string
-  files: LegalItem[]
-}
-interface LegalItem {
-  id: number; title: string; title_en: string | null
-  description: string | null; category: string; category_label: string
-  url: string; mime_type: string; formatted_size: string; created_at: string
-}
-
-const legalGroups = ref<LegalGroup[]>([])
-const legalLoading = ref(false)
-const activeLegalCat = ref<string>('')
-
-const legalCatMeta: Record<string, { icon: any; color: string }> = {
-  legislation: { icon: Scale,     color: '#1a237e' },
-  mou:         { icon: Handshake, color: '#2e7d32' },
-  other:       { icon: Files,     color: '#6b7280' },
-}
-
-const activeLegalGroup = computed(() => {
-  if (!activeLegalCat.value && legalGroups.value.length)
-    return legalGroups.value[0]
-  return legalGroups.value.find(g => g.category === activeLegalCat.value) ?? null
-})
+const activeTab   = ref<'profile' | 'membership' | 'payments' | 'documents'>('profile')
 
 // ─── Fetch ─────────────────────────────────────────────────────────────────────
 const BASE = import.meta.env.VITE_API_BASE_URL ?? ''
@@ -126,22 +97,15 @@ async function fetchTab(tab: typeof activeTab.value) {
     const r = await axios.get(`${BASE}/api/v1/contractor/documents`, { headers: apiHeaders() })
     documents.value = r.data.items
   }
-  if (tab === 'legal' && !legalGroups.value.length) {
-    legalLoading.value = true
-    try {
-      const r = await axios.get(`${BASE}/api/v1/legal-files`)
-      legalGroups.value = r.data.items?.groups ?? []
-      if (legalGroups.value.length) activeLegalCat.value = legalGroups.value[0].category
-    } finally {
-      legalLoading.value = false
-    }
-  }
 }
 
 onMounted(async () => {
   token.value = getToken()
   if (!token.value) { authError.value = true; isLoading.value = false; return }
   await fetchDashboard()
+  const requestedTab = new URLSearchParams(window.location.search).get('tab')
+  if (requestedTab && ['profile', 'membership', 'payments', 'documents'].includes(requestedTab))
+    await fetchTab(requestedTab as typeof activeTab.value)
   isLoading.value = false
 })
 
@@ -194,8 +158,8 @@ const daysUntilExpiry = computed(() => {
     <div v-if="authError" class="auth-wall">
       <img src="/logo.png" alt="الاتحاد" class="aw-logo" />
       <h2>يجب تسجيل الدخول أولاً</h2>
-      <p>سجّل دخولك من الصفحة الرئيسية للوصول إلى لوحتك الشخصية.</p>
-      <RouterLink to="/landing" class="aw-btn">العودة للصفحة الرئيسية</RouterLink>
+      <p>سجّل دخولك للوصول إلى لوحتك الشخصية.</p>
+      <RouterLink to="/contractor/login" class="aw-btn">تسجيل الدخول</RouterLink>
     </div>
 
     <!-- ─── Loading ─── -->
@@ -269,29 +233,29 @@ const daysUntilExpiry = computed(() => {
           </div>
         </div>
 
-        <!-- ─── Quick Links ─── -->
+        <!-- ─── Quick Links (الخدمات) ─── -->
         <div class="quick-links">
           <RouterLink to="/contractor/payment-gateway" class="ql-card">
-            <div class="ql-ico" style="--qic:#fce4ec;--qicc:#c62828"><CreditCard :size="20" /></div>
-            <div>
-              <p class="ql-label">بوابة الدفع</p>
-              <p class="ql-desc">احول المبلغ للحساب البنكي</p>
+            <div class="ql-ico" style="--qic:#fce4ec;--qicc:#c62828"><RefreshCw :size="20" /></div>
+            <div class="ql-txt">
+              <p class="ql-label">تجديد العضوية</p>
+              <p class="ql-desc">دفع رسوم الاشتراك</p>
             </div>
             <ChevronRight :size="16" class="ql-arrow" />
           </RouterLink>
           <RouterLink to="/contractor/support" class="ql-card">
             <div class="ql-ico" style="--qic:#f3e5f5;--qicc:#6a1b9a"><MessageSquare :size="20" /></div>
-            <div>
+            <div class="ql-txt">
               <p class="ql-label">الدعم الفني</p>
-              <p class="ql-desc">أرسل شكوى أو استفسار</p>
+              <p class="ql-desc">شكوى أو استفسار</p>
             </div>
             <ChevronRight :size="16" class="ql-arrow" />
           </RouterLink>
           <RouterLink to="/contractor/certificate-request" class="ql-card">
             <div class="ql-ico" style="--qic:#e8f5e9;--qicc:#2e7d32"><Award :size="20" /></div>
-            <div>
+            <div class="ql-txt">
               <p class="ql-label">طلب شهادة</p>
-              <p class="ql-desc">اطلب شهادة الانتساب</p>
+              <p class="ql-desc">شهادة الانتساب</p>
             </div>
             <ChevronRight :size="16" class="ql-arrow" />
           </RouterLink>
@@ -309,7 +273,6 @@ const daysUntilExpiry = computed(() => {
                   { id:'membership', label:'العضوية والاشتراك',  icon: Award },
                   { id:'payments',   label:'المعاملات المالية',  icon: CreditCard },
                   { id:'documents',  label:'الوثائق والملفات',   icon: FileText },
-                  { id:'legal',      label:'المكتبة القانونية',  icon: BookOpen },
                 ]"
                 :key="tab.id"
                 class="side-btn"
@@ -417,10 +380,12 @@ const daysUntilExpiry = computed(() => {
                 <div class="renew-icon"><RefreshCw :size="22" /></div>
                 <div class="renew-text">
                   <p class="renew-title">تجديد العضوية</p>
-                  <p class="renew-sub">لتجديد عضويتك أو الاستفسار عن رسوم الاشتراك، تواصل مع إدارة الاتحاد عبر:</p>
+                  <p class="renew-sub">جدّد عضويتك إلكترونياً — حوّل رسوم الاشتراك بنكياً وارفع إشعار التحويل، وسيتم التأكيد خلال 24 ساعة.</p>
                   <div class="renew-contacts">
-                    <a href="tel:+97020000000" class="renew-link"><Phone :size="13" /> +970 2 000 0000</a>
-                    <a href="mailto:info@pcu.ps" class="renew-link"><Mail :size="13" /> info@pcu.ps</a>
+                    <RouterLink to="/contractor/payment-gateway" class="renew-btn">
+                      <RefreshCw :size="14" /> تجديد العضوية الآن
+                    </RouterLink>
+                    <a href="tel:+97020000000" class="renew-link"><Phone :size="13" /> للاستفسار: +970 2 000 0000</a>
                   </div>
                 </div>
               </div>
@@ -504,64 +469,6 @@ const daysUntilExpiry = computed(() => {
                 <p>لا توجد وثائق مرفوعة بعد</p>
                 <p class="es-sub">ستظهر هنا وثائقك الرسمية وشهادات التصنيف</p>
               </div>
-            </div>
-
-            <!-- ══ Legal Library ══ -->
-            <div v-else-if="activeTab === 'legal'" class="tab-content">
-              <h2 class="tab-title"><BookOpen :size="20" /> المكتبة القانونية</h2>
-
-              <!-- Loading -->
-              <div v-if="legalLoading" class="empty-state">
-                <div class="spinner" style="margin:0 auto" />
-              </div>
-
-              <!-- Empty -->
-              <div v-else-if="!legalGroups.length" class="empty-state">
-                <BookOpen :size="44" class="es-ico" />
-                <p>لا توجد ملفات في المكتبة القانونية بعد</p>
-                <p class="es-sub">ستظهر هنا التشريعات ومذكرات التفاهم والملفات القانونية الخاصة بالاتحاد</p>
-              </div>
-
-              <template v-else>
-                <!-- Category tabs -->
-                <div class="legal-tabs">
-                  <button
-                    v-for="g in legalGroups"
-                    :key="g.category"
-                    class="leg-tab-btn"
-                    :class="{ active: activeLegalCat === g.category }"
-                    @click="activeLegalCat = g.category"
-                  >
-                    <component :is="legalCatMeta[g.category]?.icon ?? Files" :size="15" />
-                    <span>{{ g.category_label }}</span>
-                    <span class="leg-tab-count">{{ g.files.length }}</span>
-                  </button>
-                </div>
-
-                <!-- Files list -->
-                <div v-if="activeLegalGroup" class="legal-file-list">
-                  <div
-                    v-for="f in activeLegalGroup.files"
-                    :key="f.id"
-                    class="legal-file-card"
-                  >
-                    <div class="lf-icon" :style="`color:${legalCatMeta[f.category]?.color ?? '#6b7280'}`">
-                      <FileCheck :size="26" />
-                    </div>
-                    <div class="lf-info">
-                      <p class="lf-title">{{ f.title }}</p>
-                      <p v-if="f.description" class="lf-desc">{{ f.description }}</p>
-                      <p class="lf-meta">{{ f.category_label }} · {{ f.formatted_size }}</p>
-                    </div>
-                    <div class="lf-actions">
-                      <a :href="f.url" target="_blank" class="lf-btn view">عرض</a>
-                      <a :href="f.url" :download="f.title" class="lf-btn download">
-                        <Download :size="13" /> تحميل
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              </template>
             </div>
 
           </main>
@@ -648,14 +555,15 @@ const daysUntilExpiry = computed(() => {
 .ss-val { font-size: 1.1rem; font-weight: 800; color: var(--text-h); }
 
 /* ─── Quick Links ─────────────────────────────────────────────────────────── */
-.quick-links { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; margin-bottom: 2rem; }
-.ql-card { background: #fff; border: 1.5px solid var(--border); border-radius: 14px; padding: 1.25rem; display: flex; align-items: center; gap: 1rem; text-decoration: none; color: inherit; transition: all .2s; }
+.quick-links { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; margin-bottom: 1.75rem; }
+.ql-card { display: flex; align-items: center; gap: 1rem; background: #fff; border: 1.5px solid var(--border); border-radius: 14px; padding: 1.1rem 1.25rem; text-decoration: none; color: inherit; transition: box-shadow .2s, border-color .2s; }
 .ql-card:hover { box-shadow: 0 6px 20px rgba(26,35,126,.12); border-color: #c5cae9; }
-.ql-ico { width: 48px; height: 48px; border-radius: 12px; background: var(--qic); color: var(--qicc); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.ql-label { font-size: .9rem; font-weight: 800; color: var(--text-h); margin-bottom: .2rem; }
-.ql-desc { font-size: .8rem; color: var(--text-m); }
-.ql-arrow { margin-inline-start: auto; opacity: .4; transition: opacity .2s; flex-shrink: 0; }
-.ql-card:hover .ql-arrow { opacity: 1; }
+.ql-ico { width: 44px; height: 44px; border-radius: 11px; background: var(--qic); color: var(--qicc); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.ql-txt { flex: 1; min-width: 0; }
+.ql-label { font-size: .92rem; font-weight: 800; color: var(--text-h); }
+.ql-desc { font-size: .78rem; color: var(--text-m); margin-top: .15rem; }
+.ql-arrow { color: var(--text-m); opacity: .5; flex-shrink: 0; }
+.ql-card:hover .ql-arrow { opacity: 1; color: var(--navy); }
 
 /* ─── Layout ─────────────────────────────────────────────────────────────── */
 .cpd-layout { display: grid; grid-template-columns: 240px 1fr; gap: 1.5rem; align-items: start; }
@@ -718,6 +626,8 @@ const daysUntilExpiry = computed(() => {
 .renew-contacts { display: flex; gap: 1rem; flex-wrap: wrap; }
 .renew-link { display: flex; align-items: center; gap: .35rem; color: var(--navy); font-size: .82rem; font-weight: 600; text-decoration: none; }
 .renew-link:hover { text-decoration: underline; }
+.renew-btn { display: inline-flex; align-items: center; gap: .45rem; background: var(--navy); color: #fff; border-radius: 9px; padding: .55rem 1.25rem; font-size: .85rem; font-weight: 700; text-decoration: none; transition: background .2s; }
+.renew-btn:hover { background: var(--navy-mid, #3949ab); }
 
 .sec-title { font-size: .9rem; font-weight: 700; color: var(--text-h); margin-bottom: 1rem; }
 
@@ -763,30 +673,6 @@ const daysUntilExpiry = computed(() => {
 /* ─── Footer ──────────────────────────────────────────────────────────────── */
 .cpd-footer { text-align: center; padding: 1.25rem; font-size: .78rem; color: var(--text-m); border-top: 1px solid var(--border); background: #fff; }
 
-/* ─── Legal Library ────────────────────────────────────────────────────────── */
-.legal-tabs { display: flex; gap: .5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
-.leg-tab-btn { display: flex; align-items: center; gap: .5rem; padding: .55rem 1rem; border: 1.5px solid var(--border); border-radius: 50px; background: #fff; font-family: inherit; font-size: .83rem; font-weight: 600; color: var(--text-b); cursor: pointer; transition: all .2s; }
-.leg-tab-btn.active { background: var(--navy); border-color: var(--navy); color: #fff; }
-.leg-tab-btn:hover:not(.active) { background: var(--navy-light); border-color: var(--navy-mid); color: var(--navy); }
-.leg-tab-count { background: rgba(0,0,0,.08); border-radius: 50px; padding: .05rem .45rem; font-size: .72rem; font-weight: 700; }
-.leg-tab-btn.active .leg-tab-count { background: rgba(255,255,255,.25); }
-
-.legal-file-list { display: flex; flex-direction: column; gap: .75rem; }
-.legal-file-card { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.25rem; border: 1.5px solid var(--border); border-radius: 12px; background: #fff; transition: box-shadow .2s, border-color .2s; }
-.legal-file-card:hover { box-shadow: 0 4px 16px rgba(26,35,126,.09); border-color: #c5cae9; }
-.lf-icon { width: 48px; height: 48px; border-radius: 12px; background: var(--navy-light); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.lf-info { flex: 1; min-width: 0; }
-.lf-title { font-size: .9rem; font-weight: 700; color: var(--text-h); margin-bottom: .2rem; }
-.lf-desc { font-size: .78rem; color: var(--text-m); margin-bottom: .2rem; line-height: 1.5; }
-.lf-meta { font-size: .74rem; color: var(--text-m); }
-.lf-actions { display: flex; gap: .5rem; flex-shrink: 0; }
-.lf-btn { display: inline-flex; align-items: center; gap: .3rem; padding: .4rem .9rem; border-radius: 8px; font-size: .78rem; font-weight: 700; text-decoration: none; font-family: inherit; cursor: pointer; transition: all .2s; white-space: nowrap; }
-.lf-btn.view { background: var(--navy-light); color: var(--navy); border: 1.5px solid #c5cae9; }
-.lf-btn.view:hover { background: var(--navy); color: #fff; border-color: var(--navy); }
-.lf-btn.download { background: #fff; color: var(--text-m); border: 1.5px solid var(--border); }
-.lf-btn.download:hover { background: var(--green-light); color: var(--green); border-color: #a5d6a7; }
-
-
 /* ─── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
   .stats-strip { grid-template-columns: repeat(2,1fr); }
@@ -802,7 +688,6 @@ const daysUntilExpiry = computed(() => {
 }
 @media (max-width: 600px) {
   .stats-strip { grid-template-columns: 1fr 1fr; }
-  .quick-links { grid-template-columns: 1fr; }
   .hdr-info { display: none; }
   .tab-content { padding: 1.25rem; }
   .mem-banner { flex-direction: column; }

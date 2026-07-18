@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import axios from 'axios'
 import {
   LogOut, Send, CheckCircle, AlertCircle, MessageSquare,
-  Phone, Mail, MessageCircle, FileText, Clock,
+  Phone, Mail, MessageCircle, FileText,
 } from 'lucide-vue-next'
 
 definePage({
@@ -21,21 +21,22 @@ interface SupportTicket {
   id: number
   subject: string
   category: string
-  description: string
+  category_label: string
+  message: string
+  attachment_url: string | null
   status: string
-  priority: string
-  response: string | null
-  attachments_count: number
-  created_at: string
-  updated_at: string
+  status_label: string
+  reply: string | null
+  replied_by: string | null
   replied_at: string | null
+  created_at: string
 }
 
 interface Contractor {
   name: string
   membership_number: string
-  email: string
-  phone: string
+  email?: string
+  phone?: string
 }
 
 const contractor = ref<Contractor | null>(null)
@@ -43,22 +44,22 @@ const tickets = ref<SupportTicket[]>([])
 const activeTab = ref<'new' | 'tickets'>('new')
 const showSuccess = ref(false)
 const errorMessage = ref('')
+// Ticket detail view state
+const selectedTicket = ref<SupportTicket | null>(null)
+const isTicketDetailOpen = ref(false)
 
 const form = ref({
   subject: '',
   category: '',
-  description: '',
-  attachments: [] as File[],
+  message: '',
+  attachment: null as File | null,
 })
 
-const previewAttachments = ref<{ file: File; preview: string }[]>([])
-
 const categories = [
-  { value: 'billing', label: 'مشاكل الفواتير والدفع' },
-  { value: 'membership', label: 'مشاكل العضوية' },
-  { value: 'technical', label: 'مشاكل فنية' },
+  { value: 'technical', label: 'مشكلة فنية' },
   { value: 'complaint', label: 'شكوى' },
   { value: 'inquiry', label: 'استفسار' },
+  { value: 'suggestion', label: 'اقتراح' },
   { value: 'other', label: 'أخرى' },
 ]
 
@@ -79,9 +80,12 @@ function logout() {
 
 async function fetchData() {
   try {
-    const r = await axios.get(`${BASE}/api/v1/contractor/support`, { headers: apiHeaders() })
-    contractor.value = r.data.items?.contractor ?? null
-    tickets.value = r.data.items?.tickets ?? []
+    const [dashRes, tRes] = await Promise.all([
+      axios.get(`${BASE}/api/v1/contractor/dashboard`, { headers: apiHeaders() }),
+      axios.get(`${BASE}/api/v1/contractor/support-tickets`, { headers: apiHeaders() }),
+    ])
+    contractor.value = dashRes.data.items?.contractor ?? null
+    tickets.value = tRes.data.items ?? []
   } catch (e: any) {
     if (e?.response?.status === 401) authError.value = true
   } finally {
@@ -91,27 +95,28 @@ async function fetchData() {
 
 function onAttachmentSelected(event: Event) {
   const input = event.target as HTMLInputElement
-  const files = input.files
-  if (!files) return
+  const file = input.files?.[0]
+  if (!file) return
 
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i]
-    if (file.size > 10 * 1024 * 1024) {
-      errorMessage.value = `الملف ${file.name} كبير جداً (أقصى 10MB)`
-      continue
-    }
-    form.value.attachments.push(file)
-    previewAttachments.value.push({ file, preview: file.name })
+  const okTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'application/pdf']
+  if (!okTypes.includes(file.type)) {
+    errorMessage.value = 'الرجاء اختيار صورة (PNG/JPG/WebP) أو ملف PDF'
+    return
   }
+  if (file.size > 5 * 1024 * 1024) {
+    errorMessage.value = `الملف ${file.name} كبير جداً (أقصى 5MB)`
+    return
+  }
+  form.value.attachment = file
+  errorMessage.value = ''
 }
 
-function removeAttachment(index: number) {
-  previewAttachments.value.splice(index, 1)
-  form.value.attachments.splice(index, 1)
+function removeAttachment() {
+  form.value.attachment = null
 }
 
 async function submitTicket() {
-  if (!form.value.subject || !form.value.category || !form.value.description) {
+  if (!form.value.subject || !form.value.category || !form.value.message) {
     errorMessage.value = 'الرجاء ملء جميع الحقول المطلوبة'
     return
   }
@@ -122,23 +127,23 @@ async function submitTicket() {
   const formData = new FormData()
   formData.append('subject', form.value.subject)
   formData.append('category', form.value.category)
-  formData.append('description', form.value.description)
-
-  for (const file of form.value.attachments) {
-    formData.append('attachments[]', file)
-  }
+  formData.append('message', form.value.message)
+  if (form.value.attachment) formData.append('attachment', form.value.attachment)
 
   try {
-    const r = await axios.post(`${BASE}/api/v1/contractor/support/create`, formData, {
+    const r = await axios.post(`${BASE}/api/v1/contractor/support-tickets`, formData, {
       headers: { ...apiHeaders(), 'Content-Type': 'multipart/form-data' },
     })
     showSuccess.value = true
-    form.value = { subject: '', category: '', description: '', attachments: [] }
-    previewAttachments.value = []
-    tickets.value.unshift(r.data.items?.ticket ?? {})
+    form.value = { subject: '', category: '', message: '', attachment: null }
+    if (r.data.items) tickets.value.unshift(r.data.items)
     setTimeout(() => { activeTab.value = 'tickets'; showSuccess.value = false }, 2000)
   } catch (e: any) {
-    errorMessage.value = e?.response?.data?.message ?? 'حدث خطأ أثناء إنشاء الطلب'
+    if (e?.response?.status === 422 && e.response.data?.errors) {
+      errorMessage.value = Object.values(e.response.data.errors).flat().join(' — ')
+    } else {
+      errorMessage.value = e?.response?.data?.message ?? 'حدث خطأ أثناء إنشاء الطلب'
+    }
   } finally {
     isSending.value = false
   }
@@ -155,6 +160,31 @@ onMounted(async () => {
   if (!token.value) { authError.value = true; isLoading.value = false; return }
   await fetchData()
 })
+
+function statusClass(s: string) {
+  if (s === 'answered') return 'resolved'
+  if (s === 'closed') return 'closed'
+  if (s === 'in_progress') return 'in_progress'
+  return 'open'
+}
+
+function formatDate(date: string) {
+  return new Date(date).toLocaleDateString('ar-PS', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+// --- Ticket detail modal ---
+const isViewOpen = ref(false)
+const selectedTicket = ref<SupportTicket | null>(null)
+
+function openTicketDetail(ticket: SupportTicket) {
+  selectedTicket.value = ticket
+  isTicketDetailOpen.value = true
+}
+
+function closeTicketDetail() {
+  selectedTicket.value = null
+  isTicketDetailOpen.value = false
+}
 </script>
 
 <template>
@@ -164,7 +194,7 @@ onMounted(async () => {
       <img src="/logo.png" alt="الاتحاد" class="aw-logo" />
       <h2>يجب تسجيل الدخول أولاً</h2>
       <p>سجّل دخولك للوصول إلى خدمة الدعم الفني.</p>
-      <RouterLink to="/landing" class="aw-btn">العودة للصفحة الرئيسية</RouterLink>
+      <RouterLink to="/contractor/login" class="aw-btn">تسجيل الدخول</RouterLink>
     </div>
 
     <!-- ─── Loading ─── -->
@@ -281,11 +311,11 @@ onMounted(async () => {
               </select>
             </div>
 
-            <!-- Description -->
+            <!-- Message -->
             <div class="form-group full">
               <label>التفاصيل *</label>
               <textarea
-                v-model="form.description"
+                v-model="form.message"
                 placeholder="شرح تفصيلي للمشكلة أو الشكوى..."
                 required
                 rows="8"
@@ -293,28 +323,28 @@ onMounted(async () => {
               />
             </div>
 
-            <!-- Attachments -->
+            <!-- Attachment (single) -->
             <div class="form-group full">
-              <label>المرفقات (اختياري)</label>
+              <label>مرفق (اختياري)</label>
               <div class="file-upload-area" @click="$refs.fileInput?.click()">
                 <FileText :size="32" class="upload-icon" />
-                <p class="upload-text">اسحب الملفات هنا أو اضغط للاختيار</p>
-                <p class="upload-hint">حتى 5 ملفات · أقصى حجم 10MB لكل ملف</p>
+                <p class="upload-text">اضغط لاختيار ملف</p>
+                <p class="upload-hint">PNG, JPG, WebP أو PDF · أقصى حجم 5MB</p>
                 <input
                   ref="fileInput"
                   type="file"
-                  multiple
+                  accept="image/*,application/pdf"
                   hidden
                   @change="onAttachmentSelected"
                 />
               </div>
 
-              <!-- Attachments Preview -->
-              <div v-if="previewAttachments.length" class="attachments-list">
-                <div v-for="(item, idx) in previewAttachments" :key="idx" class="attachment-item">
+              <!-- Attachment chip -->
+              <div v-if="form.attachment" class="attachments-list">
+                <div class="attachment-item">
                   <FileText :size="16" />
-                  <span class="file-name">{{ item.preview }}</span>
-                  <button type="button" class="remove-btn" @click="removeAttachment(idx)">✕</button>
+                  <span class="file-name">{{ form.attachment.name }}</span>
+                  <button type="button" class="remove-btn" @click="removeAttachment">✕</button>
                 </div>
               </div>
             </div>
@@ -337,42 +367,43 @@ onMounted(async () => {
           </div>
 
           <div v-else class="tickets-list">
-            <div v-for="ticket in tickets" :key="ticket.id" class="ticket-card">
+            <div
+              v-for="ticket in tickets"
+              :key="ticket.id"
+              class="ticket-card"
+              @click="openTicketDetail(ticket)"
+            >
               <div class="ticket-header">
                 <div>
                   <h3 class="ticket-subject">{{ ticket.subject }}</h3>
                   <p class="ticket-meta">{{ formatDate(ticket.created_at) }}</p>
                 </div>
-                <span class="status-badge" :class="ticket.status">
-                  {{ statusLabel[ticket.status] ?? ticket.status }}
+                <span class="status-badge" :class="statusClass(ticket.status)">
+                  {{ ticket.status_label ?? ticket.status }}
                 </span>
               </div>
 
               <div class="ticket-content">
-                <p>{{ ticket.description }}</p>
+                <p>{{ ticket.message }}</p>
               </div>
 
               <div class="ticket-footer">
                 <div class="ticket-info">
                   <span class="info-item">
                     <span class="label">الفئة:</span>
-                    <span class="value">{{ categoryLabel(ticket.category) }}</span>
+                    <span class="value">{{ ticket.category_label ?? ticket.category }}</span>
                   </span>
-                  <span class="info-item">
-                    <span class="label">الأولوية:</span>
-                    <span class="value" :class="`priority-${ticket.priority}`">
-                      {{ priorityLabel[ticket.priority] ?? ticket.priority }}
-                    </span>
-                  </span>
-                  <span v-if="ticket.attachments_count" class="info-item">
-                    <span class="label">المرفقات:</span>
-                    <span class="value">{{ ticket.attachments_count }}</span>
+                  <span v-if="ticket.attachment_url" class="info-item">
+                    <span class="label">المرفق:</span>
+                    <a :href="ticket.attachment_url" target="_blank" class="value attach-link">عرض المرفق</a>
                   </span>
                 </div>
-                <div v-if="ticket.response" class="response-section">
+                <div v-if="ticket.reply" class="response-section">
                   <p class="response-label">الرد من الإدارة:</p>
-                  <p class="response-text">{{ ticket.response }}</p>
-                  <p class="response-date">{{ formatDate(ticket.replied_at) }}</p>
+                  <p class="response-text">{{ ticket.reply }}</p>
+                  <p class="response-date">
+                    <template v-if="ticket.replied_by">{{ ticket.replied_by }} · </template>{{ formatDate(ticket.replied_at!) }}
+                  </p>
                 </div>
               </div>
             </div>
@@ -386,39 +417,40 @@ onMounted(async () => {
       </footer>
     </template>
   </div>
+
+  <!-- Ticket Detail Modal -->
+  <div v-if="isTicketDetailOpen" class="modal-overlay" @click="closeTicketDetail">
+    <div class="modal-content" @click.stop>
+      <div class="modal-header">
+        <h3>تذكرة #{{ selectedTicket?.id }}</h3>
+        <span class="badge" :class="statusClass(selectedTicket?.status)">
+          {{ selectedTicket?.status_label ?? selectedTicket?.status }}
+        </span>
+      </div>
+      <div class="modal-body">
+        <p><strong>الموضوع:</strong> {{ selectedTicket?.subject }}</p>
+        <p><strong>التاريخ:</strong> {{ formatDate(selectedTicket?.created_at) }}</p>
+        <p><strong>الفئة:</strong> {{ selectedTicket?.category_label ?? selectedTicket?.category }}</p>
+        <p><strong>الرسالة:</strong></p>
+        <p class="message-body" v-html="selectedTicket?.message"></p>
+        <div v-if="selectedTicket?.attachment_url" class="attachment">
+          <a :href="selectedTicket.attachment_url" target="_blank" class="attachment-link">عرض المرفق</a>
+        </div>
+        <div v-if="selectedTicket?.reply" class="reply-section">
+          <p><strong>رد الإدارة:</strong></p>
+          <p class="reply-text" v-html="selectedTicket.reply"></p>
+          <p class="reply-footer">
+            <span v-if="selectedTicket.replied_by">{{ selectedTicket.replied_by }} · </span>
+            {{ formatDate(selectedTicket.replied_at) }}
+          </p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-close" @click="closeTicketDetail">إغلاق</button>
+      </div>
+    </div>
+  </div>
 </template>
-
-<script setup lang="ts">
-const statusLabel: Record<string, string> = {
-  open: 'مفتوح',
-  in_progress: 'قيد المعالجة',
-  resolved: 'تم حله',
-  closed: 'مغلق',
-}
-
-const priorityLabel: Record<string, string> = {
-  low: 'منخفضة',
-  medium: 'عادية',
-  high: 'عالية',
-  urgent: 'عاجلة',
-}
-
-function categoryLabel(cat: string) {
-  const cats: Record<string, string> = {
-    billing: 'مشاكل الفواتير والدفع',
-    membership: 'مشاكل العضوية',
-    technical: 'مشاكل فنية',
-    complaint: 'شكوى',
-    inquiry: 'استفسار',
-    other: 'أخرى',
-  }
-  return cats[cat] ?? cat
-}
-
-function formatDate(date: string) {
-  return new Date(date).toLocaleDateString('ar-PS', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
-</script>
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
@@ -574,5 +606,91 @@ function formatDate(date: string) {
   .tab-content { padding: 1.25rem; }
   .ticket-header { flex-direction: column; }
   .status-badge { align-self: flex-start; }
+}
+
+/* Ticket Detail Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-h);
+}
+.modal-body {
+  padding: 1.5rem;
+}
+.modal-footer {
+  padding: 1.5rem;
+  text-align: right;
+  border-top: 1px solid var(--border);
+}
+.btn-close {
+  background: var(--navy);
+  color: white;
+  border: none;
+  padding: 0.5rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.btn-close:hover {
+  background: var(--navy-mid);
+}
+.message-body, .reply-text {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin: 0.5rem 0;
+  line-height: 1.6;
+}
+.attachment {
+  margin: 1rem 0;
+}
+.attachment-link {
+  color: var(--navy);
+  text-decoration: underline;
+}
+.attachment-link:hover {
+  opacity: 0.8;
+}
+.reply-section {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+.reply-section p {
+  margin: 0 0 0.5rem 0;
+}
+.reply-section .reply-text {
+  background: var(--navy-soft);
+  padding: 0.75rem;
+  border-radius: 8px;
+}
+.reply-footer {
+  font-size: .85rem;
+  color: var(--text-m);
+  margin-top: 0.5rem;
 }
 </style>
