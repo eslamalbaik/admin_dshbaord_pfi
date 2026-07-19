@@ -59,6 +59,12 @@ class LegacyDuesImporter
                 ->orWhere('membership_number', (string) (int) $number)
                 ->first();
 
+            // مطابقة ثانية برقم المشتغل المرخص (السجل التجاري) — أرقام العضوية
+            // القديمة قد تكون بصيغ مختلفة في قاعدة البيانات
+            if (! $contractor && ! empty($company['licensed_number'])) {
+                $contractor = Contractor::where('commercial_register', $company['licensed_number'])->first();
+            }
+
             if ($contractor) {
                 $company['contractor_id']   = $contractor->id;
                 $company['contractor_name'] = $contractor->name;
@@ -106,19 +112,30 @@ class LegacyDuesImporter
             // إنشاء الشركات غير الموجودة من بيانات الكشف ثم ضمّها للمطابَقة
             if ($createMissing) {
                 foreach ($unmatched as $company) {
-                    $contractor = Contractor::create([
-                        'name'                => $company['name'],
-                        'membership_number'   => $company['membership_number'] !== '' ? $company['membership_number'] : null,
-                        'authorized_person'   => $company['authorized_person'] ?? null,
-                        'commercial_register' => $company['licensed_number'] ?? null,
-                        'trade'               => $company['first_trade'] ?? null,
-                        'classification'      => $company['first_grade'] ?? null,
-                        'status'              => 'active',
-                    ]);
+                    // حماية أخيرة من التكرار: قد يكون الرقم/السجل ظهر أثناء نفس الاستيراد
+                    $contractor = null;
+                    if (! empty($company['licensed_number'])) {
+                        $contractor = Contractor::where('commercial_register', $company['licensed_number'])->first();
+                    }
+                    if (! $contractor && $company['membership_number'] !== '') {
+                        $contractor = Contractor::where('membership_number', $company['membership_number'])->first();
+                    }
+
+                    if (! $contractor) {
+                        $contractor = Contractor::create([
+                            'name'                => $company['name'],
+                            'membership_number'   => $company['membership_number'] !== '' ? $company['membership_number'] : null,
+                            'authorized_person'   => $company['authorized_person'] ?? null,
+                            'commercial_register' => $company['licensed_number'] ?? null,
+                            'trade'               => $company['first_trade'] ?? null,
+                            'classification'      => $company['first_grade'] ?? null,
+                            'status'              => 'active',
+                        ]);
+                        $contractorsCreated++;
+                    }
 
                     $company['contractor_id'] = $contractor->id;
                     $matched[] = $company;
-                    $contractorsCreated++;
                 }
             }
 
