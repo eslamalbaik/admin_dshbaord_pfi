@@ -99,6 +99,30 @@ async function fetchTab(tab: typeof activeTab.value) {
   }
 }
 
+// ─── الملف المالي: الذمم المستحقّة بتفاصيلها ───
+interface DueRow {
+  id: number
+  year: number | null
+  description: string
+  amount_jod: string
+  paid_jod: string
+  remaining_jod: number
+  status: string
+  status_label: string
+}
+
+const dues = ref<DueRow[]>([])
+const outstandingDues = ref(0)
+
+async function fetchFinancial() {
+  try {
+    const r = await axios.get(`${BASE}/api/v1/contractor/financial`, { headers: apiHeaders() })
+    dues.value = r.data.items?.dues ?? []
+    outstandingDues.value = Number(r.data.items?.summary?.outstanding_dues_jod ?? 0)
+  }
+  catch {}
+}
+
 // ─── العطاءات المنشورة وآخر الأخبار (عامة — بلا توكن) ───
 const latestTenders = ref<any[]>([])
 const latestNews = ref<any[]>([])
@@ -119,6 +143,7 @@ onMounted(async () => {
   token.value = getToken()
   if (!token.value) { authError.value = true; isLoading.value = false; return }
   fetchPublicFeeds()
+  fetchFinancial()
   await fetchDashboard()
   const requestedTab = new URLSearchParams(window.location.search).get('tab')
   if (requestedTab && ['profile', 'membership', 'payments', 'documents'].includes(requestedTab))
@@ -213,6 +238,67 @@ const daysUntilExpiry = computed(() => {
 
       <div class="cpd-container cpd-body">
 
+        <!-- ─── Hero: بطاقة الشركة ─── -->
+        <div class="hero-card">
+          <div class="hero-right">
+            <div class="hero-av">{{ contractor.name.charAt(0) }}</div>
+            <div>
+              <p class="hero-name">{{ contractor.name }}</p>
+              <p class="hero-meta">
+                رقم العضوية: {{ contractor.membership_number }}
+                <span v-if="contractor.classification" class="hero-sep">·</span>
+                {{ contractor.classification }}
+              </p>
+              <span
+                class="hero-status"
+                :class="membership ? 'st-active' : 'st-off'"
+              >
+                {{ membership ? 'عضوية فعّالة' : 'عضوية غير مفعّلة' }}
+              </span>
+            </div>
+          </div>
+          <div class="hero-actions">
+            <RouterLink to="/contractor/certificate-request" class="hero-btn hero-btn-gold">
+              <Award :size="15" /> طلب شهادة عضوية
+            </RouterLink>
+            <button class="hero-btn hero-btn-ghost" @click="fetchTab('profile')">
+              عرض الملف الكامل
+            </button>
+          </div>
+        </div>
+
+        <!-- ─── تنبيه الذمم المالية + تفاصيلها ─── -->
+        <div v-if="outstandingDues > 0" class="dues-card">
+          <div class="dues-head">
+            <div>
+              <p class="dues-title"><AlertCircle :size="17" /> ذمم مالية مستحقّة عليك</p>
+              <p class="dues-sub">رسوم سنوات سابقة يجب تسويتها لتفعيل/تجديد العضوية — القيم بالدينار الأردني</p>
+            </div>
+            <div class="dues-total">
+              <span class="dues-total-val">{{ outstandingDues }} د.أ</span>
+              <RouterLink to="/contractor/payment-gateway" class="dues-pay-btn">
+                سداد الآن
+              </RouterLink>
+            </div>
+          </div>
+          <div class="dues-table">
+            <div class="dues-tr dues-th">
+              <span>السنة</span><span>البيان</span><span>المبلغ</span><span>المسدَّد</span><span>المتبقي</span><span>الحالة</span>
+            </div>
+            <div v-for="d in dues" :key="d.id" class="dues-tr">
+              <span>{{ d.year ?? '—' }}</span>
+              <span class="dues-desc">{{ d.description }}</span>
+              <span>{{ d.amount_jod }}</span>
+              <span>{{ d.paid_jod }}</span>
+              <span :class="d.remaining_jod > 0 ? 'txt-red' : 'txt-green'">{{ d.remaining_jod }}</span>
+              <span
+                class="dues-chip"
+                :class="d.status === 'paid' ? 'chip-green' : d.status === 'partially_paid' ? 'chip-amber' : 'chip-red'"
+              >{{ d.status_label }}</span>
+            </div>
+          </div>
+        </div>
+
         <!-- ─── Stats Strip ─── -->
         <div class="stats-strip">
           <div class="ss-card">
@@ -222,8 +308,15 @@ const daysUntilExpiry = computed(() => {
               <p class="ss-val">{{ fmtMoney(stats?.total_payments) }}</p>
             </div>
           </div>
+          <div class="ss-card" :class="{ 'ss-expiring': outstandingDues > 0 }">
+            <div class="ss-ico" style="--sic:#ffebee;--sicc:#c62828"><AlertCircle :size="20" /></div>
+            <div>
+              <p class="ss-label">ذمم مستحقّة</p>
+              <p class="ss-val">{{ outstandingDues > 0 ? `${outstandingDues} د.أ` : 'لا شيء ✓' }}</p>
+            </div>
+          </div>
           <div class="ss-card">
-            <div class="ss-ico" style="--sic:#fff8e1;--sicc:#e65100"><AlertCircle :size="20" /></div>
+            <div class="ss-ico" style="--sic:#fff8e1;--sicc:#e65100"><Wallet :size="20" /></div>
             <div>
               <p class="ss-label">مدفوعات معلّقة</p>
               <p class="ss-val">{{ stats?.pending_payments ?? 0 }}</p>
@@ -601,7 +694,45 @@ const daysUntilExpiry = computed(() => {
 .cpd-body { padding: 1.75rem 1.5rem 3rem; }
 
 /* ─── Stats Strip ─────────────────────────────────────────────────────────── */
-.stats-strip { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; margin-bottom: 1.75rem; }
+.stats-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.75rem; }
+
+/* ─── Hero بطاقة الشركة ─── */
+.hero-card { display: flex; align-items: center; justify-content: space-between; gap: 1.25rem; flex-wrap: wrap; background: linear-gradient(135deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); border-radius: 18px; padding: 1.5rem 1.75rem; margin-bottom: 1.75rem; color: #fff; }
+.hero-right { display: flex; align-items: center; gap: 1rem; }
+.hero-av { width: 58px; height: 58px; border-radius: 50%; background: rgba(255,255,255,.15); border: 2px solid rgba(255,255,255,.35); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; font-weight: 900; flex-shrink: 0; }
+.hero-name { font-size: 1.15rem; font-weight: 900; }
+.hero-meta { font-size: .8rem; color: rgba(255,255,255,.75); margin-top: .2rem; }
+.hero-sep { margin: 0 .35rem; }
+.hero-status { display: inline-block; font-size: .72rem; font-weight: 800; border-radius: 50px; padding: .18rem .7rem; margin-top: .45rem; }
+.st-active { background: rgba(76,175,80,.2); color: #a5d6a7; border: 1px solid rgba(165,214,167,.4); }
+.st-off { background: rgba(244,67,54,.18); color: #ef9a9a; border: 1px solid rgba(239,154,154,.4); }
+.hero-actions { display: flex; gap: .6rem; flex-wrap: wrap; }
+.hero-btn { display: inline-flex; align-items: center; gap: .4rem; border-radius: 10px; padding: .6rem 1.1rem; font-size: .83rem; font-weight: 800; text-decoration: none; cursor: pointer; border: none; font-family: inherit; }
+.hero-btn-gold { background: #f9a825; color: #0d1b4b; }
+.hero-btn-gold:hover { filter: brightness(1.08); }
+.hero-btn-ghost { background: transparent; color: #fff; border: 1.5px solid rgba(255,255,255,.4); }
+.hero-btn-ghost:hover { background: rgba(255,255,255,.1); }
+
+/* ─── قسم الذمم ─── */
+.dues-card { background: #fff; border: 1.5px solid #ffcdd2; border-radius: 16px; margin-bottom: 1.75rem; overflow: hidden; }
+.dues-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; padding: 1.1rem 1.4rem; background: #fff5f5; border-bottom: 1px solid #ffcdd2; }
+.dues-title { display: flex; align-items: center; gap: .45rem; font-size: .98rem; font-weight: 900; color: #b71c1c; }
+.dues-sub { font-size: .78rem; color: #8d6e63; margin-top: .25rem; }
+.dues-total { display: flex; align-items: center; gap: .9rem; }
+.dues-total-val { font-size: 1.35rem; font-weight: 900; color: #b71c1c; }
+.dues-pay-btn { background: #c62828; color: #fff; border-radius: 10px; padding: .55rem 1.2rem; font-size: .82rem; font-weight: 800; text-decoration: none; }
+.dues-pay-btn:hover { filter: brightness(1.1); }
+.dues-table { padding: .4rem 1.4rem 1rem; }
+.dues-tr { display: grid; grid-template-columns: 70px 1fr 90px 90px 90px 110px; gap: .5rem; align-items: center; padding: .55rem 0; border-bottom: 1px solid #f5f5f5; font-size: .83rem; color: #37474f; }
+.dues-th { font-size: .74rem; font-weight: 800; color: #90a4ae; border-bottom: 1.5px solid #eceff1; }
+.dues-desc { font-weight: 600; }
+.txt-red { color: #c62828; font-weight: 800; }
+.txt-green { color: #2e7d32; font-weight: 800; }
+.dues-chip { font-size: .72rem; font-weight: 800; border-radius: 50px; padding: .2rem .6rem; text-align: center; }
+.chip-red { background: #ffebee; color: #c62828; }
+.chip-amber { background: #fff8e1; color: #e65100; }
+.chip-green { background: #e8f5e9; color: #2e7d32; }
+@media (max-width: 700px) { .dues-tr { grid-template-columns: 55px 1fr 80px 90px; } .dues-tr span:nth-child(4), .dues-tr span:nth-child(5) { display: none; } .hero-card { flex-direction: column; align-items: flex-start; } }
 .ss-card { background: #fff; border: 1.5px solid var(--border); border-radius: 14px; padding: 1.1rem 1.25rem; display: flex; align-items: center; gap: .875rem; transition: box-shadow .2s; }
 .ss-card:hover { box-shadow: 0 4px 16px rgba(26,35,126,.08); }
 .ss-card.ss-expiring { border-color: #ffca28; background: #fffde7; }
