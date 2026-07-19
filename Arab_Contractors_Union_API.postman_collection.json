@@ -189,13 +189,8 @@
 									"mode": "formdata",
 									"formdata": [
 										{
-											"key": "membership_number",
-											"value": "{{membership_number}}",
-											"type": "text"
-										},
-										{
-											"key": "commercial_register",
-											"value": "{{commercial_register}}",
+											"key": "phone",
+											"value": "{{phone}}",
 											"type": "text"
 										}
 									]
@@ -211,11 +206,11 @@
 										"verify-identity"
 									]
 								},
-								"description": "**POST** `/api/v1/contractor/auth/verify-identity`\n\nشاشة التسجيل — الخطوة 1: التحقق من رقم العضوية والسجل التجاري.\n\n- إذا كان العضو موجوداً تعود بياناته العامة (اسم الشركة، المفوض، الجوال، السجل التجاري) مع `has_password`.\n- إذا لم يكن موجوداً تعود `404` برسالة «ليس لديك عضوية فعالة في اتحاد المقاولين».\n\n**Form-Data** — رقم العضوية بالهيكلية المعتمدة فقط."
+								"description": "**POST** `/api/v1/contractor/auth/verify-identity`\n\nشاشة التسجيل — الخطوة 1: التحقق من رقم الجوال وإرسال رمز التحقق إليه.\n\n- إذا كان الجوال مسجّلاً تعود بياناته العامة (اسم الشركة، المفوض، السجل التجاري، رقم العضوية) مع `has_password` ويُرسل OTP (يظهر تجريبياً في `otp_preview`).\n- إذا كان مسجّلاً ومفعّلاً بالفعل تعود `422 already_registered`.\n- إذا لم يكن موجوداً تعود `404 contractor_not_found`.\n\n**Form-Data** — رقم الجوال فقط."
 							}
 						},
 						{
-							"name": "Register — 2) Set Password (يرسل OTP)",
+							"name": "Register — 2) Verify OTP (تفعيل الجوال)",
 							"request": {
 								"method": "POST",
 								"header": [
@@ -228,13 +223,62 @@
 									"mode": "formdata",
 									"formdata": [
 										{
-											"key": "membership_number",
-											"value": "{{membership_number}}",
+											"key": "phone",
+											"value": "{{phone}}",
 											"type": "text"
 										},
 										{
-											"key": "commercial_register",
-											"value": "{{commercial_register}}",
+											"key": "otp",
+											"value": "123456",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{base_url}}/contractor/auth/verify-otp",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"contractor",
+										"auth",
+										"verify-otp"
+									]
+								},
+								"description": "**POST** `/api/v1/contractor/auth/verify-otp`\n\nشاشة التسجيل — الخطوة 2: تفعيل رقم الجوال بالرمز المرسل.\n\nبعد النجاح: إذا لم يكن للمقاول كلمة مرور بعد، ينتقل لشاشة تعيين كلمة المرور. إذا كانت موجودة، ينتقل لشاشة تسجيل الدخول.\n\nالرمز صالح 10 دقائق. رمز خاطئ/منتهي → `422 invalid_otp`.\n\n**Form-Data**"
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"const json = pm.response.json();",
+											"if (pm.response.code === 200 && json.items && json.items.token) {",
+											"  pm.collectionVariables.set('contractor_token', json.items.token);",
+											"  console.log('✅ Token saved from this response');",
+											"}"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Register — 3) Set Password (تسجيل الدخول)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "phone",
+											"value": "{{phone}}",
 											"type": "text"
 										},
 										{
@@ -260,66 +304,7 @@
 										"set-password"
 									]
 								},
-								"description": "**POST** `/api/v1/contractor/auth/set-password`\n\nشاشة التسجيل — الخطوة 2: تعيين كلمة المرور.\n\n- تسجيل جديد: تُحفظ كلمة المرور ويُرسل رمز تحقق SMS (تجريبياً يظهر في `otp_preview`) — لا يتم تسجيل الدخول قبل التفعيل.\n- عضو مفعّل مسبقاً: يسجّل الدخول مباشرة ويعود التوكن.\n\n**Form-Data**"
-							},
-							"event": [
-								{
-									"listen": "test",
-									"script": {
-										"type": "text/javascript",
-										"exec": [
-											"const json = pm.response.json();",
-											"if (pm.response.code === 200 && json.items && json.items.token) {",
-											"  pm.collectionVariables.set('contractor_token', json.items.token);",
-											"  console.log('✅ Token saved from this response');",
-											"}"
-										]
-									}
-								}
-							]
-						},
-						{
-							"name": "Register — 3) Verify OTP (تفعيل الحساب)",
-							"request": {
-								"method": "POST",
-								"header": [
-									{
-										"key": "Accept",
-										"value": "application/json"
-									}
-								],
-								"body": {
-									"mode": "formdata",
-									"formdata": [
-										{
-											"key": "membership_number",
-											"value": "{{membership_number}}",
-											"type": "text"
-										},
-										{
-											"key": "commercial_register",
-											"value": "{{commercial_register}}",
-											"type": "text"
-										},
-										{
-											"key": "otp",
-											"value": "123456",
-											"type": "text"
-										}
-									]
-								},
-								"url": {
-									"raw": "{{base_url}}/contractor/auth/verify-otp",
-									"host": [
-										"{{base_url}}"
-									],
-									"path": [
-										"contractor",
-										"auth",
-										"verify-otp"
-									]
-								},
-								"description": "**POST** `/api/v1/contractor/auth/verify-otp`\n\nشاشة التحقق: تفعيل رقم الجوال بالرمز المرسل بعد التسجيل.\n\nبعد النجاح ينتقل المستخدم إلى شاشة تسجيل الدخول.\n\nالرمز صالح 10 دقائق. رمز خاطئ/منتهي → `422 invalid_otp`.\n\n**Form-Data**"
+								"description": "**POST** `/api/v1/contractor/auth/set-password`\n\nشاشة التسجيل — الخطوة 3 (بعد تفعيل الجوال): تعيين كلمة المرور وتسجيل الدخول مباشرة (يعود التوكن).\n\n- يتطلب أن يكون الجوال مفعّلاً مسبقاً عبر verify-otp، وإلا `422 phone_not_verified`.\n- إذا كان للحساب كلمة مرور بالفعل → `422 already_registered`.\n\n**Form-Data**"
 							},
 							"event": [
 								{
@@ -351,13 +336,8 @@
 									"mode": "formdata",
 									"formdata": [
 										{
-											"key": "membership_number",
-											"value": "{{membership_number}}",
-											"type": "text"
-										},
-										{
-											"key": "commercial_register",
-											"value": "{{commercial_register}}",
+											"key": "phone",
+											"value": "{{phone}}",
 											"type": "text"
 										}
 									]

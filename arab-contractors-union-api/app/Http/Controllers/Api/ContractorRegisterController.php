@@ -5,12 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\Contractor;
-use App\Support\ApiMessages;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Validation\Rules\Password;
 
 class ContractorRegisterController extends Controller
 {
@@ -18,28 +16,29 @@ class ContractorRegisterController extends Controller
 
     // ─────────────────────────────────────────────────────────────────────────
     //  POST /api/v1/contractor/auth/verify-identity
+    //  الخطوة 1: التحقق من رقم الجوال وإرسال رمز التحقق إليه
     // ─────────────────────────────────────────────────────────────────────────
     public function verifyIdentity(Request $request)
     {
         $request->validate([
-            'membership_number'   => 'required|string',
-            'commercial_register' => 'required|string',
+            'phone' => 'required|string',
         ]);
 
-        $contractor = Contractor::where('membership_number', trim($request->membership_number))
-            ->where('commercial_register', trim($request->commercial_register))
-            ->first();
+        $contractor = Contractor::where('phone', trim($request->phone))->first();
 
         if (! $contractor) {
-            return $this->error(
-                ApiMessages::NO_MEMBERSHIP,
-                404, null, 'contractor_not_found',
-            );
+            return $this->error('لا يوجد حساب مرتبط برقم الجوال المُدخل.', 404, null, 'contractor_not_found');
         }
 
         if ($contractor->is_frozen || $contractor->status === 'suspended') {
             return $this->error('حسابك موقوف. تواصل مع الاتحاد لمزيد من المعلومات.', 403, null, 'account_inactive');
         }
+
+        if ($contractor->password && $contractor->phone_verified_at) {
+            return $this->error('حسابك مفعّل ومسجّل مسبقاً. يمكنك تسجيل الدخول.', 422, null, 'already_registered');
+        }
+
+        $otp = $this->generateOtp($contractor);
 
         return $this->success([
             'id'                  => $contractor->id,
@@ -49,58 +48,120 @@ class ContractorRegisterController extends Controller
             'commercial_register' => $contractor->commercial_register,
             'membership_number'   => $contractor->membership_number,
             'has_password'        => !empty($contractor->password),
-        ], 'تم التحقق من هويتك بنجاح.');
+            'otp_required'        => true,
+            'otp_preview'         => $otp, // للتجربة فقط — يُحذف عند ربط مزوّد SMS حقيقي
+        ], 'تم التحقق من رقم الجوال، تم إرسال رمز التحقق إليه.');
     }
 
-
-
     // ─────────────────────────────────────────────────────────────────────────
-    //  POST /api/v1/contractor/auth/set-password
+    //  POST /api/v1/contractor/auth/verify-otp
+    //  الخطوة 2: تفعيل رقم الجوال بعد إدخال رمز التحقق
     // ─────────────────────────────────────────────────────────────────────────
-    public function setPassword(Request $request)
+    public function verifyOtp(Request $request)
     {
         $request->validate([
-            'membership_number'   => 'required|string',
-            'commercial_register' => 'required|string',
-            'password'            => 'required|string|min:8',
-            'password_confirmation'=> 'nullable|string',
+            'phone' => 'required|string',
+            'otp'   => 'required|string',
         ]);
 
-        $contractor = Contractor::where('membership_number', trim($request->membership_number))
-            ->where('commercial_register', trim($request->commercial_register))
-            ->first();
+        $contractor = Contractor::where('phone', trim($request->phone))->first();
 
         if (! $contractor) {
-            return $this->error(ApiMessages::NO_MEMBERSHIP, 404, null, 'contractor_not_found');
+            return $this->error('لا يوجد حساب مرتبط برقم الجوال المُدخل.', 404, null, 'contractor_not_found');
         }
 
         if ($contractor->is_frozen || $contractor->status === 'suspended') {
             return $this->error('حسابك موقوف. تواصل مع الاتحاد لمزيد من المعلومات.', 403, null, 'account_inactive');
         }
 
-        if ($contractor->password) {
-            // مسجّل مسبقاً — نتحقق من كلمة المرور
-            if (! Hash::check($request->password, $contractor->password)) {
-                return $this->error('كلمة المرور غير صحيحة.', 401, null, 'invalid_credentials');
-            }
+        $cachedOtp = Cache::get('register_otp_' . $contractor->id);
 
-            // إذا لم يفعّل جواله بعد، نعيد إرسال رمز التحقق بدل تسجيل الدخول
-            if (! $contractor->phone_verified_at) {
-                return $this->sendRegistrationOtp($contractor);
-            }
-        } else {
-            // إذا لم يكن لديه كلمة مرور، نتحقق من تأكيد كلمة المرور ونقوم بحفظها
-            if ($request->password !== $request->password_confirmation) {
-                return $this->error('تأكيد كلمة المرور غير متطابق.', 422, null, 'password_mismatch');
-            }
-            $contractor->update([
-                'password'          => Hash::make($request->password),
-                'profile_completed' => true,
-            ]);
-
-            // التسجيل الجديد يتطلب تفعيل رقم الجوال قبل الدخول
-            return $this->sendRegistrationOtp($contractor);
+        if (! $cachedOtp || (string) $cachedOtp !== (string) $request->otp) {
+            return $this->error('رمز التحقق غير صحيح أو انتهت صلاحيته.', 422, null, 'invalid_otp');
         }
+
+        $contractor->update(['phone_verified_at' => now()]);
+        Cache::forget('register_otp_' . $contractor->id);
+
+        return $this->success([
+            'phone'          => $contractor->phone,
+            'phone_verified' => true,
+            'has_password'   => !empty($contractor->password),
+        ], $contractor->password
+            ? 'تم تفعيل رقم جوالك بنجاح. يمكنك الآن تسجيل الدخول.'
+            : 'تم تفعيل رقم جوالك بنجاح. أدخل كلمة مرور لإكمال التسجيل.');
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  POST /api/v1/contractor/auth/resend-otp
+    // ─────────────────────────────────────────────────────────────────────────
+    public function resendOtp(Request $request)
+    {
+        $request->validate([
+            'phone' => 'required|string',
+        ]);
+
+        $contractor = Contractor::where('phone', trim($request->phone))->first();
+
+        if (! $contractor) {
+            return $this->error('لا يوجد حساب مرتبط برقم الجوال المُدخل.', 404, null, 'contractor_not_found');
+        }
+
+        if ($contractor->is_frozen || $contractor->status === 'suspended') {
+            return $this->error('حسابك موقوف. تواصل مع الاتحاد لمزيد من المعلومات.', 403, null, 'account_inactive');
+        }
+
+        if ($contractor->phone_verified_at) {
+            return $this->error('رقم جوالك مفعّل مسبقاً.', 422, null, 'already_verified');
+        }
+
+        $otp = $this->generateOtp($contractor);
+
+        return $this->success([
+            'phone'        => $contractor->phone,
+            'otp_required' => true,
+            'otp_preview'  => $otp, // للتجربة فقط — يُحذف عند ربط مزوّد SMS حقيقي
+        ], 'تم إرسال رمز تحقق جديد إلى رقم جوالك.');
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  POST /api/v1/contractor/auth/set-password
+    //  الخطوة 3: تعيين كلمة المرور بعد تفعيل رقم الجوال — يُنشئ الجلسة مباشرة
+    // ─────────────────────────────────────────────────────────────────────────
+    public function setPassword(Request $request)
+    {
+        $request->validate([
+            'phone'                 => 'required|string',
+            'password'              => 'required|string|min:8',
+            'password_confirmation' => 'required|string',
+        ]);
+
+        $contractor = Contractor::where('phone', trim($request->phone))->first();
+
+        if (! $contractor) {
+            return $this->error('لا يوجد حساب مرتبط برقم الجوال المُدخل.', 404, null, 'contractor_not_found');
+        }
+
+        if ($contractor->is_frozen || $contractor->status === 'suspended') {
+            return $this->error('حسابك موقوف. تواصل مع الاتحاد لمزيد من المعلومات.', 403, null, 'account_inactive');
+        }
+
+        if (! $contractor->phone_verified_at) {
+            return $this->error('يجب تفعيل رقم الجوال أولاً عبر رمز التحقق.', 422, null, 'phone_not_verified');
+        }
+
+        if ($contractor->password) {
+            return $this->error('حسابك مسجّل مسبقاً. يمكنك تسجيل الدخول.', 422, null, 'already_registered');
+        }
+
+        if ($request->password !== $request->password_confirmation) {
+            return $this->error('تأكيد كلمة المرور غير متطابق.', 422, null, 'password_mismatch');
+        }
+
+        $contractor->update([
+            'password'          => Hash::make($request->password),
+            'profile_completed' => true,
+        ]);
 
         // حذف التوكنات القديمة
         $contractor->tokens()->delete();
@@ -118,105 +179,24 @@ class ContractorRegisterController extends Controller
                 'trade'               => $contractor->trade,
                 'classification'      => $contractor->classification,
             ],
-            'تم تسجيل الدخول بنجاح.',
+            'تم تسجيل حسابك وتسجيل الدخول بنجاح.',
             200,
         );
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  POST /api/v1/contractor/auth/verify-otp
-    //  تفعيل رقم الجوال بعد التسجيل — بعد النجاح يعود المستخدم لشاشة تسجيل الدخول
-    // ─────────────────────────────────────────────────────────────────────────
-    public function verifyOtp(Request $request)
-    {
-        $request->validate([
-            'membership_number'   => 'required|string',
-            'commercial_register' => 'required|string',
-            'otp'                 => 'required|string',
-        ]);
-
-        $contractor = Contractor::where('membership_number', trim($request->membership_number))
-            ->where('commercial_register', trim($request->commercial_register))
-            ->first();
-
-        if (! $contractor) {
-            return $this->error(ApiMessages::NO_MEMBERSHIP, 404, null, 'contractor_not_found');
-        }
-
-        if ($contractor->is_frozen || $contractor->status === 'suspended') {
-            return $this->error('حسابك موقوف. تواصل مع الاتحاد لمزيد من المعلومات.', 403, null, 'account_inactive');
-        }
-
-        if ($contractor->phone_verified_at) {
-            return $this->success([
-                'membership_number' => $contractor->membership_number,
-                'phone_verified'    => true,
-            ], 'حسابك مفعّل مسبقاً. يمكنك تسجيل الدخول.');
-        }
-
-        $cachedOtp = Cache::get('register_otp_' . $contractor->id);
-
-        if (! $cachedOtp || (string) $cachedOtp !== (string) $request->otp) {
-            return $this->error('رمز التحقق غير صحيح أو انتهت صلاحيته.', 422, null, 'invalid_otp');
-        }
-
-        $contractor->update(['phone_verified_at' => now()]);
-        Cache::forget('register_otp_' . $contractor->id);
-
-        return $this->success([
-            'membership_number' => $contractor->membership_number,
-            'phone_verified'    => true,
-        ], 'تم تفعيل حسابك بنجاح. يمكنك الآن تسجيل الدخول.');
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    //  POST /api/v1/contractor/auth/resend-otp
-    // ─────────────────────────────────────────────────────────────────────────
-    public function resendOtp(Request $request)
-    {
-        $request->validate([
-            'membership_number'   => 'required|string',
-            'commercial_register' => 'required|string',
-        ]);
-
-        $contractor = Contractor::where('membership_number', trim($request->membership_number))
-            ->where('commercial_register', trim($request->commercial_register))
-            ->first();
-
-        if (! $contractor) {
-            return $this->error(ApiMessages::NO_MEMBERSHIP, 404, null, 'contractor_not_found');
-        }
-
-        if ($contractor->is_frozen || $contractor->status === 'suspended') {
-            return $this->error('حسابك موقوف. تواصل مع الاتحاد لمزيد من المعلومات.', 403, null, 'account_inactive');
-        }
-
-        if ($contractor->phone_verified_at) {
-            return $this->error('حسابك مفعّل مسبقاً. يمكنك تسجيل الدخول.', 422, null, 'already_verified');
-        }
-
-        return $this->sendRegistrationOtp($contractor);
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
     //  توليد رمز تحقق التسجيل وإرساله (محاكاة عبر الـ Logs حالياً)
     // ─────────────────────────────────────────────────────────────────────────
-    private function sendRegistrationOtp(Contractor $contractor)
+    private function generateOtp(Contractor $contractor): int
     {
         $otp = mt_rand(100000, 999999);
 
         Cache::put('register_otp_' . $contractor->id, $otp, now()->addMinutes(10));
 
         // تسجيل الرمز في الـ Logs لمحاكاة الإرسال — يُستبدل بمزوّد SMS قبل الإطلاق
-        Log::info("Registration OTP for contractor ID {$contractor->id} (Membership: {$contractor->membership_number}): {$otp}");
+        Log::info("Registration OTP for contractor ID {$contractor->id} (Phone: {$contractor->phone}): {$otp}");
 
-        return $this->success([
-            'id'                => $contractor->id,
-            'membership_number' => $contractor->membership_number,
-            'phone'             => $contractor->phone,
-            'otp_required'      => true,
-            'otp_preview'       => $otp, // للتجربة فقط — يُحذف عند ربط مزوّد SMS حقيقي
-        ], 'تم إرسال رمز التحقق إلى رقم الجوال المسجل. فعّل حسابك ثم سجّل الدخول.');
+        return $otp;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
