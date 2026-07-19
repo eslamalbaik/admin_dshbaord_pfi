@@ -66,7 +66,7 @@ const documents   = ref<Document[]>([])
 const stats       = ref<Stats | null>(null)
 
 const isLoading   = ref(true)
-const activeTab   = ref<'profile' | 'membership' | 'payments' | 'documents'>('profile')
+const activeTab   = ref<'profile' | 'membership' | 'payments' | 'documents' | 'tenders' | 'news'>('profile')
 
 // ─── Fetch ─────────────────────────────────────────────────────────────────────
 const BASE = import.meta.env.VITE_API_BASE_URL ?? ''
@@ -97,6 +97,8 @@ async function fetchTab(tab: typeof activeTab.value) {
     const r = await axios.get(`${BASE}/api/v1/contractor/documents`, { headers: apiHeaders() })
     documents.value = r.data.items
   }
+  if ((tab === 'tenders' || tab === 'news') && !latestTenders.value.length && !latestNews.value.length)
+    await fetchPublicFeeds()
 }
 
 // ─── الملف المالي: الذمم المستحقّة بتفاصيلها ───
@@ -130,11 +132,11 @@ const latestNews = ref<any[]>([])
 async function fetchPublicFeeds() {
   try {
     const [tr, nr] = await Promise.all([
-      fetch(`${BASE}/api/v1/tenders-public?status=open&per_page=3`).then(r => r.json()),
+      fetch(`${BASE}/api/v1/tenders-public?status=open&per_page=10`).then(r => r.json()),
       fetch(`${BASE}/api/v1/news/latest`).then(r => r.json()),
     ])
     latestTenders.value = tr.items ?? []
-    latestNews.value = (nr.items ?? nr.data ?? []).slice(0, 3)
+    latestNews.value = nr.items ?? nr.data ?? []
   }
   catch {}
 }
@@ -146,7 +148,7 @@ onMounted(async () => {
   fetchFinancial()
   await fetchDashboard()
   const requestedTab = new URLSearchParams(window.location.search).get('tab')
-  if (requestedTab && ['profile', 'membership', 'payments', 'documents'].includes(requestedTab))
+  if (requestedTab && ['profile', 'membership', 'payments', 'documents', 'tenders', 'news'].includes(requestedTab))
     await fetchTab(requestedTab as typeof activeTab.value)
   isLoading.value = false
 })
@@ -371,44 +373,6 @@ const daysUntilExpiry = computed(() => {
           </RouterLink>
         </div>
 
-        <!-- ─── العطاءات المنشورة وآخر الأخبار ─── -->
-        <div v-if="latestTenders.length || latestNews.length" class="feeds-grid">
-          <div v-if="latestTenders.length" class="feed-card">
-            <div class="feed-head">
-              <p class="feed-title">📋 عطاءات منشورة</p>
-              <RouterLink to="/landing/public-tenders" class="feed-more">عرض الكل</RouterLink>
-            </div>
-            <a
-              v-for="t in latestTenders"
-              :key="t.id"
-              class="feed-item"
-              :href="t.external_url || '/landing/public-tenders'"
-              :target="t.external_url ? '_blank' : '_self'"
-            >
-              <p class="feed-item-title">{{ t.title }}</p>
-              <p class="feed-item-meta">
-                <span v-if="t.category">{{ t.category }} · </span>
-                آخر موعد: {{ t.deadline ? new Date(t.deadline).toLocaleDateString('ar-EG') : '—' }}
-              </p>
-            </a>
-          </div>
-          <div v-if="latestNews.length" class="feed-card">
-            <div class="feed-head">
-              <p class="feed-title">📰 آخر الأخبار</p>
-              <RouterLink to="/landing/news" class="feed-more">عرض الكل</RouterLink>
-            </div>
-            <RouterLink
-              v-for="n in latestNews"
-              :key="n.id"
-              class="feed-item"
-              :to="`/landing/news/${n.slug}`"
-            >
-              <p class="feed-item-title">{{ n.title }}</p>
-              <p class="feed-item-meta">{{ n.published_at ? new Date(n.published_at).toLocaleDateString('ar-EG') : '' }}</p>
-            </RouterLink>
-          </div>
-        </div>
-
         <!-- ─── Layout: Sidebar + Content ─── -->
         <div class="cpd-layout">
 
@@ -421,6 +385,8 @@ const daysUntilExpiry = computed(() => {
                   { id:'membership', label:'العضوية والاشتراك',  icon: Award },
                   { id:'payments',   label:'المعاملات المالية',  icon: CreditCard },
                   { id:'documents',  label:'الوثائق والملفات',   icon: FileText },
+                  { id:'tenders',    label:'العطاءات المنشورة',  icon: ClipboardList },
+                  { id:'news',       label:'آخر الأخبار',        icon: MessageSquare },
                 ]"
                 :key="tab.id"
                 class="side-btn"
@@ -619,6 +585,69 @@ const daysUntilExpiry = computed(() => {
               </div>
             </div>
 
+            <!-- ══ Tenders ══ -->
+            <div v-else-if="activeTab === 'tenders'" class="tab-content">
+              <h2 class="tab-title"><ClipboardList :size="20" /> العطاءات المنشورة</h2>
+
+              <div v-if="latestTenders.length" class="tender-list">
+                <a
+                  v-for="t in latestTenders"
+                  :key="t.id"
+                  class="tender-row"
+                  :href="t.external_url || '/landing/public-tenders'"
+                  :target="t.external_url ? '_blank' : '_self'"
+                  rel="noopener"
+                >
+                  <div class="tr-main">
+                    <p class="tr-title">{{ t.title }}</p>
+                    <p class="tr-meta">
+                      <span v-if="t.category" class="tr-cat">{{ t.category }}</span>
+                      <span><CalendarDays :size="12" /> آخر موعد: {{ t.deadline ? new Date(t.deadline).toLocaleDateString('ar-EG') : '—' }}</span>
+                      <span v-if="t.budget"><Wallet :size="12" /> {{ Number(t.budget).toLocaleString('ar-EG') }} $</span>
+                    </p>
+                  </div>
+                  <span class="tr-go">{{ t.external_url ? 'رابط العطاء ↗' : 'التفاصيل' }}</span>
+                </a>
+                <RouterLink to="/landing/public-tenders" class="tr-all">
+                  عرض كل العطاءات مع الفلاتر ←
+                </RouterLink>
+              </div>
+              <div v-else class="empty-state">
+                <ClipboardList :size="44" class="es-ico" />
+                <p>لا توجد عطاءات مفتوحة حالياً</p>
+              </div>
+            </div>
+
+            <!-- ══ News ══ -->
+            <div v-else-if="activeTab === 'news'" class="tab-content">
+              <h2 class="tab-title"><MessageSquare :size="20" /> آخر الأخبار</h2>
+
+              <div v-if="latestNews.length" class="tender-list">
+                <RouterLink
+                  v-for="n in latestNews"
+                  :key="n.id"
+                  class="tender-row"
+                  :to="`/landing/news/${n.slug}`"
+                >
+                  <div class="tr-main">
+                    <p class="tr-title">{{ n.title }}</p>
+                    <p class="tr-meta">
+                      <span v-if="n.category" class="tr-cat">{{ n.category }}</span>
+                      <span><CalendarDays :size="12" /> {{ n.published_at ? new Date(n.published_at).toLocaleDateString('ar-EG') : '' }}</span>
+                    </p>
+                  </div>
+                  <span class="tr-go">قراءة الخبر</span>
+                </RouterLink>
+                <RouterLink to="/landing/news" class="tr-all">
+                  عرض كل الأخبار ←
+                </RouterLink>
+              </div>
+              <div v-else class="empty-state">
+                <MessageSquare :size="44" class="es-ico" />
+                <p>لا توجد أخبار منشورة بعد</p>
+              </div>
+            </div>
+
           </main>
         </div>
       </div>
@@ -742,16 +771,18 @@ const daysUntilExpiry = computed(() => {
 
 /* ─── Quick Links ─────────────────────────────────────────────────────────── */
 .quick-links { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; margin-bottom: 1.75rem; }
-.feeds-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.75rem; }
-.feed-card { background: #fff; border: 1.5px solid var(--border); border-radius: 14px; padding: 1rem 1.25rem; }
-.feed-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .5rem; }
-.feed-title { font-size: .95rem; font-weight: 800; color: var(--text-h); }
-.feed-more { font-size: .78rem; color: var(--navy); text-decoration: none; font-weight: 700; }
-.feed-item { display: block; padding: .6rem 0; border-top: 1px solid var(--border); text-decoration: none; color: inherit; }
-.feed-item:hover .feed-item-title { color: var(--navy); }
-.feed-item-title { font-size: .86rem; font-weight: 700; color: var(--text-h); line-height: 1.5; }
-.feed-item-meta { font-size: .75rem; color: var(--text-m); margin-top: .2rem; }
-@media (max-width: 700px) { .feeds-grid { grid-template-columns: 1fr; } }
+/* ─── قوائم العطاءات والأخبار (ضمن التبويبات الجانبية) ─── */
+.tender-list { display: flex; flex-direction: column; gap: .75rem; }
+.tender-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; background: #fff; border: 1.5px solid var(--border); border-radius: 12px; padding: .9rem 1.1rem; text-decoration: none; color: inherit; transition: border-color .2s, box-shadow .2s; }
+.tender-row:hover { border-color: #c5cae9; box-shadow: 0 4px 14px rgba(26,35,126,.1); }
+.tr-main { flex: 1; min-width: 0; }
+.tr-title { font-size: .9rem; font-weight: 800; color: var(--text-h); line-height: 1.5; }
+.tr-meta { display: flex; gap: .9rem; flex-wrap: wrap; margin-top: .35rem; font-size: .76rem; color: var(--text-m); }
+.tr-meta span { display: inline-flex; align-items: center; gap: .3rem; }
+.tr-cat { background: var(--navy-light); color: var(--navy); border-radius: 50px; padding: .1rem .6rem; font-weight: 700; }
+.tr-go { flex-shrink: 0; font-size: .78rem; font-weight: 800; color: var(--navy); }
+.tr-all { display: block; text-align: center; font-size: .82rem; font-weight: 800; color: var(--navy); text-decoration: none; padding: .6rem; }
+.tr-all:hover { text-decoration: underline; }
 .ql-card { display: flex; align-items: center; gap: 1rem; background: #fff; border: 1.5px solid var(--border); border-radius: 14px; padding: 1.1rem 1.25rem; text-decoration: none; color: inherit; transition: box-shadow .2s, border-color .2s; }
 .ql-card:hover { box-shadow: 0 6px 20px rgba(26,35,126,.12); border-color: #c5cae9; }
 .ql-ico { width: 44px; height: 44px; border-radius: 11px; background: var(--qic); color: var(--qicc); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
