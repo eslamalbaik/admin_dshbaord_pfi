@@ -83,12 +83,21 @@ const renewalBlocked = ref(false)
 const renewalIssues = ref<{ type: string; description: string; amount: number | null }[]>([])
 const outstandingDues = ref(0)
 
+// هل هذه دفعة سداد ذمم؟ (لا عضوية نشطة + ذمم مستحقّة) — لا تُحظر مثل دفعة التجديد
+const isDuesPayment = computed(() => !membership.value && outstandingDues.value > 0)
+
 async function checkEligibility() {
   try {
     const r = await axios.get(`${BASE}/api/v1/contractor/renewal-eligibility`, { headers: apiHeaders() })
     renewalBlocked.value = !(r.data.items?.can_renew ?? true)
     renewalIssues.value = r.data.items?.issues ?? []
     outstandingDues.value = r.data.items?.outstanding_total_jod ?? 0
+
+    // بلا عضوية نشطة: المبلغ المقترح = إجمالي الذمم (بالدينار الأردني)
+    if (!membership.value && outstandingDues.value > 0 && !form.value.amount) {
+      form.value.amount = String(outstandingDues.value)
+      form.value.currency = 'JOD'
+    }
   }
   catch {}
 }
@@ -165,8 +174,9 @@ function copyIban(iban: string) {
 }
 
 async function submitPayment() {
-  if (renewalBlocked.value) {
-    errorMessage.value = 'لا يمكن تجديد العضوية قبل تسوية الذمم المالية المستحقّة.'
+  // دفعة التجديد تُحظر مع ذمم قائمة — أما دفعة سداد الذمم نفسها فمسموحة دائماً
+  if (renewalBlocked.value && !isDuesPayment.value) {
+    errorMessage.value = 'لا يمكن تجديد العضوية قبل تسوية الذمم المالية المستحقّة — سدّد الذمم أولاً.'
     return
   }
   if (!form.value.amount || !form.value.receipt_file) {
@@ -183,7 +193,8 @@ async function submitPayment() {
   fd.append('currency', form.value.currency)
   fd.append('receipt_image', form.value.receipt_file)
   if (membership.value) fd.append('membership_id', String(membership.value.id))
-  fd.append('notes', form.value.notes || 'دفع رسوم تجديد العضوية')
+  fd.append('type', isDuesPayment.value ? 'dues_payment' : 'membership_fee')
+  fd.append('notes', form.value.notes || (isDuesPayment.value ? 'سداد ذمم مالية مستحقّة' : 'دفع رسوم تجديد العضوية'))
 
   try {
     const r = await axios.post(`${BASE}/api/v1/contractor/payments/transfer`, fd, {
@@ -299,6 +310,26 @@ function fmtMoney(v: string | number | null) {
             <span class="rb-amount-label">رسوم الاشتراك</span>
           </div>
         </div>
+        <!-- لا عضوية نشطة + عليه ذمم: سداد الذمم هو طريق تفعيل العضوية -->
+        <div v-else-if="outstandingDues > 0" class="renewal-banner expiring">
+          <div class="rb-icon"><AlertCircle :size="24" /></div>
+          <div class="rb-info">
+            <p class="rb-title">تفعيل العضوية — سداد الذمم المالية المستحقّة</p>
+            <p class="rb-meta">
+              عليك ذمم مالية عن سنوات سابقة. سدّدها عبر التحويل البنكي أدناه،
+              وبعد تأكيد المحاسبة سيتم تفعيل/تجديد عضويتك.
+            </p>
+            <ul class="rb-meta" style="margin: .4rem 1rem 0 0;">
+              <li v-for="(iss, i) in renewalIssues.filter(x => x.type === 'unpaid_dues')" :key="i">
+                {{ iss.description }} — {{ iss.amount }} د.أ
+              </li>
+            </ul>
+          </div>
+          <div class="rb-amount">
+            <span class="rb-amount-val">{{ outstandingDues }} د.أ</span>
+            <span class="rb-amount-label">إجمالي الذمم المستحقّة</span>
+          </div>
+        </div>
         <div v-else class="alert alert-error">
           <AlertCircle :size="18" />
           <span>لا توجد عضوية مسجّلة باسمك — تواصل مع إدارة الاتحاد لتفعيل عضويتك قبل الدفع.</span>
@@ -373,7 +404,7 @@ function fmtMoney(v: string | number | null) {
             <form v-else @submit.prevent="submitPayment" class="payment-form">
               <!-- تنبيه الذمم غير المسدَّدة -->
               <div
-                v-if="renewalBlocked"
+                v-if="renewalBlocked && !isDuesPayment"
                 class="form-group"
                 style="background: #fff3e0; border: 1.5px solid #ffb74d; border-radius: 12px; padding: 1rem;"
               >

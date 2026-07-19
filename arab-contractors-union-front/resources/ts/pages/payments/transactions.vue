@@ -201,7 +201,7 @@ function fmtDate(d: string | null) {
               {{ p.amount_jod ?? '—' }}
               <span v-if="p.exchange_rate" class="text-disabled text-caption">({{ p.exchange_rate }})</span>
             </td>
-            <td>{{ p.type === 'membership_fee' ? 'رسوم عضوية' : p.type }}</td>
+            <td>{{ ({ membership_fee: 'رسوم عضوية', dues_payment: 'سداد ذمم', penalty: 'غرامة' } as Record<string, string>)[p.type] ?? p.type }}</td>
             <td>
               <a v-if="p.receipt_image_url" :href="p.receipt_image_url" target="_blank" rel="noopener">
                 <VIcon icon="tabler-photo" size="20" />
