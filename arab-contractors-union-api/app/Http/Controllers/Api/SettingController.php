@@ -53,7 +53,8 @@ class SettingController extends Controller
      */
     public function maintenancePreview(string $slug)
     {
-        $expected = (string) Setting::get('maintenance_preview_slug', 'testing');
+        $expected = mb_strtolower(trim((string) Setting::get('maintenance_preview_slug', 'testing')));
+        $slug     = mb_strtolower(trim($slug));
 
         return $this->success([
             'valid' => $expected !== '' && hash_equals($expected, $slug),

@@ -43,8 +43,9 @@ function isMaintenanceOn(): Promise<boolean> {
 }
 
 function hasMaintenancePreview(): boolean {
-  return typeof sessionStorage !== 'undefined'
-    && sessionStorage.getItem('maintenance_preview') === '1'
+  // localStorage: المعاينة تبقى في متصفح الفريق حتى بعد إغلاقه وفتح تبويبات جديدة
+  return typeof localStorage !== 'undefined'
+    && localStorage.getItem('maintenance_preview') === '1'
 }
 
 function redirectStudentToLanding(targetPath = '/student/dashboard') {

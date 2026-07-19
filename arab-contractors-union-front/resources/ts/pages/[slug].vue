@@ -15,14 +15,15 @@ const notFound = ref(false)
 const page = ref<{ title: string; content: string; updated_at?: string } | null>(null)
 
 onMounted(async () => {
-  const slug = String(route.params.slug ?? '')
+  // تطبيع الحالة — كيبوردات الجوال تكبّر أول حرف تلقائياً (Testing → testing)
+  const slug = String(route.params.slug ?? '').trim().toLowerCase()
 
   // 1) هل هو slug المعاينة السري لوضع الصيانة؟
   try {
     const r = await fetch(`${BASE}/api/v1/app/maintenance/preview/${encodeURIComponent(slug)}`)
     const data = await r.json()
     if (data?.items?.valid) {
-      sessionStorage.setItem('maintenance_preview', '1')
+      localStorage.setItem('maintenance_preview', '1')
       router.replace('/landing')
 
       return
