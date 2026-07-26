@@ -199,7 +199,8 @@ const citiesForSelectedGovernorate = computed(() => {
 
 async function fetchProfile() {
   try {
-    const r = await axios.get(`${BASE}/api/v1/contractor/auth/profile`, { headers: apiHeaders() })
+    // ‎_ts يكسر كاش المتصفح/البروكسي فيرجع أحدث بيانات بعد الحفظ‎
+    const r = await axios.get(`${BASE}/api/v1/contractor/auth/profile`, { headers: apiHeaders(), params: { _ts: Date.now() } })
     const items = r.data.items
     profileExtra.value = {
       owner_name: items.owner_name, fax: items.fax, capital: items.capital,
@@ -264,7 +265,8 @@ async function onDocFileChange(key: string, e: Event) {
     const fd = new FormData()
     fd.append(key, file)
     const r = await axios.post(`${BASE}/api/v1/contractor/auth/profile/update`, fd, {
-      headers: { ...apiHeaders(), 'Content-Type': 'multipart/form-data' },
+      // لا نحدّد Content-Type يدوياً: المتصفح يضبط multipart/form-data مع الـ boundary تلقائياً
+      headers: apiHeaders(),
       onUploadProgress: (evt) => {
         if (evt.total) docUploadProgress.value = { ...docUploadProgress.value, [key]: Math.round((evt.loaded / evt.total) * 100) }
       },
@@ -313,7 +315,8 @@ async function onLogoChange(e: Event) {
     const fd = new FormData()
     fd.append('logo', file)
     const r = await axios.post(`${BASE}/api/v1/contractor/auth/logo`, fd, {
-      headers: { ...apiHeaders(), 'Content-Type': 'multipart/form-data' },
+      // لا نحدّد Content-Type يدوياً: المتصفح يضبط multipart/form-data مع الـ boundary تلقائياً
+      headers: apiHeaders(),
       onUploadProgress: (evt) => {
         if (evt.total) logoUploadProgress.value = Math.round((evt.loaded / evt.total) * 100)
       },
@@ -340,7 +343,8 @@ async function saveProfile() {
       if (v !== null && v !== undefined) fd.append(k, String(v))
     })
     const r = await axios.post(`${BASE}/api/v1/contractor/auth/profile/update`, fd, {
-      headers: { ...apiHeaders(), 'Content-Type': 'multipart/form-data' },
+      // لا نحدّد Content-Type يدوياً: المتصفح يضبط multipart/form-data مع الـ boundary تلقائياً
+      headers: apiHeaders(),
     })
     applyProfileResponse(r.data.items)
     editMode.value = false
@@ -408,7 +412,8 @@ async function submitNameChangeRequest() {
     fd.append('requested_name', nameChangeForm.value.requested_name)
     fd.append('supporting_document', nameChangeForm.value.file)
     const r = await axios.post(`${BASE}/api/v1/contractor/auth/name-change-request`, fd, {
-      headers: { ...apiHeaders(), 'Content-Type': 'multipart/form-data' },
+      // لا نحدّد Content-Type يدوياً: المتصفح يضبط multipart/form-data مع الـ boundary تلقائياً
+      headers: apiHeaders(),
       onUploadProgress: (evt) => {
         if (evt.total) nameChangeUploadProgress.value = Math.round((evt.loaded / evt.total) * 100)
       },

@@ -46,6 +46,8 @@ const contractor = ref<Contractor | null>(null)
 const requests = ref<CertificateRequest[]>([])
 const requirementIssues = ref<RequirementIssue[]>([])
 const canRequest = ref(true)
+const profileDataComplete = ref(true)
+const missingProfileFields = ref<string[]>([])
 const showForm = ref(false)
 const successMessage = ref('')
 const errorMessage = ref('')
@@ -96,6 +98,8 @@ async function fetchData() {
     requests.value = r.data.items?.requests ?? []
     requirementIssues.value = r.data.items?.requirement_issues ?? []
     canRequest.value = r.data.items?.can_request ?? true
+    profileDataComplete.value = r.data.items?.profile_data_complete ?? true
+    missingProfileFields.value = r.data.items?.missing_profile_fields ?? []
   } catch (e: any) {
     if (e?.response?.status === 401) authError.value = true
   } finally {
@@ -121,7 +125,7 @@ async function submitRequest() {
     if (attachmentFile.value) fd.append('attachment', attachmentFile.value)
 
     const r = await axios.post(`${BASE}/api/v1/contractor/certificate-requests`, fd, {
-      headers: { ...apiHeaders(), 'Content-Type': 'multipart/form-data' },
+      headers: apiHeaders(),
     })
     successMessage.value = r.data.message ?? 'تم تقديم طلب الشهادة بنجاح.'
     form.value = { type: '', notes: '' }
@@ -130,6 +134,11 @@ async function submitRequest() {
     if (r.data.items) requests.value.unshift(r.data.items)
     setTimeout(() => { successMessage.value = '' }, 5000)
   } catch (e: any) {
+    if (e?.response?.data?.error === 'profile_incomplete') {
+      profileDataComplete.value = false
+      missingProfileFields.value = e.response.data.errors?.missing_profile_fields ?? []
+      canRequest.value = false
+    }
     errorMessage.value = e?.response?.data?.message ?? 'حدث خطأ أثناء تقديم الطلب'
   } finally {
     isSubmitting.value = false
@@ -242,6 +251,23 @@ function fmtMoney(v: string | number | null) {
         <div v-if="successMessage" class="alert alert-success">
           <CheckCircle :size="18" />
           <span>{{ successMessage }}</span>
+        </div>
+
+        <!-- Profile Incomplete Section -->
+        <div v-if="!profileDataComplete" class="profile-incomplete-section">
+          <div class="req-header">
+            <AlertCircle :size="20" class="req-icon" />
+            <div>
+              <h3 class="req-title">يجب إكمال الملف الشخصي أولاً</h3>
+              <p class="req-desc">لا يمكن تقديم طلب شهادة قبل إكمال البيانات والمستندات التالية:</p>
+            </div>
+          </div>
+          <div class="missing-fields-list">
+            <span v-for="f in missingProfileFields" :key="f" class="missing-field-chip">{{ f }}</span>
+          </div>
+          <RouterLink to="/contractor/dashboard?tab=profile" class="req-note complete-profile-link">
+            <ArrowRight :size="16" /> الانتقال إلى لوحتي لإكمال البيانات
+          </RouterLink>
         </div>
 
         <!-- Requirement Issues Section -->
@@ -478,6 +504,15 @@ function fmtMoney(v: string | number | null) {
 .alert { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.25rem; border-radius: 12px; margin-bottom: 1.5rem; font-size: .95rem; font-weight: 600; }
 .alert-error { background: var(--red-light); color: var(--red); border: 1px solid #ef9a9a; }
 .alert-success { background: var(--green-light); color: var(--green); border: 1px solid #a5d6a7; }
+
+/* Profile Incomplete Section */
+.profile-incomplete-section { background: var(--red-light); border: 1.5px solid #ef9a9a; border-radius: 14px; padding: 1.5rem; margin-bottom: 2rem; }
+.profile-incomplete-section .req-icon { color: var(--red); }
+.profile-incomplete-section .req-desc { color: var(--red); }
+.missing-fields-list { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
+.missing-field-chip { background: #fff; border: 1px solid #ef9a9a; color: var(--red); font-size: .8rem; font-weight: 700; padding: .35rem .8rem; border-radius: 50px; }
+.complete-profile-link { text-decoration: none; color: var(--red); background: rgba(198,40,40,.06); cursor: pointer; }
+.complete-profile-link:hover { text-decoration: underline; }
 
 /* Requirements Section */
 .requirements-section { background: #fff8e1; border: 1.5px solid #ffca28; border-radius: 14px; padding: 1.5rem; margin-bottom: 2rem; }

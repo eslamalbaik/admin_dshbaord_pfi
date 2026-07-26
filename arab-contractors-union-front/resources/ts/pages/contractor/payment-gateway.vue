@@ -198,7 +198,7 @@ async function submitPayment() {
 
   try {
     const r = await axios.post(`${BASE}/api/v1/contractor/payments/transfer`, fd, {
-      headers: { ...apiHeaders(), 'Content-Type': 'multipart/form-data' },
+      headers: apiHeaders(),
     })
     successMessage.value = r.data.message ?? 'تم إرسال إشعار التحويل بنجاح.'
     submitted.value = true

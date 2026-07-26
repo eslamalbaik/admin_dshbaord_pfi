@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
+import { watch } from 'vue'
 import axios from 'axios'
 import {
   LogOut, Send, CheckCircle, AlertCircle, MessageSquare,
@@ -132,7 +133,7 @@ async function submitTicket() {
 
   try {
     const r = await axios.post(`${BASE}/api/v1/contractor/support-tickets`, formData, {
-      headers: { ...apiHeaders(), 'Content-Type': 'multipart/form-data' },
+      headers: apiHeaders(),
     })
     showSuccess.value = true
     form.value = { subject: '', category: '', message: '', attachment: null }
@@ -155,10 +156,34 @@ function openWhatsApp() {
   window.open(`https://wa.me/970200000000?text=${encoded}`, '_blank')
 }
 
+// ─── حفظ الحالة في رابط الصفحة: التبويب والتذكرة المفتوحة تنجوان من الـ refresh ───
+const route = useRoute()
+
+function switchTab(tab: 'new' | 'tickets') {
+  activeTab.value = tab
+  router.replace({ query: { ...route.query, tab, ticket: undefined } })
+}
+
 onMounted(async () => {
   token.value = getToken()
   if (!token.value) { authError.value = true; isLoading.value = false; return }
+
+  // استرجاع الحالة من الرابط قبل جلب البيانات
+  if (route.query.tab === 'tickets')
+    activeTab.value = 'tickets'
+
   await fetchData()
+
+  // إعادة فتح التذكرة التي كانت مفتوحة قبل الـ refresh
+  const ticketId = Number(route.query.ticket)
+  if (ticketId) {
+    const t = tickets.value.find(x => x.id === ticketId)
+    if (t) {
+      activeTab.value = 'tickets'
+      selectedTicket.value = t
+      isTicketDetailOpen.value = true
+    }
+  }
 })
 
 function statusClass(s: string) {
@@ -176,11 +201,14 @@ function formatDate(date: string) {
 function openTicketDetail(ticket: SupportTicket) {
   selectedTicket.value = ticket
   isTicketDetailOpen.value = true
+  // تثبيت رقم التذكرة في الرابط حتى تبقى مفتوحة بعد الـ refresh
+  router.replace({ query: { ...route.query, tab: 'tickets', ticket: String(ticket.id) } })
 }
 
 function closeTicketDetail() {
   selectedTicket.value = null
   isTicketDetailOpen.value = false
+  router.replace({ query: { ...route.query, ticket: undefined } })
 }
 </script>
 
