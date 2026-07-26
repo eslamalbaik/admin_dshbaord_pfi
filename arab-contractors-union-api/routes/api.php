@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\BankAccountController;
 use App\Http\Controllers\Api\SupportTicketController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\CertificateRequestController;
+use App\Http\Controllers\Api\ContractorNameChangeRequestController;
 
 // ============================================================
 //  API v1
@@ -57,9 +58,19 @@ Route::prefix('v1')->group(function () {
         Route::get('profile',          [ContractorAuthController::class, 'profile']);
         Route::patch('profile',        [ContractorAuthController::class, 'updateProfile']);
         Route::post('profile/update',  [ContractorAuthController::class, 'updateFullProfile']);
+        Route::post('logo',            [ContractorAuthController::class, 'updateLogo']);
         Route::get('profile/pdf',      [ContractorAuthController::class, 'exportPdf']);
         Route::get('profile/download-file/{field}', [ContractorAuthController::class, 'downloadFile']);
         Route::post('change-password', [ContractorAuthController::class, 'changePassword']);
+
+        // طلب تعديل اسم الشركة (يتطلب موافقة الإدارة + وثيقة رسمية)
+        Route::get('name-change-request',  [ContractorNameChangeRequestController::class, 'show']);
+        Route::post('name-change-request', [ContractorNameChangeRequestController::class, 'store']);
+
+        // إشعارات المقاول (صندوق الوارد)
+        Route::get('notifications',                    [NotificationController::class, 'index']);
+        Route::post('notifications/read',              [NotificationController::class, 'markAllRead']);
+        Route::patch('notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead']);
     });
 
     // --------------------------------------------------------
@@ -298,6 +309,13 @@ Route::prefix('v1')->group(function () {
         Route::post('dashboard/certificate-requests/{certificateRequest}/reject',   [CertificateRequestController::class, 'reject']);
         Route::post('dashboard/certificate-requests/{certificateRequest}/issue',    [CertificateRequestController::class, 'issue']);
         Route::delete('dashboard/certificate-requests/{certificateRequest}',        [CertificateRequestController::class, 'destroy']);
+
+        // --------------------------------------------------------
+        //  طلبات تعديل اسم الشركة — Admin
+        // --------------------------------------------------------
+        Route::get('dashboard/name-change-requests',                                    [ContractorNameChangeRequestController::class, 'index']);
+        Route::post('dashboard/name-change-requests/{nameChangeRequest}/approve',        [ContractorNameChangeRequestController::class, 'approve']);
+        Route::post('dashboard/name-change-requests/{nameChangeRequest}/reject',         [ContractorNameChangeRequestController::class, 'reject']);
 
         // --------------------------------------------------------
         //  Contractor Dues — الذمم المالية (أدمن + محاسب)

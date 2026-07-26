@@ -47,9 +47,13 @@ class ContractorDashboardController extends Controller
                 'expiring_soon' => $activeMembership->expiring_soon,
             ] : null,
             'stats' => [
-                'total_payments'   => $contractor->payments()->where('status', 'paid')->sum('amount'),
-                'pending_payments' => $contractor->payments()->where('status', 'pending')->count(),
-                'total_documents'  => $contractor->documents()->count(),
+                'total_payments'       => $contractor->payments()->where('status', 'paid')->sum('amount'),
+                'pending_payments'     => $contractor->payments()->where('status', 'pending')->count(),
+                'total_documents'      => $contractor->documents()->count(),
+                'total_equipment'      => $contractor->equipment()->count(),
+                'certificate_requests' => $contractor->certificateRequests()->count(),
+                'open_tickets'         => \App\Models\SupportTicket::where('contractor_id', $contractor->id)
+                                            ->where('status', 'open')->count(),
             ],
         ]);
     }
@@ -232,6 +236,6 @@ class ContractorDashboardController extends Controller
                 'created_at'     => $d->created_at->toDateString(),
             ]);
 
-        return response()->json(['data' => $documents]);
+        return $this->success($documents->values());
     }
 }

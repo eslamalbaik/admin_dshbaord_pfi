@@ -69,13 +69,13 @@ class PaymentController extends Controller
             'type'             => 'nullable|string|max:50',
         ]);
 
-        // منع دفعات تجديد العضوية إذا كانت هناك ذمم/غرامات غير مسدَّدة
+        // منع أي عمليات باستثناء تسديد الذمم إذا كانت هناك ذمم/غرامات غير مسدَّدة
         $type = $data['type'] ?? 'membership_fee';
-        if ($type === 'membership_fee') {
+        if ($type !== 'dues_payment') {
             $blockers = \App\Support\ContractorRequirements::renewalBlockers($contractor);
             if (count($blockers) > 0) {
                 return $this->error(
-                    'لا يمكن تجديد العضوية قبل تسوية الذمم المالية المستحقّة.',
+                    'لا يمكن إتمام أي عمليات قبل تسوية الذمم المالية المستحقّة.',
                     403,
                     ['issues' => $blockers],
                     'dues_pending',
@@ -162,6 +162,8 @@ class PaymentController extends Controller
             'contractor_id'    => 'required|exists:contractors,id',
             'membership_id'    => 'nullable|exists:memberships,id',
             'amount'           => 'required|numeric|min:0',
+            'currency'         => 'nullable|in:JOD,ILS,USD',
+            'exchange_rate'    => 'nullable|numeric|min:0.0001|max:1000',
             'type'             => 'nullable|string',
             'status'           => 'nullable|in:pending,paid,refunded,failed,rejected',
             'method'           => 'nullable|string',
@@ -169,7 +171,42 @@ class PaymentController extends Controller
             'notes'            => 'nullable|string',
         ]);
 
-        $payment = Payment::create($validated);
+        $currency = strtoupper($validated['currency'] ?? 'JOD');
+        $service  = app(\App\Services\ExchangeRateService::class);
+
+        $rate       = null;
+        $rateSource = null;
+
+        if ($currency !== 'JOD') {
+            if (isset($validated['exchange_rate'])) {
+                $rate       = (float) $validated['exchange_rate'];
+                $rateSource = 'manual';
+            } else {
+                $latest = $service->latest($currency);
+                if (! $latest) {
+                    return $this->error("لا يوجد سعر صرف معتمد لعملة {$currency} — أدخل السعر يدوياً.", 422);
+                }
+                $rate       = (float) $latest->rate_to_jod;
+                $rateSource = $latest->source;
+            }
+        }
+
+        $amountJod = $service->convertToJod((float) $validated['amount'], $currency, $rate ?? 1.0);
+
+        $paymentData = array_merge($validated, [
+            'currency'      => $currency,
+            'exchange_rate' => $rate,
+            'amount_jod'    => $amountJod,
+            'rate_source'   => $currency === 'JOD' ? null : $rateSource,
+        ]);
+
+        if (isset($paymentData['status']) && $paymentData['status'] === 'paid') {
+            $paymentData['paid_at']      = now();
+            $paymentData['confirmed_at'] = now();
+            $paymentData['confirmed_by'] = Auth::id();
+        }
+
+        $payment = Payment::create($paymentData);
 
         return $this->success($payment->toArray(), 'تم تسجيل المعاملة بنجاح.', 201);
     }

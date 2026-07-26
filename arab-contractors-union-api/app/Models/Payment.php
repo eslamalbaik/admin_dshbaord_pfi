@@ -9,7 +9,7 @@ class Payment extends Model
 {
     protected $fillable = [
         'contractor_id', 'membership_id', 'bank_account_id', 'amount',
-        'currency', 'exchange_rate', 'amount_jod', 'rate_source',
+        'currency', 'exchange_rate', 'amount_jod', 'used_amount_jod', 'rate_source',
         'type', 'status', 'method', 'reference_number', 'receipt_image',
         'notes', 'paid_at', 'submitted_at', 'confirmed_by', 'confirmed_at',
         'rejection_reason',

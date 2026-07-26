@@ -73,6 +73,17 @@ class ContractorAuthController extends Controller
             'fcm_token'     => $request->fcm_token ?? $contractor->fcm_token,
         ]);
 
+        // تذكير بإكمال الملف الشخصي — مرة واحدة فقط طالما التذكير السابق لم يُقرأ بعد
+        if (! $contractor->profile_data_complete) {
+            $hasUnreadReminder = $contractor->unreadNotifications()
+                ->where('type', \App\Notifications\CompleteProfileNotification::class)
+                ->exists();
+
+            if (! $hasUnreadReminder) {
+                $contractor->notify(new \App\Notifications\CompleteProfileNotification());
+            }
+        }
+
         // استجابة خفيفة (REQ-02): البيانات الأساسية فقط — التفاصيل والملفات عبر Get Profile
         return $this->successWithToken(
             $token->plainTextToken,
@@ -119,6 +130,28 @@ class ContractorAuthController extends Controller
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    //  POST /api/v1/contractor/auth/logo
+    //  رفع/استبدال شعار الشركة
+    // ─────────────────────────────────────────────────────────────────────────
+    public function updateLogo(Request $request)
+    {
+        $contractor = $request->user('contractor');
+
+        $request->validate([
+            'logo' => 'required|image|mimes:jpg,jpeg,png,webp|max:4096',
+        ]);
+
+        if ($contractor->logo) {
+            Storage::disk('public')->delete($contractor->logo);
+        }
+
+        $path = $request->file('logo')->store('contractors/logos', 'public');
+        $contractor->update(['logo' => $path]);
+
+        return $this->success($this->contractorResource($contractor), 'تم تحديث شعار الشركة بنجاح.');
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     //  PATCH /api/contractor/auth/profile
     //  تعديل بيانات المقاول (الاسم، الهاتف، المحافظة والمدينة بالـ ID)
     // ─────────────────────────────────────────────────────────────────────────
@@ -127,7 +160,7 @@ class ContractorAuthController extends Controller
         $contractor = $request->user('contractor');
 
         $validated = $request->validate([
-            'name'           => 'sometimes|string|max:255',
+            // اسم الشركة لا يُعدَّل مباشرة — فقط عبر طلب تعديل اسم شركة تُوافق عليه الإدارة
             'phone'          => 'sometimes|string|max:20|unique:contractors,phone,' . $contractor->id,
             'governorate_id' => 'nullable|integer|exists:governorates,id',
             'city_id'        => 'nullable|integer|exists:cities,id',
@@ -181,7 +214,7 @@ class ContractorAuthController extends Controller
         }
 
         $validated = $request->validate([
-            'name'                          => 'sometimes|string|max:255',
+            // اسم الشركة لا يُعدَّل مباشرة — فقط عبر طلب تعديل اسم شركة تُوافق عليه الإدارة
             'trade'                         => 'nullable|string|max:100',
             'classification'                => 'nullable|string|max:10',
             'established_year'              => 'nullable|integer|min:1900|max:' . date('Y'),
@@ -317,6 +350,7 @@ class ContractorAuthController extends Controller
             'commercial_register'  => $contractor->commercial_register,
             'license_number'       => $contractor->license_number,
             'name'                 => $contractor->name,
+            'logo_url'             => $contractor->logo ? Storage::disk('public')->url($contractor->logo) : null,
             'authorized_person'    => $contractor->authorized_person,
             'trade'                => $contractor->trade,
             'classification'       => $contractor->classification,
@@ -375,6 +409,10 @@ class ContractorAuthController extends Controller
             'owner_name'        => $contractor->owner_name,
             'address'           => $contractor->address,
             'notes'             => $contractor->notes,
+
+            // اكتمال الملف الشخصي — مطلوب قبل السماح بطلب شهادة العضوية
+            'profile_data_complete' => $contractor->profile_data_complete,
+            'missing_profile_fields' => $contractor->missing_profile_fields,
 
             // المجالات والاختصاصات والدرجات — كل مجال يضم اختصاصاته وكل اختصاص درجته
             'fields'            => ContractorLookups::buildFieldsTree($contractor->specialties),

@@ -65,12 +65,15 @@ class MembershipController extends Controller
         $membership->update([
             'status'      => 'active',
             'starts_at'   => now(),
-            'expires_at'  => now()->addYear(),
+            'expires_at'  => now()->endOfYear(),
             'reviewed_by' => Auth::id(),
             'reviewed_at' => now(),
         ]);
 
-        $membership->contractor()->update(['status' => 'active']);
+        $contractor = $membership->contractor;
+        if ($contractor && in_array($contractor->status, ['pending', 'expired'])) {
+            $contractor->update(['status' => 'active']);
+        }
 
         return $this->success(message: 'تمت الموافقة على العضوية.');
     }

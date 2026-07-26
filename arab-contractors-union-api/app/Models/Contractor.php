@@ -26,7 +26,7 @@ class Contractor extends Authenticatable
 
     protected $fillable = [
         'membership_number', 'name', 'authorized_person', 'commercial_register',
-        'trade', 'classification', 'established_year', 'owner_name',
+        'license_number', 'trade', 'classification', 'established_year', 'owner_name',
         'email', 'phone', 'phone_verified_at', 'city', 'governorate_id', 'city_id', 'address',
         'status', 'is_frozen', 'profile_completed', 'profile_approved_by',
         'cr_file', 'id_file', 'notes',
@@ -35,7 +35,7 @@ class Contractor extends Authenticatable
         'partners', 'fax', 'building', 'floor', 'capital', 'registration_date',
         'legal_form', 'company_purposes',
         // New Files
-        'authorized_signature', 'lease_or_ownership_contract', 'company_approval_letter',
+        'authorized_signature', 'logo', 'lease_or_ownership_contract', 'company_approval_letter',
         'municipal_license', 'company_register', 'articles_of_association',
         'internal_bylaws', 'bank_dealing_letter', 'secretary_contract',
         'full_time_engineer_certificate', 'partners_ids', 'authorization_letter',
@@ -103,6 +103,11 @@ class Contractor extends Authenticatable
         return $this->hasMany(CertificateRequest::class);
     }
 
+    public function nameChangeRequests()
+    {
+        return $this->hasMany(ContractorNameChangeRequest::class);
+    }
+
     public function dues()
     {
         return $this->hasMany(ContractorDue::class);
@@ -139,6 +144,64 @@ class Contractor extends Authenticatable
         }
 
         return self::CLASSIFICATION_LABELS[$this->classification] ?? $this->classification;
+    }
+
+    /** الحقول والملفات المطلوبة في نموذج تسجيل المقاول بلوحة الأدمن — نفس القائمة تُستخدم هنا لبناء "اكتمال الملف". */
+    private const REQUIRED_PROFILE_FIELDS = [
+        'owner_name'        => 'اسم صاحب المنشأة',
+        'authorized_person' => 'اسم المفوض بالتوقيع',
+        'phone'             => 'رقم الهاتف',
+        'address'           => 'العنوان التفصيلي',
+        'license_number'    => 'رقم رخصة البلدية',
+        'established_date'  => 'تاريخ التأسيس',
+        'capital'           => 'رأس المال',
+        'legal_form'        => 'الشكل القانوني',
+        'registration_date' => 'تاريخ التسجيل',
+        'company_purposes'  => 'غايات الشركة',
+    ];
+
+    private const REQUIRED_PROFILE_FILES = [
+        'cr_file'                       => 'السجل التجاري',
+        'company_register'              => 'مستخرج سجل الشركة',
+        'municipal_license'             => 'رخصة المهن (البلدية)',
+        'bank_dealing_letter'           => 'شهادة تعامل بنكي',
+        'articles_of_association'       => 'عقد التأسيس',
+        'internal_bylaws'               => 'النظام الداخلي',
+        'lease_or_ownership_contract'   => 'عقد الإيجار / الملكية',
+        'partners_ids'                  => 'صور هويات الشركاء',
+        'authorization_letter'          => 'كتاب تفويض المفوّض',
+        'company_approval_letter'       => 'كتاب موافقة الشركة',
+        'full_time_engineer_certificate'=> 'شهادة مهندس متفرغ',
+        'secretary_contract'            => 'عقد سكرتير',
+    ];
+
+    /** أسماء الحقول والملفات الناقصة لإكمال الملف الشخصي (فارغة يعني الملف مكتمل). */
+    public function getMissingProfileFieldsAttribute(): array
+    {
+        $missing = [];
+
+        foreach (self::REQUIRED_PROFILE_FIELDS as $field => $label) {
+            if (empty($this->$field)) {
+                $missing[] = $label;
+            }
+        }
+
+        if (empty($this->governorate_id) && empty($this->city_id) && empty($this->city)) {
+            $missing[] = 'المحافظة / المدينة';
+        }
+
+        foreach (self::REQUIRED_PROFILE_FILES as $field => $label) {
+            if (empty($this->$field)) {
+                $missing[] = $label;
+            }
+        }
+
+        return $missing;
+    }
+
+    public function getProfileDataCompleteAttribute(): bool
+    {
+        return count($this->missing_profile_fields) === 0;
     }
 
     /**

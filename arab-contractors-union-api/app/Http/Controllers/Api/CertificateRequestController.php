@@ -68,8 +68,10 @@ class CertificateRequestController extends Controller
                 'status'            => $contractor->status,
                 'is_frozen'         => (bool) $contractor->is_frozen,
             ],
-            'can_request'        => count($issues) === 0,
-            'requirement_issues' => $issues,
+            'can_request'             => count($issues) === 0 && $contractor->profile_data_complete,
+            'requirement_issues'      => $issues,
+            'profile_data_complete'   => $contractor->profile_data_complete,
+            'missing_profile_fields'  => $contractor->missing_profile_fields,
             'requests'           => $contractor->certificateRequests()
                 ->latest()
                 ->get()
@@ -92,6 +94,15 @@ class CertificateRequestController extends Controller
             'notes'      => 'nullable|string|max:500',
             'attachment' => 'nullable|file|mimes:png,jpg,jpeg,webp,pdf|max:5120',
         ]);
+
+        if (! $contractor->profile_data_complete) {
+            return $this->error(
+                'يجب إكمال بيانات الملف الشخصي قبل تقديم طلب شهادة.',
+                403,
+                ['missing_profile_fields' => $contractor->missing_profile_fields],
+                'profile_incomplete',
+            );
+        }
 
         $issues = $this->requirementIssues($contractor);
         if (count($issues) > 0) {

@@ -153,13 +153,13 @@ class ContractorDueController extends Controller
         $amountJod = $service->convertToJod((float) $data['amount'], $currency, $rate ?? 1.0);
 
         $result = \Illuminate\Support\Facades\DB::transaction(function () use ($contractor, $data, $currency, $rate, $rateSource, $amountJod) {
-            // سجل الدفعة نفسها للتدقيق
             $payment = Payment::create([
                 'contractor_id'    => $contractor->id,
                 'amount'           => $data['amount'],
                 'currency'         => $currency,
                 'exchange_rate'    => $rate,
                 'amount_jod'       => $amountJod,
+                'used_amount_jod'  => 0, // Will be updated below
                 'rate_source'      => $currency === 'JOD' ? null : $rateSource,
                 'type'             => 'dues_payment',
                 'status'           => 'paid',
@@ -198,6 +198,9 @@ class ContractorDueController extends Controller
                     'status'      => $due->status,
                 ];
             }
+
+            // تحديث المبلغ المستخدم من الدفعة
+            $payment->update(['used_amount_jod' => $amountJod - $remaining]);
 
             return [
                 'payment_id'     => $payment->id,
@@ -417,6 +420,15 @@ class ContractorDueController extends Controller
         }
 
         $amount = (float) ($data['amount_jod'] ?? $due->remaining_jod);
+
+        if (isset($payment)) {
+            $available = $payment->amount_jod - $payment->used_amount_jod;
+            if ($amount > $available) {
+                return $this->error('المبلغ المراد تسويته يتجاوز الرصيد المتاح في الدفعة.', 422);
+            }
+            $payment->increment('used_amount_jod', $amount);
+        }
+
         $due->applyPayment($amount);
 
         if (! empty($data['notes'])) {
