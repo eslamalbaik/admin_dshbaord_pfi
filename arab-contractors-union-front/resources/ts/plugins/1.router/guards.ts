@@ -25,23 +25,7 @@ const waitForAuthInit = (authStore: any) => {
 
 const LANDING_URL = (import.meta.env.VITE_LANDING_URL || '').replace(/\/$/, '')
 
-// ─── وضع الصيانة: / و /landing فقط تُحوَّلان لصفحة "قيد الإنشاء" ───
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
-
-let maintenancePromise: Promise<boolean> | null = null
-
-function isMaintenanceOn(): Promise<boolean> {
-  // نداء واحد لكل جلسة تصفح — النتيجة تُخزَّن في الـ promise نفسه
-  if (!maintenancePromise) {
-    maintenancePromise = fetch(`${API_BASE}/api/v1/app/maintenance`)
-      .then(r => r.json())
-      .then(data => !!data?.items?.maintenance)
-      .catch(() => false)
-  }
-
-  return maintenancePromise
-}
-
+// ─── الموقع العام قيد الإنشاء: / و /landing و landing/* تُحوَّل دائماً لصفحة "قيد الإنشاء" ───
 function hasMaintenancePreview(): boolean {
   // localStorage: المعاينة تبقى في متصفح الفريق حتى بعد إغلاقه وفتح تبويبات جديدة
   return typeof localStorage !== 'undefined'
@@ -106,11 +90,10 @@ export const setupGuards = (router: _RouterTyped<RouteNamedMap & { [key: string]
     // Start progress bar
     NProgress.start()
 
-    // وضع الصيانة: الصفحة الرئيسية العامة فقط (/ تعيد التوجيه لـ /landing)
-    if (to.name === 'landing' && !hasMaintenancePreview()) {
-      if (await isMaintenanceOn())
-        return { name: 'under-construction' }
-    }
+    // الموقع العام قيد الإنشاء: / و /landing و أي صفحة landing/* تُحوَّل لصفحة "قيد الإنشاء".
+    // معاينة الفريق تتجاوز التحويل عبر localStorage.maintenance_preview = '1'.
+    if (String(to.name).startsWith('landing') && !hasMaintenancePreview())
+      return { name: 'under-construction' }
 
     /*
      * Public routes: accessible by everyone without any restrictions.

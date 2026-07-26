@@ -3,13 +3,13 @@ definePage({
   meta: { layout: 'blank', public: true },
 })
 
-const BASE = import.meta.env.VITE_API_BASE_URL ?? ''
+const BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1'
 
 const message = ref('الموقع قيد الإنشاء حالياً — نعود إليكم قريباً.')
 
 onMounted(async () => {
   try {
-    const r = await fetch(`${BASE}/api/v1/app/maintenance`)
+    const r = await fetch(`${BASE}/app/maintenance`)
     const data = await r.json()
     if (data?.items?.message)
       message.value = data.items.message
@@ -23,6 +23,11 @@ onMounted(async () => {
 <template>
   <div class="uc-wrap" dir="rtl">
     <div class="uc-card">
+      <img
+        src="/logo.png"
+        alt="اتحاد المقاولين الفلسطينيين"
+        class="uc-logo"
+      >
       <VIcon
         icon="tabler-barrier-block"
         size="72"
@@ -53,5 +58,13 @@ onMounted(async () => {
 .uc-card {
   max-inline-size: 480px;
   text-align: center;
+}
+
+.uc-logo {
+  display: block;
+  block-size: 96px;
+  inline-size: auto;
+  margin: 0 auto 24px;
+  object-fit: contain;
 }
 </style>
