@@ -25,13 +25,6 @@ const waitForAuthInit = (authStore: any) => {
 
 const LANDING_URL = (import.meta.env.VITE_LANDING_URL || '').replace(/\/$/, '')
 
-// ─── الموقع العام قيد الإنشاء: / و /landing و landing/* تُحوَّل دائماً لصفحة "قيد الإنشاء" ───
-function hasMaintenancePreview(): boolean {
-  // localStorage: المعاينة تبقى في متصفح الفريق حتى بعد إغلاقه وفتح تبويبات جديدة
-  return typeof localStorage !== 'undefined'
-    && localStorage.getItem('maintenance_preview') === '1'
-}
-
 function redirectStudentToLanding(targetPath = '/student/dashboard') {
   // بدون VITE_LANDING_URL (وضع اتحاد المقاولين): الـ landing داخلية على نفس الدومين.
   if (!LANDING_URL) {
@@ -89,11 +82,6 @@ export const setupGuards = (router: _RouterTyped<RouteNamedMap & { [key: string]
   router.beforeEach(async to => {
     // Start progress bar
     NProgress.start()
-
-    // الموقع العام قيد الإنشاء: / و /landing و أي صفحة landing/* تُحوَّل لصفحة "قيد الإنشاء".
-    // معاينة الفريق تتجاوز التحويل عبر localStorage.maintenance_preview = '1'.
-    if (String(to.name).startsWith('landing') && !hasMaintenancePreview())
-      return { name: 'under-construction' }
 
     /*
      * Public routes: accessible by everyone without any restrictions.
