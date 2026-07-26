@@ -3,13 +3,13 @@ definePage({
   meta: { layout: 'blank', public: true },
 })
 
-const BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1'
+const BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
 
 const message = ref('الموقع قيد الإنشاء حالياً — نعود إليكم قريباً.')
 
 onMounted(async () => {
   try {
-    const r = await fetch(`${BASE}/app/maintenance`)
+    const r = await fetch(`${BASE}/api/v1/app/maintenance`)
     const data = await r.json()
     if (data?.items?.message)
       message.value = data.items.message
