@@ -238,7 +238,7 @@ async function handleResendOtp() {
           </form>
 
           <div class="rg-test-hint">
-            بيانات تجريبية للاختبار: رقم الجوال <strong>0590000000</strong> — كلمة المرور <strong>Test@12345</strong>
+            أدخل رقم الجوال المسجّل لدى الاتحاد في ملف عضويتك. التسجيل هنا لتفعيل حساب عضو موجود مسبقاً — إن لم يكن رقمك مسجّلاً تواصل مع الاتحاد.
           </div>
 
           <div class="rg-divider"><span>أو</span></div>
