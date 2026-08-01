@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Menu, X, HardHat, Phone, ChevronDown, LayoutDashboard, User, LogOut } from 'lucide-vue-next'
+import { Menu, X, HardHat, Phone, ChevronDown, LayoutDashboard, User, LogOut, Bell } from 'lucide-vue-next'
 import api from '@/plugins/axios'
+import axios from 'axios'
+
+const BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
 defineProps<{
   contractorProfile?: any
@@ -49,7 +52,7 @@ const showUserMenu = ref(false)
 function toggleDropdown(label: string) {
   openDropdown.value = openDropdown.value === label ? null : label
 }
-function closeDropdowns() { openDropdown.value = null; showUserMenu.value = false }
+function closeDropdowns() { openDropdown.value = null; showUserMenu.value = false; showNotifDropdown.value = false }
 
 onMounted(() => document.addEventListener('click', closeDropdowns))
 onUnmounted(() => document.removeEventListener('click', closeDropdowns))
@@ -72,6 +75,7 @@ async function fetchMe() {
         headers: { Authorization: `Bearer ${savedToken}` },
       })
       localProfile.value = r.data.items ?? r.data
+      fetchNotifications()
     } catch {
       localStorage.removeItem('contractor_token')
       localProfile.value = null
@@ -81,18 +85,54 @@ async function fetchMe() {
   }
 }
 
+// ─── Notifications Inbox ───
+interface AppNotification { id: string; data: Record<string, any>; read_at: string | null; created_at: string }
+const notifications = ref<AppNotification[]>([])
+const unreadCount = ref(0)
+const showNotifDropdown = ref(false)
+
+async function fetchNotifications() {
+  const savedToken = localStorage.getItem('contractor_token')
+  if (!savedToken) return
+  try {
+    const r = await axios.get(`${BASE}/api/v1/contractor/auth/notifications`, {
+      headers: { Authorization: `Bearer ${savedToken}` },
+    })
+    notifications.value = r.data.items?.notifications?.data ?? []
+    unreadCount.value = r.data.items?.unread_count ?? 0
+  } catch {}
+}
+
+function toggleNotifDropdown() {
+  showNotifDropdown.value = !showNotifDropdown.value
+}
+
+function fmtNotifTime(d: string) {
+  return new Date(d).toLocaleDateString('ar-PS', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
+
+async function markNotificationRead(n: AppNotification) {
+  if (n.read_at) return
+  const savedToken = localStorage.getItem('contractor_token')
+  try {
+    await axios.patch(`${BASE}/api/v1/contractor/auth/notifications/${n.id}/mark-as-read`, {}, {
+      headers: { Authorization: `Bearer ${savedToken}` },
+    })
+    n.read_at = new Date().toISOString()
+    unreadCount.value = Math.max(0, unreadCount.value - 1)
+  } catch {}
+}
+
 function handleRegisterClick() {
-  if (window.location.pathname.includes('/landing')) {
-    window.dispatchEvent(new CustomEvent('open-register-modal'))
-  } else {
-    router.push('/landing?action=register')
-  }
+  router.push('/contractor/login')
 }
 
 function handleLogout() {
   showUserMenu.value = false
   mobileOpen.value = false
   localProfile.value = null
+  notifications.value = []
+  unreadCount.value = 0
   localStorage.removeItem('contractor_token')
   window.dispatchEvent(new CustomEvent('contractor-logged-out'))
 }
@@ -158,7 +198,23 @@ onMounted(() => {
           <button v-if="!localProfile" class="pub-btn-register" @click="handleRegisterClick">
             <HardHat :size="15" /> تسجيل العضوية
           </button>
-          <div v-else class="pub-nb-user" @click.stop="toggleUserMenu">
+          <div v-if="localProfile" class="pub-nb-notif" @click.stop="toggleNotifDropdown">
+            <Bell :size="19" />
+            <span v-if="unreadCount > 0" class="pub-nb-notif-badge">{{ unreadCount > 9 ? '9+' : unreadCount }}</span>
+            <div v-if="showNotifDropdown" class="pub-dropdown pub-notif-dropdown" @click.stop>
+              <div class="pub-dd-header">الإشعارات</div>
+              <div v-if="!notifications.length" class="pub-notif-empty">لا توجد إشعارات بعد.</div>
+              <button
+                v-for="n in notifications" :key="n.id"
+                class="pub-notif-item" :class="{ unread: !n.read_at }"
+                @click="markNotificationRead(n)"
+              >
+                <p>{{ n.data.message }}</p>
+                <span>{{ fmtNotifTime(n.created_at) }}</span>
+              </button>
+            </div>
+          </div>
+          <div v-if="localProfile" class="pub-nb-user" @click.stop="toggleUserMenu">
             <div class="pub-nb-avatar">{{ localProfile.name.charAt(0) }}</div>
             <span class="pub-nb-name">{{ localProfile.name }}</span>
             <ChevronDown :size="13" class="pub-nav-chevron" :class="{ open: showUserMenu }" />
@@ -314,6 +370,25 @@ div { font-family: 'Dubai', 'Neo Sans Arabic', 'Tajawal', 'Neo Sans Arabic', 'Ca
 .pub-mob-cta { width: 100%; justify-content: center; margin-top: .75rem; border-radius: 9px; padding: .65rem 1.5rem; }
 
 .pub-nb-actions { display: flex; align-items: center; gap: .5rem; flex-shrink: 0; }
+.pub-nb-notif { position: relative; display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; color: #374151; transition: background .2s; }
+.pub-nb-notif:hover { background: #f3f4f6; }
+.pub-nb-notif-badge {
+  position: absolute; top: 2px; inset-inline-end: 2px;
+  background: #dc2626; color: #fff; font-size: .62rem; font-weight: 800;
+  min-width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  padding: 0 3px; border: 2px solid #fff;
+}
+.pub-notif-dropdown { min-width: 300px; max-width: 340px; max-height: 380px; overflow-y: auto; padding: .4rem; }
+.pub-notif-empty { padding: 1.5rem 1rem; text-align: center; font-size: .82rem; color: #9ca3af; }
+.pub-notif-item {
+  display: block; width: 100%; text-align: right; background: none; border: none; cursor: pointer;
+  font-family: inherit; padding: .65rem .875rem; border-radius: 8px; margin-bottom: .15rem; transition: background .15s;
+}
+.pub-notif-item:hover { background: #f3f4f6; }
+.pub-notif-item.unread { background: #eef2ff; }
+.pub-notif-item.unread:hover { background: #e0e7ff; }
+.pub-notif-item p { margin: 0 0 .25rem; font-size: .82rem; font-weight: 600; color: #1f2937; line-height: 1.5; white-space: normal; }
+.pub-notif-item span { font-size: .72rem; color: #9ca3af; }
 .pub-nb-user { display: flex; align-items: center; gap: .6rem; position: relative; cursor: pointer; padding: .3rem .5rem; border-radius: 9px; transition: background .2s; }
 .pub-nb-user:hover { background: #f3f4f6; }
 .pub-nb-avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, #1a237e, #0d1b4b); color: #fff; display: flex; align-items: center; justify-content: center; font-size: .85rem; font-weight: 800; font-family: 'Neo Sans Arabic', 'Cairo', 'Dubai', sans-serif; flex-shrink: 0; }

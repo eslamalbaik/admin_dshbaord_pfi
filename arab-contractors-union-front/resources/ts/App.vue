@@ -17,6 +17,11 @@ initConfigStore()
 
 const configStore = useConfigStore()
 const authStore = useAuthStore()
+
+// تهيئة المصادقة عند الإقلاع — بدونها يبقى splash الشعار يدور للأبد على المسارات
+// العامة (login/landing) إذا كان في accessToken مخزّن، لأن حارس الراوتر يتخطّى
+// fetchUser على العامة فلا شيء يصفّر isInitializing.
+authStore.fetchUser()
 </script>
 
 <template>

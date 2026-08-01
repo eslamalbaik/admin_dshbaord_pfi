@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
+import { useRoute, useRouter } from 'vue-router'
 import api from '@/plugins/axios'
 
 definePage({ meta: { requiresAdmin: true } })
 
 const queryClient = useQueryClient()
+const route = useRoute()
+const router = useRouter()
 
-const page = ref(1)
-const statusFilter = ref<string | null>(null)
-const categoryFilter = ref<string | null>(null)
-const search = ref('')
+const page = ref(Number(route.query.page) || 1)
+const statusFilter = ref<string | null>((route.query.status as string) || null)
+const categoryFilter = ref<string | null>((route.query.category as string) || null)
+const search = ref((route.query.search as string) || '')
 
 const statusOptions = [
   { value: 'open', title: 'مفتوح' },
@@ -63,6 +66,30 @@ const openTicket = (t: any) => {
   actionError.value = ''
   isViewOpen.value = true
 }
+
+// ─── حفظ الحالة في رابط الصفحة ───
+watch([page, statusFilter, categoryFilter, search, isViewOpen], () => {
+  const query: Record<string, any> = {}
+  if (page.value > 1) query.page = page.value
+  if (statusFilter.value) query.status = statusFilter.value
+  if (categoryFilter.value) query.category = categoryFilter.value
+  if (search.value) query.search = search.value
+  if (isViewOpen.value && selected.value) query.ticket = selected.value.id
+
+  router.replace({ query })
+})
+
+const isRestoring = ref(true)
+watch(tickets, (newTickets) => {
+  if (isRestoring.value && route.query.ticket) {
+    const tId = Number(route.query.ticket)
+    const t = newTickets.find((x: any) => x.id === tId)
+    if (t) {
+      openTicket(t)
+    }
+    isRestoring.value = false
+  }
+}, { immediate: true })
 
 const replyMutation = useMutation({
   mutationFn: async () =>

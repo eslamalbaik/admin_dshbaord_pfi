@@ -40,7 +40,7 @@ class Contractor extends Authenticatable
         'internal_bylaws', 'bank_dealing_letter', 'secretary_contract',
         'full_time_engineer_certificate', 'partners_ids', 'authorization_letter',
         // Auto-fields and specialized types
-        'field_lk_type', 'specialization_lk_type', 'established_date', 'specialties',
+        'field_lk_type', 'specialization_lk_type', 'established_date', 'specialties', 'terms_accepted_at',
     ];
 
     protected $hidden = [
@@ -56,6 +56,7 @@ class Contractor extends Authenticatable
         'specialties'            => 'array',
         'last_login_at'          => 'datetime',
         'phone_verified_at'      => 'datetime',
+        'terms_accepted_at'      => 'datetime',
         'is_frozen'              => 'boolean',
         'profile_completed'      => 'boolean',
     ];

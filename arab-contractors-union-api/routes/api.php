@@ -169,6 +169,11 @@ Route::prefix('v1')->group(function () {
     Route::get('app/governorates', [SettingController::class, 'governorates']);
 
     // --------------------------------------------------------
+    //  Specialties Catalog (المجالات/الاختصاصات/الدرجات) — Public
+    // --------------------------------------------------------
+    Route::get('app/specialties-catalog', [SettingController::class, 'specialtiesCatalog']);
+
+    // --------------------------------------------------------
     //  Admin Auth — Public
     // --------------------------------------------------------
     Route::prefix('auth')->group(function () {

@@ -71,6 +71,9 @@ const stats       = ref<Stats | null>(null)
 const isLoading   = ref(true)
 const activeTab   = ref<'profile' | 'membership' | 'payments' | 'documents' | 'tenders' | 'news'>('profile')
 
+// إشعار popup بعد تفعيل الحساب (قادم من صفحة التسجيل)
+const showActivatedPopup = ref(false)
+
 const tabs = [
   { id: 'profile',    label: 'حسابي',            icon: User },
   { id: 'membership', label: 'العضوية والشهادات',icon: Award },
@@ -85,7 +88,8 @@ const BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
 async function fetchDashboard() {
   try {
-    const r = await axios.get(`${BASE}/api/v1/contractor/dashboard`, { headers: apiHeaders() })
+    // timeout 20s — بلا مهلة يعلّق التحميل للأبد لو تجمّد الاتصال بالسيرفر
+    const r = await axios.get(`${BASE}/api/v1/contractor/dashboard`, { headers: apiHeaders(), timeout: 20000 })
     contractor.value = r.data.items.contractor
     membership.value = r.data.items.membership
     stats.value      = r.data.items.stats
@@ -188,6 +192,29 @@ const editForm = ref({
   capital: '', legal_form: '', registration_date: '', company_purposes: '',
   address: '', notes: '', governorate_id: null as number | null, city_id: null as number | null,
 })
+
+// ─── محرّر التخصصات والتصنيفات ───
+interface SpecRow { field_lk_type: number | null; specialization_lk_type: number | null; classification: string | null }
+interface CatalogItem { id: number; name: string }
+interface GradeItem { value: string; label: string; level: number | null }
+const rawSpecialties = ref<SpecRow[]>([])
+const editClassification = ref<string>('')
+const editSpecialties = ref<SpecRow[]>([])
+const catalog = ref<{ fields: CatalogItem[]; specializations: CatalogItem[]; grades: GradeItem[] }>({ fields: [], specializations: [], grades: [] })
+
+async function fetchCatalog() {
+  if (catalog.value.fields.length) return
+  try {
+    const r = await axios.get(`${BASE}/api/v1/app/specialties-catalog`)
+    catalog.value = r.data.items
+  } catch {}
+}
+function addSpecRow() {
+  editSpecialties.value.push({ field_lk_type: null, specialization_lk_type: null, classification: null })
+}
+function removeSpecRow(i: number) {
+  editSpecialties.value.splice(i, 1)
+}
 const docsSaveError = ref<Record<string, string>>({})
 const docUploadingKeys = ref<Set<string>>(new Set())
 const docUploadProgress = ref<Record<string, number>>({})
@@ -214,6 +241,8 @@ async function fetchProfile() {
     missingProfileFields.value = items.missing_profile_fields ?? []
     logoUrl.value = items.logo_url ?? null
     contractorFields.value = items.fields ?? []
+    rawSpecialties.value = Array.isArray(items.specialties) ? items.specialties : []
+    if (contractor.value && items.classification != null) contractor.value.classification = items.classification
   } catch {}
 }
 
@@ -241,6 +270,14 @@ function startEdit() {
     governorate_id: profileExtra.value.governorate?.id ?? null,
     city_id: profileExtra.value.city?.id ?? null,
   }
+  // نسخة قابلة للتعديل من التخصصات + التصنيف العام
+  editClassification.value = contractor.value.classification ?? ''
+  editSpecialties.value = rawSpecialties.value.map(s => ({
+    field_lk_type: s.field_lk_type ?? null,
+    specialization_lk_type: s.specialization_lk_type ?? null,
+    classification: s.classification ?? null,
+  }))
+  fetchCatalog()
   saveError.value = ''
   editMode.value = true
   if (!governorates.value.length) fetchGovernorates()
@@ -290,7 +327,11 @@ function applyProfileResponse(items: any) {
     contractor.value.phone = items.phone
     contractor.value.address = items.address
     contractor.value.city = items.city?.name ?? contractor.value.city
+    if (items.classification != null) contractor.value.classification = items.classification
   }
+  // تحديث شجرة التخصصات + النسخة الخام بعد الحفظ
+  if (items.fields !== undefined) contractorFields.value = items.fields ?? []
+  if (items.specialties !== undefined) rawSpecialties.value = Array.isArray(items.specialties) ? items.specialties : []
   profileExtra.value = {
     owner_name: items.owner_name, fax: items.fax, capital: items.capital,
     registration_date: items.registration_date, legal_form: items.legal_form,
@@ -342,6 +383,11 @@ async function saveProfile() {
       // ConvertEmptyStringsToNull في الباك يحوّلها إلى null فيُمسح العمود فعلاً.
       if (v !== null && v !== undefined) fd.append(k, String(v))
     })
+    // التصنيف العام
+    fd.append('classification', editClassification.value ?? '')
+    // التخصصات: نرسل الصفوف المكتملة فقط (مجال + اختصاص) كـ JSON
+    const cleanSpecs = editSpecialties.value.filter(s => s.field_lk_type && s.specialization_lk_type)
+    fd.append('specialties', JSON.stringify(cleanSpecs))
     const r = await axios.post(`${BASE}/api/v1/contractor/auth/profile/update`, fd, {
       // لا نحدّد Content-Type يدوياً: المتصفح يضبط multipart/form-data مع الـ boundary تلقائياً
       headers: apiHeaders(),
@@ -481,6 +527,12 @@ async function fetchPublicFeeds() {
 onMounted(async () => {
   token.value = getToken()
   if (!token.value) { authError.value = true; isLoading.value = false; return }
+  // إشعار التفعيل الناجح — يُعرض مرة واحدة ثم يختفي
+  if (localStorage.getItem('contractor_activated')) {
+    localStorage.removeItem('contractor_activated')
+    showActivatedPopup.value = true
+    setTimeout(() => { showActivatedPopup.value = false }, 5000)
+  }
   fetchPublicFeeds()
   fetchFinancial()
   fetchProfile()
@@ -530,6 +582,14 @@ function downloadDoc(url: string, title: string) {
 
 <template>
   <div dir="rtl" class="md-layout">
+
+    <!-- إشعار popup: تم التفعيل بنجاح -->
+    <Transition name="toast-fade">
+      <div v-if="showActivatedPopup" class="activated-toast">
+        <CheckCircle :size="22" />
+        <span>تم تفعيل حسابك بنجاح، مرحباً بك!</span>
+      </div>
+    </Transition>
 
     <div v-if="authError" class="auth-wall">
       <img src="/logo.png" alt="الاتحاد" class="aw-logo" />
@@ -848,6 +908,51 @@ function downloadDoc(url: string, title: string) {
                 </div>
               </div>
 
+              <!-- محرّر التخصصات والتصنيفات -->
+              <div class="spec-editor">
+                <div class="spec-editor-head">
+                  <h3>التخصصات والتصنيفات</h3>
+                  <button type="button" class="md-action-btn outline sm" @click="addSpecRow">
+                    <Award :size="15" /> إضافة تخصص
+                  </button>
+                </div>
+
+                <div class="md-input-group" style="max-width:320px;margin-bottom:1rem">
+                  <label>التصنيف العام</label>
+                  <select v-model="editClassification" class="md-fi">
+                    <option value="">— غير محدد —</option>
+                    <option v-for="g in catalog.grades" :key="g.value" :value="g.value">{{ g.label }} ({{ g.value }})</option>
+                  </select>
+                </div>
+
+                <p v-if="!editSpecialties.length" class="spec-empty">لا توجد تخصصات مضافة. اضغط "إضافة تخصص".</p>
+
+                <div v-for="(row, i) in editSpecialties" :key="i" class="spec-edit-row">
+                  <div class="md-input-group">
+                    <label>المجال</label>
+                    <select v-model.number="row.field_lk_type" class="md-fi">
+                      <option :value="null">— اختر —</option>
+                      <option v-for="f in catalog.fields" :key="f.id" :value="f.id">{{ f.name }}</option>
+                    </select>
+                  </div>
+                  <div class="md-input-group">
+                    <label>الاختصاص</label>
+                    <select v-model.number="row.specialization_lk_type" class="md-fi">
+                      <option :value="null">— اختر —</option>
+                      <option v-for="s in catalog.specializations" :key="s.id" :value="s.id">{{ s.name }}</option>
+                    </select>
+                  </div>
+                  <div class="md-input-group">
+                    <label>الدرجة</label>
+                    <select v-model="row.classification" class="md-fi">
+                      <option :value="null">— غير محدد —</option>
+                      <option v-for="g in catalog.grades" :key="g.value" :value="g.value">{{ g.label }}</option>
+                    </select>
+                  </div>
+                  <button type="button" class="spec-row-remove" title="حذف" @click="removeSpecRow(i)"><X :size="16" /></button>
+                </div>
+              </div>
+
               <div class="md-form-actions">
                 <button type="button" class="md-action-btn outline" @click="cancelEdit"><X :size="16" /> إلغاء</button>
                 <button type="submit" class="md-action-btn" :disabled="isSaving">
@@ -856,11 +961,11 @@ function downloadDoc(url: string, title: string) {
               </div>
             </form>
 
-            <!-- التخصصات والتصنيفات -->
-            <div v-if="contractorFields.length" class="page-title-area">
+            <!-- التخصصات والتصنيفات (عرض للقراءة — يختفي أثناء التعديل) -->
+            <div v-if="!editMode && contractorFields.length" class="page-title-area">
               <h2>التخصصات والتصنيفات</h2>
             </div>
-            <div v-if="contractorFields.length" class="specialties-card">
+            <div v-if="!editMode && contractorFields.length" class="specialties-card">
               <template v-for="(group, gi) in contractorFields" :key="group.field_id ?? gi">
                 <div class="specialty-group-header">
                   <Award :size="16" />
@@ -1451,4 +1556,26 @@ textarea.md-fi { resize: vertical; }
   .md-docs-grid { grid-template-columns: 1fr; }
   .md-doc-row { flex-direction: column; align-items: stretch; }
 }
+
+/* ─── محرّر التخصصات ─── */
+.spec-editor { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px dashed var(--border); }
+.spec-editor-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; gap: 1rem; flex-wrap: wrap; }
+.spec-editor-head h3 { font-size: 1.05rem; font-weight: 800; color: var(--primary); }
+.md-action-btn.sm { padding: .45rem .8rem; font-size: .82rem; }
+.spec-empty { font-size: .88rem; color: var(--text-muted); padding: .5rem 0 1rem; }
+.spec-edit-row { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: .75rem; align-items: end; margin-bottom: .85rem; }
+.spec-row-remove { background: var(--red-light, #fce4ec); color: #c62828; border: none; border-radius: 8px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+.spec-row-remove:hover { background: #c62828; color: #fff; }
+@media (max-width: 700px) { .spec-edit-row { grid-template-columns: 1fr 1fr; } .spec-row-remove { grid-column: 2; justify-self: end; } }
+
+/* ─── إشعار التفعيل (toast) ─── */
+.activated-toast {
+  position: fixed; inset-block-start: 1.25rem; inset-inline: 0; margin-inline: auto;
+  width: max-content; max-width: 90vw; z-index: 3000;
+  display: flex; align-items: center; gap: .6rem;
+  background: #16a34a; color: #fff; font-weight: 700; font-size: .95rem;
+  padding: .85rem 1.4rem; border-radius: 12px; box-shadow: 0 12px 32px rgba(22,163,74,.35);
+}
+.toast-fade-enter-active, .toast-fade-leave-active { transition: opacity .35s, transform .35s; }
+.toast-fade-enter-from, .toast-fade-leave-to { opacity: 0; transform: translateY(-14px); }
 </style>

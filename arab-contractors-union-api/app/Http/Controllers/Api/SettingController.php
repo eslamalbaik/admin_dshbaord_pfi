@@ -147,6 +147,31 @@ class SettingController extends Controller
         return $this->success(['governorates' => $governorates->values()], 'تم جلب المحافظات والمدن بنجاح');
     }
 
+    /**
+     * GET /api/v1/app/specialties-catalog
+     * كتالوج المجالات والاختصاصات والدرجات — لتعبئة محرّر التخصصات في ملف المقاول.
+     */
+    public function specialtiesCatalog()
+    {
+        $mapToList = fn (array $map) => collect($map)
+            ->map(fn ($name, $id) => ['id' => (int) $id, 'name' => $name])
+            ->values();
+
+        $grades = collect(\App\Models\Contractor::CLASSIFICATION_LABELS)
+            ->map(fn ($label, $value) => [
+                'value' => $value,
+                'label' => $label,
+                'level' => \App\Support\ContractorLookups::GRADE_LEVELS[$value] ?? null,
+            ])
+            ->values();
+
+        return $this->success([
+            'fields'          => $mapToList(\App\Support\ContractorLookups::FIELDS),
+            'specializations' => $mapToList(\App\Support\ContractorLookups::SPECIALIZATIONS),
+            'grades'          => $grades,
+        ], 'تم جلب كتالوج التخصصات بنجاح');
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     //  Admin Dashboard
     // ─────────────────────────────────────────────────────────────────────────

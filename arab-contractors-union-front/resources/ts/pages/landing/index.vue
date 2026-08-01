@@ -7,12 +7,12 @@ import {
   ClipboardList, Megaphone, Wrench,
   HardHat, Building2, CalendarDays, Award,
   Scale, BookOpen, Landmark, Handshake, ChartBar,
-  Newspaper, Eye, EyeOff, X, Check, PartyPopper,
+  Newspaper, Check,
   ChevronLeft, ChevronDown, Menu,
   ShieldCheck, Users, Globe, Lightbulb, TrendingUp, Star,
   Zap, FileText, MessageSquare, PlayCircle, GraduationCap,
   Truck, Droplets, Flame, Factory, Home, TreePine,
-  ArrowLeft, ArrowRight, LogIn, UserPlus, RefreshCw,
+  ArrowLeft, ArrowRight,
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -21,150 +21,7 @@ definePage({
   meta: { layout: 'landing', public: true, unauthenticatedOnly: false },
 })
 
-// ─── Modal ────────────────────────────────────────────────────────────────────
-// التدفق: choose (تسجيل دخول أو تسجيل جديد) → verify → set-password → verify-otp (للحساب الجديد فقط) → login
-type Step = 'idle' | 'choose' | 'login-direct' | 'verify' | 'set-password' | 'verify-otp' | 'login' | 'success'
-const step = ref<Step>('idle')
-const showRegisterModal = ref(false)
-const directLoginForm = ref({ membership_number: '', password: '' })
-const verifyForm   = ref({ membership_number: '', commercial_register: '' })
-const passwordForm = ref({ password: '', password_confirmation: '' })
-const otpForm       = ref({ otp: '' })
-const otpPreview    = ref('')
-const showPwd  = ref(false)
-const showPwdC = ref(false)
-const showLoginPwd = ref(false)
-const showDirectPwd = ref(false)
-const foundContractor = ref<{ name: string; trade: string; classification: string } | null>(null)
-const loginForm = ref({ password: '' })
-const isLoading = ref(false)
-const errorMsg  = ref('')
-
-const degLabel: Record<string, string> = {
-  A1: 'الدرجة الأولى أ', A2: 'الدرجة الأولى ب',
-  B: 'الثانية', C: 'الثالثة', D: 'الرابعة', E: 'الخامسة',
-}
-
-function openModal() {
-  step.value = 'choose'; showRegisterModal.value = true; errorMsg.value = ''
-  directLoginForm.value = { membership_number: '', password: '' }
-  verifyForm.value = { membership_number: '', commercial_register: '' }
-  passwordForm.value = { password: '', password_confirmation: '' }
-  otpForm.value = { otp: '' }
-  otpPreview.value = ''
-  loginForm.value = { password: '' }
-  foundContractor.value = null
-}
-function closeModal() { showRegisterModal.value = false; step.value = 'idle' }
-
-async function persistLogin(token: string) {
-  localStorage.setItem('contractor_token', token)
-  window.dispatchEvent(new CustomEvent('contractor-logged-in'))
-}
-
-async function handleDirectLogin() {
-  errorMsg.value = ''
-  if (!directLoginForm.value.membership_number || !directLoginForm.value.password)
-    return (errorMsg.value = 'يرجى تعبئة جميع الحقول.')
-  isLoading.value = true
-  try {
-    const r = await api.post('/api/v1/contractor/auth/login', directLoginForm.value)
-    await persistLogin(r.data.items?.token)
-    closeModal()
-  } catch (e: any) {
-    errorMsg.value = e?.response?.data?.message || 'بيانات الدخول غير صحيحة.'
-  } finally { isLoading.value = false }
-}
-
-async function handleVerify() {
-  errorMsg.value = ''
-  if (!verifyForm.value.membership_number || !verifyForm.value.commercial_register)
-    return (errorMsg.value = 'يرجى تعبئة جميع الحقول.')
-  isLoading.value = true
-  try {
-    const r = await api.post('/api/v1/contractor/auth/verify-identity', verifyForm.value)
-    foundContractor.value = r.data.items
-    step.value = 'set-password'
-  } catch (e: any) {
-    if (e?.response?.data?.error === 'already_registered') {
-      foundContractor.value = e.response.data.items ?? null
-      step.value = 'login'
-    } else {
-      errorMsg.value = e?.response?.data?.message || 'لم يتم العثور على المقاول.'
-    }
-  } finally { isLoading.value = false }
-}
-
-async function handleLogin() {
-  errorMsg.value = ''
-  if (!loginForm.value.password) return (errorMsg.value = 'أدخل كلمة المرور.')
-  isLoading.value = true
-  try {
-    const r = await api.post('/api/v1/contractor/auth/login', {
-      membership_number: verifyForm.value.membership_number,
-      password: loginForm.value.password,
-    })
-    await persistLogin(r.data.items?.token)
-    closeModal()
-  } catch (e: any) {
-    errorMsg.value = e?.response?.data?.message || 'كلمة المرور غير صحيحة.'
-  } finally { isLoading.value = false }
-}
-
-async function handleSetPassword() {
-  errorMsg.value = ''
-  if (passwordForm.value.password.length < 8)
-    return (errorMsg.value = 'كلمة المرور 8 أحرف على الأقل.')
-  if (passwordForm.value.password !== passwordForm.value.password_confirmation)
-    return (errorMsg.value = 'كلمتا المرور غير متطابقتين.')
-  isLoading.value = true
-  try {
-    const r = await api.post('/api/v1/contractor/auth/set-password', { ...verifyForm.value, ...passwordForm.value })
-    if (r.data.items?.token) {
-      // عضو كان مفعّلاً مسبقاً — يسجَّل الدخول مباشرة
-      await persistLogin(r.data.items.token)
-      step.value = 'success'
-    } else {
-      // تسجيل جديد — تم إرسال رمز تحقق SMS، يجب تفعيله قبل الدخول
-      otpPreview.value = r.data.items?.otp_preview ?? ''
-      otpForm.value = { otp: '' }
-      step.value = 'verify-otp'
-    }
-  } catch (e: any) {
-    errorMsg.value = e?.response?.data?.message || 'حدث خطأ.'
-  } finally { isLoading.value = false }
-}
-
-async function handleVerifyOtp() {
-  errorMsg.value = ''
-  if (!otpForm.value.otp) return (errorMsg.value = 'أدخل رمز التحقق.')
-  isLoading.value = true
-  try {
-    await api.post('/api/v1/contractor/auth/verify-otp', {
-      membership_number: verifyForm.value.membership_number,
-      commercial_register: verifyForm.value.commercial_register,
-      otp: otpForm.value.otp,
-    })
-    loginForm.value = { password: '' }
-    step.value = 'login'
-  } catch (e: any) {
-    errorMsg.value = e?.response?.data?.message || 'رمز التحقق غير صحيح أو منتهي.'
-  } finally { isLoading.value = false }
-}
-
-async function handleResendOtp() {
-  errorMsg.value = ''
-  isLoading.value = true
-  try {
-    const r = await api.post('/api/v1/contractor/auth/resend-otp', {
-      membership_number: verifyForm.value.membership_number,
-      commercial_register: verifyForm.value.commercial_register,
-    })
-    otpPreview.value = r.data.items?.otp_preview ?? otpPreview.value
-  } catch (e: any) {
-    errorMsg.value = e?.response?.data?.message || 'تعذر إعادة إرسال الرمز.'
-  } finally { isLoading.value = false }
-}
+function goToRegister() { router.push('/contractor/login') }
 
 // ─── News ─────────────────────────────────────────────────────────────────────
 interface NewsItem { id:number; title:string; slug:string; excerpt:string|null; image:string|null; category:string; published_at:string }
@@ -175,14 +32,6 @@ function fmtDate(d: string) {
 }
 
 onMounted(async () => {
-  window.addEventListener('open-register-modal', openModal)
-
-  // Check URL query action — يفتح شاشة الاختيار (دخول/تسجيل جديد) دائماً كنقطة انطلاق موحّدة
-  const params = new URLSearchParams(window.location.search)
-  if (params.get('action') === 'register' || params.get('action') === 'login') {
-    openModal()
-  }
-
   // نداء موحّد واحد لكل بيانات الصفحة الرئيسية (أخبار + إحصائيات + بيانات الاتحاد)
   try {
     const r = await api.get('/api/v1/landing/home')
@@ -358,7 +207,7 @@ const degrees = [
             وتطوير المهنة، وتعزيز الشراكة مع المؤسسات الحكومية والقطاع الخاص للنهوض بقطاع الإنشاءات في فلسطين.
           </p>
           <div class="hero-actions">
-            <button class="btn-hero-primary" @click="openModal">
+            <button class="btn-hero-primary" @click="goToRegister">
               <HardHat :size="18" /> انضم إلى الاتحاد
             </button>
             <a href="#services" class="btn-hero-secondary">
@@ -590,7 +439,7 @@ const degrees = [
         </div>
         <div class="deg-cta">
           <p class="deg-cta-text">هل أنت مقاول مسجّل؟ فعّل حسابك الآن وابدأ رحلتك مع الاتحاد.</p>
-          <button class="btn-primary" @click="openModal">تفعيل الحساب الآن</button>
+          <button class="btn-primary" @click="goToRegister">تفعيل الحساب الآن</button>
         </div>
       </div>
     </section>
@@ -805,201 +654,6 @@ const degrees = [
         </div>
       </div>
     </section>
-
-    <!-- ══ FOOTER ══ -->
-    
-    <!-- ══ MODAL ══ -->
-    <Teleport to="body">
-      <div v-if="showRegisterModal" class="modal-overlay" @click.self="closeModal">
-        <div class="modal-box" dir="rtl">
-          <div class="modal-hdr">
-            <div class="modal-hdr-title">
-              <img src="/logo.png" alt="" class="modal-logo" />
-              <h3>
-                {{ step === 'choose' ? 'أهلاً بك' : step === 'login-direct' ? 'تسجيل الدخول' : 'تفعيل عضوية المقاول' }}
-              </h3>
-            </div>
-            <button class="modal-close" @click="closeModal"><X :size="18" /></button>
-          </div>
-
-          <div class="modal-inner">
-
-            <div v-if="step === 'choose'" class="modal-body">
-              <p class="modal-hint">هل لديك عضوية بالفعل، أم تريد تسجيل عضوية جديدة؟</p>
-              <div class="choose-grid">
-                <button class="choose-card" @click="step = 'login-direct'; errorMsg = ''">
-                  <div class="choose-ico"><LogIn :size="24" /></div>
-                  <strong>تسجيل الدخول</strong>
-                  <p>لديّ عضوية مفعّلة — أدخل رقم العضوية وكلمة المرور</p>
-                </button>
-                <button class="choose-card" @click="step = 'verify'; errorMsg = ''">
-                  <div class="choose-ico choose-ico-alt"><UserPlus :size="24" /></div>
-                  <strong>تسجيل جديد</strong>
-                  <p>لديّ رقم عضوية ولم أفعّل حسابي بعد</p>
-                </button>
-              </div>
-              <div class="modal-test-hint">
-                بيانات تجريبية للاختبار: رقم العضوية <strong>928_g</strong> — كلمة المرور <strong>Test@12345</strong>
-              </div>
-            </div>
-
-            <div v-else-if="step === 'login-direct'" class="modal-body">
-              <div v-if="errorMsg" class="modal-err">{{ errorMsg }}</div>
-              <div class="fg">
-                <label>رقم العضوية *</label>
-                <input v-model="directLoginForm.membership_number" type="text" placeholder="مثال: 928_g" class="fi" @keyup.enter="handleDirectLogin" />
-              </div>
-              <div class="fg">
-                <label>كلمة المرور *</label>
-                <div class="pw-wrap">
-                  <input v-model="directLoginForm.password" :type="showDirectPwd ? 'text' : 'password'" placeholder="••••••••" class="fi" @keyup.enter="handleDirectLogin" />
-                  <button class="pw-eye" @click="showDirectPwd = !showDirectPwd">
-                    <EyeOff v-if="showDirectPwd" :size="16" /><Eye v-else :size="16" />
-                  </button>
-                </div>
-              </div>
-              <div class="modal-test-hint">
-                بيانات تجريبية للاختبار: رقم العضوية <strong>928_g</strong> — كلمة المرور <strong>Test@12345</strong>
-              </div>
-            </div>
-
-            <div v-else-if="step === 'verify'" class="modal-body">
-              <div class="msteps">
-                <div class="ms active">١</div>
-                <div class="ms-line" />
-                <div class="ms">٢</div>
-              </div>
-              <p class="modal-hint">أدخل رقم عضويتك والسجل التجاري للتحقق من هويتك.</p>
-              <div v-if="errorMsg" class="modal-err">{{ errorMsg }}</div>
-              <div class="fg">
-                <label>رقم العضوية *</label>
-                <input v-model="verifyForm.membership_number" type="text" placeholder="مثال: MEM-2024-001" class="fi" @keyup.enter="handleVerify" />
-              </div>
-              <div class="fg">
-                <label>رقم السجل التجاري *</label>
-                <input v-model="verifyForm.commercial_register" type="text" placeholder="رقم السجل التجاري" class="fi" @keyup.enter="handleVerify" />
-              </div>
-            </div>
-
-            <div v-else-if="step === 'login'" class="modal-body">
-              <div class="login-banner">
-                <div class="found-av">{{ foundContractor?.name?.charAt(0) ?? '?' }}</div>
-                <div>
-                  <strong>{{ foundContractor?.name }}</strong>
-                  <p>حسابك مفعّل — أدخل كلمة المرور للدخول</p>
-                </div>
-              </div>
-              <div v-if="errorMsg" class="modal-err">{{ errorMsg }}</div>
-              <div class="fg">
-                <label>كلمة المرور *</label>
-                <div class="pw-wrap">
-                  <input v-model="loginForm.password" :type="showLoginPwd ? 'text' : 'password'" placeholder="••••••••" class="fi" @keyup.enter="handleLogin" />
-                  <button class="pw-eye" @click="showLoginPwd = !showLoginPwd">
-                    <EyeOff v-if="showLoginPwd" :size="16" /><Eye v-else :size="16" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div v-else-if="step === 'verify-otp'" class="modal-body">
-              <div class="msteps">
-                <div class="ms done"><Check :size="14" /></div>
-                <div class="ms-line filled" />
-                <div class="ms done"><Check :size="14" /></div>
-              </div>
-              <p class="modal-hint">
-                أرسلنا رمز تحقق إلى جوالك المسجّل. أدخله لتفعيل الحساب.
-                <span v-if="otpPreview"> (رمز الاختبار: <strong>{{ otpPreview }}</strong>)</span>
-              </p>
-              <div v-if="errorMsg" class="modal-err">{{ errorMsg }}</div>
-              <div class="fg">
-                <label>رمز التحقق *</label>
-                <input v-model="otpForm.otp" type="text" inputmode="numeric" placeholder="000000" class="fi" @keyup.enter="handleVerifyOtp" />
-              </div>
-              <button class="modal-resend" type="button" :disabled="isLoading" @click="handleResendOtp">
-                <RefreshCw :size="13" /> إعادة إرسال الرمز
-              </button>
-            </div>
-
-            <div v-else-if="step === 'set-password'" class="modal-body">
-              <div class="msteps">
-                <div class="ms done"><Check :size="14" /></div>
-                <div class="ms-line filled" />
-                <div class="ms active">٢</div>
-              </div>
-              <div v-if="foundContractor" class="found-card">
-                <div class="found-av">{{ foundContractor.name.charAt(0) }}</div>
-                <div>
-                  <strong>{{ foundContractor.name }}</strong>
-                  <p>{{ foundContractor.trade }} — {{ degLabel[foundContractor.classification] ?? foundContractor.classification }}</p>
-                </div>
-              </div>
-              <p class="modal-hint">أنشئ كلمة مرور قوية — ٨ أحرف على الأقل.</p>
-              <div v-if="errorMsg" class="modal-err">{{ errorMsg }}</div>
-              <div class="fg">
-                <label>كلمة المرور *</label>
-                <div class="pw-wrap">
-                  <input v-model="passwordForm.password" :type="showPwd ? 'text' : 'password'" placeholder="••••••••" class="fi" />
-                  <button class="pw-eye" @click="showPwd = !showPwd">
-                    <EyeOff v-if="showPwd" :size="16" /><Eye v-else :size="16" />
-                  </button>
-                </div>
-              </div>
-              <div class="fg">
-                <label>تأكيد كلمة المرور *</label>
-                <div class="pw-wrap">
-                  <input v-model="passwordForm.password_confirmation" :type="showPwdC ? 'text' : 'password'" placeholder="••••••••" class="fi" @keyup.enter="handleSetPassword" />
-                  <button class="pw-eye" @click="showPwdC = !showPwdC">
-                    <EyeOff v-if="showPwdC" :size="16" /><Eye v-else :size="16" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div v-else-if="step === 'success'" class="modal-body success-body">
-              <div class="s-icon"><PartyPopper :size="52" /></div>
-              <h3>تم تفعيل حسابك بنجاح!</h3>
-              <p>مرحباً بك في اتحاد المقاولين الفلسطينيين.</p>
-            </div>
-
-            <div class="modal-ftr">
-              <template v-if="step === 'login-direct'">
-                <button class="mbtn-s" @click="step = 'choose'; errorMsg = ''">رجوع</button>
-                <button class="mbtn-p" :disabled="isLoading" @click="handleDirectLogin">
-                  <span v-if="isLoading" class="spin" /><span v-else>تسجيل الدخول</span>
-                </button>
-              </template>
-              <template v-else-if="step === 'verify'">
-                <button class="mbtn-s" @click="step = 'choose'; errorMsg = ''">رجوع</button>
-                <button class="mbtn-p" :disabled="isLoading" @click="handleVerify">
-                  <span v-if="isLoading" class="spin" /><span v-else>التحقق من الهوية</span>
-                </button>
-              </template>
-              <template v-else-if="step === 'login'">
-                <button class="mbtn-p" :disabled="isLoading" @click="handleLogin">
-                  <span v-if="isLoading" class="spin" /><span v-else>تسجيل الدخول</span>
-                </button>
-              </template>
-              <template v-else-if="step === 'set-password'">
-                <button class="mbtn-s" @click="step = 'verify'">رجوع</button>
-                <button class="mbtn-p" :disabled="isLoading" @click="handleSetPassword">
-                  <span v-if="isLoading" class="spin" /><span v-else>تفعيل الحساب</span>
-                </button>
-              </template>
-              <template v-else-if="step === 'verify-otp'">
-                <button class="mbtn-p" :disabled="isLoading" @click="handleVerifyOtp">
-                  <span v-if="isLoading" class="spin" /><span v-else>تفعيل الحساب</span>
-                </button>
-              </template>
-              <template v-else-if="step === 'success'">
-                <button class="mbtn-p" @click="closeModal">إغلاق</button>
-              </template>
-            </div>
-
-          </div>
-        </div>
-      </div>
-    </Teleport>
 
   </div>
 </template>
@@ -1704,76 +1358,6 @@ const degrees = [
 .float-whatsapp:hover { background: #128c7e; transform: translateY(-3px) scale(1.04); box-shadow: 0 10px 28px rgba(37,211,102,.45); }
 .float-whatsapp-label { white-space: nowrap; }
 @keyframes float-wa { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
-
-/* ─── Modal ────────────────────────────────────────────────────────────────── */
-.modal-overlay {
-  position: fixed; inset: 0; background: rgba(13,27,75,.45); z-index: 999;
-  display: flex; align-items: center; justify-content: center;
-  padding: 1.5rem; backdrop-filter: blur(8px); overflow-y: auto;
-}
-.modal-box {
-  background: #fff; border-radius: 22px; width: 100%; max-width: 490px;
-  display: flex; flex-direction: column;
-  box-shadow: 0 30px 80px rgba(13,27,75,.25); overflow: hidden; max-height: 92vh;
-}
-.modal-hdr {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 1.25rem 1.5rem;
-  background: linear-gradient(135deg, var(--navy-mid), var(--navy));
-  flex-shrink: 0;
-}
-.modal-inner { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
-.modal-body { padding: 1.75rem; overflow-y: auto; flex: 1; }
-.modal-hdr-title { display: flex; align-items: center; gap: .7rem; }
-.modal-logo { height: 38px; width: auto; filter: brightness(0) invert(1); }
-.modal-hdr h3 { font-size: 1rem; font-weight: 800; color: #fff; font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; }
-.modal-close { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.2); color: rgba(255,255,255,.8); cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 8px; padding: .4rem; transition: all .2s; }
-.modal-close:hover { background: rgba(255,255,255,.25); color: #fff; }
-.modal-ftr { padding: 1.1rem 1.5rem; border-top: 1px solid var(--border); display: flex; gap: .75rem; justify-content: flex-end; flex-shrink: 0; background: #fafafa; }
-.msteps { display: flex; align-items: center; justify-content: center; margin-bottom: 1.75rem; }
-.ms { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: .85rem; font-weight: 800; color: var(--text-m); }
-.ms.active { border-color: var(--navy-mid); color: var(--navy-mid); background: var(--navy-light); }
-.ms.done { border-color: var(--green); background: var(--green); color: #fff; }
-.ms-line { flex: 1; max-width: 80px; height: 2px; background: var(--border); margin: 0 .5rem; }
-.ms-line.filled { background: var(--navy-mid); }
-.modal-hint { font-size: .875rem; color: var(--text-m); line-height: 1.75; margin-bottom: 1.5rem; }
-.modal-err { background: var(--red-light); color: var(--red); border: 1px solid #ef9a9a; border-radius: 10px; padding: .8rem 1rem; font-size: .85rem; margin-bottom: 1.1rem; }
-.fg { margin-bottom: 1.1rem; }
-.fg label { display: block; font-size: .82rem; font-weight: 700; color: var(--text-h); margin-bottom: .4rem; }
-.pw-wrap { position: relative; display: flex; align-items: center; }
-.pw-wrap .fi { padding-inline-end: 2.75rem; }
-.pw-eye { position: absolute; inset-inline-end: .8rem; background: none; border: none; cursor: pointer; color: var(--text-m); display: flex; align-items: center; transition: color .2s; }
-.pw-eye:hover { color: var(--navy); }
-.login-banner { display: flex; align-items: center; gap: 1rem; background: var(--navy-light); border: 1px solid #c5cae9; border-radius: 14px; padding: 1rem; margin-bottom: 1.5rem; }
-.login-banner strong { display: block; font-weight: 800; font-size: .9rem; color: var(--text-h); }
-.login-banner p { margin: .2rem 0 0; font-size: .78rem; color: var(--text-m); }
-.found-card { display: flex; align-items: center; gap: 1rem; background: var(--green-light); border: 1px solid #a5d6a7; border-radius: 14px; padding: 1rem; margin-bottom: 1.5rem; }
-.found-av { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, var(--navy-mid), var(--navy)); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 800; flex-shrink: 0; font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; }
-.found-card strong { display: block; font-weight: 800; font-size: .9rem; color: var(--text-h); }
-.found-card p { margin: .2rem 0 0; font-size: .78rem; color: var(--text-m); }
-.mbtn-p { background: linear-gradient(135deg, var(--navy-mid), var(--navy)); color: #fff; border: none; border-radius: 9px; padding: .65rem 1.6rem; font-size: .875rem; font-weight: 700; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: .5rem; transition: all .2s; }
-.mbtn-p:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(13,27,75,.3); }
-.mbtn-p:disabled { opacity: .6; cursor: not-allowed; }
-.mbtn-s { background: #fff; color: var(--text-b); border: 1.5px solid var(--border); border-radius: 9px; padding: .65rem 1.4rem; font-size: .875rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: all .2s; }
-.mbtn-s:hover { border-color: var(--navy-mid); color: var(--navy); }
-.choose-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem; }
-.choose-card { display: flex; flex-direction: column; align-items: flex-start; gap: .5rem; text-align: right; background: #fff; border: 1.5px solid var(--border); border-radius: 14px; padding: 1.1rem; cursor: pointer; font-family: inherit; transition: all .2s; }
-.choose-card:hover { border-color: var(--navy-mid); box-shadow: 0 6px 20px rgba(13,27,75,.12); transform: translateY(-2px); }
-.choose-card strong { font-size: .92rem; color: var(--text-h); font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; }
-.choose-card p { margin: 0; font-size: .78rem; color: var(--text-m); line-height: 1.6; }
-.choose-ico { width: 42px; height: 42px; border-radius: 10px; background: var(--navy-light); color: var(--navy-mid); display: flex; align-items: center; justify-content: center; }
-.choose-ico-alt { background: var(--gold-light); color: var(--gold-dark); }
-.modal-test-hint { background: var(--gold-light); border: 1px dashed var(--gold-dark); color: #8a5a00; border-radius: 10px; padding: .6rem .9rem; font-size: .76rem; line-height: 1.7; }
-.modal-resend { display: flex; align-items: center; gap: .4rem; background: none; border: none; color: var(--navy-mid); font-size: .8rem; font-weight: 700; cursor: pointer; font-family: inherit; margin-top: .25rem; }
-.modal-resend:hover { text-decoration: underline; }
-.modal-resend:disabled { opacity: .6; cursor: not-allowed; }
-@media (max-width: 560px) { .choose-grid { grid-template-columns: 1fr; } }
-.success-body { text-align: center; padding: 3rem 1.5rem; }
-.s-icon { color: var(--gold); margin-bottom: 1rem; display: flex; justify-content: center; }
-.success-body h3 { font-size: 1.3rem; font-weight: 800; margin-bottom: .75rem; color: var(--text-h); font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; }
-.success-body p { color: var(--text-m); font-size: .9rem; line-height: 1.75; }
-.spin { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: sp .7s linear infinite; display: inline-block; }
-@keyframes sp { to { transform: rotate(360deg); } }
 
 .nb-user { display: flex; align-items: center; gap: .6rem; flex-shrink: 0; }
 .nb-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--navy-mid), var(--navy)); color: #fff; display: flex; align-items: center; justify-content: center; font-size: .95rem; font-weight: 800; flex-shrink: 0; }
