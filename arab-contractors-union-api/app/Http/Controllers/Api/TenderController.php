@@ -69,7 +69,7 @@ class TenderController extends Controller
         $validated['created_by'] = Auth::id();
         $tender = Tender::create($validated);
 
-        return $this->success($tender->toArray(), 'تم إضافة المناقصة بنجاح.', 201);
+        return $this->success($tender->toArray(), 'تم إضافة العطاء بنجاح.', 201);
     }
 
     // GET /api/tenders/{id}
@@ -107,7 +107,7 @@ class TenderController extends Controller
 
         $tender->update($validated);
 
-        return $this->success($tender->fresh()->toArray(), 'تم تحديث المناقصة بنجاح.');
+        return $this->success($tender->fresh()->toArray(), 'تم تحديث العطاء بنجاح.');
     }
 
     // DELETE /api/tenders/{id}
@@ -115,7 +115,7 @@ class TenderController extends Controller
     {
         $tender->delete();
 
-        return $this->success(message: 'تم حذف المناقصة بنجاح.');
+        return $this->success(message: 'تم حذف العطاء بنجاح.');
     }
 
     /**

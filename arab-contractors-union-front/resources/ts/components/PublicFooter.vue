@@ -15,7 +15,7 @@ const serviceLinks = [
   { label: 'التدريب وبناء القدرات', href: '/landing/training-center' },
   { label: 'التشريعات والأنظمة', href: '/landing/legislation' },
   { label: 'مكتبة الملفات',    href: '/landing/library' },
-  { label: 'المناقصات والعطاءات', href: '/landing/public-tenders' },
+  { label: 'العطاءات', href: '/landing/public-tenders' },
 ]
 
 const legalLinks = [

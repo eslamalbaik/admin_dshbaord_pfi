@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\SupportTicketController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\CertificateRequestController;
 use App\Http\Controllers\Api\ContractorNameChangeRequestController;
+use App\Http\Controllers\Api\ContractorHomeController;
 
 // ============================================================
 //  API v1
@@ -77,6 +78,10 @@ Route::prefix('v1')->group(function () {
     //  Contractor Dashboard (Protected)
     // --------------------------------------------------------
     Route::middleware(['auth:sanctum', 'contractor.active'])->prefix('contractor')->group(function () {
+        // الشاشة الرئيسية للتطبيق (نداء واحد مجمّع) + سجل التحديثات الكامل
+        Route::get('home',         [ContractorHomeController::class, 'index']);
+        Route::get('home/updates', [ContractorHomeController::class, 'updates']);
+
         Route::get('dashboard',    [ContractorDashboardController::class, 'index']);
         Route::get('memberships',  [ContractorDashboardController::class, 'memberships']);
         Route::get('payments',     [ContractorDashboardController::class, 'payments']);
@@ -90,6 +95,7 @@ Route::prefix('v1')->group(function () {
         Route::get('support-tickets',           [SupportTicketController::class, 'myTickets']);
         Route::post('support-tickets',          [SupportTicketController::class, 'store']);
         Route::get('support-tickets/{ticket}',  [SupportTicketController::class, 'showMine']);
+        Route::post('support-tickets/{ticket}/reply', [SupportTicketController::class, 'replyMine']);
 
         // شاشة طلب شهادة العضوية
         Route::get('certificate-requests',  [CertificateRequestController::class, 'index']);
@@ -116,6 +122,12 @@ Route::prefix('v1')->group(function () {
         Route::get('/',       [NewsController::class, 'index']);
         Route::get('{slug}',  [NewsController::class, 'show']);
     });
+
+    // --------------------------------------------------------
+    //  Announcements — Public (no auth) — كيان مستقل عن الأخبار
+    // --------------------------------------------------------
+    Route::get('announcements',              [\App\Http\Controllers\Api\AnnouncementController::class, 'index']);
+    Route::get('announcements/{announcement}', [\App\Http\Controllers\Api\AnnouncementController::class, 'show']);
 
     // --------------------------------------------------------
     //  Dynamic Pages — Public (صفحات slug ديناميكية)
@@ -233,6 +245,16 @@ Route::prefix('v1')->group(function () {
         });
 
         // --------------------------------------------------------
+        //  Announcements — Admin CRUD
+        // --------------------------------------------------------
+        Route::prefix('admin/announcements')->group(function () {
+            Route::get('/',                  [\App\Http\Controllers\Api\AnnouncementController::class, 'adminIndex']);
+            Route::post('/',                 [\App\Http\Controllers\Api\AnnouncementController::class, 'store']);
+            Route::put('{announcement}',     [\App\Http\Controllers\Api\AnnouncementController::class, 'update']);
+            Route::delete('{announcement}',  [\App\Http\Controllers\Api\AnnouncementController::class, 'destroy']);
+        });
+
+        // --------------------------------------------------------
         //  Terms & Conditions — Admin CRUD
         // --------------------------------------------------------
         Route::get('dashboard/terms',          [TermsController::class, 'index']);
@@ -255,6 +277,7 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('contractors', ContractorController::class)
              ->only(['index', 'store', 'show', 'update', 'destroy']);
         Route::post('contractors/{contractor}/qr', [ContractorController::class, 'generateQR']);
+        Route::patch('contractors/{contractor}/status', [ContractorController::class, 'changeStatus']);
 
         // --------------------------------------------------------
         //  Memberships

@@ -36,7 +36,7 @@ const navLinks = [
     label: 'الخدمات', href: '#',
     children: [
       { label: 'خدمات الاتحاد',  href: '/landing/services' },
-      { label: 'المناقصات',       href: '/landing/public-tenders' },
+      { label: 'العطاءات',        href: '/landing/public-tenders' },
       { label: 'مكتبة الملفات',  href: '/landing/library' },
     ],
   },

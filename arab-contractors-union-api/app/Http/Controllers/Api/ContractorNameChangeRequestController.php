@@ -127,7 +127,7 @@ class ContractorNameChangeRequestController extends Controller
         ]);
 
         $nameChangeRequest->contractor?->update(['name' => $nameChangeRequest->requested_name]);
-        $nameChangeRequest->contractor?->notify(new NameChangeRequestStatusNotification($nameChangeRequest));
+        $this->notifyStatusChange($nameChangeRequest);
 
         return $this->success(message: 'تمت الموافقة على تعديل اسم الشركة.');
     }
@@ -148,8 +148,26 @@ class ContractorNameChangeRequestController extends Controller
             'reviewed_at'   => now(),
         ]);
 
-        $nameChangeRequest->contractor?->notify(new NameChangeRequestStatusNotification($nameChangeRequest));
+        $this->notifyStatusChange($nameChangeRequest);
 
         return $this->success(message: 'تم رفض طلب تعديل اسم الشركة.');
+    }
+
+    /**
+     * إشعار المقاول بحالة طلبه — بدون ما يفشل رد الـ API لو تعطّل البريد.
+     * القرار (موافقة/رفض) نجح فعلاً بالداتابيز قبل هالسطر؛ فشل إرسال إشعار
+     * ثانوي ما لازم يظهر للأدمن كـ "فشل تنفيذ الإجراء" رغم إنه نجح فعلياً.
+     */
+    private function notifyStatusChange(ContractorNameChangeRequest $nameChangeRequest): void
+    {
+        try {
+            $nameChangeRequest->contractor?->notify(new NameChangeRequestStatusNotification($nameChangeRequest));
+        }
+        catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed to send name-change-request status notification', [
+                'request_id' => $nameChangeRequest->id,
+                'error'      => $e->getMessage(),
+            ]);
+        }
     }
 }

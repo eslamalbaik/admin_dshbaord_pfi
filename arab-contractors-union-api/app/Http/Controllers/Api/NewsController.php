@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\News;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class NewsController extends Controller
 {
@@ -23,7 +24,7 @@ class NewsController extends Controller
             $query->where('title', 'like', '%' . $request->search . '%');
 
         $paginator = $query
-            ->select(['id', 'title', 'slug', 'excerpt', 'image', 'video_url', 'external_url', 'category', 'published_at'])
+            ->select(['id', 'title', 'slug', 'excerpt', 'image', 'video_url', 'external_url', 'gallery', 'category', 'published_at', 'event_date', 'event_location'])
             ->paginate($request->integer('per_page', 9));
 
         return $this->paginated($paginator);
@@ -34,7 +35,7 @@ class NewsController extends Controller
     {
         $news = News::published()
             ->latest('published_at')
-            ->select(['id', 'title', 'slug', 'excerpt', 'image', 'video_url', 'external_url', 'category', 'published_at'])
+            ->select(['id', 'title', 'slug', 'excerpt', 'image', 'video_url', 'external_url', 'gallery', 'category', 'published_at', 'event_date', 'event_location'])
             ->limit(3)
             ->get();
 
@@ -73,18 +74,21 @@ class NewsController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'title'        => 'required|string|max:255',
-            'excerpt'      => 'nullable|string|max:500',
-            'body'         => 'required|string',
-            'image'        => 'nullable|string',
-            'video_url'    => 'nullable|url|max:500',
-            'external_url' => 'nullable|url|max:500',
-            'gallery'      => 'nullable|array',
-            'gallery.*'    => 'string',
-            'category'     => 'required|in:news,announcement,event,tender',
-            'is_published' => 'boolean',
-            'published_at' => 'nullable|date',
+            'title'          => 'required|string|max:255',
+            'excerpt'        => 'nullable|string|max:500',
+            'body'           => 'required|string',
+            'image'          => 'nullable',
+            'video_url'      => 'nullable|url|max:500',
+            'external_url'   => 'nullable|url|max:500',
+            'gallery'        => 'nullable|array',
+            'category'       => 'required|in:news,announcement,event,tender',
+            'is_published'   => 'boolean',
+            'published_at'   => 'nullable|date',
+            'event_date'     => 'nullable|date',
+            'event_location' => 'nullable|string|max:255',
         ]);
+
+        $this->handleMediaUploads($request, $validated);
 
         $validated['slug']       = News::generateSlug($validated['title']);
         $validated['created_by'] = $request->user()->id;
@@ -101,18 +105,21 @@ class NewsController extends Controller
     public function update(Request $request, News $news)
     {
         $validated = $request->validate([
-            'title'        => 'sometimes|string|max:255',
-            'excerpt'      => 'nullable|string|max:500',
-            'body'         => 'sometimes|string',
-            'image'        => 'nullable|string',
-            'video_url'    => 'nullable|url|max:500',
-            'external_url' => 'nullable|url|max:500',
-            'gallery'      => 'nullable|array',
-            'gallery.*'    => 'string',
-            'category'     => 'sometimes|in:news,announcement,event,tender',
-            'is_published' => 'boolean',
-            'published_at' => 'nullable|date',
+            'title'          => 'sometimes|string|max:255',
+            'excerpt'        => 'nullable|string|max:500',
+            'body'           => 'sometimes|string',
+            'image'          => 'nullable',
+            'video_url'      => 'nullable|url|max:500',
+            'external_url'   => 'nullable|url|max:500',
+            'gallery'        => 'nullable|array',
+            'category'       => 'sometimes|in:news,announcement,event,tender',
+            'is_published'   => 'boolean',
+            'published_at'   => 'nullable|date',
+            'event_date'     => 'nullable|date',
+            'event_location' => 'nullable|string|max:255',
         ]);
+
+        $this->handleMediaUploads($request, $validated);
 
         if (isset($validated['title']))
             $validated['slug'] = News::generateSlug($validated['title']);
@@ -123,6 +130,20 @@ class NewsController extends Controller
         $news->update($validated);
 
         return $this->success($news->fresh()->toArray(), 'تم تحديث الخبر بنجاح.');
+    }
+
+    // يحوّل ملفات الصورة/المعرض المرفوعة (multipart) إلى روابط عامة داخل مصفوفة $validated
+    private function handleMediaUploads(Request $request, array &$validated): void
+    {
+        if ($request->hasFile('image'))
+            $validated['image'] = Storage::disk('public')->url($request->file('image')->store('news', 'public'));
+
+        if ($request->hasFile('gallery')) {
+            $validated['gallery'] = array_map(
+                fn ($file) => Storage::disk('public')->url($file->store('news/gallery', 'public')),
+                $request->file('gallery'),
+            );
+        }
     }
 
     // DELETE /api/v1/admin/news/{id}

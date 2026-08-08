@@ -35,7 +35,7 @@ const suggestionGroups: SuggestionGroup[] = [
     title: 'الأقسام الرئيسية',
     content: [
       { icon: 'tabler-building-factory-2', title: 'المقاولون',        url: { name: 'contractors' } },
-      { icon: 'tabler-files',              title: 'المناقصات',        url: { name: 'tenders' } },
+      { icon: 'tabler-files',              title: 'العطاءات',        url: { name: 'tenders' } },
       { icon: 'tabler-credit-card',        title: 'المدفوعات',        url: { name: 'payments-transactions' } },
       { icon: 'tabler-alert-triangle',     title: 'الغرامات',         url: { name: 'contractors-penalties' } },
     ],
@@ -54,7 +54,7 @@ const suggestionGroups: SuggestionGroup[] = [
 // 👉 No Data suggestion
 const noDataSuggestions: Suggestion[] = [
   { icon: 'tabler-building-factory-2', title: 'المقاولون',  url: { name: 'contractors' } },
-  { icon: 'tabler-files',              title: 'المناقصات',  url: { name: 'tenders' } },
+  { icon: 'tabler-files',              title: 'العطاءات',  url: { name: 'tenders' } },
   { icon: 'tabler-chart-bar',          title: 'التقارير',   url: { name: 'analytics' } },
 ]
 

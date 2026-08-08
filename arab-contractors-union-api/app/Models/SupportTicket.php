@@ -55,6 +55,11 @@ class SupportTicket extends Model
         return $this->belongsTo(Contractor::class);
     }
 
+    public function messages()
+    {
+        return $this->hasMany(SupportTicketMessage::class)->orderBy('created_at');
+    }
+
     public function repliedBy()
     {
         return $this->belongsTo(User::class, 'replied_by');

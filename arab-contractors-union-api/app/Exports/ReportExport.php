@@ -54,7 +54,7 @@ class ReportExport implements FromArray, WithTitle, WithStyles, ShouldAutoSize
             ['إجمالي الإيرادات', number_format((float)$this->data['revenue'], 2) . ' ₪'],
             ['مقاولون جدد', $this->data['newContractors']],
             ['عضويات نشطة', $this->data['activeMemberships']],
-            ['مناقصات', $this->data['tenders']],
+            ['عطاءات', $this->data['tenders']],
             ['', ''],
 
             // ─── الغرامات ─────────────────────────────────────────

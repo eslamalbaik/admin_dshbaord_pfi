@@ -25,8 +25,10 @@ return new class extends Migration
             $table->text('rejection_reason')->nullable()->after('confirmed_at');
         });
 
-        // إضافة حالة "rejected" إلى enum الحالة
-        DB::statement("ALTER TABLE payments MODIFY COLUMN status ENUM('pending','paid','refunded','failed','rejected') NOT NULL DEFAULT 'pending'");
+        // إضافة حالة "rejected" إلى enum الحالة — MySQL فقط (sqlite بيئة الاختبار لا تدعم MODIFY COLUMN)
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE payments MODIFY COLUMN status ENUM('pending','paid','refunded','failed','rejected') NOT NULL DEFAULT 'pending'");
+        }
     }
 
     public function down(): void
@@ -37,6 +39,8 @@ return new class extends Migration
             $table->dropColumn(['receipt_image', 'submitted_at', 'confirmed_at', 'rejection_reason']);
         });
 
-        DB::statement("ALTER TABLE payments MODIFY COLUMN status ENUM('pending','paid','refunded','failed') NOT NULL DEFAULT 'pending'");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE payments MODIFY COLUMN status ENUM('pending','paid','refunded','failed') NOT NULL DEFAULT 'pending'");
+        }
     }
 };

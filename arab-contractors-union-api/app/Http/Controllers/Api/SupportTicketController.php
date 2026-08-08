@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\SupportTicket;
 use App\Models\User;
+use App\Notifications\SupportTicketContractorRepliedNotification;
 use App\Notifications\SupportTicketCreatedNotification;
 use App\Notifications\SupportTicketRepliedNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 
 class SupportTicketController extends Controller
@@ -34,7 +36,21 @@ class SupportTicketController extends Controller
             'replied_by'     => $t->repliedBy?->name,
             'replied_at'     => $t->replied_at,
             'created_at'     => $t->created_at,
+            'messages'       => $this->formatMessages($t),
         ];
+    }
+
+    /** سجل المحادثة الكامل — الرسالة الأصلية أول فقاعة، ثم كل الردود بالترتيب الزمني */
+    private function formatMessages(SupportTicket $t): array
+    {
+        return $t->messages->map(fn ($m) => [
+            'id'             => $m->id,
+            'sender_type'    => $m->sender_type,
+            'sender_name'    => $m->sender_name,
+            'message'        => $m->message,
+            'attachment_url' => $m->attachment_url,
+            'created_at'     => $m->created_at,
+        ])->values()->all();
     }
 
     /**
@@ -61,6 +77,7 @@ class SupportTicketController extends Controller
                 'replied_by' => $t->repliedBy?->name,
                 'replied_at' => $t->replied_at,
             ] : null,
+            'messages'       => $this->formatMessages($t),
             'contractor'     => $t->contractor ? [
                 'id'                => $t->contractor->id,
                 'name'              => $t->contractor->name,
@@ -122,7 +139,7 @@ class SupportTicketController extends Controller
      */
     public function myTickets(Request $request)
     {
-        $paginator = SupportTicket::with('repliedBy:id,name')
+        $paginator = SupportTicket::with(['repliedBy:id,name', 'messages'])
             ->where('contractor_id', $request->user()->id)
             ->latest()
             ->paginate($request->integer('per_page', 15))
@@ -142,7 +159,7 @@ class SupportTicketController extends Controller
         }
 
         return $this->success($this->formatDetails(
-            $ticket->load(['repliedBy:id,name', 'contractor:id,name,membership_number'])
+            $ticket->load(['repliedBy:id,name', 'contractor:id,name,membership_number', 'messages'])
         ));
     }
 
@@ -153,7 +170,7 @@ class SupportTicketController extends Controller
     /** GET /api/v1/dashboard/support-tickets */
     public function index(Request $request)
     {
-        $query = SupportTicket::with(['contractor:id,name', 'repliedBy:id,name']);
+        $query = SupportTicket::with(['contractor:id,name', 'repliedBy:id,name', 'messages']);
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -180,13 +197,13 @@ class SupportTicketController extends Controller
     public function show(SupportTicket $ticket)
     {
         return $this->success($this->formatDetails(
-            $ticket->load(['contractor:id,name,membership_number', 'repliedBy:id,name'])
+            $ticket->load(['contractor:id,name,membership_number', 'repliedBy:id,name', 'messages'])
         ));
     }
 
     /**
      * POST /api/v1/dashboard/support-tickets/{ticket}/reply
-     * ترد الإدارة على التذكرة → إشعار للمقاول عبر البريد والتطبيق.
+     * ترد الإدارة على التذكرة (رسالة جديدة بالمحادثة) → إشعار للمقاول عبر البريد والتطبيق.
      */
     public function reply(Request $request, SupportTicket $ticket)
     {
@@ -194,19 +211,87 @@ class SupportTicketController extends Controller
             'reply' => 'required|string|max:5000',
         ]);
 
+        $ticket->messages()->create([
+            'sender_type' => 'admin',
+            'sender_id'   => Auth::id(),
+            'message'     => $data['reply'],
+        ]);
+
+        // نحافظ على reply/replied_by/replied_at كـ"آخر رد" لعرضه بقائمة التذاكر بدون تحميل المحادثة كاملة
         $ticket->update([
             'reply'      => $data['reply'],
-            'status'     => 'answered',
+            'status'     => $ticket->status === 'closed' ? 'closed' : 'answered',
             'replied_by' => Auth::id(),
             'replied_at' => now(),
         ]);
 
-        // إشعار المقاول عبر البريد الإلكتروني وإشعار داخل التطبيق
+        // إشعار المقاول عبر البريد الإلكتروني وإشعار داخل التطبيق — فشل الإشعار (مثلاً تعليق SMTP)
+        // ما لازم يفشّل الرد نفسه، لأن الرد أصلاً نجح بالداتابيز قبل هالسطر.
         if ($ticket->contractor) {
-            $ticket->contractor->notify(new SupportTicketRepliedNotification($ticket));
+            try {
+                $ticket->contractor->notify(new SupportTicketRepliedNotification($ticket));
+            }
+            catch (\Throwable $e) {
+                Log::warning('Failed to send support ticket reply notification', [
+                    'ticket_id' => $ticket->id,
+                    'error'     => $e->getMessage(),
+                ]);
+            }
         }
 
-        return $this->success($this->format($ticket->fresh(['contractor:id,name', 'repliedBy:id,name'])), 'تم إرسال الرد بنجاح.');
+        return $this->success(
+            $this->format($ticket->fresh(['contractor:id,name', 'repliedBy:id,name', 'messages'])),
+            'تم إرسال الرد بنجاح.',
+        );
+    }
+
+    /**
+     * POST /api/v1/contractor/support-tickets/{ticket}/reply
+     * يضيف المقاول رسالة متابعة على تذكرته — يعيد فتحها تلقائياً إن كانت "تم الرد".
+     */
+    public function replyMine(Request $request, SupportTicket $ticket)
+    {
+        $contractor = $request->user();
+
+        if ($ticket->contractor_id !== $contractor->id) {
+            return $this->error('غير مصرّح بالوصول إلى هذا الطلب.', 403);
+        }
+
+        if ($ticket->status === 'closed') {
+            return $this->error('هذا الطلب مغلق ولا يمكن إضافة رسائل جديدة عليه.', 422);
+        }
+
+        $data = $request->validate([
+            'message' => 'required|string|max:5000',
+        ]);
+
+        $ticket->messages()->create([
+            'sender_type' => 'contractor',
+            'sender_id'   => $contractor->id,
+            'message'     => $data['message'],
+        ]);
+
+        if ($ticket->status === 'answered') {
+            $ticket->update(['status' => 'open']);
+        }
+
+        $admins = User::where('role', 'admin')->get();
+        if ($admins->isNotEmpty()) {
+            try {
+                Notification::send($admins, new SupportTicketContractorRepliedNotification($ticket));
+            }
+            catch (\Throwable $e) {
+                Log::warning('Failed to send contractor-follow-up notification', [
+                    'ticket_id' => $ticket->id,
+                    'error'     => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $this->success(
+            $this->formatDetails($ticket->fresh(['repliedBy:id,name', 'contractor:id,name,membership_number', 'messages'])),
+            'تم إرسال رسالتك بنجاح.',
+        );
     }
 
     /** PATCH /api/v1/dashboard/support-tickets/{ticket}/status */

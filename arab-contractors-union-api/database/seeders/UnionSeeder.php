@@ -133,18 +133,18 @@ class UnionSeeder extends Seeder
         // 6. Tenders
         // ===========================
         $tendersData = [
-            ['title' => 'مناقصة توسعة شبكة الطرق المحلية — غزة',       'budget' => 850000,  'status' => 'open'],
-            ['title' => 'مناقصة ترميم البنية التحتية — رفح',           'budget' => 1200000, 'status' => 'open'],
-            ['title' => 'مناقصة إنشاء مبنى إداري — خانيونس',          'budget' => 600000,  'status' => 'closed'],
-            ['title' => 'مناقصة تمديد شبكة الكهرباء — شمال غزة',      'budget' => 420000,  'status' => 'open'],
-            ['title' => 'مناقصة إنشاء ملعب رياضي — بيت لحم',         'budget' => 350000,  'status' => 'cancelled'],
+            ['title' => 'عطاء توسعة شبكة الطرق المحلية — غزة',        'budget' => 850000,  'status' => 'open'],
+            ['title' => 'عطاء ترميم البنية التحتية — رفح',            'budget' => 1200000, 'status' => 'open'],
+            ['title' => 'عطاء إنشاء مبنى إداري — خانيونس',            'budget' => 600000,  'status' => 'closed'],
+            ['title' => 'عطاء تمديد شبكة الكهرباء — شمال غزة',        'budget' => 420000,  'status' => 'open'],
+            ['title' => 'عطاء إنشاء ملعب رياضي — بيت لحم',            'budget' => 350000,  'status' => 'cancelled'],
         ];
 
         foreach ($tendersData as $data) {
             Tender::firstOrCreate(
                 ['title' => $data['title']],
                 array_merge($data, [
-                    'description' => 'تفاصيل مناقصة ' . $data['title'],
+                    'description' => 'تفاصيل عطاء ' . $data['title'],
                     'deadline'    => Carbon::now()->addDays(rand(15, 60)),
                     'bids_count'  => rand(0, 8),
                     'created_by'  => $admin->id,

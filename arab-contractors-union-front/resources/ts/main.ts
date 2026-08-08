@@ -7,7 +7,6 @@ import { registerPlugins } from '@core/utils/plugins'
 import '@core-scss/template/index.scss'
 import '@styles/styles.scss'
 import { VueQueryPlugin } from '@tanstack/vue-query'
-import 'iconify-icon'
 
 // Create vue app
 const app = createApp(App)

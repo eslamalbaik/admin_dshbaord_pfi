@@ -44,7 +44,6 @@ if (!isAccountant) {
 	  icon: { icon: 'tabler-credit-card' },
 	  children: [
 	    { title: 'سجل المدفوعات', to: 'payments-transactions' },
-	    { title: 'رسوم العضوية', to: 'payments-subscriptions' },
 	  ],
 	})
 	menuItems.push({
@@ -58,11 +57,11 @@ if (!isAccountant) {
 	  to: 'contractors-penalties',
 	})
 
-// 4. المناقصات وسوق الآليات والوثائق (للأدمن فقط)
+// 4. العطاءات وسوق الآليات والوثائق (للأدمن فقط)
 if (!isAccountant) {
-  menuItems.push({ heading: 'المناقصات' })
+  menuItems.push({ heading: 'العطاءات' })
   menuItems.push({
-    title: 'المناقصات',
+    title: 'العطاءات',
     icon: { icon: 'tabler-files' },
     to: 'tenders',
   })
@@ -98,6 +97,11 @@ if (!isAccountant) {
     title: 'طلبات الشهادات',
     icon: { icon: 'tabler-certificate' },
     to: 'certificate-requests',
+  })
+  menuItems.push({
+    title: 'الأخبار والمناسبات',
+    icon: { icon: 'tabler-news' },
+    to: 'news',
   })
 }
 

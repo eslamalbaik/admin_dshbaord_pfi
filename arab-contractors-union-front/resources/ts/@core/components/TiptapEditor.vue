@@ -98,6 +98,16 @@ watch(() => props.modelValue, () => {
       <IconBtn
         size="small"
         rounded
+        :variant="editor.isActive('bulletList') ? 'tonal' : 'text'"
+        :color="editor.isActive('bulletList') ? 'primary' : 'default'"
+        @click="editor.chain().focus().toggleBulletList().run()"
+      >
+        <VIcon icon="tabler-list" />
+      </IconBtn>
+
+      <IconBtn
+        size="small"
+        rounded
         :variant="editor.isActive({ textAlign: 'left' }) ? 'tonal' : 'text'"
         :color="editor.isActive({ textAlign: 'left' }) ? 'primary' : 'default'"
         @click="editor.chain().focus().setTextAlign('left').run()"

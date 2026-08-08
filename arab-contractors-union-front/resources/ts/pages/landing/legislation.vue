@@ -19,7 +19,7 @@ const docs = [
   { id:5, cat:'contracts', title:'عقد الفيديك الأصفر - التصميم والبناء',        year:'٢٠١٧', type:'PDF', pages:144, color:'#f9a825', bg:'#fff8e1' },
   { id:6, cat:'contracts', title:'عقد الفيديك الفضي - المحطات الإنشائية',       year:'٢٠١٧', type:'PDF', pages:128, color:'#607d8b', bg:'#eceff1' },
   { id:7, cat:'procurement', title:'تعليمات الشراء العام للأشغال الحكومية',     year:'٢٠٢٠', type:'PDF', pages:56, color:'#6a1b9a', bg:'#f3e5f5' },
-  { id:8, cat:'procurement', title:'دليل إعداد وثائق المناقصات',                year:'٢٠٢١', type:'PDF', pages:38, color:'#00695c', bg:'#e0f2f1' },
+  { id:8, cat:'procurement', title:'دليل إعداد وثائق العطاءات',                 year:'٢٠٢١', type:'PDF', pages:38, color:'#00695c', bg:'#e0f2f1' },
   { id:9, cat:'guides',   title:'الدليل الإرشادي لتصنيف المقاولين',             year:'٢٠٢٣', type:'PDF', pages:42, color:'#0277bd', bg:'#e3f2fd' },
   { id:10, cat:'guides',  title:'دليل السلامة المهنية في مواقع البناء',          year:'٢٠٢٢', type:'PDF', pages:64, color:'#558b2f', bg:'#f1f8e9' },
   { id:11, cat:'decisions', title:'لائحة تسجيل شركات المقاولات',               year:'٢٠٢١', type:'PDF', pages:24, color:'#ad1457', bg:'#fce4ec' },

@@ -62,7 +62,7 @@ const actionError = ref('')
 
 const openTicket = (t: any) => {
   selected.value = t
-  replyText.value = t.reply ?? ''
+  replyText.value = ''
   actionError.value = ''
   isViewOpen.value = true
 }
@@ -97,6 +97,7 @@ const replyMutation = useMutation({
   onSuccess: (d: any) => {
     queryClient.invalidateQueries({ queryKey: ['support-tickets'] })
     selected.value = d?.items ?? selected.value
+    replyText.value = ''
   },
   onError: (e: any) => {
     actionError.value = e?.response?.data?.message || 'فشل إرسال الرد.'
@@ -248,28 +249,51 @@ function fmtDate(d: string | null) {
             <div><strong>التاريخ:</strong> {{ fmtDate(selected.created_at) }}</div>
           </div>
 
-          <VCard variant="tonal" color="secondary" class="pa-4 mb-4 rounded-lg">
-            <p class="text-body-2 font-weight-medium mb-1">نص الطلب:</p>
-            <p class="text-body-2" style="white-space: pre-wrap; line-height: 1.8">{{ selected.message }}</p>
-            <VBtn
-              v-if="selected.attachment_url"
-              class="mt-2"
-              size="small"
-              variant="tonal"
-              prepend-icon="tabler-paperclip"
-              :href="selected.attachment_url"
-              target="_blank"
-            >
-              عرض المرفق
-            </VBtn>
-          </VCard>
+          <!-- ─── المحادثة: الرسالة الأصلية أولاً ثم كل الردود بالترتيب الزمني ─── -->
+          <div class="chat-thread mb-4">
+            <div class="chat-bubble chat-bubble--contractor">
+              <div class="d-flex justify-space-between align-center mb-1">
+                <span class="text-caption font-weight-bold">{{ selected.contractor ?? 'المقاول' }}</span>
+                <span class="text-caption text-medium-emphasis">{{ fmtDate(selected.created_at) }}</span>
+              </div>
+              <p class="text-body-2 mb-0" style="white-space: pre-wrap; line-height: 1.8">{{ selected.message }}</p>
+              <VBtn
+                v-if="selected.attachment_url"
+                class="mt-2"
+                size="small"
+                variant="tonal"
+                prepend-icon="tabler-paperclip"
+                :href="selected.attachment_url"
+                target="_blank"
+              >
+                عرض المرفق
+              </VBtn>
+            </div>
 
-          <VCard v-if="selected.reply" variant="tonal" color="success" class="pa-4 mb-4 rounded-lg">
-            <p class="text-body-2 font-weight-medium mb-1">
-              الرد السابق ({{ selected.replied_by ?? '—' }}):
-            </p>
-            <p class="text-body-2" style="white-space: pre-wrap; line-height: 1.8">{{ selected.reply }}</p>
-          </VCard>
+            <div
+              v-for="m in selected.messages"
+              :key="m.id"
+              class="chat-bubble"
+              :class="m.sender_type === 'admin' ? 'chat-bubble--admin' : 'chat-bubble--contractor'"
+            >
+              <div class="d-flex justify-space-between align-center mb-1">
+                <span class="text-caption font-weight-bold">{{ m.sender_name ?? (m.sender_type === 'admin' ? 'الإدارة' : 'المقاول') }}</span>
+                <span class="text-caption text-medium-emphasis">{{ fmtDate(m.created_at) }}</span>
+              </div>
+              <p class="text-body-2 mb-0" style="white-space: pre-wrap; line-height: 1.8">{{ m.message }}</p>
+              <VBtn
+                v-if="m.attachment_url"
+                class="mt-2"
+                size="small"
+                variant="tonal"
+                prepend-icon="tabler-paperclip"
+                :href="m.attachment_url"
+                target="_blank"
+              >
+                عرض المرفق
+              </VBtn>
+            </div>
+          </div>
 
           <VTextarea
             v-model="replyText"
@@ -312,3 +336,29 @@ function fmtDate(d: string | null) {
     </VDialog>
   </div>
 </template>
+
+<style scoped>
+.chat-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 0.25rem;
+}
+.chat-bubble {
+  max-width: 85%;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+}
+.chat-bubble--contractor {
+  align-self: flex-start;
+  background: rgba(var(--v-theme-secondary), 0.12);
+  border-inline-start: 3px solid rgb(var(--v-theme-secondary));
+}
+.chat-bubble--admin {
+  align-self: flex-end;
+  background: rgba(var(--v-theme-success), 0.12);
+  border-inline-end: 3px solid rgb(var(--v-theme-success));
+}
+</style>

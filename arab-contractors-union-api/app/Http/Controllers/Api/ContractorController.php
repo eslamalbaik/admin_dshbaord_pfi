@@ -65,6 +65,7 @@ class ContractorController extends Controller
                 'digits:5',
                 $uniqueLicense
             ],
+            'status'                        => 'sometimes|in:active,pending,expired,suspended',
             'trade'                         => 'nullable|string|max:100',
             'classification'                => 'nullable|string|max:10',
             'established_year'              => 'nullable|integer|min:1900|max:' . date('Y'),
@@ -168,6 +169,7 @@ class ContractorController extends Controller
             'membership_number'             => 'رقم العضوية',
             'commercial_register'           => 'رقم السجل التجاري',
             'license_number'                => 'رقم الترخيص',
+            'status'                        => 'الحالة',
             'trade'                         => 'التخصص',
             'classification'                => 'التصنيف',
             'established_year'              => 'سنة التأسيس',
@@ -257,6 +259,18 @@ class ContractorController extends Controller
     {
         $contractor->delete();
         return $this->success(message: 'تم حذف المقاول بنجاح.');
+    }
+
+    // PATCH /api/contractors/{id}/status — تغيير سريع للحالة (نشط/معلّق/موقوف/منتهي) بدون المرور بفورم الملف الكامل
+    public function changeStatus(Request $request, Contractor $contractor)
+    {
+        $validated = $request->validate([
+            'status' => 'required|in:active,pending,expired,suspended',
+        ]);
+
+        $contractor->update($validated);
+
+        return $this->success($contractor->fresh()->toArray(), 'تم تحديث حالة المقاول بنجاح.');
     }
 
     public function nextMembershipNumber()

@@ -59,6 +59,8 @@ const aliases: Partial<IconAliases> = {
 }
 
 export const iconify = {
+  // أيقونات محلية (CSS mask، من icons.css المولَّد عبر build-icons.ts) — لا شبكة، لا custom element.
+  // اسم الأيقونة ("tabler-xxx") هو نفسه اسم الـ CSS class مباشرة.
   component: (props: IconProps) => {
     // Load custom SVG directly instead of going through icon component
     if (typeof props.icon === 'string') {
@@ -68,17 +70,9 @@ export const iconify = {
         return h(iconComponent)
     }
 
-    const iconStr = typeof props.icon === 'string' ? props.icon : ''
-    const formattedIcon = iconStr.includes(':') ? iconStr : iconStr.replace('-', ':')
+    const { icon, tag, ...rest } = props
 
-    return h(
-      'iconify-icon',
-      {
-        ...props,
-        icon: formattedIcon,
-        tag: undefined,
-      },
-    )
+    return h(tag ?? 'span', { ...rest, class: icon })
   },
 }
 

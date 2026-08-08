@@ -117,7 +117,7 @@ class ReportsController extends Controller
     <td><span class="kpi-value blue">{$revenue} ₪</span><span class="kpi-label">إجمالي الإيرادات</span></td>
     <td><span class="kpi-value blue">{$data['newContractors']}</span><span class="kpi-label">مقاولون جدد</span></td>
     <td><span class="kpi-value blue">{$data['activeMemberships']}</span><span class="kpi-label">عضويات نشطة</span></td>
-    <td><span class="kpi-value blue">{$data['tenders']}</span><span class="kpi-label">مناقصات</span></td>
+    <td><span class="kpi-value blue">{$data['tenders']}</span><span class="kpi-label">عطاءات</span></td>
   </tr>
 </table>
 
@@ -252,7 +252,7 @@ HTML;
             ->whereMonth('created_at', $month)
             ->sum('amount');
 
-        // مناقصات
+        // عطاءات
         $tenders = Tender::whereYear('created_at', $year)
             ->whereMonth('created_at', $month)
             ->count();
@@ -301,7 +301,7 @@ HTML;
         $penaltiesPaid   = Penalty::where('status', 'paid')
             ->whereYear('created_at', $year)->sum('amount');
 
-        // مناقصات
+        // عطاءات
         $tenders = Tender::whereYear('created_at', $year)->count();
 
         // إيرادات شهرياً للسنة
@@ -378,7 +378,7 @@ HTML;
             ['إجمالي الإيرادات', number_format($data['revenue'], 2) . ' ₪'],
             ['مقاولون جدد', $data['newContractors']],
             ['عضويات نشطة', $data['activeMemberships']],
-            ['مناقصات', $data['tenders']],
+            ['عطاءات', $data['tenders']],
             [''],
             ['الغرامات', ''],
             ['غرامات صادرة', $data['penaltiesIssued']],

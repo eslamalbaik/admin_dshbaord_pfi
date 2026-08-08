@@ -139,9 +139,9 @@ function openTender(t: Tender) {
         <div class="page-hero">
       <div class="page-hero-shapes"><div class="ph-s ph-s1" /><div class="ph-s ph-s2" /></div>
       <div class="pub-cont page-hero-inner">
-        <div class="page-breadcrumb"><RouterLink to="/landing">الرئيسية</RouterLink><span>/</span><span>المناقصات والعطاءات</span></div>
-        <h1 class="page-hero-title">المناقصات والعطاءات</h1>
-        <p class="page-hero-desc">أحدث المناقصات والعطاءات الحكومية المتاحة للشركات الأعضاء في الاتحاد</p>
+        <div class="page-breadcrumb"><RouterLink to="/landing">الرئيسية</RouterLink><span>/</span><span>العطاءات</span></div>
+        <h1 class="page-hero-title">العطاءات</h1>
+        <p class="page-hero-desc">أحدث العطاءات الحكومية المتاحة للشركات الأعضاء في الاتحاد</p>
       </div>
     </div>
 
@@ -150,7 +150,7 @@ function openTender(t: Tender) {
         <div class="tender-filters">
           <div class="search-wrap">
             <Search :size="16" class="search-ico" />
-            <input v-model="searchQ" type="text" placeholder="ابحث في المناقصات..." class="search-input" />
+            <input v-model="searchQ" type="text" placeholder="ابحث في العطاءات..." class="search-input" />
           </div>
           <div class="filter-row">
             <select v-model="filterStatus" class="filter-sel">
@@ -175,7 +175,7 @@ function openTender(t: Tender) {
             </button>
           </div>
         </div>
-        <p class="results-count">{{ total }} مناقصة</p>
+        <p class="results-count">{{ total }} عطاء</p>
 
         <div class="tenders-list">
           <div
@@ -239,7 +239,7 @@ function openTender(t: Tender) {
 
         <div v-if="!loading && !tenders.length" class="empty-state">
           <Search :size="48" style="color:#c5cae9" />
-          <p>لا توجد مناقصات مطابقة</p>
+          <p>لا توجد عطاءات مطابقة</p>
         </div>
 
         <div v-if="lastPage > 1" class="filter-row" style="justify-content: center; margin-top: 2rem;">

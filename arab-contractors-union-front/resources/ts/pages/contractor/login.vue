@@ -134,6 +134,10 @@ onMounted(() => {
             </div>
           </form>
 
+          <p class="rg-switch" style="margin-top: .9rem;">
+            <RouterLink to="/contractor/forgot-password">نسيت كلمة المرور؟</RouterLink>
+          </p>
+
           <div class="rg-divider"><span>أو</span></div>
 
           <p class="rg-switch">

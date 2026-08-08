@@ -478,7 +478,7 @@ async function submitNameChangeRequest() {
 const latestTenders = ref<any[]>([])
 const latestNews = ref<any[]>([])
 
-// فلاتر العطاءات — نفس النمط المستخدم في صفحة المناقصات العامة
+// فلاتر العطاءات — نفس النمط المستخدم في صفحة العطاءات العامة
 const tenderSearch = ref('')
 const tenderStatus = ref('open')
 const tenderCategory = ref('')

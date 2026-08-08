@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '@/plugins/axios'
-import { Search } from 'lucide-vue-next'
+import { Search, Calendar, MapPin, CalendarPlus } from 'lucide-vue-next'
 
 definePage({
   meta: {
@@ -21,8 +21,12 @@ interface NewsDetail {
   excerpt: string | null
   body: string
   image: string | null
+  video_url: string | null
+  gallery: string[] | null
   category: string
   published_at: string
+  event_date: string | null
+  event_location: string | null
   author?: { id: number; name: string }
 }
 
@@ -34,7 +38,7 @@ const categoryLabels: Record<string, string> = {
   news: 'خبر',
   announcement: 'إعلان',
   event: 'فعالية',
-  tender: 'مناقصة',
+  tender: 'عطاء',
 }
 
 const categoryColors: Record<string, string> = {
@@ -51,11 +55,38 @@ function formatDate(dateStr: string): string {
   })
 }
 
+function formatEventDateTime(dateStr: string): string {
+  return new Date(dateStr).toLocaleString('ar-PS', {
+    year: 'numeric', month: 'long', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', hour12: true,
+  })
+}
+
+function youtubeEmbedUrl(url: string): string | null {
+  const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([\w-]{11})/)
+  return m ? `https://www.youtube.com/embed/${m[1]}` : null
+}
+
+function addToCalendar() {
+  if (!news.value?.event_date) return
+  const start = new Date(news.value.event_date)
+  const end = new Date(start.getTime() + 60 * 60 * 1000)
+  const toGCalDate = (d: Date) => d.toISOString().replace(/[-:]|\.\d{3}/g, '')
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: news.value.title,
+    dates: `${toGCalDate(start)}/${toGCalDate(end)}`,
+    details: news.value.excerpt ?? '',
+    location: news.value.event_location ?? '',
+  })
+  window.open(`https://calendar.google.com/calendar/render?${params.toString()}`, '_blank')
+}
+
 onMounted(async () => {
   try {
     const slug = route.params.slug as string
     const res = await api.get(`/api/v1/news/${slug}`)
-    news.value = res.data.data
+    news.value = res.data.items
   } catch (err: any) {
     if (err?.response?.status === 404) notFound.value = true
   } finally {
@@ -116,6 +147,44 @@ onMounted(async () => {
 
           <!-- Excerpt -->
           <p v-if="news.excerpt" class="article-excerpt">{{ news.excerpt }}</p>
+
+          <!-- Event info -->
+          <div v-if="news.category === 'event' && (news.event_date || news.event_location)" class="event-info-box">
+            <div v-if="news.event_date" class="event-info-row">
+              <Calendar :size="18" />
+              <div>
+                <strong>تاريخ المناسبة</strong>
+                <span>{{ formatEventDateTime(news.event_date) }}</span>
+              </div>
+            </div>
+            <div v-if="news.event_location" class="event-info-row">
+              <MapPin :size="18" />
+              <div>
+                <strong>مكان الحدث</strong>
+                <span>{{ news.event_location }}</span>
+              </div>
+            </div>
+            <button v-if="news.event_date" class="btn-add-calendar" @click="addToCalendar">
+              <CalendarPlus :size="16" /> إضافة إلى التقويم
+            </button>
+          </div>
+
+          <!-- Video -->
+          <div v-if="news.video_url" class="article-video">
+            <iframe
+              v-if="youtubeEmbedUrl(news.video_url)"
+              :src="youtubeEmbedUrl(news.video_url)!"
+              frameborder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowfullscreen
+            />
+            <a v-else :href="news.video_url" target="_blank" rel="noopener" class="video-fallback-link">مشاهدة الفيديو ↗</a>
+          </div>
+
+          <!-- Gallery -->
+          <div v-if="news.gallery && news.gallery.length > 0" class="article-gallery">
+            <img v-for="(img, i) in news.gallery" :key="i" :src="img" :alt="`${news.title} - ${i + 1}`" />
+          </div>
 
           <!-- Divider -->
           <hr class="article-divider" />
@@ -255,6 +324,81 @@ onMounted(async () => {
   border: none;
   border-top: 2px solid #e5e7eb;
   margin: 1.5rem 0;
+}
+
+/* Event info box */
+.event-info-box {
+  background: #e8f5e9;
+  border: 1px solid #a5d6a7;
+  border-radius: 14px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.event-info-row { display: flex; align-items: center; gap: 0.75rem; color: #1b5e20; }
+.event-info-row div { display: flex; flex-direction: column; gap: 0.1rem; }
+.event-info-row strong { font-size: 0.8rem; font-weight: 700; }
+.event-info-row span { font-size: 0.9rem; color: #2e7d32; }
+
+.btn-add-calendar {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #2e7d32;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-add-calendar:hover { background: #1b5e20; }
+
+/* Video embed */
+.article-video {
+  margin-bottom: 1.5rem;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000;
+}
+
+.article-video iframe {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: none;
+  display: block;
+}
+
+.video-fallback-link {
+  display: block;
+  padding: 1rem;
+  color: #fff;
+  text-align: center;
+  font-weight: 700;
+}
+
+/* Gallery */
+.article-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.article-gallery img {
+  width: 100%;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
 }
 
 .article-body {

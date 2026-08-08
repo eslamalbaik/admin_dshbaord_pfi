@@ -142,7 +142,7 @@ const onSubmit = () => {
           <VIcon icon="tabler-shield-lock" size="22" class="text-primary ms-1" />
         </h4>
         <p class="text-body-2 text-medium-emphasis mb-0" style="font-family:Cairo,sans-serif;">
-          بوابة إدارة اتحاد المقاولين العرب
+          بوابة إدارة اتحاد المقاولين الفلسطينيين
         </p>
       </VCardText>
 

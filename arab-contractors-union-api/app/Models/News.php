@@ -16,12 +16,14 @@ class News extends Model
         'title', 'slug', 'excerpt', 'body',
         'image', 'video_url', 'external_url', 'gallery',
         'category', 'is_published',
+        'event_date', 'event_location',
         'published_at', 'created_by',
     ];
 
     protected $casts = [
         'is_published' => 'boolean',
         'published_at' => 'datetime',
+        'event_date'   => 'datetime',
         'gallery'      => 'array',
     ];
 

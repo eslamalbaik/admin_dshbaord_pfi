@@ -75,12 +75,7 @@ const sections = computed(() => data.value ?? [])
               class="legal-sec"
             >
               <h2>{{ idx + 1 }}. {{ sec.title }}</h2>
-              <p
-                v-for="(line, li) in sec.body.split('\n').filter((l: string) => l.trim())"
-                :key="li"
-              >
-                {{ line }}
-              </p>
+              <div v-html="sec.body" />
             </section>
           </template>
 

@@ -60,7 +60,7 @@ const ROUTE_TAB_TITLES: Record<string, string> = {
   'contractors-memberships': 'العضويات',
   'contractors-penalties': 'المخالفات',
   'contractors-qr': 'رمز QR',
-  'tenders': 'المناقصات',
+  'tenders': 'العطاءات',
   'documents': 'الوثائق',
 }
 

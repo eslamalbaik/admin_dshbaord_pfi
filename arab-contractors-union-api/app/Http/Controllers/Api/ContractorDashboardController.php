@@ -170,7 +170,7 @@ class ContractorDashboardController extends Controller
         $pendingPayments    = (float) $payments->where('status', 'pending')->sum('amount');
         $unpaidPenalties    = (float) $penalties->where('status', '!=', 'paid')->sum('amount');
         $outstandingDues    = $contractor->outstandingDuesTotal();
-        $totalObligations   = $pendingPayments + $unpaidPenalties + $outstandingDues;
+        $totalObligations   = $contractor->totalObligations();
 
         return $this->success([
             'summary' => [

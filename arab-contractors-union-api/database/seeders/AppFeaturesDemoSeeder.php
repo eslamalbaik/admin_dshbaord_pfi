@@ -14,7 +14,7 @@ use Illuminate\Database\Seeder;
 
 /**
  * بيانات تجريبية للميزات الجديدة (الدفع/البنوك، الدعم الفني، الإعدادات،
- * الأخبار بوسائط، المناقصات). آمن للتشغيل على أي بيئة — idempotent:
+ * الأخبار بوسائط، العطاءات). آمن للتشغيل على أي بيئة — idempotent:
  *
  *   php artisan db:seed --class=AppFeaturesDemoSeeder
  */
@@ -111,7 +111,7 @@ class AppFeaturesDemoSeeder extends Seeder
         }
     }
 
-    /** مناقصات تجريبية (فقط إن كانت قليلة) */
+    /** عطاءات تجريبية (فقط إن كانت قليلة) */
     private function tenders(): void
     {
         if (Tender::count() >= 3) {
@@ -121,13 +121,13 @@ class AppFeaturesDemoSeeder extends Seeder
         $by = User::where('role', 'admin')->value('id');
 
         $rows = [
-            ['title' => 'مناقصة توريد مواد بناء', 'category' => 'توريدات', 'budget' => 150000, 'status' => 'open',
+            ['title' => 'عطاء توريد مواد بناء', 'category' => 'توريدات', 'budget' => 150000, 'status' => 'open',
              'description' => 'توريد إسمنت وحديد لمشروع الاتحاد.', 'submission_types' => ['email', 'file'], 'submission_email' => 'tenders@acu.ps', 'deadline' => now()->addDays(20)->toDateString()],
-            ['title' => 'مناقصة أعمال صيانة طرق', 'category' => 'إنشاءات', 'budget' => 320000, 'status' => 'open',
+            ['title' => 'عطاء أعمال صيانة طرق', 'category' => 'إنشاءات', 'budget' => 320000, 'status' => 'open',
              'description' => 'صيانة وتعبيد طرق داخلية.', 'submission_types' => ['phone'], 'submission_phone' => '0599123456', 'deadline' => now()->addDays(30)->toDateString()],
-            ['title' => 'مناقصة تصميم مبنى إداري', 'category' => 'استشارات', 'budget' => 90000, 'status' => 'open',
+            ['title' => 'عطاء تصميم مبنى إداري', 'category' => 'استشارات', 'budget' => 90000, 'status' => 'open',
              'description' => 'تصميم معماري وإنشائي لمبنى إداري.', 'submission_types' => ['email', 'phone', 'file'], 'submission_email' => 'design@acu.ps', 'submission_phone' => '0598000000', 'deadline' => now()->addDays(15)->toDateString()],
-            ['title' => 'مناقصة توريد أثاث مكتبي', 'category' => 'توريدات', 'budget' => 45000, 'status' => 'closed',
+            ['title' => 'عطاء توريد أثاث مكتبي', 'category' => 'توريدات', 'budget' => 45000, 'status' => 'closed',
              'description' => 'أثاث مكتبي لمقر الاتحاد.', 'submission_types' => ['email'], 'submission_email' => 'tenders@acu.ps', 'deadline' => now()->addDays(10)->toDateString()],
         ];
 

@@ -123,6 +123,15 @@ class Contractor extends Authenticatable
             ->value('total'), 2);
     }
 
+    /** إجمالي "ما عليه" — دفعات معلّقة + غرامات غير مسدَّدة + ذمم سابقة */
+    public function totalObligations(): float
+    {
+        $pendingPayments = (float) $this->payments()->where('status', 'pending')->sum('amount');
+        $unpaidPenalties = (float) $this->penalties()->where('status', '!=', 'paid')->sum('amount');
+
+        return round($pendingPayments + $unpaidPenalties + $this->outstandingDuesTotal(), 2);
+    }
+
     public function documents()
     {
         return $this->hasMany(Document::class);

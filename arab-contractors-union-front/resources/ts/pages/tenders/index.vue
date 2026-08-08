@@ -153,7 +153,7 @@ const categoryOptions = [
 ]
 
 const headers = [
-  { title: 'عنوان المناقصة', key: 'title' },
+  { title: 'عنوان العطاء', key: 'title' },
   { title: 'التصنيف', key: 'category' },
   { title: 'ملاحظات الاتحاد', key: 'union_notes' },
   { title: 'آخر موعد', key: 'deadline' },
@@ -222,12 +222,12 @@ const createTender = async () => {
     await api.post('/api/v1/tenders', formData)
     createDialog.value = false
     newTender.value = { title: '', description: '', union_notes: '', category: '', deadline: '', status: 'open', submission_types: [], submission_email: '', submission_phone: '', submission_file: null }
-    notify('تم نشر المناقصة بنجاح')
+    notify('تم نشر العطاء بنجاح')
     fetchTenders()
   }
   catch (err) {
     console.error(err)
-    notify('تعذّر نشر المناقصة، حاول مرة أخرى', 'error')
+    notify('تعذّر نشر العطاء، حاول مرة أخرى', 'error')
   }
   finally {
     createLoading.value = false
@@ -241,11 +241,11 @@ watchEffect(() => fetchTenders())
   <div>
     <div class="d-flex justify-space-between align-center mb-6">
       <div>
-        <h1 class="text-h4 font-weight-bold" style="font-family:Cairo,sans-serif">المناقصات</h1>
-        <p class="text-body-2 text-medium-emphasis mb-0" style="font-family:Cairo,sans-serif">إدارة مناقصات الاتحاد ومتابعة العروض</p>
+        <h1 class="text-h4 font-weight-bold" style="font-family:Cairo,sans-serif">العطاءات</h1>
+        <p class="text-body-2 text-medium-emphasis mb-0" style="font-family:Cairo,sans-serif">إدارة عطاءات الاتحاد ومتابعة العروض</p>
       </div>
       <VBtn color="primary" prepend-icon="tabler-plus" @click="createDialog = true">
-        مناقصة جديدة
+        عطاء جديد
       </VBtn>
     </div>
 
@@ -253,7 +253,7 @@ watchEffect(() => fetchTenders())
       <VCardText class="d-flex gap-4 flex-wrap">
         <VTextField
           v-model="search"
-          placeholder="بحث في المناقصات..."
+          placeholder="بحث في العطاءات..."
           prepend-inner-icon="tabler-search"
           density="compact"
           style="max-width:300px"
@@ -380,7 +380,7 @@ watchEffect(() => fetchTenders())
         </template>
 
         <template #no-data>
-          <div class="text-center pa-6 text-medium-emphasis" style="font-family:Cairo,sans-serif">لا توجد مناقصات</div>
+          <div class="text-center pa-6 text-medium-emphasis" style="font-family:Cairo,sans-serif">لا توجد عطاءات</div>
         </template>
       </VDataTableServer>
     </VCard>
@@ -388,20 +388,20 @@ watchEffect(() => fetchTenders())
     <!-- Create Tender Dialog -->
     <VDialog v-model="createDialog" max-width="520">
       <VCard>
-        <VCardTitle style="font-family:Cairo,sans-serif">مناقصة جديدة</VCardTitle>
+        <VCardTitle style="font-family:Cairo,sans-serif">عطاء جديد</VCardTitle>
         <VCardText>
           <VRow>
             <VCol cols="12">
-              <VTextField v-model="newTender.title" label="عنوان المناقصة" style="font-family:Cairo,sans-serif" />
+              <VTextField v-model="newTender.title" label="عنوان العطاء" style="font-family:Cairo,sans-serif" />
             </VCol>
             <VCol cols="12">
-              <VTextarea v-model="newTender.description" label="وصف المناقصة" rows="3" style="font-family:Cairo,sans-serif" />
+              <VTextarea v-model="newTender.description" label="وصف العطاء" rows="3" style="font-family:Cairo,sans-serif" />
             </VCol>
             <VCol cols="12">
               <VTextarea
                 v-model="newTender.union_notes"
                 label="ملاحظات الاتحاد"
-                placeholder="أي ملاحظات أو اشتراطات خاصة من الاتحاد بشأن هذه المناقصة..."
+                placeholder="أي ملاحظات أو اشتراطات خاصة من الاتحاد بشأن هذا العطاء..."
                 rows="3"
                 style="font-family:Cairo,sans-serif"
                 prepend-inner-icon="tabler-notes"
@@ -411,7 +411,7 @@ watchEffect(() => fetchTenders())
               <VSelect
                 v-model="newTender.category"
                 :items="categoryOptions"
-                label="تصنيف المناقصة"
+                label="تصنيف العطاء"
                 prepend-inner-icon="tabler-category"
                 clearable
                 style="font-family:Cairo,sans-serif"
@@ -504,27 +504,27 @@ watchEffect(() => fetchTenders())
         <VCardActions>
           <VSpacer />
           <VBtn variant="tonal" @click="createDialog = false">إلغاء</VBtn>
-          <VBtn color="primary" :loading="createLoading" @click="createTender">نشر المناقصة</VBtn>
+          <VBtn color="primary" :loading="createLoading" @click="createTender">نشر العطاء</VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
     <!-- Edit Tender Dialog -->
     <VDialog v-model="editDialog" max-width="520">
       <VCard>
-        <VCardTitle style="font-family:Cairo,sans-serif">تعديل المناقصة</VCardTitle>
+        <VCardTitle style="font-family:Cairo,sans-serif">تعديل العطاء</VCardTitle>
         <VCardText>
           <VRow>
             <VCol cols="12">
-              <VTextField v-model="editTender.title" label="عنوان المناقصة" style="font-family:Cairo,sans-serif" />
+              <VTextField v-model="editTender.title" label="عنوان العطاء" style="font-family:Cairo,sans-serif" />
             </VCol>
             <VCol cols="12">
-              <VTextarea v-model="editTender.description" label="وصف المناقصة" rows="3" style="font-family:Cairo,sans-serif" />
+              <VTextarea v-model="editTender.description" label="وصف العطاء" rows="3" style="font-family:Cairo,sans-serif" />
             </VCol>
             <VCol cols="12">
               <VTextarea
                 v-model="editTender.union_notes"
                 label="ملاحظات الاتحاد"
-                placeholder="أي ملاحظات أو اشتراطات خاصة من الاتحاد بشأن هذه المناقصة..."
+                placeholder="أي ملاحظات أو اشتراطات خاصة من الاتحاد بشأن هذا العطاء..."
                 rows="3"
                 style="font-family:Cairo,sans-serif"
                 prepend-inner-icon="tabler-notes"
@@ -534,7 +534,7 @@ watchEffect(() => fetchTenders())
               <VSelect
                 v-model="editTender.category"
                 :items="categoryOptions"
-                label="تصنيف المناقصة"
+                label="تصنيف العطاء"
                 prepend-inner-icon="tabler-category"
                 clearable
                 style="font-family:Cairo,sans-serif"
@@ -627,7 +627,7 @@ watchEffect(() => fetchTenders())
           تأكيد الحذف
         </VCardTitle>
         <VCardText style="font-family:Cairo,sans-serif">
-          هل أنت متأكد من حذف المناقصة
+          هل أنت متأكد من حذف العطاء
           <strong>{{ deletingItem?.title }}</strong>؟
           لا يمكن التراجع عن هذا الإجراء.
         </VCardText>

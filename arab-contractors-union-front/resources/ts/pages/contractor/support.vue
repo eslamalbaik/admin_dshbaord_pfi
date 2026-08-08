@@ -18,6 +18,15 @@ const authError = ref(false)
 const isLoading = ref(true)
 const isSending = ref(false)
 
+interface SupportTicketMessage {
+  id: number
+  sender_type: 'contractor' | 'admin'
+  sender_name: string | null
+  message: string
+  attachment_url: string | null
+  created_at: string
+}
+
 interface SupportTicket {
   id: number
   subject: string
@@ -31,6 +40,7 @@ interface SupportTicket {
   replied_by: string | null
   replied_at: string | null
   created_at: string
+  messages?: SupportTicketMessage[]
 }
 
 interface Contractor {
@@ -48,6 +58,9 @@ const errorMessage = ref('')
 // Ticket detail view state
 const selectedTicket = ref<SupportTicket | null>(null)
 const isTicketDetailOpen = ref(false)
+const replyMessage = ref('')
+const isReplySending = ref(false)
+const replyError = ref('')
 
 const form = ref({
   subject: '',
@@ -150,6 +163,30 @@ async function submitTicket() {
   }
 }
 
+async function sendReply() {
+  if (!selectedTicket.value || !replyMessage.value.trim()) return
+
+  isReplySending.value = true
+  replyError.value = ''
+
+  try {
+    const r = await axios.post(
+      `${BASE}/api/v1/contractor/support-tickets/${selectedTicket.value.id}/reply`,
+      { message: replyMessage.value },
+      { headers: apiHeaders() },
+    )
+    const updated = r.data.items as SupportTicket
+    selectedTicket.value = updated
+    const idx = tickets.value.findIndex(t => t.id === updated.id)
+    if (idx !== -1) tickets.value[idx] = updated
+    replyMessage.value = ''
+  } catch (e: any) {
+    replyError.value = e?.response?.data?.message ?? 'تعذّر إرسال رسالتك'
+  } finally {
+    isReplySending.value = false
+  }
+}
+
 function openWhatsApp() {
   const message = `مرحباً، أنا ${contractor.value?.name} (رقم العضوية: ${contractor.value?.membership_number}) بحاجة إلى دعم فني.`
   const encoded = encodeURIComponent(message)
@@ -201,6 +238,8 @@ function formatDate(date: string) {
 function openTicketDetail(ticket: SupportTicket) {
   selectedTicket.value = ticket
   isTicketDetailOpen.value = true
+  replyMessage.value = ''
+  replyError.value = ''
   // تثبيت رقم التذكرة في الرابط حتى تبقى مفتوحة بعد الـ refresh
   router.replace({ query: { ...route.query, tab: 'tickets', ticket: String(ticket.id) } })
 }
@@ -454,21 +493,49 @@ function closeTicketDetail() {
       </div>
       <div class="modal-body">
         <p><strong>الموضوع:</strong> {{ selectedTicket?.subject }}</p>
-        <p><strong>التاريخ:</strong> {{ formatDate(selectedTicket?.created_at) }}</p>
         <p><strong>الفئة:</strong> {{ selectedTicket?.category_label ?? selectedTicket?.category }}</p>
-        <p><strong>الرسالة:</strong></p>
-        <p class="message-body" v-html="selectedTicket?.message"></p>
-        <div v-if="selectedTicket?.attachment_url" class="attachment">
-          <a :href="selectedTicket.attachment_url" target="_blank" class="attachment-link">عرض المرفق</a>
+
+        <!-- ─── المحادثة: الرسالة الأصلية ثم كل الردود بالترتيب الزمني ─── -->
+        <div class="thread">
+          <div class="thread-bubble thread-bubble--me">
+            <div class="thread-bubble-meta">
+              <span>أنت</span>
+              <span>{{ formatDate(selectedTicket?.created_at) }}</span>
+            </div>
+            <p class="thread-bubble-text">{{ selectedTicket?.message }}</p>
+            <a v-if="selectedTicket?.attachment_url" :href="selectedTicket.attachment_url" target="_blank" class="attachment-link">عرض المرفق</a>
+          </div>
+
+          <div
+            v-for="m in selectedTicket?.messages ?? []"
+            :key="m.id"
+            class="thread-bubble"
+            :class="m.sender_type === 'admin' ? 'thread-bubble--admin' : 'thread-bubble--me'"
+          >
+            <div class="thread-bubble-meta">
+              <span>{{ m.sender_name ?? (m.sender_type === 'admin' ? 'الإدارة' : 'أنت') }}</span>
+              <span>{{ formatDate(m.created_at) }}</span>
+            </div>
+            <p class="thread-bubble-text">{{ m.message }}</p>
+            <a v-if="m.attachment_url" :href="m.attachment_url" target="_blank" class="attachment-link">عرض المرفق</a>
+          </div>
         </div>
-        <div v-if="selectedTicket?.reply" class="reply-section">
-          <p><strong>رد الإدارة:</strong></p>
-          <p class="reply-text" v-html="selectedTicket.reply"></p>
-          <p class="reply-footer">
-            <span v-if="selectedTicket.replied_by">{{ selectedTicket.replied_by }} · </span>
-            {{ formatDate(selectedTicket.replied_at) }}
-          </p>
+
+        <!-- ─── صندوق الرد — مخفي لو الطلب مغلق ─── -->
+        <div v-if="selectedTicket?.status !== 'closed'" class="reply-box">
+          <p v-if="replyError" class="reply-box-error">{{ replyError }}</p>
+          <textarea
+            v-model="replyMessage"
+            rows="3"
+            placeholder="اكتب رسالتك..."
+            class="form-textarea"
+          />
+          <button class="reply-send-btn" :disabled="isReplySending || !replyMessage.trim()" @click="sendReply">
+            <Send :size="15" />
+            {{ isReplySending ? 'جاري الإرسال...' : 'إرسال' }}
+          </button>
         </div>
+        <p v-else class="thread-closed-note">هذا الطلب مغلق ولا يمكن إضافة رسائل جديدة عليه.</p>
       </div>
       <div class="modal-footer">
         <button class="btn-close" @click="closeTicketDetail">إغلاق</button>
@@ -684,38 +751,99 @@ function closeTicketDetail() {
 .btn-close:hover {
   background: var(--navy-mid);
 }
-.message-body, .reply-text {
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  margin: 0.5rem 0;
-  line-height: 1.6;
-}
-.attachment {
-  margin: 1rem 0;
-}
 .attachment-link {
   color: var(--navy);
   text-decoration: underline;
+  font-size: .85rem;
 }
 .attachment-link:hover {
   opacity: 0.8;
 }
-.reply-section {
-  margin-top: 1.5rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--border);
+
+/* Conversation thread */
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+  max-height: 320px;
+  overflow-y: auto;
+  margin: 1rem 0;
+  padding: .25rem;
 }
-.reply-section p {
-  margin: 0 0 0.5rem 0;
+.thread-bubble {
+  max-width: 85%;
+  padding: .75rem 1rem;
+  border-radius: 10px;
 }
-.reply-section .reply-text {
+.thread-bubble--me {
+  align-self: flex-start;
   background: var(--navy-soft);
-  padding: 0.75rem;
-  border-radius: 8px;
+  border-inline-start: 3px solid var(--navy);
 }
-.reply-footer {
+.thread-bubble--admin {
+  align-self: flex-end;
+  background: var(--green-light);
+  border-inline-end: 3px solid var(--green);
+}
+.thread-bubble-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: .75rem;
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--text-m);
+  margin-bottom: .35rem;
+}
+.thread-bubble-text {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  line-height: 1.6;
+  font-size: .9rem;
+  color: var(--text-b);
+}
+.thread-closed-note {
   font-size: .85rem;
   color: var(--text-m);
-  margin-top: 0.5rem;
+  text-align: center;
+  padding: .75rem;
+  background: #f5f5f5;
+  border-radius: 8px;
+}
+
+/* Reply box */
+.reply-box {
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+}
+.reply-box-error {
+  color: var(--red);
+  font-size: .85rem;
+  font-weight: 600;
+}
+.reply-send-btn {
+  align-self: flex-end;
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  background: var(--navy);
+  color: #fff;
+  border: none;
+  padding: .6rem 1.25rem;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: .85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .2s;
+}
+.reply-send-btn:hover:not(:disabled) {
+  background: var(--navy-mid);
+}
+.reply-send-btn:disabled {
+  opacity: .6;
+  cursor: not-allowed;
 }
 </style>

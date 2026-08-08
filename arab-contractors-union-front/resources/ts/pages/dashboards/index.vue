@@ -34,7 +34,7 @@ const handleRefresh = () => {
           لوحة تحكم الاتحاد
         </h1>
         <p class="text-body-2 text-medium-emphasis mb-0">
-          اتحاد المقاولين العرب — Arab Contractors Union
+          اتحاد المقاولين الفلسطينيين — Palestinian Contractors Union
         </p>
       </div>
       <VBtn
@@ -70,7 +70,15 @@ const handleRefresh = () => {
         <VCard class="text-center" :to="{ name: 'tenders' }" style="cursor:pointer">
           <VCardText class="py-4">
             <VIcon icon="tabler-files" size="32" color="success" class="mb-2" />
-            <div class="text-body-1 font-weight-medium">المناقصات</div>
+            <div class="text-body-1 font-weight-medium">العطاءات</div>
+          </VCardText>
+        </VCard>
+      </VCol>
+      <VCol cols="12" sm="6" md="3">
+        <VCard class="text-center" :to="{ name: 'payments-transactions' }" style="cursor:pointer">
+          <VCardText class="py-4">
+            <VIcon icon="tabler-credit-card" size="32" color="info" class="mb-2" />
+            <div class="text-body-1 font-weight-medium">المدفوعات</div>
           </VCardText>
         </VCard>
       </VCol>

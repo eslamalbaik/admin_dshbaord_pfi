@@ -32,7 +32,7 @@ class Membership extends Model
     // هل العضوية تنتهي خلال 30 يوم؟
     public function getExpiringSoonAttribute(): bool
     {
-        return $this->expires_at && $this->expires_at->diffInDays(now()) <= 30
-            && $this->expires_at->isFuture();
+        return $this->expires_at && $this->expires_at->isFuture()
+            && $this->expires_at->diffInDays(now(), absolute: true) <= 30;
     }
 }

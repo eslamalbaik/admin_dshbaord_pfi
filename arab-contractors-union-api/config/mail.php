@@ -45,7 +45,10 @@ return [
             'port' => env('MAIL_PORT', 2525),
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
-            'timeout' => null,
+            // QUEUE_CONNECTION=sync يخلي إشعارات ShouldQueue (مثل موافقة/رفض الطلبات) تُرسَل
+            // بريدها داخل نفس الـ HTTP request مباشرة. بدون timeout، تعليق/بطء SMTP بيعلّق
+            // الطلب كامل ويخلي الفرونت إند يعتبرها فشلت رغم إن العملية بالداتابيز نجحت فعلاً.
+            'timeout' => env('MAIL_TIMEOUT', 10),
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
 

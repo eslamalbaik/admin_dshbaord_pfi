@@ -43,9 +43,9 @@ function mapRawNotification(n: any): NotificationItem {
     // غرامات
     penalty_issued:      { title: 'غرامة جديدة صادرة',        icon: 'tabler-alert-triangle', color: 'error' },
     penalty_paid:        { title: 'تم سداد الغرامة',          icon: 'tabler-circle-check', color: 'success' },
-    // مناقصات
-    tender_new:          { title: 'مناقصة جديدة',             icon: 'tabler-files', color: 'primary' },
-    tender_deadline:     { title: 'اقتراب موعد المناقصة',     icon: 'tabler-calendar-exclamation', color: 'warning' },
+    // عطاءات
+    tender_new:          { title: 'عطاء جديد',                icon: 'tabler-files', color: 'primary' },
+    tender_deadline:     { title: 'اقتراب موعد العطاء',        icon: 'tabler-calendar-exclamation', color: 'warning' },
     // مقاولون
     contractor_new:      { title: 'مقاول جديد',               icon: 'tabler-building-factory-2', color: 'info' },
     contractor_updated:  { title: 'تحديث بيانات مقاول',       icon: 'tabler-building-factory-2', color: 'secondary' },

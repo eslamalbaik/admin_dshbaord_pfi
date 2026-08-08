@@ -40,7 +40,6 @@
     "destr": "2.0.5",
     "eslint-plugin-regexp": "2.10.0",
     "framer-motion": "^12.40.0",
-    "iconify-icon": "^3.0.2",
     "jwt-decode": "4.0.0",
     "lightningcss": "^1.32.0",
     "lucide-react": "^1.17.0",

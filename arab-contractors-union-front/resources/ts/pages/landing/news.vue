@@ -2,7 +2,7 @@
 import { ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/plugins/axios'
-import { Search, Inbox } from 'lucide-vue-next'
+import { Search, Inbox, Play, Images } from 'lucide-vue-next'
 
 definePage({
   meta: {
@@ -18,8 +18,12 @@ interface NewsItem {
   slug: string
   excerpt: string | null
   image: string | null
+  video_url: string | null
+  gallery: string[] | null
   category: string
   published_at: string
+  event_date: string | null
+  event_location: string | null
 }
 
 interface Pagination {
@@ -44,7 +48,7 @@ const categories = [
   { value: 'news', label: 'أخبار' },
   { value: 'announcement', label: 'إعلانات' },
   { value: 'event', label: 'فعاليات' },
-  { value: 'tender', label: 'مناقصات' },
+  { value: 'tender', label: 'عطاءات' },
 ]
 
 const categoryColors: Record<string, string> = {
@@ -68,8 +72,14 @@ async function fetchNews() {
     if (search.value.trim()) params.search = search.value.trim()
 
     const res = await api.get('/api/v1/news', { params })
-    news.value = res.data.data ?? []
-    pagination.value = res.data
+    news.value = res.data.items ?? []
+    pagination.value = {
+      data: res.data.items ?? [],
+      current_page: res.data.meta?.current_page ?? 1,
+      last_page: res.data.meta?.last_page ?? 1,
+      total: res.data.meta?.total ?? 0,
+      per_page: res.data.meta?.per_page ?? 9,
+    }
   } catch {
     news.value = []
   } finally {
@@ -175,10 +185,18 @@ onMounted(fetchNews)
             >
               {{ categories.find(c => c.value === item.category)?.label ?? item.category }}
             </span>
+            <span v-if="item.video_url" class="news-video-badge"><Play :size="22" fill="white" /></span>
+            <span v-if="item.gallery && item.gallery.length > 0" class="news-gallery-badge">
+              <Images :size="13" /> {{ item.gallery.length + (item.image ? 1 : 0) }}
+            </span>
           </div>
           <div class="news-body">
             <p class="news-date">{{ formatDate(item.published_at) }}</p>
             <h2 class="news-title">{{ item.title }}</h2>
+            <p v-if="item.category === 'event' && item.event_date" class="news-event-info">
+              📅 {{ formatDate(item.event_date) }}
+              <span v-if="item.event_location"> — 📍 {{ item.event_location }}</span>
+            </p>
             <p v-if="item.excerpt" class="news-excerpt">{{ item.excerpt }}</p>
             <span class="news-read-more">اقرأ المزيد ←</span>
           </div>
@@ -442,6 +460,37 @@ onMounted(fetchNews)
   font-weight: 700;
   padding: 0.25rem 0.75rem;
   border-radius: 50px;
+}
+
+.news-video-badge {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.15);
+}
+
+.news-gallery-badge {
+  position: absolute;
+  bottom: 0.75rem;
+  left: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: rgba(0,0,0,0.6);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+  border-radius: 50px;
+}
+
+.news-event-info {
+  font-size: 0.8rem;
+  color: #15803d;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
 }
 
 .news-body {

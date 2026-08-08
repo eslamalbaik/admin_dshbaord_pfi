@@ -15,9 +15,7 @@ const terms = computed(() => data.value ?? [])
 
 const emptyForm = () => ({
   title: '',
-  title_en: '',
   body: '',
-  body_en: '',
   sort: 0,
   is_active: true,
 })
@@ -27,7 +25,6 @@ const isEditing = ref(false)
 const editingId = ref<number | null>(null)
 const form = ref<any>(emptyForm())
 const formError = ref('')
-const tab = ref('ar')
 
 const openCreate = () => {
   isEditing.value = false
@@ -35,7 +32,6 @@ const openCreate = () => {
   form.value = emptyForm()
   form.value.sort = terms.value.length
   formError.value = ''
-  tab.value = 'ar'
   isFormOpen.value = true
 }
 
@@ -44,7 +40,6 @@ const openEdit = (t: any) => {
   editingId.value = t.id
   form.value = { ...t }
   formError.value = ''
-  tab.value = 'ar'
   isFormOpen.value = true
 }
 
@@ -111,9 +106,6 @@ const confirmDelete = (t: any) => {
                 {{ t.sort }}
               </VChip>
               <span class="font-weight-medium">{{ t.title }}</span>
-              <span v-if="t.title_en" class="text-body-2 text-medium-emphasis">
-                — {{ t.title_en }}
-              </span>
             </div>
             <VChip size="x-small" :color="t.is_active ? 'success' : 'secondary'">
               {{ t.is_active ? 'نشط' : 'مخفي' }}
@@ -122,20 +114,7 @@ const confirmDelete = (t: any) => {
         </VExpansionPanelTitle>
         <VExpansionPanelText>
           <VCard variant="tonal" color="secondary" class="mb-3 pa-3 rounded-lg">
-            <p class="text-body-2 font-weight-medium mb-1 text-primary">
-              عربي
-            </p>
-            <p class="text-body-2" style="white-space: pre-wrap; line-height: 1.8">
-              {{ t.body }}
-            </p>
-          </VCard>
-          <VCard v-if="t.body_en" variant="tonal" color="info" class="mb-3 pa-3 rounded-lg">
-            <p class="text-body-2 font-weight-medium mb-1" dir="ltr">
-              English
-            </p>
-            <p class="text-body-2" style="white-space: pre-wrap; line-height: 1.8" dir="ltr">
-              {{ t.body_en }}
-            </p>
+            <div class="text-body-2 term-body-preview" v-html="t.body" />
           </VCard>
           <div class="d-flex gap-2 mt-2">
             <VBtn size="small" prepend-icon="tabler-edit" @click="openEdit(t)">
@@ -183,49 +162,14 @@ const confirmDelete = (t: any) => {
             <VSwitch v-model="form.is_active" label="نشط" color="success" />
           </div>
 
-          <!-- Bilingual Tabs -->
-          <VTabs v-model="tab" class="mb-4">
-            <VTab value="ar">🇵🇸 عربي</VTab>
-            <VTab value="en">🇬🇧 English</VTab>
-          </VTabs>
-
-          <VWindow v-model="tab">
-            <!-- Arabic -->
-            <VWindowItem value="ar">
-              <VTextField
-                v-model="form.title"
-                label="العنوان (عربي) *"
-                class="mb-4"
-                dir="rtl"
-              />
-              <VTextarea
-                v-model="form.body"
-                label="نص البند (عربي) *"
-                rows="8"
-                dir="rtl"
-                hint="يمكنك استخدام أسطر جديدة للفقرات"
-                persistent-hint
-              />
-            </VWindowItem>
-
-            <!-- English -->
-            <VWindowItem value="en">
-              <VTextField
-                v-model="form.title_en"
-                label="Title (English)"
-                class="mb-4"
-                dir="ltr"
-              />
-              <VTextarea
-                v-model="form.body_en"
-                label="Body (English)"
-                rows="8"
-                dir="ltr"
-                hint="You can use new lines for paragraphs"
-                persistent-hint
-              />
-            </VWindowItem>
-          </VWindow>
+          <VTextField
+            v-model="form.title"
+            label="العنوان *"
+            class="mb-4"
+            dir="rtl"
+          />
+          <p class="text-body-2 font-weight-medium mb-1">نص البند *</p>
+          <TiptapEditor v-model="form.body" placeholder="اكتب نص البند هنا..." class="border rounded" />
         </VCardText>
 
         <VCardActions>

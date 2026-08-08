@@ -22,8 +22,8 @@ const activities = ref([
     color: 'info',
   },
   {
-    title: 'مناقصة جديدة',
-    description: 'مناقصة مشروع توسعة الطرق المحلية',
+    title: 'عطاء جديد',
+    description: 'عطاء مشروع توسعة الطرق المحلية',
     time: 'منذ 3 ساعات',
     icon: 'tabler-files',
     color: 'secondary',

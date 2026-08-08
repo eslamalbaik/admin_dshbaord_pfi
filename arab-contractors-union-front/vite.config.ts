@@ -164,6 +164,9 @@ export default defineConfig({
   // Vite compiles these (and their imports) before the first navigation so the
   // section-to-section switch is instant instead of compiling on demand.
   server: {
+    // بدونها Vite بيربط على IPv6 loopback بس (::1) على بعض أجهزة Windows —
+    // فيصير 127.0.0.1 (المتصفح، curl، أدوات المعاينة) ما توصلّه أبداً.
+    host: true,
     warmup: {
       clientFiles: [
         './resources/ts/App.vue',
@@ -204,6 +207,10 @@ export default defineConfig({
       '@tiptap/starter-kit',
       'nprogress',
       'jwt-decode',
+      'webfontloader',
+      '@antfu/utils',
+      'vuetify/labs/VVideo',
+      'vuetify/locale/adapters/vue-i18n',
     ],
     // Only crawl Vue source for dep discovery — exclude the React landing
     // micro-frontend so React/framer-motion aren't pulled into the admin scan.

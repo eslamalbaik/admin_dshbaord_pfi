@@ -1,0 +1,414 @@
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import api from '@/plugins/axios'
+import {
+  Eye, EyeOff, Lock, PartyPopper, RefreshCw,
+  ShieldCheck, Award, Handshake, ArrowLeft, AlertCircle,
+} from 'lucide-vue-next'
+
+definePage({
+  meta: { layout: 'pure', public: true, unauthenticatedOnly: false },
+})
+
+const router = useRouter()
+
+// التدفق: phone → verify-otp (محلياً) → reset (otp + password معاً) → success
+type Step = 'phone' | 'otp' | 'reset' | 'success'
+const step = ref<Step>('phone')
+
+const phoneForm    = ref({ phone: '' })
+const otpForm       = ref({ otp: '' })
+const passwordForm = ref({ password: '', password_confirmation: '' })
+const otpPreview   = ref('')
+
+const resendTimer = ref(0)
+let timerInterval: any = null
+
+function startResendTimer(seconds: number) {
+  resendTimer.value = seconds
+  clearInterval(timerInterval)
+  timerInterval = setInterval(() => {
+    if (resendTimer.value > 0) resendTimer.value--
+    else clearInterval(timerInterval)
+  }, 1000)
+}
+
+const showPwd  = ref(false)
+const showPwdC = ref(false)
+
+const isLoading = ref(false)
+const errorMsg  = ref('')
+
+const stepIndex = computed(() => {
+  if (step.value === 'otp') return 2
+  if (step.value === 'reset' || step.value === 'success') return 3
+  return 1
+})
+
+onMounted(() => {
+  if (localStorage.getItem('contractor_token'))
+    router.replace('/contractor/dashboard')
+})
+
+async function persistLogin(token: string) {
+  localStorage.setItem('contractor_token', token)
+  window.dispatchEvent(new CustomEvent('contractor-logged-in'))
+}
+
+async function handleSendOtp() {
+  errorMsg.value = ''
+  if (!phoneForm.value.phone)
+    return (errorMsg.value = 'يرجى إدخال رقم الجوال.')
+
+  isLoading.value = true
+  try {
+    const r = await api.post('/api/v1/contractor/auth/forgot-password/send-otp', {
+      phone: phoneForm.value.phone,
+    })
+    otpPreview.value = r.data.items?.otp_preview ?? ''
+    otpForm.value = { otp: '' }
+    if (r.data.items?.expires_in) startResendTimer(r.data.items.expires_in)
+    step.value = 'otp'
+  } catch (e: any) {
+    if (e?.response?.data?.error === 'otp_cooldown') {
+      errorMsg.value = e.response.data.message
+      if (e.response.data.items?.expires_in) startResendTimer(e.response.data.items.expires_in)
+    } else {
+      errorMsg.value = e?.response?.data?.message || 'تعذّر إرسال رمز التحقق.'
+    }
+  } finally { isLoading.value = false }
+}
+
+function handleVerifyOtpLocal() {
+  errorMsg.value = ''
+  if (!otpForm.value.otp) return (errorMsg.value = 'أدخل رمز التحقق.')
+  if (otpForm.value.otp.length !== 6) return (errorMsg.value = 'الرمز يجب أن يكون 6 أرقام بالضبط.')
+  step.value = 'reset'
+}
+
+async function handleResendOtp() {
+  if (resendTimer.value > 0) return
+  errorMsg.value = ''
+  isLoading.value = true
+  try {
+    const r = await api.post('/api/v1/contractor/auth/forgot-password/send-otp', {
+      phone: phoneForm.value.phone,
+    })
+    otpPreview.value = r.data.items?.otp_preview ?? otpPreview.value
+    if (r.data.items?.expires_in) startResendTimer(r.data.items.expires_in)
+  } catch (e: any) {
+    if (e?.response?.data?.error === 'otp_cooldown') {
+      errorMsg.value = e.response.data.message
+      if (e.response.data.items?.expires_in) startResendTimer(e.response.data.items.expires_in)
+    } else {
+      errorMsg.value = e?.response?.data?.message || 'تعذّر إعادة إرسال الرمز.'
+    }
+  } finally { isLoading.value = false }
+}
+
+async function handleReset() {
+  errorMsg.value = ''
+  if (passwordForm.value.password.length < 8)
+    return (errorMsg.value = 'كلمة المرور 8 أحرف على الأقل.')
+  if (passwordForm.value.password !== passwordForm.value.password_confirmation)
+    return (errorMsg.value = 'كلمتا المرور غير متطابقتين.')
+
+  isLoading.value = true
+  try {
+    const r = await api.post('/api/v1/contractor/auth/forgot-password/reset', {
+      phone: phoneForm.value.phone,
+      otp: otpForm.value.otp,
+      password: passwordForm.value.password,
+      password_confirmation: passwordForm.value.password_confirmation,
+    })
+    if (r.data.items?.token) {
+      await persistLogin(r.data.items.token)
+      step.value = 'success'
+    }
+  } catch (e: any) {
+    errorMsg.value = e?.response?.data?.message || 'حدث خطأ، تأكد من رمز التحقق.'
+    if (e?.response?.data?.error === 'invalid_otp') step.value = 'otp'
+  } finally { isLoading.value = false }
+}
+</script>
+
+<template>
+  <div dir="rtl" class="rg-page">
+    <div class="rg-shell">
+
+      <!-- لوحة العلامة التجارية -->
+      <aside class="rg-brand">
+        <div class="rg-brand-inner">
+          <div class="rg-logo-wrap"><img src="/logo.png" alt="اتحاد المقاولين الفلسطينيين" class="rg-logo" /></div>
+          <h1 class="rg-brand-title">اتحاد المقاولين الفلسطينيين</h1>
+          <p class="rg-brand-sub">استعادة كلمة المرور</p>
+
+          <ul class="rg-perks">
+            <li><span class="rg-perk-ico"><ShieldCheck :size="18" /></span> بوابة موحّدة لمتابعة عضويتك وذممك المالية</li>
+            <li><span class="rg-perk-ico"><Award :size="18" /></span> إصدار شهادات العضوية إلكترونياً</li>
+            <li><span class="rg-perk-ico"><Handshake :size="18" /></span> اطّلاع مباشر على العطاءات والأخبار</li>
+          </ul>
+
+          <RouterLink to="/landing" class="rg-back">
+            <ArrowLeft :size="15" /> العودة للصفحة الرئيسية
+          </RouterLink>
+        </div>
+      </aside>
+
+      <!-- بطاقة النموذج -->
+      <main class="rg-card">
+
+        <!-- مؤشّر الخطوات -->
+        <div v-if="step !== 'success'" class="rg-steps">
+          <div class="rg-step" :class="{ active: stepIndex === 1, done: stepIndex > 1 }">
+            <span v-if="stepIndex > 1"><Lock :size="12" /></span><span v-else>١</span>
+          </div>
+          <div class="rg-step-line" :class="{ filled: stepIndex > 1 }" />
+          <div class="rg-step" :class="{ active: stepIndex === 2, done: stepIndex > 2 }">
+            <span v-if="stepIndex > 2"><Lock :size="12" /></span><span v-else>٢</span>
+          </div>
+          <div class="rg-step-line" :class="{ filled: stepIndex > 2 }" />
+          <div class="rg-step" :class="{ active: stepIndex === 3 }">٣</div>
+        </div>
+
+        <!-- phone -->
+        <div v-if="step === 'phone'" class="rg-body">
+          <h2 class="rg-title">نسيت كلمة المرور</h2>
+          <p class="rg-hint">أدخل رقم جوالك المسجّل لاستلام رمز التحقق عبر رسالة نصية.</p>
+          <div v-if="errorMsg" class="rg-err"><AlertCircle :size="16" /> {{ errorMsg }}</div>
+          <form class="rg-form" @submit.prevent="handleSendOtp">
+            <div class="rg-fg">
+              <label>رقم الجوال *</label>
+              <input v-model="phoneForm.phone" type="text" inputmode="tel" dir="ltr" placeholder="مثال: 0590000000" class="rg-fi" style="text-align: right;" />
+            </div>
+            <div class="rg-actions">
+              <button type="submit" class="rg-btn-p rg-btn-block" :disabled="isLoading">
+                <span v-if="isLoading" class="rg-spin" /><span v-else>إرسال رمز التحقق</span>
+              </button>
+            </div>
+          </form>
+
+          <div class="rg-divider"><span>أو</span></div>
+          <p class="rg-switch">
+            تذكّرت كلمة المرور؟
+            <RouterLink to="/contractor/login">تسجيل دخول</RouterLink>
+          </p>
+        </div>
+
+        <!-- otp -->
+        <div v-else-if="step === 'otp'" class="rg-body">
+          <h2 class="rg-title">ادخل رمز التحقق</h2>
+          <p class="rg-hint">
+            استخدم الرمز المكوّن من 6 أرقام الذي وصلك على رقم هاتفك لإتمام التسجيل.
+            <span v-if="otpPreview"> (رمز الاختبار: <strong>{{ otpPreview }}</strong>)</span>
+          </p>
+          <div v-if="errorMsg" class="rg-err"><AlertCircle :size="16" /> {{ errorMsg }}</div>
+          <form class="rg-form" @submit.prevent="handleVerifyOtpLocal">
+            <div class="rg-fg">
+              <label>رمز التحقق *</label>
+              <input v-model="otpForm.otp" type="text" inputmode="numeric" placeholder="000000" maxlength="6" class="rg-fi rg-fi-otp" />
+            </div>
+            <button class="rg-resend" type="button" :disabled="isLoading || resendTimer > 0" @click="handleResendOtp">
+              <RefreshCw :size="13" :class="{ 'rg-spin': isLoading }" />
+              <span v-if="resendTimer > 0">إعادة إرسال الرمز بعد {{ resendTimer }} ثانية</span>
+              <span v-else>إعادة إرسال الرمز</span>
+            </button>
+            <div class="rg-actions">
+              <button type="submit" class="rg-btn-p rg-btn-block" :disabled="isLoading">
+                <span>تحقق</span>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- reset -->
+        <div v-else-if="step === 'reset'" class="rg-body">
+          <h2 class="rg-title">إعادة تعيين المرور</h2>
+          <p class="rg-hint">اختر كلمة مرور قوية لحماية حسابك.</p>
+          <div v-if="errorMsg" class="rg-err"><AlertCircle :size="16" /> {{ errorMsg }}</div>
+          <form class="rg-form" @submit.prevent="handleReset">
+            <div class="rg-fg">
+              <label>كلمة المرور الجديدة *</label>
+              <div class="rg-pw-wrap">
+                <input v-model="passwordForm.password" :type="showPwd ? 'text' : 'password'" placeholder="••••••••" class="rg-fi" />
+                <button type="button" class="rg-pw-eye" @click="showPwd = !showPwd">
+                  <EyeOff v-if="showPwd" :size="16" /><Eye v-else :size="16" />
+                </button>
+              </div>
+            </div>
+            <div class="rg-fg">
+              <label>تأكيد كلمة المرور *</label>
+              <div class="rg-pw-wrap">
+                <input v-model="passwordForm.password_confirmation" :type="showPwdC ? 'text' : 'password'" placeholder="••••••••" class="rg-fi" />
+                <button type="button" class="rg-pw-eye" @click="showPwdC = !showPwdC">
+                  <EyeOff v-if="showPwdC" :size="16" /><Eye v-else :size="16" />
+                </button>
+              </div>
+            </div>
+            <div class="rg-actions">
+              <button type="submit" class="rg-btn-p rg-btn-block" :disabled="isLoading">
+                <span v-if="isLoading" class="rg-spin" /><span v-else>تحديث كلمة المرور</span>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- success -->
+        <div v-else-if="step === 'success'" class="rg-body rg-success">
+          <div class="rg-success-icon"><PartyPopper :size="52" /></div>
+          <h2 class="rg-title">تم تحديث كلمة المرور بنجاح!</h2>
+          <p class="rg-hint">تم تسجيل دخولك تلقائياً.</p>
+          <button class="rg-btn-p rg-btn-block" @click="router.push('/contractor/dashboard')">الانتقال إلى لوحتي</button>
+        </div>
+
+      </main>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap');
+
+:global(:root) {
+  --navy:        #0f1f5c;
+  --navy-mid:    #17307e;
+  --navy-bright: #2b4bb0;
+  --navy-light:  #e8eaf6;
+  --navy-soft:   #f5f7ff;
+  --gold:        #d9a441;
+  --gold-dark:   #b3781f;
+  --gold-light:  #fdf3e1;
+  --green:       #2e7d32;
+  --green-light: #e8f5e9;
+  --red:         #c62828;
+  --red-light:   #fce4ec;
+  --text-h:      #0d1b3e;
+  --text-b:      #374151;
+  --text-m:      #6b7280;
+  --border:      #e5e7eb;
+}
+
+* { box-sizing: border-box; }
+
+.rg-page {
+  min-height: 100vh;
+  font-family: 'Tajawal', 'Cairo', sans-serif;
+  background: var(--navy-soft);
+  display: flex; align-items: center; justify-content: center;
+  padding: 2rem 1.5rem;
+}
+
+.rg-shell {
+  width: 100%; max-width: 1040px;
+  display: grid; grid-template-columns: 2fr 3fr;
+  border-radius: 24px; overflow: hidden;
+  box-shadow: 0 30px 90px rgba(15,31,92,.2);
+  background: #fff;
+  min-height: 620px;
+}
+
+.rg-brand {
+  background: #fff;
+  color: var(--text-h); padding: 3rem 2.25rem;
+  display: flex; flex-direction: column; justify-content: center; position: relative;
+  overflow: hidden; border-inline-end: 1px solid var(--border);
+}
+.rg-brand-inner { position: relative; z-index: 1; }
+.rg-logo-wrap { display: flex; justify-content: center; margin-bottom: 1.75rem; }
+.rg-logo { height: 108px; width: auto; }
+.rg-brand-title { font-size: 1.35rem; font-weight: 900; line-height: 1.5; color: var(--text-h); font-family: 'Cairo', sans-serif; }
+.rg-brand-sub { font-size: .9rem; color: var(--text-m); margin-top: .4rem; margin-bottom: 2rem; }
+
+.rg-perks { list-style: none; padding: 0; margin: 0 0 2.5rem; display: flex; flex-direction: column; gap: 1.1rem; }
+.rg-perks li { display: flex; align-items: center; gap: .85rem; font-size: .84rem; line-height: 1.6; color: var(--text-b); }
+.rg-perk-ico {
+  width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+  background: var(--navy-light); color: var(--navy-mid);
+  display: flex; align-items: center; justify-content: center;
+  transition: background .25s, color .25s, transform .25s;
+}
+.rg-perks li:hover .rg-perk-ico { background: var(--navy-mid); color: #fff; transform: scale(1.08) rotate(-6deg); }
+
+.rg-back { display: inline-flex; align-items: center; gap: .4rem; color: var(--text-m); font-size: .82rem; text-decoration: none; font-weight: 600; transition: color .2s; }
+.rg-back:hover { color: var(--navy); }
+
+.rg-card {
+  background: linear-gradient(160deg, var(--navy) 0%, var(--navy-mid) 100%);
+  padding: 3rem 2.75rem; display: flex; flex-direction: column; justify-content: center; position: relative;
+  overflow: hidden;
+}
+.rg-card::after {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(circle at 85% 110%, rgba(217,164,65,.16), transparent 55%);
+}
+.rg-body { width: 100%; position: relative; z-index: 1; }
+
+.rg-steps { display: flex; align-items: center; justify-content: center; margin-bottom: 2rem; }
+.rg-step { width: 32px; height: 32px; border-radius: 50%; border: 2px solid rgba(255,255,255,.25); display: flex; align-items: center; justify-content: center; font-size: .82rem; font-weight: 800; color: rgba(255,255,255,.6); flex-shrink: 0; transition: all .2s; }
+.rg-step.active { border-color: var(--gold); color: var(--gold); background: rgba(217,164,65,.15); }
+.rg-step.done { border-color: var(--green); background: var(--green); color: #fff; }
+.rg-step-line { flex: 1; max-width: 90px; height: 2px; background: rgba(255,255,255,.2); margin: 0 .5rem; }
+.rg-step-line.filled { background: var(--gold); }
+
+.rg-title { font-size: 1.3rem; font-weight: 900; color: #fff; font-family: 'Cairo', sans-serif; margin-bottom: .5rem; }
+.rg-hint { font-size: .875rem; color: rgba(255,255,255,.65); line-height: 1.75; margin-bottom: 1.5rem; }
+
+.rg-err { display: flex; align-items: center; gap: .5rem; background: rgba(198,40,40,.18); color: #ffcdd2; border: 1px solid rgba(239,154,154,.4); border-radius: 10px; padding: .8rem 1rem; font-size: .85rem; margin-bottom: 1.25rem; }
+
+.rg-form { display: flex; flex-direction: column; }
+.rg-fg { margin-bottom: 1.1rem; }
+.rg-fg label { display: block; font-size: .82rem; font-weight: 700; color: rgba(255,255,255,.85); margin-bottom: .4rem; }
+.rg-fi {
+  width: 100%; font-family: inherit; font-size: .92rem; color: #fff;
+  background: rgba(255,255,255,.07); padding: .8rem 1rem; border: 1.5px solid rgba(255,255,255,.2); border-radius: 10px;
+  transition: border-color .2s, background .2s;
+}
+.rg-fi::placeholder { color: rgba(255,255,255,.4); }
+.rg-fi:focus { outline: none; border-color: var(--gold); background: rgba(255,255,255,.1); }
+.rg-fi-otp { text-align: center; letter-spacing: .4em; font-size: 1.1rem; font-weight: 700; }
+
+.rg-pw-wrap { position: relative; display: flex; align-items: center; }
+.rg-pw-wrap .rg-fi { padding-inline-end: 2.75rem; }
+.rg-pw-eye { position: absolute; inset-inline-end: .8rem; background: none; border: none; cursor: pointer; color: rgba(255,255,255,.6); display: flex; align-items: center; transition: color .2s; }
+.rg-pw-eye:hover { color: #fff; }
+
+.rg-actions { display: flex; gap: .75rem; justify-content: flex-end; margin-top: .5rem; }
+.rg-btn-p {
+  background: linear-gradient(135deg, var(--gold), var(--gold-dark)); color: #fff; border: none;
+  border-radius: 10px; padding: .75rem 1.6rem; font-size: .9rem; font-weight: 700;
+  cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: .5rem;
+  transition: all .2s;
+}
+.rg-btn-p:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+.rg-btn-p:disabled { opacity: .6; cursor: not-allowed; }
+.rg-btn-block { width: 100%; }
+
+.rg-spin { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: rg-sp .7s linear infinite; }
+@keyframes rg-sp { to { transform: rotate(360deg); } }
+
+.rg-resend { display: flex; align-items: center; gap: .4rem; background: none; border: none; color: var(--gold); font-size: .82rem; font-weight: 700; cursor: pointer; font-family: inherit; margin-bottom: 1.25rem; }
+.rg-resend:hover { text-decoration: underline; }
+.rg-resend:disabled { opacity: .6; cursor: not-allowed; }
+
+.rg-success { text-align: center; padding: 1rem 0; }
+.rg-success-icon { color: var(--gold); margin-bottom: 1rem; display: flex; justify-content: center; }
+.rg-success .rg-title { margin-bottom: .5rem; }
+.rg-success .rg-hint { margin-bottom: 2rem; }
+
+.rg-divider { display: flex; align-items: center; text-align: center; margin: 1.5rem 0 1.1rem; color: rgba(255,255,255,.5); font-size: .78rem; }
+.rg-divider::before, .rg-divider::after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,.18); }
+.rg-divider span { padding: 0 .9rem; }
+
+.rg-switch { text-align: center; font-size: .85rem; color: rgba(255,255,255,.65); }
+.rg-switch a { color: var(--gold); font-weight: 700; text-decoration: none; margin-inline-start: .3rem; }
+.rg-switch a:hover { text-decoration: underline; }
+
+@media (max-width: 860px) {
+  .rg-shell { grid-template-columns: 1fr; min-height: 0; }
+  .rg-brand { padding: 2.25rem 1.75rem; border-inline-end: none; border-bottom: 1px solid var(--border); }
+  .rg-perks { margin-bottom: 1.5rem; }
+  .rg-back { display: none; }
+  .rg-card { padding: 2.25rem 1.75rem; }
+}
+</style>
