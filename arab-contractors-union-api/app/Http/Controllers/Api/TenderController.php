@@ -4,11 +4,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
+use App\Models\Contractor;
 use App\Models\Tender;
+use App\Models\TenderBookmark;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 class TenderController extends Controller
 {
@@ -39,6 +42,67 @@ class TenderController extends Controller
         return $this->success($this->formatPublic($tender));
     }
 
+    // ═════════════════════════════════════════════════════════════════════════
+    //  Contractor Mobile App — تصفح + حفظ (Bookmark) — REQ-09/11/13
+    // ═════════════════════════════════════════════════════════════════════════
+
+    // GET /api/v1/contractor/tenders
+    public function contractorIndex(Request $request)
+    {
+        $contractor = $request->user();
+        $query      = $this->applyFilters(Tender::query(), $request);
+
+        $bookmarkedIds = $contractor->bookmarkedTenders()->pluck('tenders.id');
+
+        $paginator = $query->paginate($this->perPage($request))
+            ->through(fn ($t) => $this->formatPublic($t, $bookmarkedIds));
+
+        return $this->paginated($paginator);
+    }
+
+    // GET /api/v1/contractor/tenders/{tender}
+    public function contractorShow(Request $request, Tender $tender)
+    {
+        $bookmarkedIds = $request->user()->bookmarkedTenders()->pluck('tenders.id');
+
+        return $this->success($this->formatPublic($tender, $bookmarkedIds));
+    }
+
+    // GET /api/v1/contractor/tenders/bookmarked
+    public function bookmarked(Request $request)
+    {
+        $query = $this->applyFilters(
+            $request->user()->bookmarkedTenders()->getQuery(),
+            $request,
+        );
+
+        $paginator = $query->paginate($this->perPage($request))
+            ->through(fn ($t) => $this->formatPublic($t, collect([$t->id])));
+
+        return $this->paginated($paginator);
+    }
+
+    // POST /api/v1/contractor/tenders/{tender}/bookmark
+    public function bookmark(Request $request, Tender $tender)
+    {
+        TenderBookmark::firstOrCreate([
+            'contractor_id' => $request->user()->id,
+            'tender_id'     => $tender->id,
+        ]);
+
+        return $this->success(message: 'تم حفظ العطاء بالمفضلة.');
+    }
+
+    // DELETE /api/v1/contractor/tenders/{tender}/bookmark
+    public function unbookmark(Request $request, Tender $tender)
+    {
+        TenderBookmark::where('contractor_id', $request->user()->id)
+            ->where('tender_id', $tender->id)
+            ->delete();
+
+        return $this->success(message: 'تمت إزالة العطاء من المفضلة.');
+    }
+
     // POST /api/tenders
     public function store(Request $request)
     {
@@ -46,7 +110,7 @@ class TenderController extends Controller
             'title'              => 'required|string|max:255',
             'description'        => 'nullable|string',
             'union_notes'        => 'nullable|string',
-            'category'           => 'nullable|string|max:100',
+            'category'           => ['nullable', Rule::in(Tender::CATEGORIES)],
             'deadline'           => 'nullable|date',
             'status'             => 'nullable|in:open,closed,cancelled',
             'submission_types'   => 'nullable|array',
@@ -75,7 +139,7 @@ class TenderController extends Controller
     // GET /api/tenders/{id}
     public function show(Tender $tender)
     {
-        return $this->success($tender->toArray());
+        return $this->success($tender->load('attachments')->toArray());
     }
 
     // PATCH /api/tenders/{id}
@@ -85,7 +149,7 @@ class TenderController extends Controller
             'title'              => 'sometimes|string|max:255',
             'description'        => 'nullable|string',
             'union_notes'        => 'nullable|string',
-            'category'           => 'nullable|string|max:100',
+            'category'           => ['nullable', Rule::in(Tender::CATEGORIES)],
             'deadline'           => 'nullable|date',
             'status'             => 'nullable|in:open,closed,cancelled',
             'submission_types'   => 'nullable|array',
@@ -140,6 +204,19 @@ class TenderController extends Controller
             $query->whereDate('updated_at', '<=', $request->date('updated_to'));
         }
 
+        // فعّالة/مؤرشفة (REQ-09) — archived_at يُضبط تلقائياً بأمر tenders:archive المجدول يومياً
+        if ($request->input('scope') === 'active') {
+            $query->whereNull('archived_at');
+        } elseif ($request->input('scope') === 'archived') {
+            $query->whereNotNull('archived_at');
+        }
+
+        // فلترة "مجالاتي" (REQ-13) — فقط ضمن سياق مقاول موثَّق
+        if ($request->input('scope') === 'my_specialties' && $request->user() instanceof Contractor) {
+            $specialties = $request->user()->specialties ?? [];
+            $query->whereIn('category', $specialties ?: ['__none__']);
+        }
+
         return match ($request->input('sort')) {
             'oldest'        => $query->oldest(),
             'deadline_asc'  => $query->orderByRaw('deadline IS NULL, deadline asc'),
@@ -158,7 +235,8 @@ class TenderController extends Controller
     }
 
     // شكل العطاء المعروض للعامة — بدون union_notes / created_by
-    private function formatPublic(Tender $t): array
+    // $bookmarkedIds: قائمة IDs عطاءات المقاول المحفوظة (لتعليم is_bookmarked) — اختياري خارج سياق المقاول
+    private function formatPublic(Tender $t, ?\Illuminate\Support\Collection $bookmarkedIds = null): array
     {
         return [
             'id'                  => $t->id,
@@ -168,6 +246,8 @@ class TenderController extends Controller
             'budget'              => $t->budget,
             'deadline'            => $t->deadline?->toDateString(),
             'status'              => $t->status,
+            'is_active'           => $t->is_active,
+            'archived_at'         => $t->archived_at?->toDateString(),
             'bids_count'          => $t->bids_count,
             'submission_types'    => $t->submission_types,
             'submission_email'    => $t->submission_email,
@@ -175,9 +255,52 @@ class TenderController extends Controller
             'submission_file_url' => $t->submission_file
                 ? Storage::disk('public')->url($t->submission_file)
                 : null,
+            'attachments'         => $t->attachments->map(fn ($a) => [
+                'id'    => $a->id,
+                'label' => $a->label,
+                'url'   => $a->file_url,
+            ])->values(),
             'external_url'        => $t->external_url,
+            'is_bookmarked'       => $bookmarkedIds?->contains($t->id) ?? false,
             'created_at'          => $t->created_at,
             'updated_at'          => $t->updated_at,
         ];
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    //  Admin — مرفقات العطاء المتعددة
+    // ═════════════════════════════════════════════════════════════════════════
+
+    // POST /api/v1/dashboard/tenders/{tender}/attachments
+    public function storeAttachment(Request $request, Tender $tender)
+    {
+        $data = $request->validate([
+            'file'  => 'required|file|mimes:pdf,doc,docx|max:10240',
+            'label' => 'nullable|string|max:255',
+        ]);
+
+        $path = $request->file('file')->store('tenders/attachments', 'public');
+
+        $attachment = $tender->attachments()->create([
+            'file_path' => $path,
+            'label'     => $data['label'] ?? null,
+        ]);
+
+        return $this->success([
+            'id' => $attachment->id, 'label' => $attachment->label, 'url' => $attachment->file_url,
+        ], 'تمت إضافة المرفق بنجاح.', 201);
+    }
+
+    // DELETE /api/v1/dashboard/tenders/{tender}/attachments/{attachment}
+    public function destroyAttachment(Tender $tender, \App\Models\TenderAttachment $attachment)
+    {
+        if ($attachment->tender_id !== $tender->id) {
+            return $this->error('المرفق لا يعود لهذا العطاء.', 422);
+        }
+
+        Storage::disk('public')->delete($attachment->file_path);
+        $attachment->delete();
+
+        return $this->success(message: 'تم حذف المرفق.');
     }
 }

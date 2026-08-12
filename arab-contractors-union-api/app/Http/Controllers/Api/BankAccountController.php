@@ -19,6 +19,7 @@ class BankAccountController extends Controller
             'id'             => $b->id,
             'bank_name'      => $b->bank_name,
             'bank_name_en'   => $b->bank_name_en,
+            'currency'       => $b->currency,
             'logo_url'       => $b->logo_url,
             'iban'           => $b->iban,
             'account_number' => $b->account_number,
@@ -63,6 +64,7 @@ class BankAccountController extends Controller
         $data = $request->validate([
             'bank_name'      => 'required|string|max:255',
             'bank_name_en'   => 'nullable|string|max:255',
+            'currency'       => 'nullable|in:ILS,JOD,USD,EUR',
             'iban'           => 'required|string|max:60',
             'account_number' => 'nullable|string|max:60',
             'account_holder' => 'nullable|string|max:255',
@@ -89,6 +91,7 @@ class BankAccountController extends Controller
         $data = $request->validate([
             'bank_name'      => 'sometimes|required|string|max:255',
             'bank_name_en'   => 'nullable|string|max:255',
+            'currency'       => 'nullable|in:ILS,JOD,USD,EUR',
             'iban'           => 'sometimes|required|string|max:60',
             'account_number' => 'nullable|string|max:60',
             'account_holder' => 'nullable|string|max:255',

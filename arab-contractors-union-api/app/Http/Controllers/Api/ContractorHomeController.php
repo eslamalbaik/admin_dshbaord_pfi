@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\Announcement;
+use App\Models\AnnouncementAcknowledgement;
 use App\Models\CertificateRequest;
 use App\Models\Contractor;
 use App\Models\ContractorNameChangeRequest;
@@ -130,7 +131,7 @@ class ContractorHomeController extends Controller
         return [
             'balance'         => number_format($balance, 2, '.', ''),
             'has_overdue'     => $hasOverdue,
-            'last_invoice'    => $lastDue ? [
+            'last_due'        => $lastDue ? [
                 'id'          => $lastDue->id,
                 'description' => $lastDue->description . ($lastDue->year ? " ({$lastDue->year})" : ''),
                 'amount_jod'  => $lastDue->amount_jod,
@@ -175,6 +176,7 @@ class ContractorHomeController extends Controller
     {
         return $this->tenderUpdates()
             ->concat($this->newsUpdates())
+            ->concat($this->announcementUpdates($contractor))
             ->concat($this->financeUpdates($contractor))
             ->concat($this->memberUpdates($contractor))
             // created_at وحده غير كافٍ كمفتاح ترتيب — سجلات كتيرة بنفس الثانية ممكنة (استيراد جماعي مثلاً)
@@ -236,6 +238,28 @@ class ContractorHomeController extends Controller
                 'is_new'       => $n->published_at->gt(now()->subHours(self::NEW_BADGE_HOURS)),
                 'priority'     => 'normal',
                 'created_at'   => $n->published_at,
+            ]);
+    }
+
+    // تعميمات مثبّتة (is_pinned) — بادج "غير مقروء" حتى يُقرّها المقاول (REQ-20)
+    private function announcementUpdates(Contractor $contractor): Collection
+    {
+        $acknowledgedIds = AnnouncementAcknowledgement::where('contractor_id', $contractor->id)->pluck('announcement_id');
+
+        return Announcement::published()
+            ->where('is_pinned', true)
+            ->latest('published_at')
+            ->limit(self::FEED_POOL_LIMIT)
+            ->get()
+            ->map(fn (Announcement $a) => [
+                'type'         => 'circular',
+                'reference_id' => $a->id,
+                'title'        => $a->title,
+                'subtitle'     => $acknowledgedIds->contains($a->id) ? null : 'بانتظار الإقرار بالقراءة',
+                'has_attachment' => (bool) $a->image,
+                'is_new'       => ! $acknowledgedIds->contains($a->id),
+                'priority'     => $acknowledgedIds->contains($a->id) ? 'normal' : 'high',
+                'created_at'   => $a->published_at,
             ]);
     }
 

@@ -303,4 +303,26 @@ class ContractorController extends Controller
             'expires_at'    => $expiresAt->toISOString(),
         ]);
     }
+
+    /**
+     * PATCH /api/v1/dashboard/contractors/{contractor}/equipment-ban
+     * حظر/رفع حظر مقاول من النشر بسوق الآليات فقط — منفصل عن status/is_frozen العامين (REQ-08).
+     */
+    public function equipmentBan(Request $request, Contractor $contractor)
+    {
+        $data = $request->validate(['banned' => 'required|boolean']);
+
+        $contractor->update(['equipment_banned_at' => $data['banned'] ? now() : null]);
+
+        \App\Services\AuditLogService::record(
+            $request->user(),
+            $data['banned'] ? 'contractor.equipment_banned' : 'contractor.equipment_unbanned',
+            $contractor,
+        );
+
+        return $this->success(
+            ['equipment_banned_at' => $contractor->equipment_banned_at],
+            $data['banned'] ? 'تم حظر المقاول من سوق الآليات.' : 'تم رفع الحظر عن المقاول.',
+        );
+    }
 }

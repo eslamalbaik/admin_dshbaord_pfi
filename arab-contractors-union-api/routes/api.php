@@ -90,22 +90,58 @@ Route::prefix('v1')->group(function () {
         // شاشة الدفع — رفع إشعار التحويل ومتابعته
         Route::post('payments/transfer', [PaymentController::class, 'submitTransfer']);
         Route::get('payments/transfer',  [PaymentController::class, 'myTransfers']);
+        Route::get('payments/{payment}/receipt', [PaymentController::class, 'receipt']);
 
-        // شاشة الدعم الفني والشكاوى
-        Route::get('support-tickets',           [SupportTicketController::class, 'myTickets']);
-        Route::post('support-tickets',          [SupportTicketController::class, 'store']);
-        Route::get('support-tickets/{ticket}',  [SupportTicketController::class, 'showMine']);
-        Route::post('support-tickets/{ticket}/reply', [SupportTicketController::class, 'replyMine']);
+        // شاشة الدعم الفني — مجمَّدة (REQ-23): الاتحاد قرر التحويل المباشر لاتصال هاتفي/واتساب
+        // بدل نظام التذاكر داخل التطبيق (موارد بشرية محدودة). الكود (Controller/Model/migrations)
+        // يبقى بالمستودع كما هو دون حذف لإمكانية إعادة التفعيل بـv2 — فقط الوصول من الموبايل معطَّل هنا.
+        // Route::get('support-tickets',           [SupportTicketController::class, 'myTickets']);
+        // Route::post('support-tickets',          [SupportTicketController::class, 'store']);
+        // Route::get('support-tickets/{ticket}',  [SupportTicketController::class, 'showMine']);
+        // Route::post('support-tickets/{ticket}/reply', [SupportTicketController::class, 'replyMine']);
 
         // شاشة طلب شهادة العضوية
         Route::get('certificate-requests',  [CertificateRequestController::class, 'index']);
         Route::post('certificate-requests', [CertificateRequestController::class, 'store']);
+        Route::get('certificates/status',   [CertificateRequestController::class, 'certificatesStatus']);
 
         // شاشة الملف المالي — كشف حساب "ما له وما عليه"
         Route::get('financial', [ContractorDashboardController::class, 'financial']);
 
         // أهلية تجديد العضوية (تُمنع مع ذمم غير مسدَّدة)
         Route::get('renewal-eligibility', [ContractorDashboardController::class, 'renewalEligibility']);
+
+        // شاشة العطاءات — تصفح موثَّق (فعّال/مؤرشف/مجالاتي) + حفظ بالمفضلة (REQ-09/11/13)
+        Route::get('tenders',                   [TenderController::class, 'contractorIndex']);
+        Route::get('tenders/bookmarked',         [TenderController::class, 'bookmarked']);
+        Route::get('tenders/{tender}',           [TenderController::class, 'contractorShow']);
+        Route::post('tenders/{tender}/bookmark', [TenderController::class, 'bookmark']);
+        Route::delete('tenders/{tender}/bookmark', [TenderController::class, 'unbookmark']);
+
+        // التعميمات الثابتة — Pop-up أول فتح + إقرار القراءة (REQ-20)
+        Route::get('circulars/pending', [\App\Http\Controllers\Api\AnnouncementController::class, 'pending']);
+        Route::post('circulars/{announcement}/acknowledge', [\App\Http\Controllers\Api\AnnouncementController::class, 'acknowledge']);
+
+        // الفعاليات — تصفح + انضمام/إلغاء (RSVP) — REQ-21
+        Route::get('events',                 [NewsController::class, 'contractorEvents']);
+        Route::get('events/{news}',          [NewsController::class, 'contractorEventShow']);
+        Route::post('events/{news}/join',    [NewsController::class, 'joinEvent']);
+        Route::delete('events/{news}/join',  [NewsController::class, 'leaveEvent']);
+
+        // سوق الآليات — "آلياتي" + تصفح السوق + بلاغات + الباقات (REQ-04→08)
+        Route::get('equipment-packages',            [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'packages']);
+        Route::get('equipment/subscription-status',  [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'subscriptionStatus']);
+        Route::get('equipment/marketplace',          [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'marketplace']);
+        Route::get('equipment',                      [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'index']);
+        Route::post('equipment',                     [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'store']);
+        Route::patch('equipment/{equipment}',        [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'update']);
+        Route::delete('equipment/{equipment}',       [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'destroy']);
+        Route::post('equipment/{equipment}/report',  [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'report']);
+
+        // طلبات تعديل بيانات البروفايل الثانوية (REQ-26)
+        Route::get('profile-update-requests/mine',          [\App\Http\Controllers\Api\ProfileUpdateRequestController::class, 'mine']);
+        Route::post('profile-update-requests/send-phone-otp', [\App\Http\Controllers\Api\ProfileUpdateRequestController::class, 'sendPhoneOtp']);
+        Route::post('profile-update-requests',               [\App\Http\Controllers\Api\ProfileUpdateRequestController::class, 'store']);
     });
 
     // --------------------------------------------------------
@@ -242,6 +278,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/',         [NewsController::class, 'store']);
             Route::put('{news}',     [NewsController::class, 'update']);
             Route::delete('{news}',  [NewsController::class, 'destroy']);
+            Route::get('{news}/attendees', [NewsController::class, 'attendees']);
         });
 
         // --------------------------------------------------------
@@ -333,6 +370,7 @@ Route::prefix('v1')->group(function () {
         // --------------------------------------------------------
         Route::get('dashboard/certificate-requests',                                [CertificateRequestController::class, 'adminIndex']);
         Route::get('dashboard/certificate-requests/{certificateRequest}',           [CertificateRequestController::class, 'show']);
+        Route::post('dashboard/certificate-requests/issue-membership',              [CertificateRequestController::class, 'adminIssueMembership']);
         Route::post('dashboard/certificate-requests/{certificateRequest}/approve',  [CertificateRequestController::class, 'approve']);
         Route::post('dashboard/certificate-requests/{certificateRequest}/reject',   [CertificateRequestController::class, 'reject']);
         Route::post('dashboard/certificate-requests/{certificateRequest}/issue',    [CertificateRequestController::class, 'issue']);
@@ -344,6 +382,10 @@ Route::prefix('v1')->group(function () {
         Route::get('dashboard/name-change-requests',                                    [ContractorNameChangeRequestController::class, 'index']);
         Route::post('dashboard/name-change-requests/{nameChangeRequest}/approve',        [ContractorNameChangeRequestController::class, 'approve']);
         Route::post('dashboard/name-change-requests/{nameChangeRequest}/reject',         [ContractorNameChangeRequestController::class, 'reject']);
+
+        Route::get('dashboard/profile-update-requests',                                       [\App\Http\Controllers\Api\ProfileUpdateRequestController::class, 'index']);
+        Route::post('dashboard/profile-update-requests/{profileUpdateRequest}/approve',        [\App\Http\Controllers\Api\ProfileUpdateRequestController::class, 'approve']);
+        Route::post('dashboard/profile-update-requests/{profileUpdateRequest}/reject',         [\App\Http\Controllers\Api\ProfileUpdateRequestController::class, 'reject']);
 
         // --------------------------------------------------------
         //  Contractor Dues — الذمم المالية (أدمن + محاسب)
@@ -375,6 +417,8 @@ Route::prefix('v1')->group(function () {
         //  Tenders
         // --------------------------------------------------------
         Route::apiResource('tenders', TenderController::class);
+        Route::post('tenders/{tender}/attachments', [TenderController::class, 'storeAttachment']);
+        Route::delete('tenders/{tender}/attachments/{attachment}', [TenderController::class, 'destroyAttachment']);
 
         // --------------------------------------------------------
         //  Documents
@@ -390,6 +434,11 @@ Route::prefix('v1')->group(function () {
         Route::get('notifications',                    [NotificationController::class, 'index']);
         Route::post('notifications/read',              [NotificationController::class, 'markAllRead']);
         Route::patch('notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead']);
+
+        // بث إشعارات مستهدَفة لكل المقاولين — أدمن فقط (REQ-22)
+        Route::middleware('role:admin')->group(function () {
+            Route::post('notifications/broadcast', [NotificationController::class, 'broadcast']);
+        });
 
         // --------------------------------------------------------
         //  Equipment Marketplace — سوق الآليات
@@ -413,6 +462,19 @@ Route::prefix('v1')->group(function () {
         Route::get('equipment/{equipment}/blocked-dates',                  [EquipmentController::class, 'blockedDates']);
         Route::post('equipment/{equipment}/blocked-dates',                 [EquipmentController::class, 'addBlockedDate']);
         Route::delete('equipment/{equipment}/blocked-dates/{blockedDate}', [EquipmentController::class, 'removeBlockedDate']);
+
+        // بلاغات "الإبلاغ عن مشكلة" بالسوق (اكتُشف بتصميم الموبايل)
+        Route::get('equipment-reports',                [\App\Http\Controllers\Api\EquipmentReportController::class, 'index']);
+        Route::patch('equipment-reports/{equipmentReport}', [\App\Http\Controllers\Api\EquipmentReportController::class, 'update']);
+
+        // باقات اشتراك سوق الآليات (REQ-06)
+        Route::get('equipment-packages',                    [\App\Http\Controllers\Api\EquipmentPackageController::class, 'index']);
+        Route::post('equipment-packages',                   [\App\Http\Controllers\Api\EquipmentPackageController::class, 'store']);
+        Route::patch('equipment-packages/{equipmentPackage}', [\App\Http\Controllers\Api\EquipmentPackageController::class, 'update']);
+        Route::delete('equipment-packages/{equipmentPackage}', [\App\Http\Controllers\Api\EquipmentPackageController::class, 'destroy']);
+
+        // حظر مقاول من سوق الآليات فقط (REQ-08)
+        Route::patch('contractors/{contractor}/equipment-ban', [ContractorController::class, 'equipmentBan']);
 
         // --------------------------------------------------------
         //  Reports / Analytics

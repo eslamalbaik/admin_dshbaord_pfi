@@ -25,11 +25,13 @@ class Equipment extends Model
         'owner_phone',
         'status',
         'admin_notes',
+        'is_hidden',
     ];
 
     protected $casts = [
         'daily_price'      => 'decimal:2',
         'manufacture_year' => 'integer',
+        'is_hidden'        => 'boolean',
     ];
 
     public function contractor()
@@ -55,5 +57,15 @@ class Equipment extends Model
     public function blockedDates()
     {
         return $this->hasMany(EquipmentBlockedDate::class);
+    }
+
+    public function reports()
+    {
+        return $this->hasMany(EquipmentReport::class);
+    }
+
+    public function scopeVisibleInMarketplace($query)
+    {
+        return $query->where('is_hidden', false)->where('status', 'visible');
     }
 }

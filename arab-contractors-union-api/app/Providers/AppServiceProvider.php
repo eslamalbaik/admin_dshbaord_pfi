@@ -18,6 +18,24 @@ class AppServiceProvider extends ServiceProvider
                 default => new \App\Services\Sms\LogSmsSender(),
             },
         );
+
+        // مرسل Push (FCM) — log إلى أن يُعرَّف ملف اعتماد Firebase عبر FIREBASE_CREDENTIALS
+        $this->app->bind(
+            \App\Services\Push\PushSenderInterface::class,
+            function () {
+                $credentials = config('services.firebase.credentials');
+
+                if (! $credentials || ! file_exists($credentials)) {
+                    return new \App\Services\Push\LogPushSender();
+                }
+
+                $messaging = (new \Kreait\Firebase\Factory())
+                    ->withServiceAccount($credentials)
+                    ->createMessaging();
+
+                return new \App\Services\Push\FirebasePushSender($messaging);
+            },
+        );
     }
 
     /**

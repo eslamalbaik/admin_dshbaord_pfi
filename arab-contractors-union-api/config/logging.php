@@ -79,6 +79,15 @@ return [
             'replace_placeholders' => true,
         ],
 
+        // إشعارات Push الصادرة (خصوصاً بوضع log قبل تعريف اعتماد Firebase)
+        'push' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/push.log'),
+            'level' => 'info',
+            'days' => 30,
+            'replace_placeholders' => true,
+        ],
+
         // تقارير استيراد البيانات القديمة
         'import' => [
             'driver' => 'single',

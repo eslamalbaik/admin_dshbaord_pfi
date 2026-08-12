@@ -1,4 +1,9 @@
 // 👉 Table
+.v-table__wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .v-table {
   th {
     color: rgba(var(--v-theme-on-surface), var(--v-high-emphasis-opacity)) !important;

@@ -86,6 +86,7 @@ onMounted(fetchPenalties)
         :items="penalties"
         :loading="loading"
         :items-per-page="15"
+        mobile-breakpoint="sm"
       >
         <template #item.contractor_name="{ item }">
           <span style="font-family:Cairo,sans-serif">{{ item.contractor_name || item.contractor?.name || '—' }}</span>

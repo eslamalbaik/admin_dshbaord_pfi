@@ -57,4 +57,17 @@ return [
         'driver' => env('SMS_DRIVER', 'log'),
     ],
 
+    // Firebase Cloud Messaging — log للتجربة إلى أن يُرفَع ملف اعتماد Service Account
+    'firebase' => [
+        'credentials' => env('FIREBASE_CREDENTIALS'),
+    ],
+
+    // تحويل شهادات DOCX إلى PDF — على لينكس soffice غالباً بالـ PATH، وعلى ويندوز
+    // بالمسار الافتراضي لتثبيت LibreOffice
+    'libreoffice' => [
+        'binary' => env('LIBREOFFICE_BINARY', PHP_OS_FAMILY === 'Windows'
+            ? 'C:\Program Files\LibreOffice\program\soffice.exe'
+            : 'soffice'),
+    ],
+
 ];

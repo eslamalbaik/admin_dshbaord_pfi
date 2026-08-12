@@ -60,20 +60,12 @@ class MembershipController extends Controller
     }
 
     // POST /api/memberships/{id}/approve
-    public function approve(Membership $membership)
+    public function approve(Membership $membership, \App\Services\MembershipRenewalService $renewal)
     {
-        $membership->update([
-            'status'      => 'active',
-            'starts_at'   => now(),
-            'expires_at'  => now()->endOfYear(),
-            'reviewed_by' => Auth::id(),
-            'reviewed_at' => now(),
-        ]);
-
-        $contractor = $membership->contractor;
-        if ($contractor && in_array($contractor->status, ['pending', 'expired'])) {
-            $contractor->update(['status' => 'active']);
-        }
+        // موعد التجديد ثابت سنوياً — يُحسب من تاريخ آخر عضوية (لا من تاريخ الموافقة نفسه)
+        // حتى لا ينزاح "موعد الاستحقاق" كل مرة تتأخر فيها المعالجة الإدارية.
+        // مثال: عضوية بدأت 1/1/2020 → تنتهي 1/1/2021 → تجديدها يبدأ من 1/1/2021 وينتهي 1/1/2022... وهكذا.
+        $renewal->applyRenewal($membership, Auth::id());
 
         return $this->success(message: 'تمت الموافقة على العضوية.');
     }

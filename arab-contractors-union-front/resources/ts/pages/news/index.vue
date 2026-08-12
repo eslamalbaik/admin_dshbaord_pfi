@@ -224,6 +224,7 @@ const deleteNews = async () => {
         :items-length="total"
         :loading="loading"
         v-model:page="page"
+        mobile-breakpoint="sm"
       >
         <template #item.title="{ item }">
           <div class="d-flex align-center gap-3">

@@ -25,9 +25,10 @@ class Contractor extends Authenticatable
     ];
 
     protected $fillable = [
-        'membership_number', 'name', 'authorized_person', 'commercial_register',
+        'membership_number', 'name', 'authorized_person', 'authorized_person_title', 'commercial_register',
         'license_number', 'trade', 'classification', 'established_year', 'owner_name',
         'email', 'phone', 'phone_verified_at', 'city', 'governorate_id', 'city_id', 'address',
+        'classification_decision_number', 'classification_decision_date',
         'status', 'is_frozen', 'profile_completed', 'profile_approved_by',
         'cr_file', 'id_file', 'notes',
         'password', 'remember_token', 'last_login_at', 'fcm_token',
@@ -41,6 +42,7 @@ class Contractor extends Authenticatable
         'full_time_engineer_certificate', 'partners_ids', 'authorization_letter',
         // Auto-fields and specialized types
         'field_lk_type', 'specialization_lk_type', 'established_date', 'specialties', 'terms_accepted_at',
+        'equipment_disclaimer_accepted_at', 'equipment_banned_at',
     ];
 
     protected $hidden = [
@@ -53,12 +55,15 @@ class Contractor extends Authenticatable
         'field_lk_type'          => 'integer',
         'specialization_lk_type' => 'integer',
         'established_date'       => 'date',
+        'classification_decision_date' => 'date',
         'specialties'            => 'array',
         'last_login_at'          => 'datetime',
         'phone_verified_at'      => 'datetime',
         'terms_accepted_at'      => 'datetime',
         'is_frozen'              => 'boolean',
         'profile_completed'      => 'boolean',
+        'equipment_disclaimer_accepted_at' => 'datetime',
+        'equipment_banned_at'    => 'datetime',
     ];
 
     // ─── Relations ───────────────────────────────────────────────────────────
@@ -109,6 +114,11 @@ class Contractor extends Authenticatable
         return $this->hasMany(ContractorNameChangeRequest::class);
     }
 
+    public function profileUpdateRequests()
+    {
+        return $this->hasMany(ProfileUpdateRequest::class);
+    }
+
     public function dues()
     {
         return $this->hasMany(ContractorDue::class);
@@ -132,6 +142,56 @@ class Contractor extends Authenticatable
         return round($pendingPayments + $unpaidPenalties + $this->outstandingDuesTotal(), 2);
     }
 
+    /** الحد الأدنى لنسبة سداد الذمم لإصدار شهادة العضوية (REQ-02) — للعرض فقط الآن */
+    public const MEMBERSHIP_CERT_MIN_PAID_PERCENT = 95.0;
+
+    /** سقف هامش السماح المطلق بالدينار — أيهما أقل يُعتمَد: 5% من الإجمالي أو 50 دينار */
+    public const MEMBERSHIP_CERT_MAX_MARGIN_JOD = 50.0;
+
+    /** نسبة ما سُدِّد من إجمالي الذمم (amount_jod مقابل paid_jod) — 100% إن لم توجد ذمم مسجّلة */
+    public function duesPaidPercentage(): float
+    {
+        $totals = $this->duesTotals();
+        $total  = $totals['total'];
+
+        if ($total <= 0) {
+            return 100.0;
+        }
+
+        return round(($totals['paid'] / $total) * 100, 2);
+    }
+
+    /** @return array{total: float, paid: float, outstanding: float} */
+    private function duesTotals(): array
+    {
+        $totals = $this->dues()
+            ->selectRaw('COALESCE(SUM(amount_jod), 0) as total, COALESCE(SUM(paid_jod), 0) as paid')
+            ->first();
+
+        $total = (float) $totals->total;
+        $paid  = (float) $totals->paid;
+
+        return ['total' => $total, 'paid' => $paid, 'outstanding' => round($total - $paid, 2)];
+    }
+
+    /**
+     * هامش السماح المسموح بالدينار لإصدار شهادة العضوية — أيهما أقل: 5% من إجمالي
+     * الذمم أو سقف {@see MEMBERSHIP_CERT_MAX_MARGIN_JOD} — لمنع حسابات الذمم الكبيرة
+     * من الاستفادة من هامش نسبي كبير (إطار الحوكمة، اجتماع مجلس الإدارة).
+     */
+    public function membershipCertAllowedMarginJod(): float
+    {
+        $total = $this->duesTotals()['total'];
+
+        return min($total * (100 - self::MEMBERSHIP_CERT_MIN_PAID_PERCENT) / 100, self::MEMBERSHIP_CERT_MAX_MARGIN_JOD);
+    }
+
+    /** هل الذمة المتبقية تقع ضمن هامش السماح (5% أو 50 دينار، أيهما أقل) لإصدار شهادة العضوية؟ */
+    public function isEligibleForMembershipCertificate(): bool
+    {
+        return $this->duesTotals()['outstanding'] <= $this->membershipCertAllowedMarginJod();
+    }
+
     public function documents()
     {
         return $this->hasMany(Document::class);
@@ -140,6 +200,23 @@ class Contractor extends Authenticatable
     public function equipment()
     {
         return $this->hasMany(Equipment::class);
+    }
+
+    public function equipmentSubscriptions()
+    {
+        return $this->hasMany(ContractorEquipmentSubscription::class);
+    }
+
+    public function activeEquipmentSubscription()
+    {
+        return $this->hasOne(ContractorEquipmentSubscription::class)
+            ->where('expires_at', '>=', now())
+            ->latestOfMany('expires_at');
+    }
+
+    public function bookmarkedTenders()
+    {
+        return $this->belongsToMany(Tender::class, 'tender_bookmarks');
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────

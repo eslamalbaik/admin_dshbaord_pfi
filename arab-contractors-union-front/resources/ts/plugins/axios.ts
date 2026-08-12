@@ -6,7 +6,7 @@ const axiosIns = axios.create({
   baseURL: apiBaseUrl,
   // 20s — `php artisan serve` rebuilds config/routes on a cold first request,
   // so cold login (~4s) + CORS preflight (~1s) can spike. 8s was too tight.
-  timeout: 20000,
+  timeout: 60000,
   headers: {
     'Accept': 'application/json',
     'Content-Type': 'application/json',

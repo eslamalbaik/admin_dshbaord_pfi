@@ -70,6 +70,7 @@ declare module 'vue-router/auto-routes' {
     'marketplace-create': RouteRecordInfo<'marketplace-create', '/marketplace/create', Record<never, never>, Record<never, never>>,
     'marketplace-types': RouteRecordInfo<'marketplace-types', '/marketplace/types', Record<never, never>, Record<never, never>>,
     'media': RouteRecordInfo<'media', '/media', Record<never, never>, Record<never, never>>,
+    'membership-certificates': RouteRecordInfo<'membership-certificates', '/membership-certificates', Record<never, never>, Record<never, never>>,
     'news': RouteRecordInfo<'news', '/news', Record<never, never>, Record<never, never>>,
     'not-authorized': RouteRecordInfo<'not-authorized', '/not-authorized', Record<never, never>, Record<never, never>>,
     'notifications': RouteRecordInfo<'notifications', '/notifications', Record<never, never>, Record<never, never>>,

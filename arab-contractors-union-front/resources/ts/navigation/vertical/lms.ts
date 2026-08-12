@@ -94,9 +94,12 @@ if (!isAccountant) {
     to: 'support-tickets',
   })
   menuItems.push({
-    title: 'طلبات الشهادات',
+    title: 'الشهادات',
     icon: { icon: 'tabler-certificate' },
-    to: 'certificate-requests',
+    children: [
+      { title: 'طلبات الشهادات', to: 'certificate-requests' },
+      { title: 'شهادة العضوية', to: 'membership-certificates' },
+    ],
   })
   menuItems.push({
     title: 'الأخبار والمناسبات',

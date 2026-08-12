@@ -10,11 +10,12 @@ class Announcement extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'title', 'body', 'image', 'is_published', 'published_at', 'created_by',
+        'title', 'body', 'image', 'is_published', 'is_pinned', 'published_at', 'created_by',
     ];
 
     protected $casts = [
         'is_published' => 'boolean',
+        'is_pinned'    => 'boolean',
         'published_at' => 'datetime',
     ];
 
@@ -28,5 +29,10 @@ class Announcement extends Model
     public function author()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function acknowledgements()
+    {
+        return $this->hasMany(AnnouncementAcknowledgement::class);
     }
 }

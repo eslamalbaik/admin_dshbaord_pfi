@@ -56,4 +56,40 @@ class NotificationController extends Controller
             'تم تحديد جميع الإشعارات كمقروءة.',
         );
     }
+
+    /**
+     * POST /api/v1/dashboard/notifications/broadcast
+     * إشعار مستهدَف من لوحة التحكم — فلترة حسب تخصصات/تصنيف/محافظة (REQ-22).
+     */
+    public function broadcast(Request $request, \App\Services\PushNotificationService $push): JsonResponse
+    {
+        $data = $request->validate([
+            'title'                   => 'required|string|max:255',
+            'body'                    => 'required|string|max:1000',
+            'filters'                 => 'nullable|array',
+            'filters.specialties'     => 'nullable|array',
+            'filters.classification'  => 'nullable|array',
+            'filters.governorate_id'  => 'nullable|integer',
+        ]);
+
+        $filters     = $data['filters'] ?? [];
+        $contractors = $push->filteredContractorsQuery($filters)->get();
+
+        \Illuminate\Support\Facades\Notification::send(
+            $contractors,
+            new \App\Notifications\AdminBroadcastNotification($data['title'], $data['body']),
+        );
+
+        \App\Services\AuditLogService::record(
+            $request->user(),
+            'notifications.broadcast',
+            null,
+            ['filters' => $filters, 'title' => $data['title'], 'recipients_count' => $contractors->count()],
+        );
+
+        return $this->success(
+            ['recipients_count' => $contractors->count()],
+            'تم إرسال الإشعار لـ' . $contractors->count() . ' مقاول.',
+        );
+    }
 }

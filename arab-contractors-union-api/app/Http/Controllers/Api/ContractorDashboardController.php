@@ -180,18 +180,21 @@ class ContractorDashboardController extends Controller
                 'outstanding_dues_jod' => number_format($outstandingDues, 2, '.', ''),  // ذمم سابقة بالدينار
                 'total_obligations'    => number_format($totalObligations, 2, '.', ''), // ما عليه
             ],
-            'dues' => $dues->map(fn ($d) => [
-                'id'            => $d->id,
-                'year'          => $d->year,
-                'period'        => $d->period,
-                'description'   => $d->description,
-                'amount_jod'    => $d->amount_jod,
-                'paid_jod'      => $d->paid_jod,
-                'remaining_jod' => $d->remaining_jod,
-                'status'        => $d->status,
-                'status_label'  => $d->status_label,
-                'due_date'      => $d->due_date?->toDateString(),
-            ])->values(),
+            // فلتر شاشة "الرسوم المالية" بالتطبيق: ?status=unpaid|partially_paid|paid|overdue
+            // "متأخرة" محسوبة (غير مسدَّدة بالكامل + تجاوز موعد الاستحقاق) وليست عموداً بقاعدة البيانات.
+            'dues' => $this->filterDuesByStatus($dues, $request->string('status')->toString())
+                ->map(fn ($d) => [
+                    'id'            => $d->id,
+                    'year'          => $d->year,
+                    'period'        => $d->period,
+                    'description'   => $d->description,
+                    'amount_jod'    => $d->amount_jod,
+                    'paid_jod'      => $d->paid_jod,
+                    'remaining_jod' => $d->remaining_jod,
+                    'status'        => $d->status,
+                    'status_label'  => $d->status_label,
+                    'due_date'      => $d->due_date?->toDateString(),
+                ])->values(),
             // الالتزامات المستحقة فقط (تُستثنى الدفعات المرفوضة — ليست دينًا قائمًا)
             'obligations' => $statement
                 ->where('direction', 'debit')
@@ -199,6 +202,20 @@ class ContractorDashboardController extends Controller
                 ->values(),
             'statement'   => $statement,
         ]);
+    }
+
+    /** فلترة قائمة الذمم حسب تبويب شاشة الرسوم المالية (فارغ = بلا فلترة) */
+    private function filterDuesByStatus(\Illuminate\Support\Collection $dues, ?string $status): \Illuminate\Support\Collection
+    {
+        if (empty($status)) {
+            return $dues;
+        }
+
+        if ($status === 'overdue') {
+            return $dues->filter(fn ($d) => $d->status !== 'paid' && $d->due_date && $d->due_date->isPast())->values();
+        }
+
+        return $dues->where('status', $status)->values();
     }
 
     // ─────────────────────────────────────────────────────────────────────────

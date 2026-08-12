@@ -400,6 +400,7 @@ const importMutation = useMutation({
 
       <VProgressLinear v-if="isLoading" indeterminate color="primary" />
 
+      <div class="overflow-x-auto">
       <VTable>
         <thead>
           <tr>
@@ -459,6 +460,7 @@ const importMutation = useMutation({
             <tr v-if="expandedId === c.contractor_id">
               <td colspan="8" style="background: rgba(var(--v-theme-primary), 0.03); padding: 0;">
                 <VProgressLinear v-if="expandedLoading" indeterminate color="primary" />
+                <div class="overflow-x-auto">
                 <VTable v-else density="compact" style="background: transparent;">
                   <thead>
                     <tr>
@@ -496,6 +498,7 @@ const importMutation = useMutation({
                     </tr>
                   </tbody>
                 </VTable>
+                </div>
               </td>
             </tr>
           </template>
@@ -507,6 +510,7 @@ const importMutation = useMutation({
           </tr>
         </tbody>
       </VTable>
+      </div>
 
       <VCardText v-if="(data?.last_page ?? 1) > 1" class="d-flex justify-center">
         <VPagination v-model="page" :length="data?.last_page ?? 1" :total-visible="7" />
@@ -656,6 +660,7 @@ const importMutation = useMutation({
                   ? 'شركات غير موجودة في النظام — ستُنشأ تلقائياً مع ذممها عند الاستيراد الفعلي:'
                   : 'شركات غير مطابَقة (لن تُستورد — تُراجع يدوياً):' }}
               </p>
+              <div class="overflow-x-auto">
               <VTable density="compact">
                 <thead>
                   <tr>
@@ -674,6 +679,7 @@ const importMutation = useMutation({
                   </tr>
                 </tbody>
               </VTable>
+              </div>
             </template>
           </template>
         </VCardText>

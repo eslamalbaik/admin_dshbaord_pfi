@@ -44,7 +44,7 @@ class CertificateRequest extends Model
     public function getTypeLabelAttribute(): string
     {
         return [
-            'membership'     => 'شهادة الانتساب',
+            'membership'     => 'شهادة العضوية',
             'good_standing'  => 'شهادة حسن السير والسلوك',
             'classification' => 'شهادة التصنيف',
             'experience'     => 'شهادة الخبرة والمشاريع',

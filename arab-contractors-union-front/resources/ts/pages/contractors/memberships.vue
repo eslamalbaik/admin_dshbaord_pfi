@@ -98,6 +98,7 @@ onMounted(fetchRequests)
         :items="requests"
         :loading="loading"
         :items-per-page="15"
+        mobile-breakpoint="sm"
       >
         <template #item.contractor_name="{ item }">
           <div class="font-weight-medium" style="font-family:Cairo,sans-serif">

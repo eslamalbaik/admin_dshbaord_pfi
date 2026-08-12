@@ -58,7 +58,7 @@ const form = ref({
 })
 
 const certificateTypes = [
-  { value: 'membership', label: 'شهادة الانتساب للاتحاد' },
+  { value: 'membership', label: 'شهادة العضوية' },
   { value: 'good_standing', label: 'شهادة حسن السير والسلوك' },
   { value: 'classification', label: 'شهادة التصنيف' },
   { value: 'experience', label: 'شهادة الخبرة والمشاريع' },

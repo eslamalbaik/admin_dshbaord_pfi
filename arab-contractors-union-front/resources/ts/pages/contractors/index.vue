@@ -238,6 +238,7 @@ const getSpecialtiesList = (contractor: any) => {
         v-model:page="page"
         v-model:items-per-page="itemsPerPage"
         :items-per-page-options="[10, 25, 50]"
+        mobile-breakpoint="sm"
         @update:options="fetchContractors"
       >
         <template #item.name="{ item }">

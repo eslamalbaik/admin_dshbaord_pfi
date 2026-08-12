@@ -43,6 +43,11 @@ class News extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function registrations()
+    {
+        return $this->hasMany(EventRegistration::class);
+    }
+
     // ─── Helpers ─────────────────────────────────────────────────────────────
 
     public static function generateSlug(string $title): string

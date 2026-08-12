@@ -61,6 +61,10 @@ class CertificateRequestController extends Controller
         $contractor = $request->user();
         $issues     = $this->requirementIssues($contractor);
 
+        // نفس استثناء unpaid_dues المطبَّق بـstore()/certificatesStatus() — شهادة العضوية
+        // محكومة بهامش السماح لا بالحظر الصفري، وcan_request هنا يغذّي زر الطلب بالموبايل
+        $blockingIssues = array_values(array_filter($issues, fn ($i) => $i['type'] !== 'unpaid_dues'));
+
         return $this->success([
             'contractor' => [
                 'name'              => $contractor->name,
@@ -68,7 +72,7 @@ class CertificateRequestController extends Controller
                 'status'            => $contractor->status,
                 'is_frozen'         => (bool) $contractor->is_frozen,
             ],
-            'can_request'             => count($issues) === 0 && $contractor->profile_data_complete,
+            'can_request'             => count($blockingIssues) === 0 && $contractor->profile_data_complete,
             'requirement_issues'      => $issues,
             'profile_data_complete'   => $contractor->profile_data_complete,
             'missing_profile_fields'  => $contractor->missing_profile_fields,
@@ -77,6 +81,58 @@ class CertificateRequestController extends Controller
                 ->get()
                 ->map(fn ($r) => $this->format($r))
                 ->values(),
+        ]);
+    }
+
+    /**
+     * GET /api/v1/contractor/certificates/status
+     * ملخّص موحّد لحالة شهادتي العضوية والتصنيف — يغذّي شاشة "طلب شهادة" بالبطاقتين المتجاورتين.
+     */
+    public function certificatesStatus(Request $request)
+    {
+        $contractor = $request->user();
+        $issues     = $this->requirementIssues($contractor);
+        $percent    = $contractor->duesPaidPercentage();
+
+        $latestMembershipCert = $contractor->certificateRequests()
+            ->where('type', 'membership')
+            ->latest()
+            ->first();
+
+        $latestClassificationCert = $contractor->certificateRequests()
+            ->where('type', 'classification')
+            ->latest()
+            ->first();
+
+        $activeMembership = $contractor->activeMembership;
+
+        // نفس استثناء unpaid_dues المطبَّق بـstore() — شهادة العضوية محكومة بهامش السماح لا بالحظر الصفري
+        $blockingIssues = array_values(array_filter($issues, fn ($i) => $i['type'] !== 'unpaid_dues'));
+
+        return $this->success([
+            'membership' => [
+                'eligible'          => count($blockingIssues) === 0
+                    && $contractor->profile_data_complete
+                    && $contractor->isEligibleForMembershipCertificate(),
+                'paid_percentage'   => $percent,
+                'required_percent'  => \App\Models\Contractor::MEMBERSHIP_CERT_MIN_PAID_PERCENT,
+                // هامش السماح الفعلي: أيهما أقل بين 5% من الإجمالي أو سقف مطلق 50 دينار (إطار الحوكمة)
+                'allowed_margin_jod' => $contractor->membershipCertAllowedMarginJod(),
+                'outstanding_jod'   => $contractor->outstandingDuesTotal(),
+                'requirement_issues' => $issues,
+                'profile_data_complete' => $contractor->profile_data_complete,
+                'membership_valid_until' => $activeMembership?->expires_at?->toDateString(),
+                'is_expired'        => $activeMembership ? $activeMembership->expires_at?->isPast() : true,
+                'latest_request'    => $latestMembershipCert ? $this->format($latestMembershipCert) : null,
+            ],
+            'classification' => [
+                'has_certificate' => (bool) $latestClassificationCert?->certificate_path,
+                'certificate_url' => $latestClassificationCert?->certificate_url,
+                'latest_request'  => $latestClassificationCert ? $this->format($latestClassificationCert) : null,
+                'message'         => $latestClassificationCert?->certificate_path
+                    ? null
+                    : 'يرجى مراجعة مقر اتحاد المقاولين لطلب شهادة التصنيف.',
+            ],
         ]);
     }
 
@@ -105,12 +161,47 @@ class CertificateRequestController extends Controller
         }
 
         $issues = $this->requirementIssues($contractor);
-        if (count($issues) > 0) {
+
+        // شهادة العضوية تحديداً محكومة بهامش السماح الخاص بها (isEligibleForMembershipCertificate)
+        // بدل الحظر الثنائي الصفري لـ"unpaid_dues" — نستبعده هنا فقط لهذا النوع، ونتحقق منه
+        // بدقة بالخطوة التالية. باقي المتطلبات (غرامات، تجميد، عدم وجود عضوية نشطة) تبقى حاجزة كما هي.
+        $blockingIssues = $data['type'] === 'membership'
+            ? array_values(array_filter($issues, fn ($i) => $i['type'] !== 'unpaid_dues'))
+            : $issues;
+
+        if (count($blockingIssues) > 0) {
             return $this->error(
                 'لا يمكن تقديم الطلب قبل تسوية المتطلبات المستحقّة.',
                 403,
                 null,
                 'requirements_pending',
+            );
+        }
+
+        // شهادة العضوية تحديداً تشترط أن تقع الذمة المتبقية ضمن هامش السماح
+        // (أيهما أقل: 5% من إجمالي الذمم أو 50 دينار — إطار الحوكمة، اجتماع مجلس الإدارة)
+        if ($data['type'] === 'membership' && ! $contractor->isEligibleForMembershipCertificate()) {
+            $percent = $contractor->duesPaidPercentage();
+            $margin  = $contractor->membershipCertAllowedMarginJod();
+            $outstanding = $contractor->outstandingDuesTotal();
+
+            return $this->error(
+                "الذمة المتبقية عليك {$outstanding} دينار — تتجاوز هامش السماح المسموح ({$margin} دينار) لإصدار شهادة العضوية.",
+                403,
+                [
+                    'paid_percentage'   => $percent,
+                    'outstanding_jod'   => $outstanding,
+                    'allowed_margin_jod' => $margin,
+                    'remaining_dues'   => $contractor->dues()->outstanding()->get()->map(fn ($d) => [
+                        'id'           => $d->id,
+                        'description'  => $d->description,
+                        'year'         => $d->year,
+                        'amount_jod'   => $d->amount_jod,
+                        'remaining_jod' => $d->remaining_jod,
+                        'status'       => $d->status,
+                    ])->values(),
+                ],
+                'dues_below_threshold',
             );
         }
 
@@ -135,7 +226,9 @@ class CertificateRequestController extends Controller
             'status'     => 'pending',
         ]);
 
-        // إشعار الإدارة بوجود طلب جديد
+        // تم إلغاء الإصدار التلقائي بناء على طلب المستخدم، لتصبح جميع الطلبات بانتظار موافقة الإدارة
+
+        // إشعار الإدارة بوجود طلب جديد (شهادة التصنيف — تبقى تحتاج مراجعة/رفع ملف يدوي)
         $admins = User::where('role', 'admin')->get();
         if ($admins->isNotEmpty()) {
             Notification::send($admins, new CertificateRequestSubmittedNotification($certRequest));
@@ -271,5 +364,69 @@ class CertificateRequestController extends Controller
         $certificateRequest->delete();
 
         return $this->success(message: 'تم حذف الطلب.');
+    }
+
+    /**
+     * POST /api/v1/dashboard/certificate-requests/issue-membership
+     * يُصدر المشرف شهادة عضوية مباشرة لمقاول معيَّن بدون طلب مسبق من المقاول.
+     */
+    public function adminIssueMembership(Request $request)
+    {
+        $data = $request->validate([
+            'contractor_id'   => 'required|integer|exists:contractors,id',
+            'notes'           => 'nullable|string|max:500',
+            'address'         => 'nullable|string|max:255',
+            'decision_number' => 'nullable|string|max:100',
+            'decision_date'   => 'nullable|date',
+        ]);
+
+        $contractor = \App\Models\Contractor::findOrFail($data['contractor_id']);
+
+        // إنشاء طلب شهادة عضوية
+        $certRequest = $contractor->certificateRequests()->create([
+            'type'   => 'membership',
+            'notes'  => $data['notes'] ?? 'إصدار مباشر من لوحة التحكم',
+            'status' => 'pending',
+        ]);
+
+        // توليد DOCX تلقائياً — عنوان الشركة ورقم/تاريخ قرار التصنيف قابلة للتعديل يدوياً قبل الإصدار
+        try {
+            $path = app(\App\Services\MembershipCertificateDocxService::class)->generate($certRequest, [
+                'address'         => $data['address'] ?? null,
+                'decision_number' => $data['decision_number'] ?? null,
+                'decision_date'   => $data['decision_date'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            // لا نترك طلب "قيد المراجعة" يتيم بدون شهادة عند فشل التوليد
+            $certRequest->delete();
+            throw $e;
+        }
+
+        $certRequest->update([
+            'status'           => 'issued',
+            'certificate_path' => $path,
+            'issued_at'        => now(),
+            'reviewed_by'      => Auth::id(),
+            'reviewed_at'      => now(),
+        ]);
+
+        // إشعار المقاول
+        $certRequest->contractor?->notify(
+            new CertificateRequestStatusNotification($certRequest)
+        );
+
+        // سجل تدقيق
+        \App\Services\AuditLogService::record(
+            Auth::user(),
+            'certificate.admin_issued_membership',
+            $certRequest,
+            ['contractor_id' => $contractor->id, 'contractor_name' => $contractor->name]
+        );
+
+        return $this->success(
+            $this->format($certRequest->fresh()),
+            'تم إصدار شهادة العضوية بنجاح.',
+            201,
+        );
     }
 }

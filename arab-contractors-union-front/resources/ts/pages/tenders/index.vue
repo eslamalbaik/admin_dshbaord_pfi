@@ -307,6 +307,7 @@ watchEffect(() => fetchTenders())
         :items-length="total"
         :loading="loading"
         v-model:page="page"
+        mobile-breakpoint="sm"
       >
         <template #item.title="{ item }">
           <div class="font-weight-medium" style="font-family:Cairo,sans-serif">{{ item.title }}</div>

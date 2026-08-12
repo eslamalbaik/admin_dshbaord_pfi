@@ -20,7 +20,7 @@ const statusOptions = [
 ]
 
 const typeOptions = [
-  { value: 'membership', title: 'شهادة الانتساب للاتحاد' },
+  { value: 'membership', title: 'شهادة العضوية' },
   { value: 'good_standing', title: 'شهادة حسن السير والسلوك' },
   { value: 'classification', title: 'شهادة التصنيف' },
   { value: 'experience', title: 'شهادة الخبرة والمشاريع' },
