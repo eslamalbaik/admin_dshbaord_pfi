@@ -460,8 +460,8 @@ const importMutation = useMutation({
             <tr v-if="expandedId === c.contractor_id">
               <td colspan="8" style="background: rgba(var(--v-theme-primary), 0.03); padding: 0;">
                 <VProgressLinear v-if="expandedLoading" indeterminate color="primary" />
-                <div class="overflow-x-auto">
-                <VTable v-else density="compact" style="background: transparent;">
+                <div v-else class="overflow-x-auto">
+                <VTable density="compact" style="background: transparent;">
                   <thead>
                     <tr>
                       <th>السنة</th>
