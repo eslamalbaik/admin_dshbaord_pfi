@@ -55,6 +55,10 @@ const issueDecisionDate = ref('')
 const loadingIssueDefaults = ref(false)
 
 async function openIssueDialog(c: any) {
+  // بدون reset تبقى isSuccess مرفوعة من إصدار سابق، فيفتح الحوار وزر
+  // الإصدار معطّل ورسالة النجاح ظاهرة — ما بيخلّي المشرف يصدر مرة تانية
+  issueMutation.reset()
+
   selectedContractor.value = c
   issueNotes.value = ''
   issueError.value = ''
@@ -157,6 +161,69 @@ const deleteMutation = useMutation({
     queryClient.invalidateQueries({ queryKey: ['issued-certificates'] })
     isDeleteOpen.value = false
     certToDelete.value = null
+  },
+})
+
+// ─── تحديد متعدد + حذف جماعي ───
+const selectedIds = ref<number[]>([])
+
+// التحديد مربوط بالصفحة المعروضة، فأي تغيير في الفلترة أو الصفحة يلغيه
+watch([certPage, certSearch, certStatusFilter], () => selectedIds.value = [])
+
+const allSelected = computed(() =>
+  certificates.value.length > 0 && selectedIds.value.length === certificates.value.length)
+
+const someSelected = computed(() =>
+  selectedIds.value.length > 0 && !allSelected.value)
+
+function toggleSelectAll() {
+  selectedIds.value = allSelected.value ? [] : certificates.value.map((r: any) => r.id)
+}
+
+const isBulkDeleteOpen = ref(false)
+const bulkDeleteError = ref('')
+
+const bulkDeleteMutation = useMutation({
+  mutationFn: async () => {
+    return (await api.post('/api/v1/dashboard/certificate-requests/bulk-delete', {
+      ids: selectedIds.value,
+    })).data
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['issued-certificates'] })
+    selectedIds.value = []
+    isBulkDeleteOpen.value = false
+    bulkDeleteError.value = ''
+  },
+  onError: (e: any) => {
+    bulkDeleteError.value = e?.response?.data?.message ?? 'تعذّر حذف الشهادات المحددة.'
+  },
+})
+
+// ─── إعادة إصدار شهادة قائمة (نفس الرقم التسلسلي) ───
+const regeneratingId = ref<number | null>(null)
+const regenerateError = ref('')
+
+const regenerateMutation = useMutation({
+  mutationFn: async (id: number) => {
+    return (await api.post(`/api/v1/dashboard/certificate-requests/${id}/regenerate`, {})).data
+  },
+  onMutate: (id: number) => {
+    regeneratingId.value = id
+    regenerateError.value = ''
+  },
+  onSuccess: (data: any) => {
+    queryClient.invalidateQueries({ queryKey: ['issued-certificates'] })
+
+    const url = data?.items?.certificate_url
+    if (url)
+      window.open(`${url}?t=${Date.now()}`, '_blank')
+  },
+  onError: (e: any) => {
+    regenerateError.value = e?.response?.data?.message ?? 'تعذّرت إعادة إصدار الشهادة.'
+  },
+  onSettled: () => {
+    regeneratingId.value = null
   },
 })
 
@@ -356,6 +423,36 @@ const contractorStatusLabel: Record<string, string> = {
           </VCol>
         </VRow>
 
+        <VAlert
+          v-if="selectedIds.length"
+          type="info"
+          variant="tonal"
+          density="compact"
+          class="mb-4 d-flex align-center"
+        >
+          <div class="d-flex align-center justify-space-between flex-wrap gap-2 w-100">
+            <span>تم تحديد {{ selectedIds.length }} شهادة</span>
+            <div class="d-flex gap-2">
+              <VBtn size="small" variant="text" @click="selectedIds = []">
+                إلغاء التحديد
+              </VBtn>
+              <VBtn
+                size="small"
+                color="error"
+                variant="tonal"
+                prepend-icon="tabler-trash"
+                @click="isBulkDeleteOpen = true"
+              >
+                حذف المحدد
+              </VBtn>
+            </div>
+          </div>
+        </VAlert>
+
+        <VAlert v-if="regenerateError" type="error" variant="tonal" density="compact" class="mb-4">
+          {{ regenerateError }}
+        </VAlert>
+
         <VProgressLinear v-if="loadingCerts" indeterminate color="primary" />
 
         <VAlert v-else-if="certificates.length === 0" type="info" variant="tonal">
@@ -365,6 +462,14 @@ const contractorStatusLabel: Record<string, string> = {
         <VTable v-else class="border rounded">
           <thead>
             <tr>
+              <th style="width:48px">
+                <VCheckboxBtn
+                  :model-value="allSelected"
+                  :indeterminate="someSelected"
+                  density="compact"
+                  @click="toggleSelectAll"
+                />
+              </th>
               <th>#</th>
               <th>المقاول</th>
               <th>رقم العضوية</th>
@@ -376,6 +481,9 @@ const contractorStatusLabel: Record<string, string> = {
           </thead>
           <tbody>
             <tr v-for="r in certificates" :key="r.id">
+              <td>
+                <VCheckboxBtn v-model="selectedIds" :value="r.id" density="compact" />
+              </td>
               <td class="text-caption">{{ r.id }}</td>
               <td class="font-weight-medium">{{ r.contractor ?? '—' }}</td>
               <td>{{ r.membership_number ?? '—' }}</td>
@@ -403,6 +511,20 @@ const contractorStatusLabel: Record<string, string> = {
                 <VChip v-else size="x-small" color="warning" variant="tonal">
                   لم تُصدر بعد
                 </VChip>
+                <VTooltip text="إعادة إصدار الشهادة بنفس الرقم" location="top">
+                  <template #activator="{ props }">
+                    <VBtn
+                      v-bind="props"
+                      icon="tabler-refresh"
+                      size="x-small"
+                      variant="text"
+                      color="primary"
+                      :loading="regeneratingId === r.id"
+                      :disabled="regeneratingId !== null"
+                      @click="regenerateMutation.mutate(r.id)"
+                    />
+                  </template>
+                </VTooltip>
                 <VTooltip text="حذف الشهادة" location="top">
                   <template #activator="{ props }">
                     <VBtn
@@ -539,6 +661,40 @@ const contractorStatusLabel: Record<string, string> = {
             :loading="deleteMutation.isPending?.value"
             prepend-icon="tabler-trash"
             @click="deleteMutation.mutate()"
+          >
+            حذف نهائياً
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- ═══ حوار تأكيد الحذف الجماعي ═══ -->
+    <VDialog v-model="isBulkDeleteOpen" max-width="440">
+      <VCard>
+        <VCardItem>
+          <VCardTitle class="d-flex align-center gap-2">
+            <VIcon icon="tabler-alert-triangle" color="error" />
+            حذف {{ selectedIds.length }} شهادة
+          </VCardTitle>
+        </VCardItem>
+
+        <VCardText>
+          سيتم حذف <strong>{{ selectedIds.length }}</strong> شهادة وملفاتها نهائياً،
+          ولا يمكن التراجع عن هذا الإجراء.
+
+          <VAlert v-if="bulkDeleteError" type="error" variant="tonal" class="mt-3">
+            {{ bulkDeleteError }}
+          </VAlert>
+        </VCardText>
+
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="text" @click="isBulkDeleteOpen = false">إلغاء</VBtn>
+          <VBtn
+            color="error"
+            :loading="bulkDeleteMutation.isPending?.value"
+            prepend-icon="tabler-trash"
+            @click="bulkDeleteMutation.mutate()"
           >
             حذف نهائياً
           </VBtn>

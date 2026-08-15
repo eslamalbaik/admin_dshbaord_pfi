@@ -367,6 +367,88 @@ class CertificateRequestController extends Controller
     }
 
     /**
+     * POST /api/v1/dashboard/certificate-requests/bulk-delete
+     * حذف مجموعة طلبات دفعة واحدة مع ملفاتها.
+     */
+    public function bulkDestroy(Request $request)
+    {
+        $data = $request->validate([
+            'ids'   => 'required|array|min:1|max:200',
+            'ids.*' => 'integer|exists:certificate_requests,id',
+        ]);
+
+        $requests = CertificateRequest::whereIn('id', $data['ids'])->get();
+
+        foreach ($requests as $r) {
+            if ($r->certificate_path) {
+                Storage::disk('public')->delete($r->certificate_path);
+            }
+            $r->delete();
+        }
+
+        \App\Services\AuditLogService::record(
+            Auth::user(),
+            'certificate.bulk_deleted',
+            null,
+            ['ids' => $requests->pluck('id')->all()]
+        );
+
+        return $this->success(
+            ['deleted' => $requests->count()],
+            "تم حذف {$requests->count()} طلب.",
+        );
+    }
+
+    /**
+     * POST /api/v1/dashboard/certificate-requests/{certificateRequest}/regenerate
+     * يعيد توليد ملف شهادة العضوية لطلب قائم مع الحفاظ على رقمه التسلسلي.
+     * لا يُرسل إشعاراً للمقاول — إعادة التوليد إجراء إداري لتصحيح الملف.
+     */
+    public function regenerate(Request $request, CertificateRequest $certificateRequest)
+    {
+        if ($certificateRequest->type !== 'membership') {
+            return $this->error('إعادة الإصدار متاحة لشهادات العضوية فقط.', 422);
+        }
+
+        $data = $request->validate([
+            'address'         => 'nullable|string|max:255',
+            'decision_number' => 'nullable|string|max:100',
+            'decision_date'   => 'nullable|date',
+        ]);
+
+        $oldPath = $certificateRequest->certificate_path;
+
+        $path = app(\App\Services\MembershipCertificateDocxService::class)->generate($certificateRequest, [
+            'address'         => $data['address'] ?? null,
+            'decision_number' => $data['decision_number'] ?? null,
+            'decision_date'   => $data['decision_date'] ?? null,
+        ]);
+
+        // الرقم التسلسلي مشتق من معرّف الطلب، فالمسار الجديد مطابق للقديم عملياً.
+        // نحذف القديم فقط لو اختلف حتى لا نمسح الملف الذي تولّد للتو.
+        if ($oldPath && $oldPath !== $path) {
+            Storage::disk('public')->delete($oldPath);
+        }
+
+        $certificateRequest->update([
+            'status'           => 'issued',
+            'certificate_path' => $path,
+            'issued_at'        => now(),
+            'reviewed_by'      => Auth::id(),
+            'reviewed_at'      => now(),
+        ]);
+
+        \App\Services\AuditLogService::record(
+            Auth::user(),
+            'certificate.regenerated',
+            $certificateRequest,
+            ['contractor_id' => $certificateRequest->contractor_id]
+        );
+
+        return $this->success($this->format($certificateRequest->fresh()), 'تمت إعادة إصدار الشهادة بنجاح.');
+    }
+
+    /**
      * POST /api/v1/dashboard/certificate-requests/issue-membership
      * يُصدر المشرف شهادة عضوية مباشرة لمقاول معيَّن بدون طلب مسبق من المقاول.
      */
