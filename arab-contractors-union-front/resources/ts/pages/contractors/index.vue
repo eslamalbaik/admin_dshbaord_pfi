@@ -10,6 +10,7 @@ const itemsPerPage = ref(10)
 const total = ref(0)
 const loading = ref(false)
 const contractors = ref<any[]>([])
+const fetchError = ref('')
 
 const deleteDialog = ref(false)
 const deleteTarget = ref<any>(null)
@@ -37,6 +38,7 @@ const statusOptions = [
 
 const fetchContractors = async () => {
   loading.value = true
+  fetchError.value = ''
   try {
     const { data } = await api.get('/api/v1/contractors', {
       params: { search: search.value, status: statusFilter.value, page: page.value, per_page: itemsPerPage.value },
@@ -44,8 +46,11 @@ const fetchContractors = async () => {
     contractors.value = data.items || []
     total.value = data.meta?.total || contractors.value.length
   }
-  catch {
+  catch (err: any) {
+    // بدون إظهار الخطأ كان أي فشل في الطلب يبان كأنه "صفر نتائج"
     contractors.value = []
+    total.value = 0
+    fetchError.value = err?.response?.data?.message ?? 'تعذّر تحميل قائمة المقاولين.'
   }
   finally {
     loading.value = false
@@ -274,19 +279,19 @@ const getSpecialtiesList = (contractor: any) => {
         </template>
 
         <template #item.actions="{ item }">
-          <VBtn icon size="small" variant="text" color="info" @click="openDetails(item)" title="��� ��������">
+          <VBtn icon size="small" variant="text" color="info" @click="openDetails(item)" title="عرض التفاصيل">
             <VIcon icon="tabler-eye" />
           </VBtn>
-          <VBtn icon size="small" variant="text" color="primary" :to="{ name: 'contractors-edit-id', params: { id: item.id } }" title="�����">
+          <VBtn icon size="small" variant="text" color="primary" :to="{ name: 'contractors-edit-id', params: { id: item.id } }" title="تعديل">
             <VIcon icon="tabler-edit" />
           </VBtn>
-          <VBtn icon size="small" variant="text" color="error" @click="openDelete(item)" title="���">
+          <VBtn icon size="small" variant="text" color="error" @click="openDelete(item)" title="حذف">
             <VIcon icon="tabler-trash" />
           </VBtn>
         </template>
         <template #no-data>
           <div class="text-center pa-6 text-medium-emphasis" style="font-family:Cairo,sans-serif">
-            �� ���� �����
+            {{ fetchError || 'لا توجد نتائج' }}
           </div>
         </template>
       </VDataTableServer>
