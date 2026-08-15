@@ -9,7 +9,6 @@ use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PenaltyController;
 use App\Http\Controllers\Api\TenderController;
 use App\Http\Controllers\Api\DocumentController;
-use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ContractorAuthController;
 use App\Http\Controllers\Api\ContractorRegisterController;
@@ -433,7 +432,6 @@ Route::prefix('v1')->group(function () {
         // --------------------------------------------------------
         //  Users & Notifications
         // --------------------------------------------------------
-        Route::get('users',               [UserController::class,         'index']);
         Route::get('notifications',                    [NotificationController::class, 'index']);
         Route::post('notifications/read',              [NotificationController::class, 'markAllRead']);
         Route::patch('notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead']);

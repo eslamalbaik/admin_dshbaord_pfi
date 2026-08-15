@@ -1,8 +1,8 @@
-import lms from './lms'
+import pcu from './pcu'
 import type { VerticalNavItems } from '@layouts/types'
 
 /**
- * Vue admin app navigation only.
- * Students are redirected to the landing app by router guards — do not add student routes here.
+ * قائمة لوحة تحكم اتحاد المقاولين الفلسطينيين (PCU) — الشريط الجانبي.
+ * تخص المشرفين فقط؛ المقاولون يُحوَّلون لبوابتهم عبر router guards.
  */
-export default lms as VerticalNavItems
+export default pcu as VerticalNavItems

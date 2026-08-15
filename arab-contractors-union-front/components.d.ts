@@ -41,7 +41,6 @@ declare module 'vue' {
     ProductDescriptionEditor: typeof import('./resources/ts/@core/components/ProductDescriptionEditor.vue')['default']
     PublicFooter: typeof import('./resources/ts/components/PublicFooter.vue')['default']
     PublicNavbar: typeof import('./resources/ts/components/PublicNavbar.vue')['default']
-    QuizPlayer: typeof import('./resources/ts/components/quiz/QuizPlayer.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     ScrollToTop: typeof import('./resources/ts/@core/components/ScrollToTop.vue')['default']
