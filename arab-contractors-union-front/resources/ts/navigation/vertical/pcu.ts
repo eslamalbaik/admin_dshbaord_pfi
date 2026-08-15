@@ -1,3 +1,5 @@
+import type { VerticalNavItems } from '@layouts/types'
+
 // قراءة الـ role من localStorage مباشرة — يعمل قبل تهيئة Pinia
 function getUserRole(): string {
   try {
@@ -13,7 +15,7 @@ function getUserRole(): string {
 const role = getUserRole()
 const isAccountant = role === 'accountant'
 
-const menuItems = []
+const menuItems: VerticalNavItems = []
 
 // 1. لوحة التحكم (مشتركة)
 menuItems.push({
