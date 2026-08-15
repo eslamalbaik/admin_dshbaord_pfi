@@ -46,6 +46,9 @@ class ContractorController extends Controller
         $uniqueCR = $isUpdate ? "unique:contractors,commercial_register,{$contractorId}" : "unique:contractors,commercial_register";
         $uniqueLicense = $isUpdate ? "unique:contractors,license_number,{$contractorId}" : "unique:contractors,license_number";
         $uniqueEmail = $isUpdate ? "unique:contractors,email,{$contractorId}" : "unique:contractors,email";
+        // الجوال عليه قيد unique في قاعدة البيانات (contractors_phone_unique) — بدون هذه
+        // القاعدة يمرّ التحقق ويسقط الإدراج بخطأ SQL خام أمام المستخدم
+        $uniquePhone = $isUpdate ? "unique:contractors,phone,{$contractorId}" : "unique:contractors,phone";
 
         return [
             'name'                          => 'required|string|max:255',
@@ -75,7 +78,7 @@ class ContractorController extends Controller
             'specialties'                   => 'nullable|string',
             'owner_name'                    => 'nullable|string|max:255',
             'email'                         => "nullable|email|{$uniqueEmail}",
-            'phone'                         => 'nullable|string|max:20',
+            'phone'                         => "nullable|string|max:20|{$uniquePhone}",
             'city'                          => 'nullable|string|max:100',
             'governorate_id'                => 'nullable|integer|exists:governorates,id',
             'city_id'                       => 'nullable|integer|exists:cities,id',
