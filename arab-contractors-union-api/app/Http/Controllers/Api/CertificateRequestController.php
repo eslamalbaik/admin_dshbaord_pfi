@@ -418,7 +418,7 @@ class CertificateRequestController extends Controller
 
         $oldPath = $certificateRequest->certificate_path;
 
-        $path = app(\App\Services\MembershipCertificateDocxService::class)->generate($certificateRequest, [
+        $path = app(\App\Services\MembershipCertificatePdfService::class)->generate($certificateRequest, [
             'address'         => $data['address'] ?? null,
             'decision_number' => $data['decision_number'] ?? null,
             'decision_date'   => $data['decision_date'] ?? null,
@@ -471,9 +471,9 @@ class CertificateRequestController extends Controller
             'status' => 'pending',
         ]);
 
-        // توليد DOCX تلقائياً — عنوان الشركة ورقم/تاريخ قرار التصنيف قابلة للتعديل يدوياً قبل الإصدار
+        // توليد PDF تلقائياً — عنوان الشركة ورقم/تاريخ قرار التصنيف قابلة للتعديل يدوياً قبل الإصدار
         try {
-            $path = app(\App\Services\MembershipCertificateDocxService::class)->generate($certRequest, [
+            $path = app(\App\Services\MembershipCertificatePdfService::class)->generate($certRequest, [
                 'address'         => $data['address'] ?? null,
                 'decision_number' => $data['decision_number'] ?? null,
                 'decision_date'   => $data['decision_date'] ?? null,
