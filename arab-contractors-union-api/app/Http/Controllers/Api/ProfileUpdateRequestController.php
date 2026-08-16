@@ -74,10 +74,14 @@ class ProfileUpdateRequestController extends Controller
         Cache::put('profile_phone_otp_' . $contractor->id, ['otp' => $otp, 'phone' => $data['phone']], now()->addMinutes(10));
         Cache::put($cooldownKey, true, now()->addSeconds(35));
 
-        Log::info("Profile phone-change OTP for contractor ID {$contractor->id} (new phone: {$data['phone']}): {$otp}");
+        app(\App\Services\Sms\SmsSenderInterface::class)->send(
+            $data['phone'],
+            "رمز تأكيد تغيير رقم الجوال في اتحاد المقاولين الفلسطينيين: {$otp}. صالح لمدة 10 دقائق."
+        );
 
         return $this->success(
-            ['otp_preview' => $otp], // للتجربة فقط — يُحذف عند ربط مزوّد SMS حقيقي (نفس تحفّظ باقي تدفقات الـOTP بالمشروع)
+            // otp_preview للتجربة فقط، يظهر فقط بوضع log — يختفي تلقائياً عند SMS_DRIVER=hotsms
+            config('services.sms.driver', 'log') === 'log' ? ['otp_preview' => $otp] : [],
             'تم إرسال رمز التحقق إلى الرقم الجديد.',
         );
     }

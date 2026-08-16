@@ -15,6 +15,10 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             \App\Services\Sms\SmsSenderInterface::class,
             fn () => match (config('services.sms.driver', 'log')) {
+                'hotsms' => new \App\Services\Sms\HotSmsSender(
+                    config('services.sms.hotsms.api_token'),
+                    config('services.sms.hotsms.sender'),
+                ),
                 default => new \App\Services\Sms\LogSmsSender(),
             },
         );

@@ -52,9 +52,14 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI', env('APP_URL', 'http://localhost:8000') . '/auth/google/callback'),
     ],
 
-    // مزود الرسائل النصية — log للتجربة، يُستبدل بمزود فلسطيني عند التعاقد
+    // مزود الرسائل النصية — log للتجربة، hotsms للإرسال الفعلي عبر hotsms.ps
     'sms' => [
         'driver' => env('SMS_DRIVER', 'log'),
+
+        'hotsms' => [
+            'api_token' => env('HOTSMS_API_TOKEN'),
+            'sender'    => env('HOTSMS_SENDER', 'PCU'),
+        ],
     ],
 
     // Firebase Cloud Messaging — log للتجربة إلى أن يُرفَع ملف اعتماد Service Account

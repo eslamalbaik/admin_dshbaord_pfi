@@ -5,14 +5,23 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\Contractor;
+use App\Services\Sms\SmsSenderInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
 
 class ContractorRegisterController extends Controller
 {
     use ApiResponseTrait;
+
+    /**
+     * الرمز يُرجَع بالرد فقط بوضع log (SMS_DRIVER=log) للتسهيل على الفحص محلياً —
+     * يختفي تلقائياً بمجرد ضبط مزوّد فعلي (SMS_DRIVER=hotsms).
+     */
+    private function otpPreview(int $otp): array
+    {
+        return config('services.sms.driver', 'log') === 'log' ? ['otp_preview' => $otp] : [];
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     //  POST /api/v1/contractor/auth/verify-identity
@@ -60,8 +69,8 @@ class ContractorRegisterController extends Controller
             'membership_number'   => $contractor->membership_number,
             'has_password'        => !empty($contractor->password),
             'otp_required'        => true,
-            'otp_preview'         => $otp, // للتجربة فقط — يُحذف عند ربط مزوّد SMS حقيقي
             'expires_in'          => 35,
+            ...$this->otpPreview($otp),
         ], 'تم التحقق من رقم الجوال، تم إرسال رمز التحقق إليه.');
     }
 
@@ -138,8 +147,8 @@ class ContractorRegisterController extends Controller
         return $this->success([
             'phone'        => $contractor->phone,
             'otp_required' => true,
-            'otp_preview'  => $otp, // للتجربة فقط — يُحذف عند ربط مزوّد SMS حقيقي
             'expires_in'   => 35,
+            ...$this->otpPreview($otp),
         ], 'تم إرسال رمز تحقق جديد إلى رقم جوالك.');
     }
 
@@ -204,7 +213,7 @@ class ContractorRegisterController extends Controller
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  توليد رمز تحقق التسجيل وإرساله (محاكاة عبر الـ Logs حالياً)
+    //  توليد رمز تحقق التسجيل وإرساله عبر مزوّد SMS المفعَّل (SMS_DRIVER)
     // ─────────────────────────────────────────────────────────────────────────
     private function generateOtp(Contractor $contractor): int
     {
@@ -213,8 +222,10 @@ class ContractorRegisterController extends Controller
         Cache::put('register_otp_' . $contractor->id, $otp, now()->addMinutes(10));
         Cache::put('register_otp_cooldown_' . $contractor->id, time() + 35, now()->addSeconds(35));
 
-        // تسجيل الرمز في الـ Logs لمحاكاة الإرسال — يُستبدل بمزوّد SMS قبل الإطلاق
-        Log::info("Registration OTP for contractor ID {$contractor->id} (Phone: {$contractor->phone}): {$otp}");
+        app(SmsSenderInterface::class)->send(
+            $contractor->phone,
+            "رمز التحقق الخاص بك في اتحاد المقاولين الفلسطينيين: {$otp}. صالح لمدة 10 دقائق."
+        );
 
         return $otp;
     }
@@ -256,15 +267,17 @@ class ContractorRegisterController extends Controller
         Cache::put('otp_' . $contractor->id, $otp, now()->addMinutes(10));
         Cache::put($cooldownKey, time() + 35, now()->addSeconds(35));
 
-        // تسجيل الرمز في الـ Logs لمحاكاة الإرسال
-        Log::info("Forgot Password OTP for contractor ID {$contractor->id} (Membership: {$contractor->membership_number}): {$otp}");
+        app(SmsSenderInterface::class)->send(
+            $contractor->phone,
+            "رمز استعادة كلمة المرور في اتحاد المقاولين الفلسطينيين: {$otp}. صالح لمدة 10 دقائق."
+        );
 
         return $this->success([
             'id'                  => $contractor->id,
             'membership_number'   => $contractor->membership_number,
             'phone'               => $contractor->phone,
-            'otp_preview'         => $otp, // إرجاع الرمز للتسهيل على مطور الموبايل في الفحص والتجربة
             'expires_in'          => 35,
+            ...$this->otpPreview($otp),
         ], 'تم إرسال رمز التحقق إلى رقم الجوال المسجل بنجاح.');
     }
 
