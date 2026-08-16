@@ -65,3 +65,33 @@ public/mockServiceWorker.js
 # Env files
 .env*
 !.env.example
+
+# مخرجات وقت التشغيل لتوليد الشهادات — تتولّد على كل سيرفر ولا تُنقل بين البيئات
+/storage/app/mpdf-tmp/
+/storage/app/mpdf-tmp-test/
+/storage/app/lo-profile-*/
+/storage/app/public/certificates/
+/storage/app/public/receipts/
+/storage/app/public/contractors/profile-update/
+
+# سكربتات فحص/بناء قالب الشهادة المحلية — أدوات تشخيص لمرة واحدة لا جزء من التطبيق
+/build_and_verify.php
+/build_template.php
+/check.php
+/debug.php
+/prepare_docx.php
+/read_template.php
+/test_issue.php
+/xml_dump.txt
+
+# خطوط جُرِّبت للشهادة ثم استُبعدت (Amiri و Noto Naskh) — mPDF يرفض جدول GPOS
+# فيها، والخط المعتمد xbriyaz مشحون داخل vendor. لا داعي لشحن 1.4 م.ب بلا استعمال.
+/resources/certificate-assets/fonts/
+
+# نسخ احتياطية من قالب الشهادة تُنشأ يدوياً أثناء التعديل
+/resources/templates/*.bak
+/resources/templates/*.bak-*
+/resources/templates/*.bak2-*
+/resources/templates/*.bak3-*
+/resources/templates/*.broken.bak
+/storage/app/membership_template.docx
