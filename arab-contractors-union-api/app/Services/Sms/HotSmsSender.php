@@ -6,12 +6,14 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
- * مرسل SMS عبر HotSMS (hotsms.ps) — تفويض بـapi_token عبر GET.
- * أرقام محلية (05XXXXXXXX) تُحوَّل لصيغة دولية (972XXXXXXXXX) قبل الإرسال؛
- * hotsms يرفض الرقم بلا رمز الدولة.
+ * مرسل SMS عبر HotSMS REST API v2 (hotsms.ps) — تفويض Bearer token
+ * (وليس api_token بالرابط كما بالإصدار القديم v1).
+ * أرقام محلية (05XXXXXXXX) تُحوَّل لصيغة دولية (+970XXXXXXXXX) قبل الإرسال.
  */
 class HotSmsSender implements SmsSenderInterface
 {
+    private const BASE_URL = 'https://hotsms.ps/api/rest/v2';
+
     public function __construct(
         private readonly string $apiToken,
         private readonly string $sender,
@@ -22,26 +24,25 @@ class HotSmsSender implements SmsSenderInterface
     {
         $mobile = $this->toInternational($phone);
 
-        $response = Http::timeout(10)->get('http://hotsms.ps/sendbulksms.php', [
-            'api_token' => $this->apiToken,
-            'sender'    => $this->sender,
-            'mobile'    => $mobile,
-            'type'      => 2, // UTF-8 متعدد اللغات — رسائل التحقق عربية
-            'text'      => $message,
-        ]);
+        $response = Http::withToken($this->apiToken)
+            ->timeout(10)
+            ->post(self::BASE_URL . '/messages/send', [
+                'mobile'  => $mobile,
+                'message' => $message,
+                'sender'  => $this->sender,
+            ]);
 
-        $result = trim($response->body());
+        $body = $response->json() ?? [];
 
-        // رموز النجاح: "1001" أو "1001_<message_id>" — أي شيء آخر خطأ (راجع رموز الخطأ بتوثيق hotsms)
-        if (! str_starts_with($result, '1001')) {
+        if (! ($body['status'] ?? false)) {
             Log::channel('sms')->error('HotSMS send failed', [
-                'phone' => $phone, 'mobile' => $mobile, 'result' => $result,
+                'phone' => $phone, 'mobile' => $mobile, 'http_status' => $response->status(), 'response' => $body,
             ]);
 
             return false;
         }
 
-        Log::channel('sms')->info('HotSMS sent', ['phone' => $phone, 'mobile' => $mobile, 'result' => $result]);
+        Log::channel('sms')->info('HotSMS sent', ['phone' => $phone, 'mobile' => $mobile, 'response' => $body]);
 
         return true;
     }
@@ -50,10 +51,10 @@ class HotSmsSender implements SmsSenderInterface
     {
         $digits = preg_replace('/\D/', '', $phone);
 
-        // إزالة رمز الدولة إن وُجد قبل إعادة تركيبه بصيغة hotsms — 970 الرسمي
-        // لفلسطين، و972 مستخدَم فعلياً أيضاً بسبب تشارك الشبكة مع إسرائيل
+        // إزالة رمز الدولة إن وُجد قبل إعادة تركيبه — 970 رمز فلسطين المعتمَد
+        // بتوثيق hotsms v2، و972 يظهر أحياناً بسبب تشارك الشبكة مع إسرائيل
         $digits = preg_replace('/^(970|972)/', '', $digits);
 
-        return '972' . ltrim($digits, '0');
+        return '+970' . ltrim($digits, '0');
     }
 }
