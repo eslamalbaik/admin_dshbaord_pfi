@@ -78,12 +78,18 @@ export const useAuthStore = defineStore('auth', {
             localStorage.setItem('userData', JSON.stringify(normalized))
           }
         })
-        .catch(() => {
-          this.user = null
-          this.isLoggedIn = false
-          if (typeof localStorage !== 'undefined') {
-            localStorage.removeItem('accessToken')
-            localStorage.removeItem('userData')
+        .catch(error => {
+          // Only treat this as "not logged in" on a real auth rejection (401/419).
+          // Network errors, CORS failures, or 5xx must not wipe a valid token —
+          // otherwise a transient/server issue looks identical to a bad login.
+          const status = error?.response?.status
+          if (status === 401 || status === 419) {
+            this.user = null
+            this.isLoggedIn = false
+            if (typeof localStorage !== 'undefined') {
+              localStorage.removeItem('accessToken')
+              localStorage.removeItem('userData')
+            }
           }
         })
         .finally(() => {
