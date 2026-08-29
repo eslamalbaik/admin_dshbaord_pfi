@@ -55,7 +55,7 @@ class TenderController extends Controller
         $bookmarkedIds = $contractor->bookmarkedTenders()->pluck('tenders.id');
 
         $paginator = $query->paginate($this->perPage($request))
-            ->through(fn ($t) => $this->formatPublic($t, $bookmarkedIds));
+            ->through(fn ($t) => $this->formatPublic($t, $bookmarkedIds, forContractor: true));
 
         return $this->paginated($paginator);
     }
@@ -65,7 +65,7 @@ class TenderController extends Controller
     {
         $bookmarkedIds = $request->user()->bookmarkedTenders()->pluck('tenders.id');
 
-        return $this->success($this->formatPublic($tender, $bookmarkedIds));
+        return $this->success($this->formatPublic($tender, $bookmarkedIds, forContractor: true));
     }
 
     // GET /api/v1/contractor/tenders/bookmarked
@@ -77,7 +77,7 @@ class TenderController extends Controller
         );
 
         $paginator = $query->paginate($this->perPage($request))
-            ->through(fn ($t) => $this->formatPublic($t, collect([$t->id])));
+            ->through(fn ($t) => $this->formatPublic($t, collect([$t->id]), forContractor: true));
 
         return $this->paginated($paginator);
     }
@@ -108,6 +108,7 @@ class TenderController extends Controller
     {
         $validated = $request->validate([
             'title'              => 'required|string|max:255',
+            'issuing_entity'     => 'nullable|string|max:255',
             'description'        => 'nullable|string',
             'union_notes'        => 'nullable|string',
             'category'           => ['nullable', Rule::in(Tender::CATEGORIES)],
@@ -132,8 +133,15 @@ class TenderController extends Controller
 
         $validated['created_by'] = Auth::id();
         $tender = Tender::create($validated);
+        $tender->update(['reference_number' => $this->generateReferenceNumber($tender)]);
 
         return $this->success($tender->toArray(), 'تم إضافة العطاء بنجاح.', 201);
+    }
+
+    /** رقم مرجعي بصيغة TND-<سنة>-<رقم العطاء بـ3 خانات> — يُولَّد مرة واحدة عند الإنشاء */
+    private function generateReferenceNumber(Tender $tender): string
+    {
+        return 'TND-' . $tender->created_at->year . '-' . str_pad((string) $tender->id, 3, '0', STR_PAD_LEFT);
     }
 
     // GET /api/tenders/{id}
@@ -147,6 +155,7 @@ class TenderController extends Controller
     {
         $validated = $request->validate([
             'title'              => 'sometimes|string|max:255',
+            'issuing_entity'     => 'nullable|string|max:255',
             'description'        => 'nullable|string',
             'union_notes'        => 'nullable|string',
             'category'           => ['nullable', Rule::in(Tender::CATEGORIES)],
@@ -203,6 +212,33 @@ class TenderController extends Controller
         if ($request->filled('updated_to')) {
             $query->whereDate('updated_at', '<=', $request->date('updated_to'));
         }
+        if ($request->filled('deadline_from')) {
+            $query->whereDate('deadline', '>=', $request->date('deadline_from'));
+        }
+        if ($request->filled('deadline_to')) {
+            $query->whereDate('deadline', '<=', $request->date('deadline_to'));
+        }
+
+        // فلتر "حالة العطاء" بمودال التصفية — أي عطاء يطابق واحدة من الحالات المفعّلة (new/updated/closing_soon)
+        if ($request->filled('states')) {
+            $states = array_intersect((array) $request->input('states'), ['new', 'updated', 'closing_soon']);
+            if ($states) {
+                $query->where(function (Builder $q) use ($states) {
+                    if (in_array('new', $states, true)) {
+                        $q->orWhere('created_at', '>=', now()->subHours(48));
+                    }
+                    if (in_array('updated', $states, true)) {
+                        $q->orWhere(function (Builder $qu) {
+                            $qu->where('updated_at', '>=', now()->subHours(48))
+                                ->whereColumn('updated_at', '>', 'created_at');
+                        });
+                    }
+                    if (in_array('closing_soon', $states, true)) {
+                        $q->orWhereBetween('deadline', [now()->toDateString(), now()->addDays(7)->toDateString()]);
+                    }
+                });
+            }
+        }
 
         // فعّالة/مؤرشفة (REQ-09) — archived_at يُضبط تلقائياً بأمر tenders:archive المجدول يومياً
         if ($request->input('scope') === 'active') {
@@ -234,19 +270,27 @@ class TenderController extends Controller
         return min($request->integer('per_page', 15), 100);
     }
 
-    // شكل العطاء المعروض للعامة — بدون union_notes / created_by
+    // شكل العطاء المعروض للعامة/للمقاول — بدون created_by
+    // union_notes ملاحظات داخلية موجّهة للمقاولين تحديداً (شاشة تفاصيل العطاء بالتطبيق) —
+    // ما بتظهر بـ tenders-public (زوار الموقع غير المسجّلين)
     // $bookmarkedIds: قائمة IDs عطاءات المقاول المحفوظة (لتعليم is_bookmarked) — اختياري خارج سياق المقاول
-    private function formatPublic(Tender $t, ?\Illuminate\Support\Collection $bookmarkedIds = null): array
+    private function formatPublic(Tender $t, ?\Illuminate\Support\Collection $bookmarkedIds = null, bool $forContractor = false): array
     {
         return [
             'id'                  => $t->id,
+            'reference_number'    => $t->reference_number,
             'title'               => $t->title,
+            'issuing_entity'      => $t->issuing_entity,
             'description'         => $t->description,
+            'union_notes'         => $forContractor ? $t->union_notes : null,
             'category'            => $t->category,
             'budget'              => $t->budget,
             'deadline'            => $t->deadline?->toDateString(),
             'status'              => $t->status,
             'is_active'           => $t->is_active,
+            'is_new'              => $t->is_new,
+            'is_updated'          => $t->is_updated,
+            'closing_soon'        => $t->closing_soon,
             'archived_at'         => $t->archived_at?->toDateString(),
             'bids_count'          => $t->bids_count,
             'submission_types'    => $t->submission_types,

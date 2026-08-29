@@ -95,6 +95,47 @@ class ContractorHomeTest extends TestCase
             ]);
     }
 
+    public function test_home_includes_profile_completeness_and_unread_notifications(): void
+    {
+        $contractor = $this->createContractor();
+        Sanctum::actingAs($contractor, ['*']);
+
+        $this->getJson('/api/v1/contractor/home')
+            ->assertStatus(200)
+            ->assertJsonStructure([
+                'items' => [
+                    'contractor' => ['profile_data_complete', 'missing_profile_fields'],
+                ],
+            ])
+            ->assertJsonPath('items.contractor.profile_data_complete', false) // مقاول تجريبي ناقص الحقول
+            ->assertJsonPath('items.unread_notifications_count', 0);
+    }
+
+    public function test_home_events_count_only_counts_upcoming_published_events(): void
+    {
+        $contractor = $this->createContractor();
+
+        News::create([
+            'title' => 'فعالية قادمة', 'slug' => 'upcoming-event', 'body' => 'x',
+            'category' => 'event', 'is_published' => true, 'published_at' => now(),
+            'event_date' => now()->addDays(5),
+        ]);
+        News::create([
+            'title' => 'فعالية سابقة', 'slug' => 'past-event', 'body' => 'x',
+            'category' => 'event', 'is_published' => true, 'published_at' => now()->subDays(30),
+            'event_date' => now()->subDays(10),
+        ]);
+        News::create([
+            'title' => 'خبر عادي', 'slug' => 'plain-news-2', 'body' => 'x',
+            'category' => 'news', 'is_published' => true, 'published_at' => now(),
+        ]);
+
+        Sanctum::actingAs($contractor, ['*']);
+
+        $this->getJson('/api/v1/contractor/home')
+            ->assertJsonPath('items.stats.events_count', 1);
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     //  Membership badge
     // ─────────────────────────────────────────────────────────────────────

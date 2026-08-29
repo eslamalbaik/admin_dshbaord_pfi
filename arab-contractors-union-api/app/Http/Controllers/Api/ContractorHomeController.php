@@ -41,12 +41,13 @@ class ContractorHomeController extends Controller
         $contractor = $request->user();
 
         return $this->success([
-            'contractor'      => $this->contractorCard($contractor),
-            'membership'      => $this->membershipStatus($contractor),
-            'financial'       => $this->financialSummary($contractor),
-            'stats'           => $this->statsCard($contractor),
-            'cta_certificate' => $this->ctaCertificate($contractor),
-            'latest_updates'  => $this->presentFeed(
+            'contractor'                 => $this->contractorCard($contractor),
+            'membership'                 => $this->membershipStatus($contractor),
+            'financial'                  => $this->financialSummary($contractor),
+            'stats'                      => $this->statsCard($contractor),
+            'cta_certificate'            => $this->ctaCertificate($contractor),
+            'unread_notifications_count' => $contractor->unreadNotifications()->count(),
+            'latest_updates'             => $this->presentFeed(
                 $this->buildFeed($contractor)->take(self::HOME_UPDATES_LIMIT)
             ),
         ]);
@@ -80,12 +81,14 @@ class ContractorHomeController extends Controller
     private function contractorCard(Contractor $contractor): array
     {
         return [
-            'id'                => $contractor->id,
-            'name'              => $contractor->name,
-            'membership_number' => $contractor->membership_number,
-            'logo'              => $contractor->logo
+            'id'                     => $contractor->id,
+            'name'                   => $contractor->name,
+            'membership_number'      => $contractor->membership_number,
+            'logo'                   => $contractor->logo
                 ? \Illuminate\Support\Facades\Storage::disk('public')->url($contractor->logo)
                 : null,
+            'profile_data_complete'  => $contractor->profile_data_complete,
+            'missing_profile_fields' => $contractor->missing_profile_fields,
         ];
     }
 
@@ -147,6 +150,10 @@ class ContractorHomeController extends Controller
     private function statsCard(Contractor $contractor): array
     {
         return [
+            'events_count'         => News::published()
+                ->where('category', 'event')
+                ->where('event_date', '>=', now())
+                ->count(),
             'announcements_count' => Announcement::published()->count(),
             'machinery_count'     => $contractor->equipment()->count(),
             'new_tenders_count'   => Tender::where('status', 'open')
