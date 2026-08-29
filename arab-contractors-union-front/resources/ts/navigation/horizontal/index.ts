@@ -52,7 +52,6 @@ export default [
     icon: { icon: 'tabler-dots' },
     children: [
       { title: 'إدارة الوثائق', to: 'documents', icon: { icon: 'tabler-folder' } },
-      { title: 'الدعم الفني والشكاوى', to: 'support-tickets', icon: { icon: 'tabler-headset' } },
       { title: 'الأخبار والمناسبات', to: 'news', icon: { icon: 'tabler-news' } },
       { title: 'التقارير', to: 'analytics', icon: { icon: 'tabler-chart-bar' } },
       { title: 'الإشعارات', to: 'notifications', icon: { icon: 'tabler-bell' } },

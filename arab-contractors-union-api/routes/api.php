@@ -20,7 +20,6 @@ use App\Http\Controllers\Api\NewsController;
 use App\Http\Controllers\Api\TermsController;
 use App\Http\Controllers\Api\LegalFileController;
 use App\Http\Controllers\Api\BankAccountController;
-use App\Http\Controllers\Api\SupportTicketController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\CertificateRequestController;
 use App\Http\Controllers\Api\ContractorNameChangeRequestController;
@@ -342,15 +341,6 @@ Route::prefix('v1')->group(function () {
         Route::post('dashboard/bank-accounts',               [BankAccountController::class, 'store']);
         Route::post('dashboard/bank-accounts/{bankAccount}', [BankAccountController::class, 'update']);
         Route::delete('dashboard/bank-accounts/{bankAccount}',[BankAccountController::class, 'destroy']);
-
-        // --------------------------------------------------------
-        //  Support Tickets — Admin (الدعم الفني والشكاوى)
-        // --------------------------------------------------------
-        Route::get('dashboard/support-tickets',                   [SupportTicketController::class, 'index']);
-        Route::get('dashboard/support-tickets/{ticket}',          [SupportTicketController::class, 'show']);
-        Route::post('dashboard/support-tickets/{ticket}/reply',   [SupportTicketController::class, 'reply']);
-        Route::patch('dashboard/support-tickets/{ticket}/status', [SupportTicketController::class, 'updateStatus']);
-        Route::delete('dashboard/support-tickets/{ticket}',       [SupportTicketController::class, 'destroy']);
 
         // --------------------------------------------------------
         //  App Settings — Admin (واتساب/بريد الدعم، بيانات الاتحاد، السوشال ميديا)

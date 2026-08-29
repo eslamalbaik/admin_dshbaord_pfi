@@ -91,11 +91,6 @@ if (!isAccountant) {
 if (!isAccountant) {
   menuItems.push({ heading: 'خدمات الأعضاء' })
   menuItems.push({
-    title: 'الدعم الفني والشكاوى',
-    icon: { icon: 'tabler-headset' },
-    to: 'support-tickets',
-  })
-  menuItems.push({
     title: 'الشهادات',
     icon: { icon: 'tabler-certificate' },
     children: [
