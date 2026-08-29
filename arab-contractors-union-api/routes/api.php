@@ -110,6 +110,9 @@ Route::prefix('v1')->group(function () {
         // أهلية تجديد العضوية (تُمنع مع ذمم غير مسدَّدة)
         Route::get('renewal-eligibility', [ContractorDashboardController::class, 'renewalEligibility']);
 
+        // كائن موحّد لتفاصيل الاشتراك ووضعه — لإعادة الاستخدام بأكثر من شاشة
+        Route::get('subscription', [ContractorDashboardController::class, 'subscription']);
+
         // شاشة العطاءات — تصفح موثَّق (فعّال/مؤرشف/مجالاتي) + حفظ بالمفضلة (REQ-09/11/13)
         Route::get('tenders',                   [TenderController::class, 'contractorIndex']);
         Route::get('tenders/bookmarked',         [TenderController::class, 'bookmarked']);

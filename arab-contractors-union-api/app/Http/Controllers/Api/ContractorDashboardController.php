@@ -219,6 +219,16 @@ class ContractorDashboardController extends Controller
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    //  GET /api/v1/contractor/subscription
+    //  كائن موحّد لتفاصيل اشتراك المقاول ووضعه — يُستخدم من أكثر من شاشة بالتطبيق
+    //  بدل تكرار حسبة badge/expiring_soon/can_renew في كل مكان.
+    // ─────────────────────────────────────────────────────────────────────────
+    public function subscription(Request $request)
+    {
+        return $this->success($request->user()->subscriptionStatus());
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     //  GET /api/v1/contractor/renewal-eligibility
     //  هل يستطيع المقاول تجديد عضويته؟ (تُمنع مع ذمم/غرامات غير مسدَّدة)
     // ─────────────────────────────────────────────────────────────────────────

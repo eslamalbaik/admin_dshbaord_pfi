@@ -40,6 +40,10 @@ class ContractorRegisterController extends Controller
             return $this->error('لا يوجد حساب مرتبط برقم الجوال المُدخل.', 404, null, 'contractor_not_found');
         }
 
+        if (empty($contractor->membership_number)) {
+            return $this->error('لا يوجد رقم عضوية مرتبط بحسابك. تواصل مع الاتحاد.', 422, null, 'no_membership_number');
+        }
+
         if ($contractor->is_frozen || $contractor->status === 'suspended') {
             return $this->error('حسابك موقوف. تواصل مع الاتحاد لمزيد من المعلومات.', 403, null, 'account_inactive');
         }
@@ -168,6 +172,10 @@ class ContractorRegisterController extends Controller
 
         if (! $contractor) {
             return $this->error('لا يوجد حساب مرتبط برقم الجوال المُدخل.', 404, null, 'contractor_not_found');
+        }
+
+        if (empty($contractor->membership_number)) {
+            return $this->error('لا يوجد رقم عضوية مرتبط بحسابك. تواصل مع الاتحاد.', 422, null, 'no_membership_number');
         }
 
         if ($contractor->is_frozen || $contractor->status === 'suspended') {
