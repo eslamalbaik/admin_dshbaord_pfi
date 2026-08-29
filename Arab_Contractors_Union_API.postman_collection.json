@@ -219,7 +219,7 @@
                     "verify-identity"
                   ]
                 },
-                "description": "**POST** `/api/v1/contractor/auth/verify-identity`\n\nشاشة التسجيل — الخطوة 1: التحقق من رقم الجوال وإرسال رمز التحقق إليه.\n\n**⚠️ تحديث:** يتطلب الآن حقل `terms_accepted` = `1` (الموافقة على الشروط والأحكام وسياسة الخصوصية). عند أول تسجيل يُحفظ وقت الموافقة في `terms_accepted_at`.\n\n- إذا كان الجوال مسجّلاً تعود بياناته العامة (اسم الشركة، المفوض، السجل التجاري، رقم العضوية) مع `has_password` ويُرسل OTP (يظهر تجريبياً في `otp_preview`).\n- **`expires_in`**: 35 ثانية — مدة الانتظار قبل طلب رمز جديد (للعدّاد الزمني في التطبيق).\n- إذا طُلب رمز جديد قبل انتهاء الـ 35 ثانية → `429 otp_cooldown` مع `expires_in` بالثواني المتبقية.\n- إذا كان مسجّلاً ومفعّلاً بالفعل تعود `422 already_registered`.\n- إذا لم يكن موجوداً تعود `404 contractor_not_found`.\n\n**Form-Data**\n\n| الحقل | مطلوب | الوصف |\n|---|---|---|\n| phone | ✅ | رقم جوال المقاول |\n| terms_accepted | ✅ | 1 = موافق على الشروط والأحكام |\n\n**استجابة النجاح تحتوي:**\n```json\n{\n  \"id\": 1,\n  \"name\": \"...\",\n  \"phone\": \"...\",\n  \"otp_required\": true,\n  \"otp_preview\": 123456,\n  \"expires_in\": 35\n}\n```"
+                "description": "**POST** `/api/v1/contractor/auth/verify-identity`\n\nشاشة التسجيل — الخطوة 1: التحقق من رقم الجوال وإرسال رمز التحقق إليه.\n\n**⚠️ تحديث:** يتطلب الآن حقل `terms_accepted` = `1` (الموافقة على الشروط والأحكام وسياسة الخصوصية). عند أول تسجيل يُحفظ وقت الموافقة في `terms_accepted_at`.\n\n**⚠️ تحديث جديد:** لا يكفي وجود رقم الجوال بالداتابيز — لازم يكون عند المقاول `membership_number` مسجّل مسبقاً (من الاستيراد القديم أو إدخال الأدمن). لو رقم الجوال موجود لكن بدون رقم عضوية مربوط → `422 no_membership_number`. هالفحص داخلي فقط، ما بيتطلب أي حقل إضافي بالـ request.\n\n- إذا كان الجوال مسجّلاً وله رقم عضوية تعود بياناته العامة (اسم الشركة، المفوض، السجل التجاري، رقم العضوية) مع `has_password` ويُرسل OTP (يظهر تجريبياً في `otp_preview`).\n- **`expires_in`**: 35 ثانية — مدة الانتظار قبل طلب رمز جديد (للعدّاد الزمني في التطبيق).\n- إذا طُلب رمز جديد قبل انتهاء الـ 35 ثانية → `429 otp_cooldown` مع `expires_in` بالثواني المتبقية.\n- إذا كان مسجّلاً ومفعّلاً بالفعل تعود `422 already_registered`.\n- إذا لم يكن موجوداً تعود `404 contractor_not_found`.\n\n**Form-Data**\n\n| الحقل | مطلوب | الوصف |\n|---|---|---|\n| phone | ✅ | رقم جوال المقاول |\n| terms_accepted | ✅ | 1 = موافق على الشروط والأحكام |\n\n**استجابة النجاح تحتوي:**\n```json\n{\n  \"id\": 1,\n  \"name\": \"...\",\n  \"phone\": \"...\",\n  \"otp_required\": true,\n  \"otp_preview\": 123456,\n  \"expires_in\": 35\n}\n```\n\n**أخطاء محتملة:**\n\n| كود | error | السبب |\n|---|---|---|\n| 404 | contractor_not_found | لا يوجد حساب برقم الجوال هذا |\n| 422 | no_membership_number | الحساب موجود لكن بدون رقم عضوية مربوط |\n| 422 | already_registered | مسجّل ومفعّل مسبقاً |\n| 403 | account_inactive | الحساب مجمّد/موقوف |\n| 429 | otp_cooldown | لسا داخل فترة انتظار 35 ثانية |"
               }
             },
             {
@@ -318,7 +318,7 @@
                     "set-password"
                   ]
                 },
-                "description": "**POST** `/api/v1/contractor/auth/set-password`\n\nشاشة التسجيل — الخطوة 3 (بعد تفعيل الجوال): تعيين كلمة المرور وتسجيل الدخول مباشرة (يعود التوكن).\n\n- يتطلب أن يكون الجوال مفعّلاً مسبقاً عبر verify-otp، وإلا `422 phone_not_verified`.\n- إذا كان للحساب كلمة مرور بالفعل → `422 already_registered`.\n\n**Form-Data**"
+                "description": "**POST** `/api/v1/contractor/auth/set-password`\n\nشاشة التسجيل — الخطوة 3 (بعد تفعيل الجوال): تعيين كلمة المرور وتسجيل الدخول مباشرة (يعود التوكن).\n\n- يتطلب أن يكون الجوال مفعّلاً مسبقاً عبر verify-otp، وإلا `422 phone_not_verified`.\n- إذا كان للحساب كلمة مرور بالفعل → `422 already_registered`.\n- **⚠️ تحديث جديد:** نفس فحص `verify-identity` — لازم يكون عند المقاول `membership_number` مسجّل، غير هيك `422 no_membership_number`. لا حقل إضافي مطلوب بالـ request.\n- بعد النجاح ترجع بيانات العضوية الحقيقية (membership_number/commercial_register/trade/classification) من سجل المقاول — لو طلعت null تأكد إنه المقاول فعلاً معبّى هالحقول بالداتابيز.\n\n**Form-Data**"
               },
               "event": [
                 {
@@ -1186,6 +1186,40 @@
                   ]
                 },
                 "description": "هل يستطيع المقاول تجديد عضويته؟ يُمنع مع ذمم غير مسدَّدة",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{contractor_token}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Subscription Status",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/contractor/subscription",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "contractor",
+                    "subscription"
+                  ]
+                },
+                "description": "**GET** `/api/v1/contractor/subscription` — *توكن المقاول* — **جديد**\n\nكائن موحّد لتفاصيل اشتراك المقاول ووضعه — نداء واحد يجمع نفس منطق `badge`/`expiring_soon`/`can_renew` المُستخدم بشاشات متفرقة (home/dashboard/renewal-eligibility)، بدل تكراره بكل شاشة.\n\n**النجاح 200:**\n```json\n{\n  \"items\": {\n    \"id\": 12,\n    \"type\": \"renewal\",\n    \"membership_status\": \"active\",\n    \"badge\": \"active\",\n    \"starts_at\": \"2025-01-15\",\n    \"expires_at\": \"2026-01-15\",\n    \"amount\": \"150.00\",\n    \"expiring_soon\": false,\n    \"days_remaining\": 145,\n    \"can_renew\": true,\n    \"renewal_blockers\": [],\n    \"outstanding_total_jod\": 0\n  }\n}\n```\n\nلو ما فيه عضوية نشطة: `id`/`type`/`membership_status`/`starts_at`/`expires_at`/`amount` بترجع `null`، و`badge` بياخد حالة المقاول العامة (`contractor.status`).",
                 "auth": {
                   "type": "bearer",
                   "bearer": [
