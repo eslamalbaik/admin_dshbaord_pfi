@@ -108,23 +108,13 @@ class ContractorAuthController extends Controller
 
     // ─────────────────────────────────────────────────────────────────────────
     //  GET /api/contractor/auth/me
-    // ─────────────────────────────────────────────────────────────────────────
-    public function me(Request $request)
-    {
-        $contractor = $request->user('contractor');
-        $contractor->load(['activeMembership', 'governorate', 'cityModel', 'equipment' => fn($q) => $q->where('status', 'visible')]);
-
-        return $this->success($this->contractorResource($contractor));
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
     //  GET /api/v1/contractor/auth/profile
-    //  الملف الشخصي الكامل (REQ-03) — يُستدعى عند فتح شاشة الملف الشخصي فقط
+    //  نفس الملف الشخصي الكامل — مُوحّد بمسارين للتوافق مع العملاء الحاليين (REQ-03)
     // ─────────────────────────────────────────────────────────────────────────
     public function profile(Request $request)
     {
         $contractor = $request->user('contractor');
-        $contractor->load(['activeMembership', 'governorate', 'cityModel']);
+        $contractor->load(['activeMembership', 'governorate', 'cityModel', 'equipment' => fn($q) => $q->where('status', 'visible')]);
 
         return $this->success($this->contractorResource($contractor), 'تم جلب الملف الشخصي بنجاح');
     }

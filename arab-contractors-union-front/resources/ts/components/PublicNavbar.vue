@@ -71,7 +71,7 @@ async function fetchMe() {
   const savedToken = localStorage.getItem('contractor_token')
   if (savedToken) {
     try {
-      const r = await api.get('/api/v1/contractor/auth/me', {
+      const r = await api.get('/api/v1/contractor/auth/profile', {
         headers: { Authorization: `Bearer ${savedToken}` },
       })
       localProfile.value = r.data.items ?? r.data

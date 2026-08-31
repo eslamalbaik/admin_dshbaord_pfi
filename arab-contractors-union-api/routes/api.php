@@ -53,7 +53,6 @@ Route::prefix('v1')->group(function () {
     // --------------------------------------------------------
     Route::middleware(['auth:sanctum', 'contractor.active'])->prefix('contractor/auth')->group(function () {
         Route::post('logout',          [ContractorAuthController::class, 'logout']);
-        Route::get('me',               [ContractorAuthController::class, 'me']);
         Route::get('profile',          [ContractorAuthController::class, 'profile']);
         Route::patch('profile',        [ContractorAuthController::class, 'updateProfile']);
         Route::post('profile/update',  [ContractorAuthController::class, 'updateFullProfile']);
