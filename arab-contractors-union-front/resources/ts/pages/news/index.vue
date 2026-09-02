@@ -64,30 +64,58 @@ const fetchNews = async () => {
 watchEffect(() => fetchNews())
 
 // ── Create/Edit form ──────────────────────────────
+interface SpeakerForm { name: string; title: string; photo: string; is_keynote: boolean }
+
+const eventFormatOptions = [
+  { title: 'وجاهي', value: 'onsite' },
+  { title: 'أونلاين', value: 'online' },
+  { title: 'وجاهي + أونلاين', value: 'hybrid' },
+]
+
 const emptyForm = () => ({
   id: null as number | null,
   title: '',
   excerpt: '',
   body: '',
   category: 'news',
-  image: null as File | null,
   imagePreview: '' as string,
   gallery: [] as File[],
+  existingGallery: [] as string[],
+  removeGallery: [] as string[],
   video_url: '',
   external_url: '',
   event_date: '',
   event_location: '',
+  event_format: '' as string,
+  is_international: false,
+  stream_url: '',
+  speakers: [] as SpeakerForm[],
   is_published: false,
   published_at: '',
 })
+
+const addSpeaker = () => form.value.speakers.push({ name: '', title: '', photo: '', is_keynote: false })
+const removeSpeaker = (i: number) => form.value.speakers.splice(i, 1)
+
+const toggleRemoveGalleryImage = (url: string) => {
+  const idx = form.value.removeGallery.indexOf(url)
+  if (idx === -1) form.value.removeGallery.push(url)
+  else form.value.removeGallery.splice(idx, 1)
+}
 
 const formDialog = ref(false)
 const formLoading = ref(false)
 const isEditing = ref(false)
 const form = ref(emptyForm())
 
+// VFileInput v-model must be a plain ref<File[]> — binding it through a computed
+// ternary (`form.image ? [form.image] : []`) silently breaks Vuetify's internal
+// proxied model and the selected file never reaches form.image.
+const mainImageFile = ref<File[]>([])
+
 const openCreate = () => {
   form.value = emptyForm()
+  mainImageFile.value = []
   isEditing.value = false
   formDialog.value = true
 }
@@ -99,16 +127,24 @@ const openEdit = (item: any) => {
     excerpt: item.excerpt ?? '',
     body: item.body ?? '',
     category: item.category,
-    image: null,
     imagePreview: item.image ?? '',
     gallery: [],
+    existingGallery: item.gallery ?? [],
+    removeGallery: [],
     video_url: item.video_url ?? '',
     external_url: item.external_url ?? '',
     event_date: item.event_date ? item.event_date.substring(0, 16) : '',
     event_location: item.event_location ?? '',
+    event_format: item.event_format ?? '',
+    is_international: !!item.is_international,
+    stream_url: item.stream_url ?? '',
+    speakers: Array.isArray(item.speakers) ? item.speakers.map((s: any) => ({
+      name: s.name ?? '', title: s.title ?? '', photo: s.photo ?? '', is_keynote: !!s.is_keynote,
+    })) : [],
     is_published: !!item.is_published,
     published_at: item.published_at ? item.published_at.substring(0, 10) : '',
   }
+  mainImageFile.value = []
   isEditing.value = true
   formDialog.value = true
 }
@@ -132,9 +168,19 @@ const saveNews = async () => {
     if (form.value.category === 'event') {
       if (form.value.event_date) fd.append('event_date', form.value.event_date)
       if (form.value.event_location) fd.append('event_location', form.value.event_location)
+      if (form.value.event_format) fd.append('event_format', form.value.event_format)
+      fd.append('is_international', form.value.is_international ? '1' : '0')
+      if (form.value.stream_url) fd.append('stream_url', form.value.stream_url)
+      form.value.speakers.forEach((s, i) => {
+        fd.append(`speakers[${i}][name]`, s.name)
+        if (s.title) fd.append(`speakers[${i}][title]`, s.title)
+        if (s.photo) fd.append(`speakers[${i}][photo]`, s.photo)
+        fd.append(`speakers[${i}][is_keynote]`, s.is_keynote ? '1' : '0')
+      })
     }
-    if (form.value.image) fd.append('image', form.value.image)
+    if (mainImageFile.value[0]) fd.append('image', mainImageFile.value[0])
     form.value.gallery.forEach(f => fd.append('gallery[]', f))
+    form.value.removeGallery.forEach(url => fd.append('remove_gallery[]', url))
 
     if (isEditing.value) {
       fd.append('_method', 'PUT')
@@ -303,13 +349,12 @@ const deleteNews = async () => {
                 prepend-icon=""
                 accept="image/*"
                 style="font-family:Cairo,sans-serif"
-                :model-value="form.image ? [form.image] : []"
-                @update:model-value="form.image = $event?.[0] ?? null"
+                v-model="mainImageFile"
               />
             </VCol>
             <VCol cols="12" md="6">
               <VFileInput
-                label="معرض صور إضافي"
+                label="إضافة صور للمعرض"
                 prepend-inner-icon="tabler-photo-plus"
                 prepend-icon=""
                 accept="image/*"
@@ -318,6 +363,40 @@ const deleteNews = async () => {
                 :model-value="form.gallery"
                 @update:model-value="form.gallery = $event ?? []"
               />
+            </VCol>
+
+            <VCol v-if="form.existingGallery.length" cols="12">
+              <label class="text-body-2 font-weight-medium mb-2 d-block" style="font-family:Cairo,sans-serif">
+                صور المعرض الحالية (اضغط لحذف صورة)
+              </label>
+              <div class="d-flex flex-wrap gap-3">
+                <div
+                  v-for="url in form.existingGallery"
+                  :key="url"
+                  class="position-relative"
+                  style="width:80px;height:80px;cursor:pointer"
+                  @click="toggleRemoveGalleryImage(url)"
+                >
+                  <VImg
+                    :src="url"
+                    width="80"
+                    height="80"
+                    cover
+                    rounded
+                    :style="form.removeGallery.includes(url) ? 'opacity:0.35' : ''"
+                  />
+                  <VIcon
+                    :icon="form.removeGallery.includes(url) ? 'tabler-rotate' : 'tabler-trash'"
+                    :color="form.removeGallery.includes(url) ? 'success' : 'error'"
+                    size="18"
+                    class="position-absolute"
+                    style="top:2px;left:2px;background:white;border-radius:50%;padding:2px"
+                  />
+                </div>
+              </div>
+              <p v-if="form.removeGallery.length" class="text-caption text-error mt-1" style="font-family:Cairo,sans-serif">
+                {{ form.removeGallery.length }} صورة ستُحذف عند الحفظ
+              </p>
             </VCol>
 
             <VCol cols="12" md="6">
@@ -333,6 +412,57 @@ const deleteNews = async () => {
               </VCol>
               <VCol cols="12" md="6">
                 <VTextField v-model="form.event_location" label="مكان المناسبة" prepend-inner-icon="tabler-map-pin" style="font-family:Cairo,sans-serif" />
+              </VCol>
+              <VCol cols="12" md="4">
+                <VSelect
+                  v-model="form.event_format"
+                  :items="eventFormatOptions"
+                  label="نوع الحضور"
+                  clearable
+                  style="font-family:Cairo,sans-serif"
+                />
+              </VCol>
+              <VCol cols="12" md="4" class="d-flex align-center">
+                <VSwitch v-model="form.is_international" label="فعالية دولية" color="info" style="font-family:Cairo,sans-serif" />
+              </VCol>
+              <VCol cols="12" md="4">
+                <VTextField
+                  v-model="form.stream_url"
+                  label="رابط البث المباشر (Zoom)"
+                  prepend-inner-icon="tabler-video"
+                  dir="ltr"
+                  hint="يظهر للمقاولين يوم الفعالية فقط"
+                  persistent-hint
+                />
+              </VCol>
+
+              <VCol cols="12">
+                <div class="d-flex justify-space-between align-center mb-2">
+                  <span class="text-body-2 font-weight-medium" style="font-family:Cairo,sans-serif">المتحدثون</span>
+                  <VBtn size="small" variant="tonal" prepend-icon="tabler-plus" @click="addSpeaker">
+                    إضافة متحدث
+                  </VBtn>
+                </div>
+                <VRow v-for="(sp, i) in form.speakers" :key="i" align="center" class="mb-1">
+                  <VCol cols="12" md="3">
+                    <VTextField v-model="sp.name" label="الاسم" density="compact" style="font-family:Cairo,sans-serif" />
+                  </VCol>
+                  <VCol cols="12" md="3">
+                    <VTextField v-model="sp.title" label="المسمى/الصفة" density="compact" style="font-family:Cairo,sans-serif" />
+                  </VCol>
+                  <VCol cols="12" md="3">
+                    <VTextField v-model="sp.photo" label="رابط الصورة (اختياري)" density="compact" dir="ltr" />
+                  </VCol>
+                  <VCol cols="12" md="2">
+                    <VSwitch v-model="sp.is_keynote" label="متحدث رئيسي" density="compact" style="font-family:Cairo,sans-serif" />
+                  </VCol>
+                  <VCol cols="12" md="1" class="text-center">
+                    <VBtn icon="tabler-trash" size="small" variant="text" color="error" @click="removeSpeaker(i)" />
+                  </VCol>
+                </VRow>
+                <p v-if="!form.speakers.length" class="text-body-2 text-medium-emphasis" style="font-family:Cairo,sans-serif">
+                  لا يوجد متحدثون مضافون.
+                </p>
               </VCol>
             </template>
 
