@@ -22,6 +22,13 @@ const KEY_GROUPS: Record<string, string> = {
   union_phone: 'about',
   union_phone2: 'about',
   union_email: 'about',
+  union_vision: 'about',
+  union_mission: 'about',
+  union_badge_label: 'about',
+  union_members_count: 'about',
+  union_founding_year: 'about',
+  union_official_label: 'about',
+  union_branches_count: 'about',
   support_whatsapp: 'contact',
   support_email: 'contact',
   support_phone: 'contact',
@@ -43,8 +50,15 @@ const form = ref<Record<string, string>>(
   Object.fromEntries(Object.keys(KEY_GROUPS).map(k => [k, ''])),
 )
 const logoUrl = ref<string | null>(null)
+const coverImageUrl = ref<string | null>(null)
 const successMessage = ref('')
 const errorMessage = ref('')
+
+interface ServiceItem { title: string; description: string; icon: string }
+const services = ref<ServiceItem[]>([])
+
+const addService = () => services.value.push({ title: '', description: '', icon: '' })
+const removeService = (i: number) => services.value.splice(i, 1)
 
 const { data, isLoading } = useQuery({
   queryKey: ['app-settings'],
@@ -58,6 +72,12 @@ watch(data, (d: any) => {
       form.value[s.key] = s.value ?? ''
     if (s.key === 'union_logo' && s.value)
       logoUrl.value = `${import.meta.env.VITE_API_BASE_URL || ''}/storage/${s.value}`
+    if (s.key === 'union_cover_image' && s.value)
+      coverImageUrl.value = `${import.meta.env.VITE_API_BASE_URL || ''}/storage/${s.value}`
+    if (s.key === 'union_services' && s.value) {
+      try { services.value = JSON.parse(s.value) }
+      catch { services.value = [] }
+    }
   }
 }, { immediate: true })
 
@@ -68,6 +88,8 @@ const saveMutation = useMutation({
       value,
       group: KEY_GROUPS[key],
     }))
+
+    settings.push({ key: 'union_services', value: JSON.stringify(services.value), group: 'about' })
 
     return (await api.put('/api/v1/dashboard/settings', { settings })).data
   },
@@ -99,6 +121,26 @@ const logoMutation = useMutation({
   },
   onError: (e: any) => {
     errorMessage.value = e?.response?.data?.message || 'فشل رفع الشعار.'
+  },
+})
+
+// ─── رفع صورة الغلاف (شاشة "عن الاتحاد" بالتطبيق) ───
+const coverImageFile = ref<File[]>([])
+const coverImageMutation = useMutation({
+  mutationFn: async () => {
+    const fd = new FormData()
+    fd.append('cover_image', coverImageFile.value[0])
+
+    return (await api.post('/api/v1/dashboard/settings/cover-image', fd)).data
+  },
+  onSuccess: (d: any) => {
+    coverImageUrl.value = d?.items?.cover_image_url ?? coverImageUrl.value
+    coverImageFile.value = []
+    successMessage.value = 'تم رفع صورة الغلاف بنجاح.'
+    setTimeout(() => successMessage.value = '', 4000)
+  },
+  onError: (e: any) => {
+    errorMessage.value = e?.response?.data?.message || 'فشل رفع صورة الغلاف.'
   },
 })
 </script>
@@ -152,7 +194,30 @@ const logoMutation = useMutation({
               رفع الشعار
             </VBtn>
           </VCol>
-          <VCol cols="12" md="9">
+          <VCol cols="12" md="3" class="text-center">
+            <VAvatar :size="120" rounded="lg" color="secondary" variant="tonal" class="mb-3">
+              <VImg v-if="coverImageUrl" :src="coverImageUrl" />
+              <VIcon v-else icon="tabler-photo" size="48" />
+            </VAvatar>
+            <VFileInput
+              v-model="coverImageFile"
+              label="صورة الغلاف (شاشة عن الاتحاد بالتطبيق)"
+              accept="image/*"
+              density="compact"
+              prepend-icon="tabler-upload"
+            />
+            <VBtn
+              size="small"
+              color="primary"
+              variant="tonal"
+              :disabled="!coverImageFile.length"
+              :loading="coverImageMutation.isPending.value"
+              @click="coverImageMutation.mutate()"
+            >
+              رفع صورة الغلاف
+            </VBtn>
+          </VCol>
+          <VCol cols="12" md="6">
             <VRow>
               <VCol cols="12" md="6">
                 <VTextField v-model="form.union_name" label="اسم الاتحاد (عربي)" dir="rtl" />
@@ -178,6 +243,67 @@ const logoMutation = useMutation({
             </VRow>
           </VCol>
         </VRow>
+      </VCardText>
+    </VCard>
+
+    <!-- ─── شاشة "عن الاتحاد" بالتطبيق (موبايل): رؤية/رسالة/إحصائيات/خدمات ─── -->
+    <VCard class="mb-6">
+      <VCardTitle class="d-flex align-center gap-2 pt-4">
+        <VIcon icon="tabler-device-mobile" color="primary" />
+        <span>شاشة "عن الاتحاد" بالتطبيق</span>
+      </VCardTitle>
+      <VCardText>
+        <VRow>
+          <VCol cols="12" md="6">
+            <VTextField v-model="form.union_badge_label" label="نص الشارة (مثال: الجهة الرسمية المعتمدة)" dir="rtl" />
+          </VCol>
+          <VCol cols="12" md="6">
+            <VTextField v-model="form.union_official_label" label="تسمية الحالة الرسمية (مثال: معتمدة)" dir="rtl" />
+          </VCol>
+          <VCol cols="12">
+            <VTextarea v-model="form.union_vision" label="رؤيتنا" rows="3" dir="rtl" />
+          </VCol>
+          <VCol cols="12">
+            <VTextarea v-model="form.union_mission" label="رسالتنا" rows="3" dir="rtl" />
+          </VCol>
+          <VCol cols="12" md="4">
+            <VTextField v-model="form.union_members_count" label="عدد الأعضاء (مثال: 1500+)" dir="ltr" />
+          </VCol>
+          <VCol cols="12" md="4">
+            <VTextField v-model="form.union_founding_year" label="سنة التأسيس" type="number" dir="ltr" />
+          </VCol>
+          <VCol cols="12" md="4">
+            <VTextField v-model="form.union_branches_count" label="عدد الفروع" type="number" dir="ltr" />
+          </VCol>
+        </VRow>
+
+        <VDivider class="my-4" />
+
+        <div class="d-flex justify-space-between align-center mb-3">
+          <span class="text-subtitle-1 font-weight-medium">الخدمات الرئيسية</span>
+          <VBtn size="small" variant="tonal" prepend-icon="tabler-plus" @click="addService">
+            إضافة خدمة
+          </VBtn>
+        </div>
+
+        <VRow v-for="(svc, i) in services" :key="i" class="mb-1" align="center">
+          <VCol cols="12" md="3">
+            <VTextField v-model="svc.title" label="عنوان الخدمة" density="compact" dir="rtl" />
+          </VCol>
+          <VCol cols="12" md="5">
+            <VTextField v-model="svc.description" label="وصف الخدمة" density="compact" dir="rtl" />
+          </VCol>
+          <VCol cols="12" md="3">
+            <VTextField v-model="svc.icon" label="أيقونة (اختياري)" density="compact" dir="ltr" />
+          </VCol>
+          <VCol cols="12" md="1" class="text-center">
+            <VBtn icon="tabler-trash" size="small" variant="text" color="error" @click="removeService(i)" />
+          </VCol>
+        </VRow>
+
+        <p v-if="!services.length" class="text-body-2 text-medium-emphasis">
+          لا توجد خدمات مضافة بعد.
+        </p>
       </VCardText>
     </VCard>
 

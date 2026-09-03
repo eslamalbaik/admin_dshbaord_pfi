@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\CertificateRequest;
+use App\Notifications\Channels\SmsChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -10,7 +11,8 @@ use Illuminate\Notifications\Notification;
 
 /**
  * إشعار للمقاول عند تغيّر حالة طلب الشهادة (موافقة / إصدار / رفض)
- * — عبر البريد الإلكتروني وإشعار داخل التطبيق.
+ * — عبر البريد الإلكتروني وإشعار داخل التطبيق، + SMS عند الإصدار تحديداً
+ * (REQ: "الشهادة جاهزة" يستاهل sms، الموافقة/الرفض تبقى بريد+داخل التطبيق بس).
  */
 class CertificateRequestStatusNotification extends Notification implements ShouldQueue
 {
@@ -22,7 +24,22 @@ class CertificateRequestStatusNotification extends Notification implements Shoul
 
     public function via(object $notifiable): array
     {
-        return $notifiable->email ? ['database', 'mail'] : ['database'];
+        $channels = ['database'];
+
+        if (! empty($notifiable->email)) {
+            $channels[] = 'mail';
+        }
+
+        if ($this->certificateRequest->status === 'issued' && ! empty($notifiable->phone)) {
+            $channels[] = SmsChannel::class;
+        }
+
+        return $channels;
+    }
+
+    public function toSms(object $notifiable): string
+    {
+        return "اتحاد المقاولين: تم إصدار شهادتك ({$this->certificateRequest->type_label}) — حمّلها من التطبيق.";
     }
 
     private function statusMessage(): string

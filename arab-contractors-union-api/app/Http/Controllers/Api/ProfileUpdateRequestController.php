@@ -11,13 +11,12 @@ use App\Notifications\ProfileUpdateRequestSubmittedNotification;
 use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 
 /**
  * طلبات تعديل بيانات البروفايل الثانوية (REQ-26) — لا كتابة مباشرة على contractors
- * إلا بعد موافقة الإدارة. تغيير الجوال يشترط تحقق OTP أولاً (2FA) بنفس نمط OTP
+ * إلا بعد موافقة الإدارة. تغيير الجوال له مسار مستقل فوري (ContractorAuthController)
  * التسجيل الموجود بـContractorRegisterController (Cache + mt_rand، بلا مزوّد SMS فعلي بعد).
  */
 class ProfileUpdateRequestController extends Controller
@@ -57,36 +56,6 @@ class ProfileUpdateRequestController extends Controller
     }
 
     /**
-     * POST /api/v1/contractor/profile-update-requests/send-phone-otp
-     * يُستدعى قبل submit عند تضمّن الطلب تغيير رقم الجوال.
-     */
-    public function sendPhoneOtp(Request $request)
-    {
-        $contractor = $request->user();
-        $data = $request->validate(['phone' => 'required|string|max:20']);
-
-        $cooldownKey = 'profile_phone_otp_cooldown_' . $contractor->id;
-        if (Cache::has($cooldownKey)) {
-            return $this->error('يرجى الانتظار قبل طلب رمز جديد.', 429, null, 'otp_cooldown');
-        }
-
-        $otp = mt_rand(100000, 999999);
-        Cache::put('profile_phone_otp_' . $contractor->id, ['otp' => $otp, 'phone' => $data['phone']], now()->addMinutes(10));
-        Cache::put($cooldownKey, true, now()->addSeconds(35));
-
-        app(\App\Services\Sms\SmsSenderInterface::class)->send(
-            $data['phone'],
-            "رمز تأكيد تغيير رقم الجوال في اتحاد المقاولين الفلسطينيين: {$otp}. صالح لمدة 10 دقائق."
-        );
-
-        return $this->success(
-            // otp_preview للتجربة فقط، يظهر فقط بوضع log — يختفي تلقائياً عند SMS_DRIVER=hotsms
-            config('services.sms.driver', 'log') === 'log' ? ['otp_preview' => $otp] : [],
-            'تم إرسال رمز التحقق إلى الرقم الجديد.',
-        );
-    }
-
-    /**
      * POST /api/v1/contractor/profile-update-requests
      * الحقول المسموح تعديلها فقط (ProfileUpdateRequest::ALLOWED_FIELDS) — الاسم/رقم
      * العضوية/رقم المشتغل مقفلة تماماً ولا تُقبل هنا إطلاقاً.
@@ -103,10 +72,8 @@ class ProfileUpdateRequestController extends Controller
         $data = $request->validate([
             'authorized_person'       => 'sometimes|string|max:255',
             'authorized_person_title' => 'sometimes|nullable|string|max:255',
-            'phone'                   => 'sometimes|string|max:20',
             'email'                   => 'sometimes|nullable|email|max:255',
             'address'                 => 'sometimes|string|max:500',
-            'otp'                     => 'required_with:phone|string|size:6',
             'attachment'              => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240',
         ]);
 
@@ -117,23 +84,12 @@ class ProfileUpdateRequestController extends Controller
             return $this->error('لم يتم تحديد أي بيانات للتعديل.', 422);
         }
 
-        $phoneOtpVerifiedAt = null;
-        if (isset($proposedData['phone'])) {
-            $cached = Cache::get('profile_phone_otp_' . $contractor->id);
-            if (! $cached || (string) $cached['otp'] !== (string) $data['otp'] || $cached['phone'] !== $proposedData['phone']) {
-                return $this->error('رمز التحقق غير صحيح أو انتهت صلاحيته.', 422, null, 'invalid_otp');
-            }
-            Cache::forget('profile_phone_otp_' . $contractor->id);
-            $phoneOtpVerifiedAt = now();
-        }
-
         $attachmentPath = $request->file('attachment')->store('contractors/profile-update', 'public');
 
         $profileRequest = $contractor->profileUpdateRequests()->create([
-            'proposed_data'         => $proposedData,
-            'attachment'            => $attachmentPath,
-            'phone_otp_verified_at' => $phoneOtpVerifiedAt,
-            'status'                => 'pending',
+            'proposed_data' => $proposedData,
+            'attachment'    => $attachmentPath,
+            'status'        => 'pending',
         ]);
 
         $admins = User::where('role', 'admin')->get();

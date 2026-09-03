@@ -16,6 +16,16 @@ const deleteDialog = ref(false)
 const deleteTarget = ref<any>(null)
 const deleteLoading = ref(false)
 
+// ── Snackbar (feedback) ───────────────────────────
+const snackbar = ref(false)
+const snackbarText = ref('')
+const snackbarColor = ref('success')
+const notify = (text: string, color: 'success' | 'error' = 'success') => {
+  snackbarText.value = text
+  snackbarColor.value = color
+  snackbar.value = true
+}
+
 const detailsDialog = ref(false)
 const detailsTarget = ref<any>(null)
 
@@ -88,10 +98,15 @@ const confirmDelete = async () => {
   try {
     await api.delete(`/api/v1/contractors/${deleteTarget.value.id}`)
     deleteDialog.value = false
+    notify('تم حذف المقاول بنجاح.')
+    // لو كان آخر عنصر بالصفحة الحالية، ارجع صفحة للخلف بدل ما تعرض صفحة فاضية
+    if (contractors.value.length === 1 && page.value > 1)
+      page.value -= 1
     fetchContractors()
   }
-  catch (err) {
+  catch (err: any) {
     console.error(err)
+    notify(err?.response?.data?.message ?? 'تعذّر حذف المقاول.', 'error')
   }
   finally {
     deleteLoading.value = false
@@ -390,5 +405,19 @@ const getSpecialtiesList = (contractor: any) => {
         </VCardActions>
       </VCard>
     </VDialog>
+
+    <!-- Feedback Snackbar -->
+    <VSnackbar
+      v-model="snackbar"
+      :timeout="3500"
+      :color="snackbarColor"
+      location="bottom end"
+      variant="elevated"
+    >
+      <span style="font-family:Cairo,sans-serif">{{ snackbarText }}</span>
+      <template #actions>
+        <VBtn variant="text" size="small" @click="snackbar = false">إغلاق</VBtn>
+      </template>
+    </VSnackbar>
   </div>
 </template>

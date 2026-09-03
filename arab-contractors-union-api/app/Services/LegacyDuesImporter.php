@@ -142,7 +142,7 @@ class LegacyDuesImporter
             $created = 0;
             foreach ($matched as $company) {
                 foreach ($company['dues'] as $due) {
-                    ContractorDue::create([
+                    $contractorDue = ContractorDue::create([
                         'contractor_id' => $company['contractor_id'],
                         'year'          => $due['year'],
                         'period'        => $company['last_session_number'],
@@ -153,6 +153,7 @@ class LegacyDuesImporter
                         'notes'         => $company['notes'],
                         'created_by'    => $userId,
                     ]);
+                    $contractorDue->update(['reference_number' => ContractorDue::generateReferenceNumber($contractorDue)]);
                     $created++;
                 }
             }

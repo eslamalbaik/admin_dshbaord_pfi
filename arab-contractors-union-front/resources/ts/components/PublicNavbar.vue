@@ -41,6 +41,7 @@ const navLinks = [
     ],
   },
   { label: 'الأخبار',           href: '/landing/news' },
+  { label: 'الفعاليات',         href: '/landing/events' },
   { label: 'المشاريع والمعارض', href: '/landing/projects' },
   { label: 'التدريب',           href: '/landing/training-center' },
   { label: 'التشريعات',         href: '/landing/legislation' },

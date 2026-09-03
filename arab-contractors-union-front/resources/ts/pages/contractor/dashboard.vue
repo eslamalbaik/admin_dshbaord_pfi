@@ -61,6 +61,19 @@ interface Stats {
   total_equipment: number; certificate_requests: number; open_tickets: number;
 }
 
+interface AccountStatusBanner {
+  type: string; severity: 'error' | 'warning' | 'success'
+  message: string; cta: string | null; cta_label: string | null
+}
+interface AccountStatus {
+  banner: AccountStatusBanner | null
+  membership: { badge: string; expires_at: string | null }
+  dues: { has_pending: boolean; outstanding_amount: number; badge: string | null }
+  certificates: { locked: boolean; lock_reason: string | null }
+  equipment_subscription: { active: boolean; badge: string; expires_at: string | null }
+}
+const accountStatus = ref<AccountStatus | null>(null)
+
 const contractor  = ref<Contractor | null>(null)
 const membership  = ref<Membership | null>(null)
 const memberships = ref<Membership[]>([])
@@ -123,6 +136,16 @@ interface DueRow {
 }
 const dues = ref<DueRow[]>([])
 const outstandingDues = ref(0)
+const duesTotalJod = ref(0)
+const duesPaidJod = ref(0)
+const duesPaidPercentage = ref(0)
+const duesCounts = ref({ unpaid: 0, pending_review: 0 })
+
+interface PendingDuesPayment {
+  id: number; description: string; amount: string; currency: string
+  reference_number: string | null; receipt_image_url: string | null; submitted_at: string | null
+}
+const pendingDuesPayments = ref<PendingDuesPayment[]>([])
 
 interface Obligation {
   date: string | null; description: string; type: 'payment' | 'penalty' | 'due'
@@ -136,9 +159,15 @@ const obligationTypeLabel: Record<string, string> = {
 async function fetchFinancial() {
   try {
     const r = await axios.get(`${BASE}/api/v1/contractor/financial`, { headers: apiHeaders() })
-    dues.value = r.data.items?.dues ?? []
-    outstandingDues.value = Number(r.data.items?.summary?.outstanding_dues_jod ?? 0)
-    obligations.value = r.data.items?.obligations ?? []
+    const items = r.data.items
+    dues.value = items?.dues ?? []
+    outstandingDues.value = Number(items?.summary?.outstanding_dues_jod ?? 0)
+    obligations.value = items?.obligations ?? []
+    duesTotalJod.value = Number(items?.summary?.dues_total_jod ?? 0)
+    duesPaidJod.value = Number(items?.summary?.dues_paid_jod ?? 0)
+    duesPaidPercentage.value = Number(items?.summary?.dues_paid_percentage ?? 0)
+    duesCounts.value = items?.dues_counts ?? { unpaid: 0, pending_review: 0 }
+    pendingDuesPayments.value = items?.pending_dues_payments ?? []
   } catch {}
 }
 
@@ -237,6 +266,7 @@ async function fetchProfile() {
       governorate: items.governorate, city: items.city,
     }
     docFields.forEach(f => { fileUrls.value[f.key] = items[`${f.key}_url`] ?? null })
+    accountStatus.value = items.account_status ?? null
     profileDataComplete.value = items.profile_data_complete ?? true
     missingProfileFields.value = items.missing_profile_fields ?? []
     logoUrl.value = items.logo_url ?? null
@@ -631,8 +661,16 @@ function downloadDoc(url: string, title: string) {
           </div>
         </div>
 
-        <!-- تنبيه ذمم مالية مستحقة -->
-        <div v-if="outstandingDues > 0" class="dues-warning-banner">
+        <!-- بانر حالة الحساب (عضوية منتهية / ذمم مستحقة / عضوية سارية) — بأولوية محسوبة من الباك اند -->
+        <div v-if="accountStatus?.banner" class="account-status-banner" :class="`severity-${accountStatus.banner.severity}`">
+          <AlertCircle :size="18" />
+          <div>
+            <strong>{{ accountStatus.banner.message }}</strong>
+            <p v-if="accountStatus.certificates.locked">{{ accountStatus.certificates.lock_reason }}</p>
+          </div>
+        </div>
+        <!-- تنبيه ذمم مالية مستحقة (احتياطي — يظهر بس لو ما وصل account_status لأي سبب) -->
+        <div v-else-if="outstandingDues > 0" class="dues-warning-banner">
           <AlertCircle :size="18" />
           <div>
             <strong>لديك ذمم مالية مستحقة بقيمة {{ outstandingDues }} د.أ</strong>
@@ -1039,6 +1077,51 @@ function downloadDoc(url: string, title: string) {
               <h2>المعاملات المالية</h2>
             </div>
 
+            <!-- ملخص الذمم: الرصيد المستحق / المدفوع / إجمالي الرسوم + نسبة السداد -->
+            <div v-if="duesTotalJod > 0" class="dues-summary-card">
+              <div class="dsc-row">
+                <div class="dsc-item">
+                  <span class="dsc-label">الرصيد المستحق</span>
+                  <span class="dsc-val danger">{{ outstandingDues.toLocaleString('ar-PS') }} د.أ</span>
+                </div>
+                <div class="dsc-item">
+                  <span class="dsc-label">المدفوع</span>
+                  <span class="dsc-val success">{{ duesPaidJod.toLocaleString('ar-PS') }} د.أ</span>
+                </div>
+                <div class="dsc-item">
+                  <span class="dsc-label">إجمالي الرسوم</span>
+                  <span class="dsc-val">{{ duesTotalJod.toLocaleString('ar-PS') }} د.أ</span>
+                </div>
+              </div>
+              <div class="dsc-progress-track">
+                <div class="dsc-progress-fill" :style="{ width: duesPaidPercentage + '%' }" />
+              </div>
+              <div class="dsc-badges">
+                <span v-if="duesCounts.unpaid" class="md-badge badge-red">{{ duesCounts.unpaid }} غير مدفوع</span>
+                <span v-if="duesCounts.pending_review" class="md-badge badge-yellow">{{ duesCounts.pending_review }} قيد المراجعة</span>
+              </div>
+            </div>
+
+            <!-- تحويلات قيد المراجعة (بانتظار اعتماد المحاسبة) -->
+            <template v-if="pendingDuesPayments.length">
+              <div class="page-title-area obligations-title">
+                <h3>قيد المراجعة</h3>
+              </div>
+              <div class="obligations-list">
+                <div v-for="p in pendingDuesPayments" :key="p.id" class="obligation-row">
+                  <div class="obligation-info">
+                    <span class="obligation-type-badge obligation-due">بانتظار الاعتماد</span>
+                    <span class="obligation-desc">{{ p.description }}</span>
+                  </div>
+                  <div class="obligation-meta">
+                    <span class="obligation-date">{{ p.reference_number ?? '—' }}</span>
+                    <span class="obligation-amount">{{ p.amount }} {{ p.currency }}</span>
+                    <a v-if="p.receipt_image_url" :href="p.receipt_image_url" target="_blank" class="md-link">معاينة الإشعار</a>
+                  </div>
+                </div>
+              </div>
+            </template>
+
             <!-- الالتزامات المستحقة: غرامات + ذمم سابقة + دفعات معلّقة -->
             <template v-if="obligations.length">
               <div class="page-title-area obligations-title">
@@ -1280,6 +1363,18 @@ function downloadDoc(url: string, title: string) {
 .pr-camera-progress { font-size: 0.55rem; font-weight: 800; }
 .pr-logo-err { font-size: 0.78rem; color: #dc2626; font-weight: 600; margin-top: 0.4rem; }
 
+/* ─── Account Status Banner (severity من الباك اند) ─── */
+.account-status-banner {
+  display: flex; gap: 0.85rem; align-items: flex-start;
+  border-radius: 14px; padding: 1.1rem 1.25rem; margin-bottom: 1.5rem;
+  border: 1px solid;
+}
+.account-status-banner strong { display: block; font-size: 0.95rem; margin-bottom: 0.25rem; }
+.account-status-banner p { font-size: 0.85rem; margin: 0; }
+.account-status-banner.severity-error   { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+.account-status-banner.severity-warning { background: #fff7ed; border-color: #fed7aa; color: #c2410c; }
+.account-status-banner.severity-success { background: #f0fdf4; border-color: #bbf7d0; color: #15803d; }
+
 /* ─── Dues Warning Banner ─── */
 .dues-warning-banner {
   display: flex; gap: 0.85rem; align-items: flex-start;
@@ -1402,6 +1497,21 @@ textarea.md-fi { resize: vertical; }
 
 .docs-title { margin-top: 2.5rem; }
 .docs-hint { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem; }
+
+/* ─── Dues Summary Card ─── */
+.dues-summary-card {
+  background: linear-gradient(135deg, #1e3a8a, #1e40af); color: #fff;
+  border-radius: 16px; padding: 1.25rem 1.5rem; margin-bottom: 1.5rem;
+}
+.dsc-row { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.dsc-item { display: flex; flex-direction: column; gap: 0.2rem; }
+.dsc-label { font-size: 0.78rem; opacity: 0.8; }
+.dsc-val { font-size: 1.1rem; font-weight: 800; }
+.dsc-val.danger { color: #fca5a5; }
+.dsc-val.success { color: #86efac; }
+.dsc-progress-track { height: 6px; background: rgba(255,255,255,0.2); border-radius: 999px; overflow: hidden; margin-bottom: 0.85rem; }
+.dsc-progress-fill { height: 100%; background: #fff; border-radius: 999px; transition: width 0.3s; }
+.dsc-badges { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
 /* ─── Financial Obligations ─── */
 .obligations-title h3 { font-weight: 800; font-size: 1.05rem; color: var(--text-dark); }

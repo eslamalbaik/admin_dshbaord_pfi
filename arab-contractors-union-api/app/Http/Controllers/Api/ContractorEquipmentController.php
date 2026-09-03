@@ -8,6 +8,8 @@ use App\Models\Equipment;
 use App\Models\EquipmentImage;
 use App\Models\EquipmentPackage;
 use App\Models\EquipmentReport;
+use App\Models\EquipmentType;
+use App\Models\Governorate;
 use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -25,17 +27,24 @@ class ContractorEquipmentController extends Controller
         return [
             'id'                => $e->id,
             'contractor_id'     => $e->contractor_id,
+            // بطاقة "المالك/المقاول" بشاشة تفاصيل الألية — زر تواصل واتساب مباشر (owner_phone)
+            'contractor_name'   => $e->contractor?->name,
             'type'              => $e->type?->only(['id', 'name_ar', 'icon']),
             'name'              => $e->name,
+            'brand'             => $e->brand,
             'description'       => $e->description,
             'manufacture_year'  => $e->manufacture_year,
             'power'             => $e->power,
             'condition'         => $e->condition,
+            'contract_type'     => $e->contract_type,
             'governorate'       => $e->governorate,
             'city'              => $e->city,
             'daily_price'       => $e->daily_price,
             'owner_phone'       => $e->owner_phone,
             'status'            => $e->status,
+            'is_featured'       => (bool) $e->is_featured,
+            'needs_maintenance' => (bool) $e->needs_maintenance,
+            'is_new'            => $e->is_new,
             'is_hidden'         => (bool) $e->is_hidden,
             'images'            => $e->images->map(fn ($img) => [
                 'id'         => $img->id,
@@ -49,6 +58,40 @@ class ContractorEquipmentController extends Controller
     // ═════════════════════════════════════════════════════════════════════════
     //  "آلياتي" — إدارة إعلانات المقاول الخاصة به
     // ═════════════════════════════════════════════════════════════════════════
+
+    // GET /api/v1/contractor/equipment/form-options
+    // كل خيارات نموذج "إضافة/تعديل آلية" بنداء واحد (REQ: تجميع القوائم المنسدلة)
+    public function formOptions()
+    {
+        return $this->success([
+            'equipment_types' => EquipmentType::where('is_active', true)
+                ->orderBy('name_ar')
+                ->get(['id', 'name_ar', 'name_en', 'icon']),
+            'conditions' => [
+                ['value' => 'excellent', 'label' => 'ممتازة'],
+                ['value' => 'good',      'label' => 'جيدة'],
+                ['value' => 'fair',      'label' => 'بحاجة صيانة'],
+            ],
+            'contract_types' => [
+                ['value' => 'daily',   'label' => 'يومي'],
+                ['value' => 'weekly',  'label' => 'اسبوعي'],
+                ['value' => 'monthly', 'label' => 'شهري'],
+            ],
+            // قائمة ماركات شائعة للاختيار السريع — الحقل نفسه نص حر، "أخرى" يسمح بإدخال أي قيمة
+            'brands' => [
+                'Caterpillar', 'Komatsu', 'Volvo', 'JCB', 'Hitachi',
+                'Liebherr', 'Hyundai', 'Case', 'Bobcat', 'John Deere',
+            ],
+            'governorates' => Governorate::with('cities')
+                ->orderBy('sort')->orderBy('id')
+                ->get()
+                ->map(fn ($g) => [
+                    'id'     => $g->id,
+                    'name'   => $g->name,
+                    'cities' => $g->cities->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])->values(),
+                ])->values(),
+        ]);
+    }
 
     // GET /api/v1/contractor/equipment?hidden=1
     public function index(Request $request)
@@ -84,10 +127,12 @@ class ContractorEquipmentController extends Controller
         $data = $request->validate([
             'equipment_type_id'  => 'required|exists:equipment_types,id',
             'name'               => 'required|string|max:255',
+            'brand'              => 'nullable|string|max:100',
             'description'        => 'nullable|string',
             'manufacture_year'   => 'nullable|integer|min:1970|max:' . date('Y'),
             'power'              => 'nullable|string|max:50',
             'condition'          => 'nullable|in:excellent,good,fair',
+            'contract_type'      => 'required|in:daily,weekly,monthly',
             'governorate'        => 'nullable|string|max:100',
             'city'               => 'nullable|string|max:100',
             'daily_price'        => 'required|numeric|min:0',
@@ -145,15 +190,18 @@ class ContractorEquipmentController extends Controller
 
         $data = $request->validate([
             'name'              => 'sometimes|string|max:255',
+            'brand'             => 'nullable|string|max:100',
             'description'       => 'nullable|string',
             'manufacture_year'  => 'nullable|integer|min:1970|max:' . date('Y'),
             'power'             => 'nullable|string|max:50',
             'condition'         => 'nullable|in:excellent,good,fair',
+            'contract_type'     => 'sometimes|in:daily,weekly,monthly',
             'governorate'       => 'nullable|string|max:100',
             'city'              => 'nullable|string|max:100',
             'daily_price'       => 'sometimes|numeric|min:0',
             'owner_phone'       => 'nullable|string|max:20',
             'is_hidden'         => 'sometimes|boolean',
+            'needs_maintenance' => 'sometimes|boolean',
         ]);
 
         $equipment->update($data);
@@ -196,15 +244,26 @@ class ContractorEquipmentController extends Controller
         if ($request->filled('condition')) {
             $query->where('condition', $request->condition);
         }
+        if ($request->filled('contract_type')) {
+            $query->where('contract_type', $request->contract_type);
+        }
         if ($request->filled('search')) {
             $query->where('name', 'like', '%' . $request->search . '%');
         }
 
-        $paginator = $query->latest()
+        $paginator = $query->orderByDesc('is_featured')->latest()
             ->paginate($request->integer('per_page', 15))
             ->through(fn ($e) => $this->format($e));
 
         return $this->paginated($paginator);
+    }
+
+    // GET /api/v1/contractor/equipment/marketplace/{equipment} — شاشة تفاصيل الألية
+    public function show(Equipment $equipment)
+    {
+        $equipment->load(['type:id,name_ar,icon', 'contractor:id,name,phone', 'images']);
+
+        return $this->success($this->format($equipment));
     }
 
     // POST /api/v1/contractor/equipment/{equipment}/report
@@ -235,20 +294,33 @@ class ContractorEquipmentController extends Controller
     }
 
     // GET /api/v1/contractor/equipment/subscription-status
+    // شاشة "اشتراك الآليات السنوي" — حالة الاشتراك الحالي/المنتهي + تفاصيل الباقة والفاتورة
     public function subscriptionStatus(Request $request)
     {
         $contractor = $request->user();
-        $subscription = $contractor->activeEquipmentSubscription;
+
+        // آخر اشتراك بغض النظر عن انتهائه — عشان نقدر نعرض بطاقة "منتهي في ..." بتفاصيلها
+        // كاملة، مش بس Active. activeEquipmentSubscription (تنتهي=false) يرجع null لو منتهي.
+        $latest    = $contractor->equipmentSubscriptions()->with('package')->latest('expires_at')->first();
+        $isExpired = $latest && $latest->expires_at->isPast();
 
         return $this->success([
-            'has_free_access' => $this->hasFreeTrialAccess(),
-            'free_until'      => Setting::get('equipment_marketplace_free_until'),
-            'has_subscription' => (bool) $subscription,
-            'subscription'    => $subscription ? [
-                'package_name' => $subscription->package?->name,
-                'expires_at'   => $subscription->expires_at,
+            'has_free_access'   => $this->hasFreeTrialAccess(),
+            'free_until'        => Setting::get('equipment_marketplace_free_until'),
+            'has_subscription'  => (bool) $latest && ! $isExpired,
+            'is_expired'        => $isExpired,
+            'can_publish'       => $this->hasActiveMarketplaceAccess($contractor),
+            'subscription'      => $latest ? [
+                'id'                   => $latest->id,
+                'equipment_package_id' => $latest->equipment_package_id,
+                'package_name'         => $latest->package?->name,
+                'price'                => $latest->package?->price,
+                'currency'             => $latest->package?->currency ?? 'JOD',
+                'duration_days'        => $latest->package?->duration_days,
+                'starts_at'            => $latest->starts_at,
+                'expires_at'           => $latest->expires_at,
+                'status'               => $isExpired ? 'expired' : 'active',
             ] : null,
-            'can_publish' => $this->hasActiveMarketplaceAccess($contractor),
         ]);
     }
 
@@ -264,6 +336,6 @@ class ContractorEquipmentController extends Controller
 
     private function hasActiveMarketplaceAccess($contractor): bool
     {
-        return $this->hasFreeTrialAccess() || (bool) $contractor->activeEquipmentSubscription;
+        return $contractor->hasActiveEquipmentMarketplaceAccess();
     }
 }

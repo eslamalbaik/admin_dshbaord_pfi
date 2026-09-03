@@ -95,3 +95,5 @@ public/mockServiceWorker.js
 /resources/templates/*.bak3-*
 /resources/templates/*.broken.bak
 /storage/app/membership_template.docx
+rr
+.rr.yaml

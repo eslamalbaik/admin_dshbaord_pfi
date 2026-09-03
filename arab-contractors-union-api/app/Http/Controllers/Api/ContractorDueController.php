@@ -23,6 +23,7 @@ class ContractorDueController extends Controller
             'membership_number' => $d->contractor?->membership_number,
             'year'              => $d->year,
             'period'            => $d->period,
+            'reference_number'  => $d->reference_number,
             'description'       => $d->description,
             'amount_jod'        => $d->amount_jod,
             'paid_jod'          => $d->paid_jod,
@@ -356,6 +357,7 @@ class ContractorDueController extends Controller
             'source'     => 'manual',
             'created_by' => Auth::id(),
         ]);
+        $due->update(['reference_number' => ContractorDue::generateReferenceNumber($due)]);
 
         $this->financeLog('due.created', [
             'due_id'        => $due->id,

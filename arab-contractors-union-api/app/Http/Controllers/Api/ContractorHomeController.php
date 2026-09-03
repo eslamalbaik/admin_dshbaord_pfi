@@ -9,6 +9,7 @@ use App\Models\AnnouncementAcknowledgement;
 use App\Models\CertificateRequest;
 use App\Models\Contractor;
 use App\Models\ContractorNameChangeRequest;
+use App\Models\Event;
 use App\Models\Membership;
 use App\Models\News;
 use App\Models\Tender;
@@ -150,8 +151,7 @@ class ContractorHomeController extends Controller
     private function statsCard(Contractor $contractor): array
     {
         return [
-            'events_count'         => News::published()
-                ->where('category', 'event')
+            'events_count'         => Event::published()
                 ->where('event_date', '>=', now())
                 ->count(),
             'announcements_count' => Announcement::published()->count(),

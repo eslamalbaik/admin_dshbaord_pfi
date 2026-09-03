@@ -37,6 +37,7 @@ export default [
       { title: 'العطاءات', to: 'tenders' },
       { title: 'جميع الآليات', to: 'marketplace' },
       { title: 'أنواع المعدات', to: 'marketplace-types' },
+      { title: 'باقات الاشتراك', to: 'marketplace-packages' },
     ],
   },
   {
@@ -52,7 +53,9 @@ export default [
     icon: { icon: 'tabler-dots' },
     children: [
       { title: 'إدارة الوثائق', to: 'documents', icon: { icon: 'tabler-folder' } },
-      { title: 'الأخبار والمناسبات', to: 'news', icon: { icon: 'tabler-news' } },
+      { title: 'الدعم الفني والشكاوى', to: 'support-tickets', icon: { icon: 'tabler-headset' } },
+      { title: 'الأخبار', to: 'news', icon: { icon: 'tabler-news' } },
+      { title: 'الفعاليات', to: 'events', icon: { icon: 'tabler-calendar-event' } },
       { title: 'التقارير', to: 'analytics', icon: { icon: 'tabler-chart-bar' } },
       { title: 'الإشعارات', to: 'notifications', icon: { icon: 'tabler-bell' } },
       { title: 'الإعدادات', to: 'settings', icon: { icon: 'tabler-settings' } },

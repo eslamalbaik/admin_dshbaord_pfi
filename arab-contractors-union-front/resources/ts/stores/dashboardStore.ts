@@ -28,7 +28,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
     try {
       const response = await api.get('/api/v1/dashboard/stats')
-      const data = response?.data || {}
+      const data = response?.data?.items || {}
 
       stats.value = data?.stats || {
         total_contractors: 0,

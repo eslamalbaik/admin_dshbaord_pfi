@@ -76,6 +76,7 @@ if (!isAccountant) {
       { title: 'جميع الآليات', to: 'marketplace' },
       { title: 'إضافة آلية', to: 'marketplace-create' },
       { title: 'أنواع المعدات', to: 'marketplace-types' },
+      { title: 'باقات الاشتراك', to: 'marketplace-packages' },
     ],
   })
 
@@ -91,6 +92,11 @@ if (!isAccountant) {
 if (!isAccountant) {
   menuItems.push({ heading: 'خدمات الأعضاء' })
   menuItems.push({
+    title: 'الدعم الفني والشكاوى',
+    icon: { icon: 'tabler-headset' },
+    to: 'support-tickets',
+  })
+  menuItems.push({
     title: 'الشهادات',
     icon: { icon: 'tabler-certificate' },
     children: [
@@ -99,9 +105,14 @@ if (!isAccountant) {
     ],
   })
   menuItems.push({
-    title: 'الأخبار والمناسبات',
+    title: 'الأخبار',
     icon: { icon: 'tabler-news' },
     to: 'news',
+  })
+  menuItems.push({
+    title: 'الفعاليات',
+    icon: { icon: 'tabler-calendar-event' },
+    to: 'events',
   })
 }
 

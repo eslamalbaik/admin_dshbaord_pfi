@@ -22,6 +22,7 @@ class PaymentController extends Controller
     {
         return [
             'id'                => $p->id,
+            'transaction_number' => $p->transaction_number,
             'contractor'        => $p->contractor?->name,
             'contractor_id'     => $p->contractor_id,
             'membership_id'     => $p->membership_id,
@@ -34,6 +35,7 @@ class PaymentController extends Controller
             'rate_source'       => $p->rate_source,
             'type'              => $p->type,
             'status'            => $p->status,
+            'status_label'      => $p->status_label,
             'method'            => $p->method,
             'reference_number'  => $p->reference_number,
             'receipt_image_url' => $p->receipt_image_url,
@@ -103,6 +105,7 @@ class PaymentController extends Controller
             'notes'            => $data['notes'] ?? null,
             'submitted_at'     => now(),
         ]);
+        $payment->update(['transaction_number' => Payment::generateTransactionNumber($payment)]);
 
         // إشعار موظفي المحاسبة والإدارة بوجود إشعار تحويل بانتظار المراجعة
         $reviewers = User::whereIn('role', ['accountant', 'admin'])->get();
@@ -110,9 +113,10 @@ class PaymentController extends Controller
             Notification::send($reviewers, new PaymentSubmittedNotification($payment));
         }
 
+        // نص شاشة "تم الإرسال" (عنوان ثابت بالتطبيق + هالنص من الـ response) — REQ: نص الرسالة يرجع بالـ API
         return $this->success(
             $this->format($payment->load('contractor')),
-            'تم إرسال إشعار التحويل بنجاح، وسيتم مراجعته من قِبل المحاسبة.',
+            'سيقوم المحاسب بتقديم الاعتماد وتحديث حالة حسابك فور التحقق من الحوالة.',
             201,
         );
     }
@@ -146,16 +150,38 @@ class PaymentController extends Controller
     /**
      * GET /api/v1/contractor/payments/transfer
      * قائمة تحويلات المقاول الحالي.
+     * ?status=paid&type=dues_payment — تبويب "مكتمل" بشاشة الذمم المالية (تحويلات ذمم مؤكَّدة فقط).
      */
     public function myTransfers(Request $request)
     {
-        $paginator = $request->user()->payments()
-            ->with('contractor:id,name')
-            ->latest()
+        $query = $request->user()->payments()->with('contractor:id,name');
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('type')) {
+            $query->where('type', $request->type);
+        }
+
+        $paginator = $query->latest()
             ->paginate($request->integer('per_page', 15))
             ->through(fn ($p) => $this->format($p));
 
         return $this->paginated($paginator);
+    }
+
+    /**
+     * GET /api/v1/contractor/payments/{payment}
+     * شاشة "معاينة اشعار التحويل" — تفاصيل تحويل واحد (المرجع، المبلغ، صورة الإشعار، الحالة).
+     */
+    public function show(Request $request, Payment $payment)
+    {
+        if ($payment->contractor_id !== $request->user()->id) {
+            return $this->error('غير مصرَّح لك بالوصول لهذا الإشعار.', 403);
+        }
+
+        return $this->success($this->format($payment->load('contractor:id,name')));
     }
 
     // ═════════════════════════════════════════════════════════════════════════

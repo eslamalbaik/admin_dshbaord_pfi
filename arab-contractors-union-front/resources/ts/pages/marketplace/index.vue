@@ -17,6 +17,7 @@ const search   = ref('')
 const filterType   = ref('')
 const filterStatus = ref('')
 const filterGov    = ref('')
+const filterContractType = ref('')
 
 // ─── Dialogs ────────────────────────────────────────────────────────────────
 const editDialog    = ref(false)
@@ -28,9 +29,9 @@ const saving        = ref(false)
 const deleting      = ref(false)
 
 const editForm = ref({
-  name: '', description: '', manufacture_year: null as number | null,
-  power: '', condition: 'good', governorate: '', city: '',
-  daily_price: 0, owner_phone: '', status: 'visible', admin_notes: '',
+  name: '', brand: '', description: '', manufacture_year: null as number | null,
+  power: '', condition: 'good', contract_type: 'daily', governorate: '', city: '',
+  daily_price: 0, owner_phone: '', status: 'visible', is_featured: false, needs_maintenance: false, admin_notes: '',
 })
 
 // image management
@@ -70,6 +71,17 @@ const conditionMeta: Record<string, { color: string; label: string }> = {
   fair:      { color: 'warning', label: 'مقبولة' },
 }
 
+const contractTypeOptions = [
+  { title: 'الكل', value: '' },
+  { title: 'يومي', value: 'daily' },
+  { title: 'أسبوعي', value: 'weekly' },
+  { title: 'شهري', value: 'monthly' },
+]
+
+const contractTypeLabel: Record<string, string> = {
+  daily: 'يومي', weekly: 'أسبوعي', monthly: 'شهري',
+}
+
 const governorates = [
   'غزة', 'شمال غزة', 'خانيونس', 'رفح', 'الوسطى',
   'رام الله والبيرة', 'نابلس', 'جنين', 'طولكرم',
@@ -85,6 +97,7 @@ const fetchEquipment = async () => {
     if (filterType.value)   params.type_id     = filterType.value
     if (filterStatus.value) params.status      = filterStatus.value
     if (filterGov.value)    params.governorate = filterGov.value
+    if (filterContractType.value) params.contract_type = filterContractType.value
 
     const { data } = await api.get('/api/v1/equipment', { params })
     equipment.value = data.data
@@ -112,7 +125,7 @@ onMounted(() => {
 })
 
 // reset page on filter change
-watch([search, filterType, filterStatus, filterGov], () => {
+watch([search, filterType, filterStatus, filterGov, filterContractType], () => {
   page.value = 1
   fetchEquipment()
 })
@@ -124,15 +137,19 @@ const openEdit = (item: any) => {
   selectedItem.value = item
   editForm.value = {
     name:             item.name,
+    brand:            item.brand ?? '',
     description:      item.description ?? '',
     manufacture_year: item.manufacture_year ?? null,
     power:            item.power ?? '',
     condition:        item.condition ?? 'good',
+    contract_type:    item.contract_type ?? 'daily',
     governorate:      item.governorate ?? '',
     city:             item.city ?? '',
     daily_price:      Number(item.daily_price),
     owner_phone:      item.owner_phone ?? '',
     status:           item.status ?? 'visible',
+    is_featured:      !!item.is_featured,
+    needs_maintenance: !!item.needs_maintenance,
     admin_notes:      item.admin_notes ?? '',
   }
   editDialog.value = true
@@ -350,6 +367,16 @@ const reasonLabel: Record<string, string> = {
               :placeholder="'الكل'"
             />
           </VCol>
+          <VCol cols="12" md="2">
+            <VSelect
+              v-model="filterContractType"
+              :items="contractTypeOptions"
+              label="نوع العقد"
+              variant="outlined"
+              density="compact"
+              style="font-family:Cairo,sans-serif"
+            />
+          </VCol>
         </VRow>
       </VCardText>
     </VCard>
@@ -388,10 +415,19 @@ const reasonLabel: Record<string, string> = {
                   <VIcon v-if="!item.primary_image" icon="tabler-tractor" size="20" />
                 </VAvatar>
                 <div>
-                  <div class="font-weight-semibold" style="font-family:Cairo,sans-serif">{{ item.name }}</div>
+                  <div class="font-weight-semibold d-flex align-center gap-1" style="font-family:Cairo,sans-serif">
+                    {{ item.name }}
+                    <VIcon v-if="item.is_featured" icon="tabler-star-filled" size="14" color="warning">
+                      <VTooltip activator="parent">آلية مميزة</VTooltip>
+                    </VIcon>
+                    <VIcon v-if="item.needs_maintenance" icon="tabler-tool" size="14" color="error">
+                      <VTooltip activator="parent">بحاجة صيانة</VTooltip>
+                    </VIcon>
+                  </div>
                   <div class="text-caption text-medium-emphasis" style="font-family:Cairo,sans-serif">
                     {{ item.manufacture_year ? `سنة ${item.manufacture_year}` : '' }}
                     {{ item.power ? `· ${item.power}` : '' }}
+                    {{ item.contract_type ? `· ${contractTypeLabel[item.contract_type] ?? item.contract_type}` : '' }}
                   </div>
                 </div>
               </div>
@@ -473,16 +509,29 @@ const reasonLabel: Record<string, string> = {
               <VTextField v-model="editForm.name" label="اسم الآلية" variant="outlined" density="compact" style="font-family:Cairo,sans-serif" />
             </VCol>
             <VCol cols="12" md="6">
+              <VTextField v-model="editForm.brand" label="الماركة" variant="outlined" density="compact" style="font-family:Cairo,sans-serif" />
+            </VCol>
+            <VCol cols="12" md="6">
               <VTextField v-model="editForm.owner_phone" label="هاتف المالك" variant="outlined" density="compact" style="font-family:Cairo,sans-serif" />
             </VCol>
-            <VCol cols="12" md="4">
+            <VCol cols="12" md="3">
               <VTextField v-model.number="editForm.manufacture_year" label="سنة الصنع" type="number" variant="outlined" density="compact" style="font-family:Cairo,sans-serif" />
             </VCol>
-            <VCol cols="12" md="4">
+            <VCol cols="12" md="3">
               <VTextField v-model="editForm.power" label="القدرة" variant="outlined" density="compact" style="font-family:Cairo,sans-serif" />
             </VCol>
-            <VCol cols="12" md="4">
+            <VCol cols="12" md="3">
               <VSelect v-model="editForm.condition" :items="conditionOptions" label="الحالة" variant="outlined" density="compact" style="font-family:Cairo,sans-serif" />
+            </VCol>
+            <VCol cols="12" md="3">
+              <VSelect
+                v-model="editForm.contract_type"
+                :items="contractTypeOptions.filter(o => o.value)"
+                label="نوع العقد"
+                variant="outlined"
+                density="compact"
+                style="font-family:Cairo,sans-serif"
+              />
             </VCol>
             <VCol cols="12" md="4">
               <VSelect
@@ -513,6 +562,12 @@ const reasonLabel: Record<string, string> = {
                 density="compact"
                 style="font-family:Cairo,sans-serif"
               />
+            </VCol>
+            <VCol cols="12" md="6" class="d-flex align-center">
+              <VSwitch v-model="editForm.is_featured" label="آلية مميزة (تظهر أولاً في السوق)" color="warning" style="font-family:Cairo,sans-serif" />
+            </VCol>
+            <VCol cols="12" md="6" class="d-flex align-center">
+              <VSwitch v-model="editForm.needs_maintenance" label="بحاجة صيانة (تختفي من السوق مؤقتاً)" color="error" style="font-family:Cairo,sans-serif" />
             </VCol>
             <VCol cols="12">
               <VTextarea v-model="editForm.description" label="الوصف" variant="outlined" density="compact" rows="2" style="font-family:Cairo,sans-serif" />

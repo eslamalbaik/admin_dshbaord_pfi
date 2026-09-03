@@ -8,7 +8,7 @@ class EventRegistration extends Model
 {
     public $timestamps = false;
 
-    protected $fillable = ['news_id', 'contractor_id', 'registered_at'];
+    protected $fillable = ['event_id', 'contractor_id', 'registered_at'];
 
     protected $casts = ['registered_at' => 'datetime'];
 
@@ -17,8 +17,8 @@ class EventRegistration extends Model
         return $this->belongsTo(Contractor::class);
     }
 
-    public function news()
+    public function event()
     {
-        return $this->belongsTo(News::class);
+        return $this->belongsTo(Event::class);
     }
 }

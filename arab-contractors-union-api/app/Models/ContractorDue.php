@@ -10,7 +10,7 @@ class ContractorDue extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'contractor_id', 'year', 'period', 'description',
+        'contractor_id', 'year', 'period', 'reference_number', 'description',
         'amount_jod', 'paid_jod', 'status', 'source',
         'due_date', 'notes', 'created_by',
     ];
@@ -52,6 +52,12 @@ class ContractorDue extends Model
     public function getStatusLabelAttribute(): string
     {
         return self::STATUS_LABELS[$this->status] ?? $this->status;
+    }
+
+    /** رقم مرجعي بصيغة INV-<سنة الإنشاء>-<رقم الذمة بـ3 خانات> — يُولَّد مرة واحدة عند الإنشاء */
+    public static function generateReferenceNumber(self $due): string
+    {
+        return 'INV-' . $due->created_at->year . '-' . str_pad((string) $due->id, 3, '0', STR_PAD_LEFT);
     }
 
     /** تسجيل سداد (كامل أو جزئي) وتحديث الحالة تبعاً للمتبقي */

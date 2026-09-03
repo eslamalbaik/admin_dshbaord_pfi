@@ -34,6 +34,12 @@ class NotificationController extends Controller
         ]);
     }
 
+    // GET /api/notifications/unread-count
+    public function unreadCount(Request $request): JsonResponse
+    {
+        return $this->success(['unread_count' => $request->user()->unreadNotifications()->count()]);
+    }
+
     // PATCH /api/notifications/{id}/mark-as-read
     public function markAsRead(Request $request, string $id): JsonResponse
     {

@@ -196,6 +196,12 @@ class Contractor extends Authenticatable
     }
 
     /** @return array{total: float, paid: float, outstanding: float} */
+    public function duesTotalsSummary(): array
+    {
+        return $this->duesTotals();
+    }
+
+    /** @return array{total: float, paid: float, outstanding: float} */
     private function duesTotals(): array
     {
         $totals = $this->dues()
@@ -246,6 +252,15 @@ class Contractor extends Authenticatable
         return $this->hasOne(ContractorEquipmentSubscription::class)
             ->where('expires_at', '>=', now())
             ->latestOfMany('expires_at');
+    }
+
+    /** وصول مجاني مؤقت لسوق الآليات (لم تنتهِ equipment_marketplace_free_until) أو اشتراك مدفوع ساري */
+    public function hasActiveEquipmentMarketplaceAccess(): bool
+    {
+        $freeUntil = Setting::get('equipment_marketplace_free_until');
+        $hasFreeTrialAccess = ! $freeUntil || now()->lte(\Carbon\Carbon::parse($freeUntil));
+
+        return $hasFreeTrialAccess || (bool) $this->activeEquipmentSubscription;
     }
 
     public function bookmarkedTenders()

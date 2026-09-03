@@ -22,8 +22,6 @@ interface NewsItem {
   gallery: string[] | null
   category: string
   published_at: string
-  event_date: string | null
-  event_location: string | null
 }
 
 interface Pagination {
@@ -47,14 +45,12 @@ const categories = [
   { value: '', label: 'الكل' },
   { value: 'news', label: 'أخبار' },
   { value: 'announcement', label: 'إعلانات' },
-  { value: 'event', label: 'فعاليات' },
   { value: 'tender', label: 'عطاءات' },
 ]
 
 const categoryColors: Record<string, string> = {
   news: '#000269',
   announcement: '#0369a1',
-  event: '#15803d',
   tender: '#b45309',
 }
 
@@ -193,10 +189,6 @@ onMounted(fetchNews)
           <div class="news-body">
             <p class="news-date">{{ formatDate(item.published_at) }}</p>
             <h2 class="news-title">{{ item.title }}</h2>
-            <p v-if="item.category === 'event' && item.event_date" class="news-event-info">
-              📅 {{ formatDate(item.event_date) }}
-              <span v-if="item.event_location"> — 📍 {{ item.event_location }}</span>
-            </p>
             <p v-if="item.excerpt" class="news-excerpt">{{ item.excerpt }}</p>
             <span class="news-read-more">اقرأ المزيد ←</span>
           </div>
@@ -484,13 +476,6 @@ onMounted(fetchNews)
   font-weight: 700;
   padding: 0.2rem 0.6rem;
   border-radius: 50px;
-}
-
-.news-event-info {
-  font-size: 0.8rem;
-  color: #15803d;
-  font-weight: 600;
-  margin-bottom: 0.4rem;
 }
 
 .news-body {

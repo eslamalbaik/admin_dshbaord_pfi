@@ -36,6 +36,10 @@ class EquipmentController extends Controller
             $query->where('governorate', $request->governorate);
         }
 
+        if ($request->filled('contract_type')) {
+            $query->where('contract_type', $request->contract_type);
+        }
+
         if ($request->filled('contractor_id')) {
             $query->where('contractor_id', $request->contractor_id);
         }
@@ -63,15 +67,19 @@ class EquipmentController extends Controller
             'contractor_id'     => 'required|exists:contractors,id',
             'equipment_type_id' => 'required|exists:equipment_types,id',
             'name'              => 'required|string|max:255',
+            'brand'             => 'nullable|string|max:100',
             'description'       => 'nullable|string',
             'manufacture_year'  => 'nullable|integer|min:1970|max:' . date('Y'),
             'power'             => 'nullable|string|max:50',
             'condition'         => 'nullable|in:excellent,good,fair',
+            'contract_type'     => 'nullable|in:daily,weekly,monthly',
             'governorate'       => 'nullable|string|max:100',
             'city'              => 'nullable|string|max:100',
             'daily_price'       => 'required|numeric|min:0',
             'owner_phone'       => 'nullable|string|max:20',
             'status'            => 'nullable|in:visible,hidden,suspended',
+            'is_featured'       => 'nullable|boolean',
+            'needs_maintenance' => 'nullable|boolean',
             'admin_notes'       => 'nullable|string',
             'images'            => 'nullable|array|max:8',
             'images.*'          => 'image|mimes:jpg,jpeg,png,webp|max:3072',
@@ -110,15 +118,19 @@ class EquipmentController extends Controller
             'contractor_id'     => 'sometimes|exists:contractors,id',
             'equipment_type_id' => 'sometimes|exists:equipment_types,id',
             'name'              => 'sometimes|string|max:255',
+            'brand'             => 'nullable|string|max:100',
             'description'       => 'nullable|string',
             'manufacture_year'  => 'nullable|integer|min:1970|max:' . date('Y'),
             'power'             => 'nullable|string|max:50',
             'condition'         => 'nullable|in:excellent,good,fair',
+            'contract_type'     => 'nullable|in:daily,weekly,monthly',
             'governorate'       => 'nullable|string|max:100',
             'city'              => 'nullable|string|max:100',
             'daily_price'       => 'sometimes|numeric|min:0',
             'owner_phone'       => 'nullable|string|max:20',
             'status'            => 'nullable|in:visible,hidden,suspended',
+            'is_featured'       => 'nullable|boolean',
+            'needs_maintenance' => 'nullable|boolean',
             'admin_notes'       => 'nullable|string',
         ]);
 

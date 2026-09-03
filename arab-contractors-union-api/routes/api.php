@@ -17,11 +17,13 @@ use App\Http\Controllers\Api\EquipmentTypeController;
 use App\Http\Controllers\Api\EquipmentController;
 use App\Http\Controllers\Api\ReportsController;
 use App\Http\Controllers\Api\NewsController;
+use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\TermsController;
 use App\Http\Controllers\Api\LegalFileController;
 use App\Http\Controllers\Api\BankAccountController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\CertificateRequestController;
+use App\Http\Controllers\Api\SupportTicketController;
 use App\Http\Controllers\Api\ContractorNameChangeRequestController;
 use App\Http\Controllers\Api\ContractorHomeController;
 
@@ -56,6 +58,8 @@ Route::prefix('v1')->group(function () {
         Route::get('profile',          [ContractorAuthController::class, 'profile']);
         Route::patch('profile',        [ContractorAuthController::class, 'updateProfile']);
         Route::post('profile/update',  [ContractorAuthController::class, 'updateFullProfile']);
+        Route::post('profile/phone/request-otp', [ContractorAuthController::class, 'requestPhoneChangeOtp']);
+        Route::post('profile/phone/verify-otp',  [ContractorAuthController::class, 'verifyPhoneChangeOtp']);
         Route::post('logo',            [ContractorAuthController::class, 'updateLogo']);
         Route::get('profile/pdf',      [ContractorAuthController::class, 'exportPdf']);
         Route::get('profile/download-file/{field}', [ContractorAuthController::class, 'downloadFile']);
@@ -67,6 +71,7 @@ Route::prefix('v1')->group(function () {
 
         // إشعارات المقاول (صندوق الوارد)
         Route::get('notifications',                    [NotificationController::class, 'index']);
+        Route::get('notifications/unread-count',       [NotificationController::class, 'unreadCount']);
         Route::post('notifications/read',              [NotificationController::class, 'markAllRead']);
         Route::patch('notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead']);
     });
@@ -88,14 +93,14 @@ Route::prefix('v1')->group(function () {
         Route::post('payments/transfer', [PaymentController::class, 'submitTransfer']);
         Route::get('payments/transfer',  [PaymentController::class, 'myTransfers']);
         Route::get('payments/{payment}/receipt', [PaymentController::class, 'receipt']);
+        Route::get('payments/{payment}',         [PaymentController::class, 'show']);
 
-        // شاشة الدعم الفني — مجمَّدة (REQ-23): الاتحاد قرر التحويل المباشر لاتصال هاتفي/واتساب
-        // بدل نظام التذاكر داخل التطبيق (موارد بشرية محدودة). الكود (Controller/Model/migrations)
-        // يبقى بالمستودع كما هو دون حذف لإمكانية إعادة التفعيل بـv2 — فقط الوصول من الموبايل معطَّل هنا.
-        // Route::get('support-tickets',           [SupportTicketController::class, 'myTickets']);
-        // Route::post('support-tickets',          [SupportTicketController::class, 'store']);
-        // Route::get('support-tickets/{ticket}',  [SupportTicketController::class, 'showMine']);
-        // Route::post('support-tickets/{ticket}/reply', [SupportTicketController::class, 'replyMine']);
+        // شاشة الدعم الفني — أُعيد تفعيلها بتصميم جديد (REQ-23 تراجع عنها): تذكرة مع رقم واتساب
+        // للتواصل بدل تحويل مباشر بالكامل خارج التطبيق.
+        Route::get('support-tickets',           [SupportTicketController::class, 'myTickets']);
+        Route::post('support-tickets',          [SupportTicketController::class, 'store']);
+        Route::get('support-tickets/{ticket}',  [SupportTicketController::class, 'showMine']);
+        Route::post('support-tickets/{ticket}/reply', [SupportTicketController::class, 'replyMine']);
 
         // شاشة طلب شهادة العضوية
         Route::get('certificate-requests',  [CertificateRequestController::class, 'index']);
@@ -123,15 +128,17 @@ Route::prefix('v1')->group(function () {
         Route::post('circulars/{announcement}/acknowledge', [\App\Http\Controllers\Api\AnnouncementController::class, 'acknowledge']);
 
         // الفعاليات — تصفح + انضمام/إلغاء (RSVP) — REQ-21
-        Route::get('events',                 [NewsController::class, 'contractorEvents']);
-        Route::get('events/{news}',          [NewsController::class, 'contractorEventShow']);
-        Route::post('events/{news}/join',    [NewsController::class, 'joinEvent']);
-        Route::delete('events/{news}/join',  [NewsController::class, 'leaveEvent']);
+        Route::get('events',                  [EventController::class, 'contractorEvents']);
+        Route::get('events/{event}',          [EventController::class, 'contractorEventShow']);
+        Route::post('events/{event}/join',    [EventController::class, 'joinEvent']);
+        Route::delete('events/{event}/join',  [EventController::class, 'leaveEvent']);
 
         // سوق الآليات — "آلياتي" + تصفح السوق + بلاغات + الباقات (REQ-04→08)
         Route::get('equipment-packages',            [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'packages']);
+        Route::get('equipment/form-options',         [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'formOptions']);
         Route::get('equipment/subscription-status',  [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'subscriptionStatus']);
         Route::get('equipment/marketplace',          [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'marketplace']);
+        Route::get('equipment/marketplace/{equipment}', [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'show']);
         Route::get('equipment',                      [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'index']);
         Route::post('equipment',                     [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'store']);
         Route::patch('equipment/{equipment}',        [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'update']);
@@ -157,6 +164,15 @@ Route::prefix('v1')->group(function () {
         Route::get('latest',  [NewsController::class, 'latest']);
         Route::get('/',       [NewsController::class, 'index']);
         Route::get('{slug}',  [NewsController::class, 'show']);
+    });
+
+    // --------------------------------------------------------
+    //  Events — Public (no auth) — كيان مستقل عن الأخبار
+    // --------------------------------------------------------
+    Route::prefix('events')->group(function () {
+        Route::get('latest',  [EventController::class, 'latest']);
+        Route::get('/',       [EventController::class, 'index']);
+        Route::get('{slug}',  [EventController::class, 'show']);
     });
 
     // --------------------------------------------------------
@@ -278,7 +294,17 @@ Route::prefix('v1')->group(function () {
             Route::post('/',         [NewsController::class, 'store']);
             Route::put('{news}',     [NewsController::class, 'update']);
             Route::delete('{news}',  [NewsController::class, 'destroy']);
-            Route::get('{news}/attendees', [NewsController::class, 'attendees']);
+        });
+
+        // --------------------------------------------------------
+        //  Events — Admin CRUD
+        // --------------------------------------------------------
+        Route::prefix('admin/events')->group(function () {
+            Route::get('/',                 [EventController::class, 'adminIndex']);
+            Route::post('/',                [EventController::class, 'store']);
+            Route::put('{event}',           [EventController::class, 'update']);
+            Route::delete('{event}',        [EventController::class, 'destroy']);
+            Route::get('{event}/attendees', [EventController::class, 'attendees']);
         });
 
         // --------------------------------------------------------
@@ -347,6 +373,7 @@ Route::prefix('v1')->group(function () {
         Route::get('dashboard/settings',       [SettingController::class, 'index']);
         Route::put('dashboard/settings',       [SettingController::class, 'update']);
         Route::post('dashboard/settings/logo', [SettingController::class, 'uploadLogo']);
+        Route::post('dashboard/settings/cover-image', [SettingController::class, 'uploadCoverImage']);
 
         // --------------------------------------------------------
         //  Dynamic Pages — Admin CRUD
@@ -369,6 +396,15 @@ Route::prefix('v1')->group(function () {
         Route::post('dashboard/certificate-requests/{certificateRequest}/issue',      [CertificateRequestController::class, 'issue']);
         Route::post('dashboard/certificate-requests/{certificateRequest}/regenerate', [CertificateRequestController::class, 'regenerate']);
         Route::delete('dashboard/certificate-requests/{certificateRequest}',          [CertificateRequestController::class, 'destroy']);
+
+        // --------------------------------------------------------
+        //  Support Tickets — Admin (الدعم الفني، أُعيد تفعيلها بتصميم جديد)
+        // --------------------------------------------------------
+        Route::get('dashboard/support-tickets',                     [SupportTicketController::class, 'index']);
+        Route::get('dashboard/support-tickets/{ticket}',             [SupportTicketController::class, 'show']);
+        Route::post('dashboard/support-tickets/{ticket}/reply',      [SupportTicketController::class, 'reply']);
+        Route::patch('dashboard/support-tickets/{ticket}/status',    [SupportTicketController::class, 'updateStatus']);
+        Route::delete('dashboard/support-tickets/{ticket}',          [SupportTicketController::class, 'destroy']);
 
         // --------------------------------------------------------
         //  طلبات تعديل اسم الشركة — Admin

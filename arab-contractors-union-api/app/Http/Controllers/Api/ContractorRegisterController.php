@@ -109,9 +109,14 @@ class ContractorRegisterController extends Controller
         Cache::forget('register_otp_' . $contractor->id);
 
         return $this->success([
-            'phone'          => $contractor->phone,
-            'phone_verified' => true,
-            'has_password'   => !empty($contractor->password),
+            'id'                  => $contractor->id,
+            'name'                => $contractor->name,
+            'authorized_person'   => $contractor->authorized_person,
+            'commercial_register' => $contractor->commercial_register,
+            'membership_number'   => $contractor->membership_number,
+            'phone'               => $contractor->phone,
+            'phone_verified'      => true,
+            'has_password'        => !empty($contractor->password),
         ], $contractor->password
             ? 'تم تفعيل رقم جوالك بنجاح. يمكنك الآن تسجيل الدخول.'
             : 'تم تفعيل رقم جوالك بنجاح. أدخل كلمة مرور لإكمال التسجيل.');

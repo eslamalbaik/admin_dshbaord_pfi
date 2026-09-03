@@ -212,6 +212,13 @@ class TenderController extends Controller
         if ($request->filled('updated_to')) {
             $query->whereDate('updated_at', '<=', $request->date('updated_to'));
         }
+        // "تاريخ نشر العطاء" بمودال التصفية (شاشة العطاءات، تطبيق المقاول)
+        if ($request->filled('created_from')) {
+            $query->whereDate('created_at', '>=', $request->date('created_from'));
+        }
+        if ($request->filled('created_to')) {
+            $query->whereDate('created_at', '<=', $request->date('created_to'));
+        }
         if ($request->filled('deadline_from')) {
             $query->whereDate('deadline', '>=', $request->date('deadline_from'));
         }
@@ -251,6 +258,12 @@ class TenderController extends Controller
         if ($request->input('scope') === 'my_specialties' && $request->user() instanceof Contractor) {
             $specialties = $request->user()->specialties ?? [];
             $query->whereIn('category', $specialties ?: ['__none__']);
+        }
+
+        // toggle "العطاءات المهتم بها فقط" بمودال التصفية — بديل داخل applyFilters لمسار bookmarked المخصَّص
+        if ($request->boolean('bookmarked') && $request->user() instanceof Contractor) {
+            $bookmarkedIds = $request->user()->bookmarkedTenders()->pluck('tenders.id');
+            $query->whereIn('tenders.id', $bookmarkedIds->isNotEmpty() ? $bookmarkedIds : ['__none__']);
         }
 
         return match ($request->input('sort')) {

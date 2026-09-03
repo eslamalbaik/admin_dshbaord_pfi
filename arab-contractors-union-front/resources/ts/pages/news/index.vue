@@ -25,7 +25,6 @@ const publishedFilter = ref('')
 const categoryOptions = [
   { title: 'خبر', value: 'news' },
   { title: 'إعلان', value: 'announcement' },
-  { title: 'مناسبة', value: 'event' },
   { title: 'عطاء', value: 'tender' },
 ]
 
@@ -38,7 +37,7 @@ const headers = [
 ]
 
 const getCategoryLabel = (c: string) => categoryOptions.find(o => o.value === c)?.title ?? c
-const getCategoryColor = (c: string) => ({ news: 'primary', announcement: 'info', event: 'success', tender: 'warning' }[c] || 'secondary')
+const getCategoryColor = (c: string) => ({ news: 'primary', announcement: 'info', tender: 'warning' }[c] || 'secondary')
 
 const fetchNews = async () => {
   loading.value = true
@@ -64,14 +63,6 @@ const fetchNews = async () => {
 watchEffect(() => fetchNews())
 
 // ── Create/Edit form ──────────────────────────────
-interface SpeakerForm { name: string; title: string; photo: string; is_keynote: boolean }
-
-const eventFormatOptions = [
-  { title: 'وجاهي', value: 'onsite' },
-  { title: 'أونلاين', value: 'online' },
-  { title: 'وجاهي + أونلاين', value: 'hybrid' },
-]
-
 const emptyForm = () => ({
   id: null as number | null,
   title: '',
@@ -84,18 +75,9 @@ const emptyForm = () => ({
   removeGallery: [] as string[],
   video_url: '',
   external_url: '',
-  event_date: '',
-  event_location: '',
-  event_format: '' as string,
-  is_international: false,
-  stream_url: '',
-  speakers: [] as SpeakerForm[],
   is_published: false,
   published_at: '',
 })
-
-const addSpeaker = () => form.value.speakers.push({ name: '', title: '', photo: '', is_keynote: false })
-const removeSpeaker = (i: number) => form.value.speakers.splice(i, 1)
 
 const toggleRemoveGalleryImage = (url: string) => {
   const idx = form.value.removeGallery.indexOf(url)
@@ -133,14 +115,6 @@ const openEdit = (item: any) => {
     removeGallery: [],
     video_url: item.video_url ?? '',
     external_url: item.external_url ?? '',
-    event_date: item.event_date ? item.event_date.substring(0, 16) : '',
-    event_location: item.event_location ?? '',
-    event_format: item.event_format ?? '',
-    is_international: !!item.is_international,
-    stream_url: item.stream_url ?? '',
-    speakers: Array.isArray(item.speakers) ? item.speakers.map((s: any) => ({
-      name: s.name ?? '', title: s.title ?? '', photo: s.photo ?? '', is_keynote: !!s.is_keynote,
-    })) : [],
     is_published: !!item.is_published,
     published_at: item.published_at ? item.published_at.substring(0, 10) : '',
   }
@@ -165,19 +139,6 @@ const saveNews = async () => {
     if (form.value.video_url) fd.append('video_url', form.value.video_url)
     if (form.value.external_url) fd.append('external_url', form.value.external_url)
     if (form.value.published_at) fd.append('published_at', form.value.published_at)
-    if (form.value.category === 'event') {
-      if (form.value.event_date) fd.append('event_date', form.value.event_date)
-      if (form.value.event_location) fd.append('event_location', form.value.event_location)
-      if (form.value.event_format) fd.append('event_format', form.value.event_format)
-      fd.append('is_international', form.value.is_international ? '1' : '0')
-      if (form.value.stream_url) fd.append('stream_url', form.value.stream_url)
-      form.value.speakers.forEach((s, i) => {
-        fd.append(`speakers[${i}][name]`, s.name)
-        if (s.title) fd.append(`speakers[${i}][title]`, s.title)
-        if (s.photo) fd.append(`speakers[${i}][photo]`, s.photo)
-        fd.append(`speakers[${i}][is_keynote]`, s.is_keynote ? '1' : '0')
-      })
-    }
     if (mainImageFile.value[0]) fd.append('image', mainImageFile.value[0])
     form.value.gallery.forEach(f => fd.append('gallery[]', f))
     form.value.removeGallery.forEach(url => fd.append('remove_gallery[]', url))
@@ -227,11 +188,11 @@ const deleteNews = async () => {
   <div>
     <div class="d-flex justify-space-between align-center mb-6">
       <div>
-        <h1 class="text-h4 font-weight-bold" style="font-family:Cairo,sans-serif">الأخبار والمناسبات</h1>
-        <p class="text-body-2 text-medium-emphasis mb-0" style="font-family:Cairo,sans-serif">إدارة أخبار وإعلانات ومناسبات الاتحاد المنشورة على الموقع</p>
+        <h1 class="text-h4 font-weight-bold" style="font-family:Cairo,sans-serif">الأخبار</h1>
+        <p class="text-body-2 text-medium-emphasis mb-0" style="font-family:Cairo,sans-serif">إدارة أخبار وإعلانات وعطاءات الاتحاد المنشورة على الموقع</p>
       </div>
       <VBtn color="primary" prepend-icon="tabler-plus" @click="openCreate">
-        خبر / مناسبة جديدة
+        خبر جديد
       </VBtn>
     </div>
 
@@ -312,7 +273,7 @@ const deleteNews = async () => {
         </template>
 
         <template #no-data>
-          <div class="text-center pa-6 text-medium-emphasis" style="font-family:Cairo,sans-serif">لا توجد أخبار أو مناسبات بعد</div>
+          <div class="text-center pa-6 text-medium-emphasis" style="font-family:Cairo,sans-serif">لا توجد أخبار بعد</div>
         </template>
       </VDataTableServer>
     </VCard>
@@ -320,7 +281,7 @@ const deleteNews = async () => {
     <!-- Create/Edit Dialog -->
     <VDialog v-model="formDialog" max-width="680" scrollable>
       <VCard>
-        <VCardTitle style="font-family:Cairo,sans-serif">{{ isEditing ? 'تعديل الخبر' : 'خبر / مناسبة جديدة' }}</VCardTitle>
+        <VCardTitle style="font-family:Cairo,sans-serif">{{ isEditing ? 'تعديل الخبر' : 'خبر جديد' }}</VCardTitle>
         <VCardText>
           <VRow>
             <VCol cols="12" md="8">
@@ -405,66 +366,6 @@ const deleteNews = async () => {
             <VCol cols="12" md="6">
               <VTextField v-model="form.external_url" label="رابط خارجي (اختياري)" prepend-inner-icon="tabler-external-link" dir="ltr" />
             </VCol>
-
-            <template v-if="form.category === 'event'">
-              <VCol cols="12" md="6">
-                <VTextField v-model="form.event_date" label="موعد المناسبة" type="datetime-local" style="font-family:Cairo,sans-serif" />
-              </VCol>
-              <VCol cols="12" md="6">
-                <VTextField v-model="form.event_location" label="مكان المناسبة" prepend-inner-icon="tabler-map-pin" style="font-family:Cairo,sans-serif" />
-              </VCol>
-              <VCol cols="12" md="4">
-                <VSelect
-                  v-model="form.event_format"
-                  :items="eventFormatOptions"
-                  label="نوع الحضور"
-                  clearable
-                  style="font-family:Cairo,sans-serif"
-                />
-              </VCol>
-              <VCol cols="12" md="4" class="d-flex align-center">
-                <VSwitch v-model="form.is_international" label="فعالية دولية" color="info" style="font-family:Cairo,sans-serif" />
-              </VCol>
-              <VCol cols="12" md="4">
-                <VTextField
-                  v-model="form.stream_url"
-                  label="رابط البث المباشر (Zoom)"
-                  prepend-inner-icon="tabler-video"
-                  dir="ltr"
-                  hint="يظهر للمقاولين يوم الفعالية فقط"
-                  persistent-hint
-                />
-              </VCol>
-
-              <VCol cols="12">
-                <div class="d-flex justify-space-between align-center mb-2">
-                  <span class="text-body-2 font-weight-medium" style="font-family:Cairo,sans-serif">المتحدثون</span>
-                  <VBtn size="small" variant="tonal" prepend-icon="tabler-plus" @click="addSpeaker">
-                    إضافة متحدث
-                  </VBtn>
-                </div>
-                <VRow v-for="(sp, i) in form.speakers" :key="i" align="center" class="mb-1">
-                  <VCol cols="12" md="3">
-                    <VTextField v-model="sp.name" label="الاسم" density="compact" style="font-family:Cairo,sans-serif" />
-                  </VCol>
-                  <VCol cols="12" md="3">
-                    <VTextField v-model="sp.title" label="المسمى/الصفة" density="compact" style="font-family:Cairo,sans-serif" />
-                  </VCol>
-                  <VCol cols="12" md="3">
-                    <VTextField v-model="sp.photo" label="رابط الصورة (اختياري)" density="compact" dir="ltr" />
-                  </VCol>
-                  <VCol cols="12" md="2">
-                    <VSwitch v-model="sp.is_keynote" label="متحدث رئيسي" density="compact" style="font-family:Cairo,sans-serif" />
-                  </VCol>
-                  <VCol cols="12" md="1" class="text-center">
-                    <VBtn icon="tabler-trash" size="small" variant="text" color="error" @click="removeSpeaker(i)" />
-                  </VCol>
-                </VRow>
-                <p v-if="!form.speakers.length" class="text-body-2 text-medium-emphasis" style="font-family:Cairo,sans-serif">
-                  لا يوجد متحدثون مضافون.
-                </p>
-              </VCol>
-            </template>
 
             <VCol cols="12" md="6">
               <VTextField v-model="form.published_at" label="تاريخ النشر (اختياري — الآن افتراضياً)" type="date" style="font-family:Cairo,sans-serif" />

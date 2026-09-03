@@ -29,6 +29,11 @@ Schedule::command('memberships:send-renewal-reminders')
     ->dailyAt('08:00')
     ->onFailure(fn () => Log::channel('reminders')->error('schedule: renewal reminders failed'));
 
+// تذكيرات فترة السماح بعد انتهاء العضوية (بداية/منتصف/نهاية الفترة) — الوصول للتطبيق يبقى مسموحاً خلالها
+Schedule::command('memberships:send-grace-period-reminders')
+    ->dailyAt('08:05')
+    ->onFailure(fn () => Log::channel('reminders')->error('schedule: grace period reminders failed'));
+
 // نسخة احتياطية يومية لقاعدة البيانات وملفات storage/app/public + تنظيف النسخ القديمة أسبوعياً
 Schedule::command('backup:run')
     ->dailyAt('02:00')

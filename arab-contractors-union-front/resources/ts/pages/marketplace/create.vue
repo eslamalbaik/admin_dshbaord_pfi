@@ -30,15 +30,19 @@ const form = ref({
   contractor_id:     '',
   equipment_type_id: '',
   name:              '',
+  brand:             '',
   description:       '',
   manufacture_year:  null as number | null,
   power:             '',
   condition:         'good',
+  contract_type:     'daily',
   governorate:       '',
   city:              '',
   daily_price:       0,
   owner_phone:       '',
   status:            'visible',
+  is_featured:       false,
+  needs_maintenance: false,
   admin_notes:       '',
 })
 
@@ -63,15 +67,19 @@ const fetchEquipment = async () => {
       contractor_id:     String(data.contractor_id),
       equipment_type_id: String(data.equipment_type_id),
       name:              data.name,
+      brand:             data.brand ?? '',
       description:       data.description ?? '',
       manufacture_year:  data.manufacture_year ?? null,
       power:             data.power ?? '',
       condition:         data.condition ?? 'good',
+      contract_type:     data.contract_type ?? 'daily',
       governorate:       data.governorate ?? '',
       city:              data.city ?? '',
       daily_price:       Number(data.daily_price),
       owner_phone:       data.owner_phone ?? '',
       status:            data.status ?? 'visible',
+      is_featured:       !!data.is_featured,
+      needs_maintenance: !!data.needs_maintenance,
       admin_notes:       data.admin_notes ?? '',
     }
   }
@@ -112,8 +120,12 @@ const submit = async () => {
     const payload = new FormData()
 
     Object.entries(form.value).forEach(([key, val]) => {
-      if (val !== null && val !== undefined && val !== '')
-        payload.append(key, String(val))
+      if (val !== null && val !== undefined && val !== '') {
+        if (typeof val === 'boolean')
+          payload.append(key, val ? '1' : '0')
+        else
+          payload.append(key, String(val))
+      }
     })
 
     newImages.value.forEach(file => payload.append('images[]', file))
@@ -152,6 +164,12 @@ const conditionOptions = [
   { title: 'ممتازة', value: 'excellent' },
   { title: 'جيدة', value: 'good' },
   { title: 'مقبولة', value: 'fair' },
+]
+
+const contractTypeOptions = [
+  { title: 'تأجير يومي', value: 'daily' },
+  { title: 'تأجير أسبوعي', value: 'weekly' },
+  { title: 'تأجير شهري', value: 'monthly' },
 ]
 </script>
 
@@ -217,6 +235,16 @@ const conditionOptions = [
           </VCol>
           <VCol cols="12" md="6">
             <VTextField
+              v-model="form.brand"
+              label="الماركة"
+              placeholder="مثال: كاتربيلر"
+              variant="outlined"
+              density="compact"
+              style="font-family:Cairo,sans-serif"
+            />
+          </VCol>
+          <VCol cols="12" md="6">
+            <VTextField
               v-model="form.owner_phone"
               label="رقم هاتف المالك"
               placeholder="0599-XXXXXX"
@@ -246,7 +274,7 @@ const conditionOptions = [
             </p>
           </VCol>
 
-          <VCol cols="12" md="4">
+          <VCol cols="12" md="3">
             <VTextField
               v-model.number="form.manufacture_year"
               label="سنة الصنع"
@@ -258,7 +286,7 @@ const conditionOptions = [
               style="font-family:Cairo,sans-serif"
             />
           </VCol>
-          <VCol cols="12" md="4">
+          <VCol cols="12" md="3">
             <VTextField
               v-model="form.power"
               label="القدرة / الطاقة"
@@ -268,11 +296,21 @@ const conditionOptions = [
               style="font-family:Cairo,sans-serif"
             />
           </VCol>
-          <VCol cols="12" md="4">
+          <VCol cols="12" md="3">
             <VSelect
               v-model="form.condition"
               :items="conditionOptions"
               label="حالة الآلية"
+              variant="outlined"
+              density="compact"
+              style="font-family:Cairo,sans-serif"
+            />
+          </VCol>
+          <VCol cols="12" md="3">
+            <VSelect
+              v-model="form.contract_type"
+              :items="contractTypeOptions"
+              label="نوع العقد *"
               variant="outlined"
               density="compact"
               style="font-family:Cairo,sans-serif"
@@ -340,7 +378,22 @@ const conditionOptions = [
               style="font-family:Cairo,sans-serif"
             />
           </VCol>
-          <VCol cols="12" md="6" />
+          <VCol cols="12" md="6" class="d-flex align-center">
+            <VSwitch
+              v-model="form.is_featured"
+              label="آلية مميزة (تظهر أولاً في السوق)"
+              color="warning"
+              style="font-family:Cairo,sans-serif"
+            />
+          </VCol>
+          <VCol cols="12" md="6" class="d-flex align-center">
+            <VSwitch
+              v-model="form.needs_maintenance"
+              label="بحاجة صيانة (تختفي من السوق مؤقتاً)"
+              color="error"
+              style="font-family:Cairo,sans-serif"
+            />
+          </VCol>
           <VCol cols="12">
             <VTextarea
               v-model="form.admin_notes"

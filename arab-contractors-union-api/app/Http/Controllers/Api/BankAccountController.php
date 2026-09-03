@@ -34,15 +34,34 @@ class BankAccountController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
     //  Contractor Mobile App — الحسابات البنكية الظاهرة في شاشة الدفع (Public)
     //  GET /api/v1/bank-accounts
+    //  مجمَّعة حسب اسم البنك — كل بنك بطاقة واحدة تحوي إيبان لكل عملة (JOD/USD/ILS)
+    //  بدل صف منفصل لكل عملة (البيانات بجدول bank_accounts تبقى صف لكل بنك+عملة كما هي).
     // ─────────────────────────────────────────────────────────────────────────
     public function publicIndex()
     {
-        $accounts = BankAccount::active()
-            ->orderBy('sort')->orderBy('id')
-            ->get()
-            ->map(fn ($b) => $this->format($b));
+        $accounts = BankAccount::active()->orderBy('sort')->orderBy('id')->get();
 
-        return $this->success(['bank_accounts' => $accounts->values()]);
+        $banks = $accounts->groupBy('bank_name')->map(function ($rows) {
+            $first = $rows->first();
+
+            return [
+                'bank_name'      => $first->bank_name,
+                'bank_name_en'   => $first->bank_name_en,
+                'logo_url'       => $first->logo_url,
+                'account_holder' => $first->account_holder,
+                'account_number' => $first->account_number,
+                'swift'          => $first->swift,
+                'notes'          => $first->notes,
+                // إيبان كل عملة على حدة — نفس البنك ممكن يكون له أكثر من صف بجدول bank_accounts (صف لكل عملة)
+                'accounts'       => $rows->map(fn ($r) => [
+                    'id'       => $r->id,
+                    'currency' => $r->currency,
+                    'iban'     => $r->iban,
+                ])->values(),
+            ];
+        })->values();
+
+        return $this->success(['banks' => $banks]);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

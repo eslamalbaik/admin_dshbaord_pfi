@@ -171,6 +171,11 @@ class ContractorDashboardController extends Controller
         $unpaidPenalties    = (float) $penalties->where('status', '!=', 'paid')->sum('amount');
         $outstandingDues    = $contractor->outstandingDuesTotal();
         $totalObligations   = $contractor->totalObligations();
+        $duesTotals         = $contractor->duesTotalsSummary();
+
+        // ذمم "قيد المراجعة" (شاشة الذمم المالية) — تحويلات مرفوعة لتسديد ذمم بانتظار تأكيد المحاسبة،
+        // مش عمود بجدول contractor_dues، مشتقة من Payment(type=dues_payment, status=pending)
+        $pendingDuesPayments = $payments->where('type', 'dues_payment')->where('status', 'pending')->values();
 
         return $this->success([
             'summary' => [
@@ -179,15 +184,43 @@ class ContractorDashboardController extends Controller
                 'unpaid_penalties'     => number_format($unpaidPenalties, 2, '.', ''),
                 'outstanding_dues_jod' => number_format($outstandingDues, 2, '.', ''),  // ذمم سابقة بالدينار
                 'total_obligations'    => number_format($totalObligations, 2, '.', ''), // ما عليه
+                // بطاقة شاشة "الذمم المالية": الرصيد المستحق / المدفوع / إجمالي الرسوم + نسبة السداد
+                'dues_total_jod'       => number_format($duesTotals['total'], 2, '.', ''),
+                'dues_paid_jod'        => number_format($duesTotals['paid'], 2, '.', ''),
+                'dues_paid_percentage' => $contractor->duesPaidPercentage(),
             ],
+            // تبويب "المستحقات": بادجات الأعداد (غير مدفوع / قيد المراجعة) لعرضها فوق القائمة
+            'dues_counts' => [
+                'unpaid'         => $dues->where('status', '!=', 'paid')->count(),
+                'pending_review' => $pendingDuesPayments->count(),
+            ],
+            // تبويب "الدفعات السابقة": بادجات الأعداد (دفع جزئي / مكتمل)
+            // دفع جزئي = ذمم partially_paid (تُعرض من مصفوفة dues أدناه بفلتر ?status=partially_paid)
+            // مكتمل = تحويلات ذمم مؤكَّدة (تُعرض عبر GET contractor/payments/transfer?status=paid&type=dues_payment)
+            'payment_history_counts' => [
+                'partially_paid' => $dues->where('status', 'partially_paid')->count(),
+                'completed'      => $payments->where('type', 'dues_payment')->where('status', 'paid')->count(),
+            ],
+            // تحويلات تسديد ذمم بانتظار مراجعة المحاسبة — لكل عنصر reference_number + receipt_image_url
+            // جاهزين لزر "معاينة الاشعار المرفوع" (نفس شكل PaymentController::format())
+            'pending_dues_payments' => $pendingDuesPayments->map(fn ($p) => [
+                'id'                => $p->id,
+                'description'       => $p->notes ?: 'دفعة مقدمة للمشروع',
+                'amount'            => $p->amount,
+                'currency'          => $p->currency ?? 'JOD',
+                'reference_number'  => $p->reference_number,
+                'receipt_image_url' => $p->receipt_image_url,
+                'submitted_at'      => $p->submitted_at,
+            ])->values(),
             // فلتر شاشة "الرسوم المالية" بالتطبيق: ?status=unpaid|partially_paid|paid|overdue
             // "متأخرة" محسوبة (غير مسدَّدة بالكامل + تجاوز موعد الاستحقاق) وليست عموداً بقاعدة البيانات.
             'dues' => $this->filterDuesByStatus($dues, $request->string('status')->toString())
                 ->map(fn ($d) => [
-                    'id'            => $d->id,
-                    'year'          => $d->year,
-                    'period'        => $d->period,
-                    'description'   => $d->description,
+                    'id'               => $d->id,
+                    'year'             => $d->year,
+                    'period'           => $d->period,
+                    'reference_number' => $d->reference_number,
+                    'description'      => $d->description,
                     'amount_jod'    => $d->amount_jod,
                     'paid_jod'      => $d->paid_jod,
                     'remaining_jod' => $d->remaining_jod,

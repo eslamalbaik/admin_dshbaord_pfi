@@ -27,9 +27,11 @@ class ProfileUpdateRequest extends Model
     /**
      * الحقول القابلة للتعديل عبر طلب — whitelist صريح. الاسم/رقم العضوية/رقم المشتغل
      * مقفلة تماماً ولا تظهر هنا إطلاقاً (REQ-26).
+     * رقم الجوال استُبعد من هون — صار له مسار فوري مستقل (ContractorAuthController::
+     * requestPhoneChangeOtp/verifyPhoneChangeOtp + updateFullProfile) بدون موافقة إدارة.
      */
     public const ALLOWED_FIELDS = [
-        'authorized_person', 'authorized_person_title', 'phone', 'email', 'address',
+        'authorized_person', 'authorized_person_title', 'email', 'address',
     ];
 
     public function contractor()

@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\City;
 use App\Models\Contractor;
+use App\Services\Sms\SmsSenderInterface;
 use App\Support\ApiMessages;
 use App\Support\ContractorLookups;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -114,7 +116,11 @@ class ContractorAuthController extends Controller
     public function profile(Request $request)
     {
         $contractor = $request->user('contractor');
-        $contractor->load(['activeMembership', 'governorate', 'cityModel', 'equipment' => fn($q) => $q->where('status', 'visible')]);
+        $contractor->load([
+            'activeMembership', 'governorate', 'cityModel',
+            'equipment' => fn($q) => $q->where('status', 'visible'),
+            'activeEquipmentSubscription.package',
+        ]);
 
         return $this->success($this->contractorResource($contractor), 'تم جلب الملف الشخصي بنجاح');
     }
@@ -193,6 +199,69 @@ class ContractorAuthController extends Controller
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    //  POST /api/v1/contractor/auth/profile/phone/request-otp
+    //  الخطوة 1: طلب رمز تحقق لرقم الجوال الجديد قبل تعديل الملف الشخصي
+    // ─────────────────────────────────────────────────────────────────────────
+    public function requestPhoneChangeOtp(Request $request)
+    {
+        $contractor = $request->user('contractor');
+
+        $data = $request->validate(['phone' => 'required|string|max:20']);
+        $newPhone = trim($data['phone']);
+
+        if ($newPhone === $contractor->phone) {
+            return $this->error('رقم الجوال المُدخل هو نفس رقمك الحالي.', 422, null, 'same_phone');
+        }
+
+        if (Contractor::where('phone', $newPhone)->where('id', '!=', $contractor->id)->exists()) {
+            return $this->error('رقم الجوال هذا مستخدَم بحساب آخر.', 422, null, 'phone_taken');
+        }
+
+        $cooldownKey = 'profile_phone_otp_cooldown_' . $contractor->id;
+        if (Cache::has($cooldownKey)) {
+            $expiresIn = max(0, Cache::get($cooldownKey) - time());
+            return $this->error("يرجى الانتظار {$expiresIn} ثانية قبل طلب رمز جديد.", 429, ['expires_in' => $expiresIn], 'otp_cooldown');
+        }
+
+        $otp = mt_rand(100000, 999999);
+        Cache::put('profile_phone_otp_' . $contractor->id, ['otp' => $otp, 'phone' => $newPhone], now()->addMinutes(10));
+        Cache::put($cooldownKey, time() + 35, now()->addSeconds(35));
+
+        app(SmsSenderInterface::class)->send(
+            $newPhone,
+            "اتحاد المقاولين: رمز تحقق تغيير رقم الجوال: {$otp}. صالح لمدة 10 دقائق."
+        );
+
+        return $this->success(
+            array_merge(['expires_in' => 35], config('services.sms.driver', 'log') === 'log' ? ['otp_preview' => $otp] : []),
+            'تم إرسال رمز التحقق إلى رقم الجوال الجديد.',
+        );
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  POST /api/v1/contractor/auth/profile/phone/verify-otp
+    //  الخطوة 2: تأكيد الرمز — يُتيح إرسال نفس الرقم بـ profile/update بعدها
+    // ─────────────────────────────────────────────────────────────────────────
+    public function verifyPhoneChangeOtp(Request $request)
+    {
+        $contractor = $request->user('contractor');
+
+        $data = $request->validate(['otp' => 'required|string|size:6']);
+
+        $cached = Cache::get('profile_phone_otp_' . $contractor->id);
+
+        if (! $cached || (string) $cached['otp'] !== (string) $data['otp']) {
+            return $this->error('رمز التحقق غير صحيح أو انتهت صلاحيته.', 422, null, 'invalid_otp');
+        }
+
+        Cache::forget('profile_phone_otp_' . $contractor->id);
+        // صالح 15 دقيقة — كافية لإكمال حفظ باقي التعديلات بنفس الشاشة
+        Cache::put('profile_phone_verified_' . $contractor->id, $cached['phone'], now()->addMinutes(15));
+
+        return $this->success(['phone' => $cached['phone']], 'تم التحقق من رقم الجوال بنجاح.');
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     //  POST /api/v1/contractor/auth/profile/update
     //  تحديث الملف الشخصي الكامل مع الملفات المرفقة
     // ─────────────────────────────────────────────────────────────────────────
@@ -212,14 +281,14 @@ class ContractorAuthController extends Controller
             'specialties'                   => 'nullable|string', 
             'owner_name'                    => 'nullable|string|max:255',
             'email'                         => 'nullable|email|unique:contractors,email,' . $contractor->id,
-            'phone'                         => 'nullable|string|max:20',
+            'phone'                         => 'nullable|string|max:20|unique:contractors,phone,' . $contractor->id,
             'governorate_id'                => 'nullable|integer|exists:governorates,id',
             'city_id'                       => 'nullable|integer|exists:cities,id',
             'address'                       => 'nullable|string',
             'notes'                         => 'nullable|string',
 
             // Text fields
-            'partners'                      => 'nullable|string', 
+            'partners'                      => 'nullable|string',
             'fax'                           => 'nullable|string|max:50',
             'building'                      => 'nullable|string|max:100',
             'floor'                         => 'nullable|string|max:50',
@@ -245,6 +314,24 @@ class ContractorAuthController extends Controller
             'authorization_letter'          => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
             'authorized_signature'          => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
         ]);
+
+        // تغيير رقم الجوال يتطلب تحقق OTP مسبق (phone/request-otp + phone/verify-otp)
+        // — لا يُقبل مباشرة ولو مختلف عن القيمة المخزَّنة، لأن الجوال يُستخدم لتفعيل/دخول الحساب.
+        if (array_key_exists('phone', $validated) && $validated['phone'] && $validated['phone'] !== $contractor->phone) {
+            $verifiedPhone = Cache::get('profile_phone_verified_' . $contractor->id);
+
+            if ($verifiedPhone !== $validated['phone']) {
+                return $this->error(
+                    'يجب التحقق من رقم الجوال الجديد أولاً عبر رمز التحقق (OTP) قبل حفظ التعديل.',
+                    422,
+                    null,
+                    'phone_verification_required',
+                );
+            }
+
+            Cache::forget('profile_phone_verified_' . $contractor->id);
+            $validated['phone_verified_at'] = now();
+        }
 
         $this->applyLocation($validated);
         $this->handleProfileFileUploads($request, $validated, $contractor);
@@ -395,6 +482,9 @@ class ContractorAuthController extends Controller
         }
 
         return array_merge($this->contractorLiteResource($contractor), [
+            // بطاقة "حسابي" — حالة العضوية/الذمم/الشهادات/اشتراك سوق الآليات في نداء واحد
+            'account_status'    => $this->accountStatus($contractor),
+
             'established_year'  => $contractor->established_year,
             'owner_name'        => $contractor->owner_name,
             'address'           => $contractor->address,
@@ -418,6 +508,96 @@ class ContractorAuthController extends Controller
             'legal_form'        => $contractor->legal_form,
             'company_purposes'  => $contractor->company_purposes,
         ], $fileUrls);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Private — بطاقة "حسابي": بانر واحد بالأولوية (عضوية منتهية > ذمم مستحقة >
+    //  عضوية سارية)، حالة قفل الشهادات، وبادج اشتراك سوق الآليات (REQ: شاشة حسابي)
+    // ─────────────────────────────────────────────────────────────────────────
+    private function accountStatus(Contractor $contractor): array
+    {
+        $membership = $contractor->subscriptionStatus();
+        // "ما عليه" الكامل (ذمم + غرامات غير مسدَّدة + دفعات معلّقة) — نفس حسبة الشاشة الرئيسية
+        $duesAmount = $contractor->totalObligations();
+        $hasPendingDues = $duesAmount > 0;
+        $certificatesLocked = count(\App\Support\ContractorRequirements::issues($contractor)) > 0;
+
+        $banner = match (true) {
+            $membership['badge'] === 'expired' || ! $membership['id'] => [
+                'type'       => 'membership_expired',
+                'severity'   => 'error',
+                'expires_at' => $membership['expires_at'],
+                'message'    => 'العضوية منتهية (' . $this->arabicDate($membership['expires_at']) . ')',
+                'cta'        => 'renew_membership',
+                'cta_label'  => 'السداد وتجديد الآن',
+            ],
+            $hasPendingDues => [
+                'type'               => 'dues_overdue',
+                'severity'           => 'warning',
+                'outstanding_amount' => $duesAmount,
+                'message'            => 'يوجد ذمم مالية مستحقة بقيمة ' . number_format($duesAmount, 2) . ' دينار — يرجى السداد لتجنب تجميد الخدمات والشهادات',
+                'cta'                => 'pay_dues',
+                'cta_label'          => 'السداد الآن',
+            ],
+            $membership['badge'] === 'active' => [
+                'type'       => 'membership_active',
+                'severity'   => 'success',
+                'expires_at' => $membership['expires_at'],
+                'message'    => 'العضوية سارية حتى تاريخ ' . $this->arabicDate($membership['expires_at']),
+                'cta'        => null,
+                'cta_label'  => null,
+            ],
+            default => null,
+        };
+
+        $equipmentSubscription = $contractor->activeEquipmentSubscription;
+        $equipmentActive = $contractor->hasActiveEquipmentMarketplaceAccess();
+
+        return [
+            'banner' => $banner,
+
+            'membership' => [
+                'badge'       => $membership['badge'], // active | expired
+                'expires_at'  => $membership['expires_at'],
+            ],
+
+            'dues' => [
+                'has_pending'        => $hasPendingDues,
+                'outstanding_amount' => $duesAmount,
+                'badge'              => $hasPendingDues ? 'مستحقات' : null,
+            ],
+
+            'certificates' => [
+                'locked'      => $certificatesLocked,
+                'lock_reason' => $certificatesLocked ? 'يلزم تجديد العضوية' : null,
+            ],
+
+            'equipment_subscription' => [
+                'active'      => $equipmentActive,
+                'badge'       => $equipmentActive ? 'نشط' : 'تجديد الاشتراك',
+                'expires_at'  => $equipmentSubscription?->expires_at?->toDateString(),
+            ],
+        ];
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Private — "31 ديسمبر 2025" من تاريخ Y-m-d — لرسائل بانر حسابي فقط
+    // ─────────────────────────────────────────────────────────────────────────
+    private function arabicDate(?string $date): ?string
+    {
+        if (! $date) {
+            return null;
+        }
+
+        static $months = [
+            1 => 'يناير', 2 => 'فبراير', 3 => 'مارس', 4 => 'أبريل',
+            5 => 'مايو', 6 => 'يونيو', 7 => 'يوليو', 8 => 'أغسطس',
+            9 => 'سبتمبر', 10 => 'أكتوبر', 11 => 'نوفمبر', 12 => 'ديسمبر',
+        ];
+
+        $carbon = \Carbon\Carbon::parse($date);
+
+        return $carbon->day . ' ' . $months[$carbon->month] . ' ' . $carbon->year;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
