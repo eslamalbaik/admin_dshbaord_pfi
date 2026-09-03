@@ -27,9 +27,6 @@ class AuthController extends Controller
                 Log::info("Admin login: {$user->email} at " . now());
             }
 
-            // FTR-001: Invalidate all previous sessions before issuing new token
-            $user->tokens()->delete();
-
             $deviceLabel = substr($request->header('User-Agent', 'Unknown Device'), 0, 120);
             $token = $user->createToken('auth_token', ['*'], now()->addDays(30));
             $token->accessToken->update(['device_label' => $deviceLabel]);
@@ -76,8 +73,6 @@ class AuthController extends Controller
             'role' => 'student',
         ]);
 
-        // FTR-001: No prior tokens on fresh registration, but be defensive
-        $user->tokens()->delete();
         $plainToken = $user->createToken('auth_token')->plainTextToken;
 
         $landingUrl = rtrim(config('app.landing_url'), '/');
@@ -172,8 +167,6 @@ class AuthController extends Controller
             Log::info("New Google student registered: {$email}");
         }
 
-        // FTR-001: Invalidate all previous sessions on Google OAuth login too
-        $user->tokens()->delete();
         $plainToken = $user->createToken('google_oauth')->plainTextToken;
 
         $redirectUrl = in_array($user->role, ['admin', 'accountant'])
