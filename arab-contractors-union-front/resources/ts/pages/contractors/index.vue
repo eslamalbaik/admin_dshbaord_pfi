@@ -35,6 +35,7 @@ const headers = [
   { title: 'رقم السجل', key: 'commercial_register' },
   { title: 'التخصص', key: 'trade' },
   { title: 'الحالة', key: 'status' },
+  { title: 'حالة الحساب', key: 'has_app_account', sortable: false },
   { title: 'تاريخ الانضمام', key: 'created_at' },
   { title: 'إجراءات', key: 'actions', sortable: false },
 ]
@@ -287,6 +288,12 @@ const getSpecialtiesList = (contractor: any) => {
               </VListItem>
             </VList>
           </VMenu>
+        </template>
+
+        <template #item.has_app_account="{ item }">
+          <VChip :color="item.has_app_account ? 'success' : 'secondary'" size="small" label>
+            {{ item.has_app_account ? 'فاتح حساب' : 'لم يفتح بعد' }}
+          </VChip>
         </template>
 
         <template #item.created_at="{ item }">

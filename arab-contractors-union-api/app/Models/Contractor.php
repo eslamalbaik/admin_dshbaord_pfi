@@ -50,6 +50,8 @@ class Contractor extends Authenticatable
         'remember_token',
     ];
 
+    protected $appends = ['has_app_account'];
+
     protected $casts = [
         'established_year'       => 'integer',
         'field_lk_type'          => 'integer',
@@ -338,6 +340,12 @@ class Contractor extends Authenticatable
     public function getProfileDataCompleteAttribute(): bool
     {
         return count($this->missing_profile_fields) === 0;
+    }
+
+    /** فتح حساب على التطبيق = أكمل التحقق من الهوية وضبط كلمة مرور (نفس شرط تسجيل الدخول). */
+    public function getHasAppAccountAttribute(): bool
+    {
+        return (bool) $this->password && (bool) $this->phone_verified_at;
     }
 
     /**
