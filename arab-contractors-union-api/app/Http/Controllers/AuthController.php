@@ -35,8 +35,8 @@ class AuthController extends Controller
             $token->accessToken->update(['device_label' => $deviceLabel]);
             $plainToken = $token->plainTextToken;
 
-            $frontendUrl = rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/');
-            $landingUrl = rtrim(env('LANDING_URL', 'http://localhost:8080'), '/');
+            $frontendUrl = rtrim(config('app.frontend_url'), '/');
+            $landingUrl = rtrim(config('app.landing_url'), '/');
 
             $redirectUrl = match($user->role) {
                 'admin', 'accountant' => $frontendUrl . '/dashboards',
@@ -80,7 +80,7 @@ class AuthController extends Controller
         $user->tokens()->delete();
         $plainToken = $user->createToken('auth_token')->plainTextToken;
 
-        $landingUrl = rtrim(env('LANDING_URL', 'http://localhost:8080'), '/');
+        $landingUrl = rtrim(config('app.landing_url'), '/');
 
         return $this->successWithToken($plainToken, [
             'id'           => $user->id,
@@ -113,7 +113,7 @@ class AuthController extends Controller
      */
     public function redirectToGoogle(Request $request)
     {
-        $landingUrl = rtrim(env('LANDING_URL', 'http://localhost:8080'), '/');
+        $landingUrl = rtrim(config('app.landing_url'), '/');
 
         if (! config('services.google.client_id') || ! config('services.google.client_secret')) {
             return redirect($landingUrl . '/login?error=google_not_configured');
@@ -138,7 +138,7 @@ class AuthController extends Controller
     {
         $request->validate(['code' => 'required|string']);
 
-        $landingUrl = rtrim(env('LANDING_URL', 'http://localhost:8080'), '/');
+        $landingUrl = rtrim(config('app.landing_url'), '/');
 
         try {
             $driver     = Socialite::driver('google')->stateless();
@@ -177,7 +177,7 @@ class AuthController extends Controller
         $plainToken = $user->createToken('google_oauth')->plainTextToken;
 
         $redirectUrl = in_array($user->role, ['admin', 'accountant'])
-            ? rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/') . '/dashboards'
+            ? rtrim(config('app.frontend_url'), '/') . '/dashboards'
             : $landingUrl . '/student/dashboard';
 
         return $this->successWithToken($plainToken, [
