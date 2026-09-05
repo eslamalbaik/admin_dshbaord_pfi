@@ -12,25 +12,35 @@ class Tender extends Model
     /** سقف 5 مجالات رئيسية (REQ-12) + "عام" كتصنيف احتياطي للمجالات النادرة */
     public const CATEGORIES = ['مباني', 'طرق', 'بنية تحتية', 'قطاع صحي', 'قطاع تعليمي', 'عام'];
 
-    /** نافذة بادج "جديد" و"ينتهي قريباً" — بالساعات/الأيام على التوالي */
+    /** نافذة بادج "جديد" — بالساعات؛ "ينتهي قريباً" — عدد الأيام قبل الموعد النهائي */
     private const NEW_WINDOW_HOURS   = 48;
-    private const CLOSING_SOON_DAYS  = 7;
+    private const CLOSING_SOON_DAYS  = 4;
 
     protected $fillable = [
         'title', 'issuing_entity', 'reference_number', 'description', 'union_notes',
-        'category', 'budget', 'deadline',
-        'status', 'archived_at', 'bids_count', 'created_by',
+        'category', 'budget', 'deadline', 'published_at',
+        'status', 'archived_at', 'created_by',
         'submission_types', 'submission_email', 'submission_phone', 'submission_file',
         'external_url',
     ];
 
     protected $casts = [
         'deadline'         => 'date',
+        'published_at'     => 'datetime',
         'archived_at'      => 'datetime',
         'budget'           => 'decimal:2',
-        'bids_count'       => 'integer',
         'submission_types' => 'array',
     ];
+
+    protected $appends = ['is_active', 'is_new', 'is_updated', 'closing_soon'];
+
+    protected static function booted(): void
+    {
+        // تاريخ النشر تلقائي دائماً — لا حقل يدوي بالفورم، يُضبط لحظة الإنشاء بغض النظر عن نقطة الدخول
+        static::creating(function (Tender $tender) {
+            $tender->published_at ??= now();
+        });
+    }
 
     public function creator()
     {
@@ -75,7 +85,7 @@ class Tender extends Model
             && $this->updated_at->gt(now()->subHours(self::NEW_WINDOW_HOURS));
     }
 
-    /** بادج "ينتهي قريباً" — الموعد النهائي خلال 7 أيام القادمة */
+    /** بادج "ينتهي قريباً" — الموعد النهائي خلال CLOSING_SOON_DAYS أيام القادمة */
     public function getClosingSoonAttribute(): bool
     {
         return (bool) $this->deadline

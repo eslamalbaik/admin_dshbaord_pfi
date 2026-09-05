@@ -36,7 +36,7 @@ const editDialog  = ref(false)
 const editLoading = ref(false)
 const editTender  = ref<any>({})
 
-const openEdit = (item: any) => {
+const openEdit = async (item: any) => {
   editTender.value = {
     id:               item.id,
     title:            item.title,
@@ -51,7 +51,57 @@ const openEdit = (item: any) => {
     submission_file:  null,
     external_url:     item.external_url || '',
   }
+  attachments.value = Array.isArray(item.attachments) ? [...item.attachments] : []
   editDialog.value = true
+
+  // القائمة الإدارية ما بترجّع attachments (تفادياً لتحميل زايد على كل صف) — نجيبها وقت فتح التعديل
+  try {
+    const { data } = await api.get(`/api/v1/tenders/${item.id}`)
+    attachments.value = data.items?.attachments ?? []
+  } catch (err) {
+    console.error(err)
+  }
+}
+
+// ── مرفقات العطاء (متعددة — مستندات وصور) ──────────
+const attachments = ref<any[]>([])
+const newAttachmentFiles = ref<File[]>([])
+const attachmentUploading = ref(false)
+const attachmentDeletingId = ref<number | null>(null)
+
+const uploadAttachments = async () => {
+  if (!editTender.value.id || !newAttachmentFiles.value.length)
+    return
+  attachmentUploading.value = true
+  try {
+    for (const file of newAttachmentFiles.value) {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('label', file.name)
+      const { data } = await api.post(`/api/v1/tenders/${editTender.value.id}/attachments`, fd)
+      attachments.value.push(data.items)
+    }
+    newAttachmentFiles.value = []
+    notify('تمت إضافة المرفقات بنجاح')
+  } catch (err) {
+    console.error(err)
+    notify('تعذّر رفع أحد المرفقات', 'error')
+  } finally {
+    attachmentUploading.value = false
+  }
+}
+
+const removeAttachment = async (attachmentId: number) => {
+  attachmentDeletingId.value = attachmentId
+  try {
+    await api.delete(`/api/v1/tenders/${editTender.value.id}/attachments/${attachmentId}`)
+    attachments.value = attachments.value.filter(a => a.id !== attachmentId)
+  } catch (err) {
+    console.error(err)
+    notify('تعذّر حذف المرفق', 'error')
+  } finally {
+    attachmentDeletingId.value = null
+  }
 }
 
 const saveTender = async () => {
@@ -143,22 +193,23 @@ const submissionOptions = [
   { label: 'ملف مرفق', value: 'file', icon: 'tabler-file-upload' },
 ]
 
+// لازم يطابق Tender::CATEGORIES بالباك اند — أي قيمة زيادة هون بترفضها الـvalidation (422)
 const categoryOptions = [
-  'غير محدد',
+  'مباني',
   'طرق',
-  'ابنية',
-  'كهروميكانيك',
-  'المياه/المجارى',
-  'أشغال عامة',
+  'بنية تحتية',
+  'قطاع صحي',
+  'قطاع تعليمي',
+  'عام',
 ]
 
 const headers = [
   { title: 'عنوان العطاء', key: 'title' },
   { title: 'التصنيف', key: 'category' },
   { title: 'ملاحظات الاتحاد', key: 'union_notes' },
+  { title: 'تاريخ النشر', key: 'published_at' },
   { title: 'آخر موعد', key: 'deadline' },
   { title: 'الحالة', key: 'status' },
-  { title: 'العروض', key: 'bids_count' },
   { title: 'إجراءات', key: 'actions', sortable: false },
 ]
 
@@ -219,11 +270,13 @@ const createTender = async () => {
     if (newTender.value.submission_types.includes('file') && newTender.value.submission_file)
       formData.append('submission_file', newTender.value.submission_file)
 
-    await api.post('/api/v1/tenders', formData)
+    const { data } = await api.post('/api/v1/tenders', formData)
     createDialog.value = false
     newTender.value = { title: '', description: '', union_notes: '', category: '', deadline: '', status: 'open', submission_types: [], submission_email: '', submission_phone: '', submission_file: null }
-    notify('تم نشر العطاء بنجاح')
+    notify('تم نشر العطاء بنجاح — أضف مرفقات العطاء الآن لو حابب')
     fetchTenders()
+    // فتح نافذة التعديل مباشرة على العطاء الجديد — عشان إضافة المرفقات (بتحتاج id العطاء، مش متاحة وقت الإنشاء)
+    openEdit(data.items)
   }
   catch (err) {
     console.error(err)
@@ -327,18 +380,23 @@ watchEffect(() => fetchTenders())
           <span v-else class="text-medium-emphasis text-body-2">—</span>
         </template>
 
+        <template #item.published_at="{ item }">
+          {{ item.published_at ? new Date(item.published_at).toLocaleDateString('ar-PS') : '—' }}
+        </template>
+
         <template #item.deadline="{ item }">
-          {{ item.deadline ? new Date(item.deadline).toLocaleDateString('ar-PS') : '—' }}
+          <div class="d-flex align-center gap-2">
+            <span>{{ item.deadline ? new Date(item.deadline).toLocaleDateString('ar-PS') : '—' }}</span>
+            <VChip v-if="item.closing_soon" color="warning" size="x-small" label style="font-family:Cairo,sans-serif">
+              ينتهي قريباً
+            </VChip>
+          </div>
         </template>
 
         <template #item.status="{ item }">
           <VChip :color="getStatusColor(item.status)" size="small" label style="font-family:Cairo,sans-serif">
             {{ getStatusLabel(item.status) }}
           </VChip>
-        </template>
-
-        <template #item.bids_count="{ item }">
-          <VChip color="info" size="small" variant="tonal">{{ item.bids_count || 0 }}</VChip>
         </template>
 
         <template #item.actions="{ item }">
@@ -484,8 +542,8 @@ watchEffect(() => fetchTenders())
                 prepend-icon=""
                 accept=".pdf,.doc,.docx"
                 style="font-family:Cairo,sans-serif"
-                :model-value="newTender.submission_file ? [newTender.submission_file] : []"
-                @update:model-value="newTender.submission_file = $event?.[0] ?? null"
+                :model-value="newTender.submission_file"
+                @update:model-value="newTender.submission_file = ($event as File | null) ?? null"
               />
             </VCol>
 
@@ -596,8 +654,8 @@ watchEffect(() => fetchTenders())
                 prepend-icon=""
                 accept=".pdf,.doc,.docx"
                 style="font-family:Cairo,sans-serif"
-                :model-value="editTender.submission_file ? [editTender.submission_file] : []"
-                @update:model-value="editTender.submission_file = $event?.[0] ?? null"
+                :model-value="editTender.submission_file"
+                @update:model-value="editTender.submission_file = $event ?? null"
               />
             </VCol>
             <VCol cols="12">
@@ -609,6 +667,68 @@ watchEffect(() => fetchTenders())
                 dir="ltr"
                 placeholder="https://example.com/tender/123"
               />
+            </VCol>
+
+            <!-- مرفقات العطاء — متعددة، مستندات أو صور -->
+            <VCol cols="12">
+              <div class="text-body-2 font-weight-medium mb-2" style="font-family:Cairo,sans-serif">
+                مرفقات العطاء
+                <span class="text-medium-emphasis">(يمكن إضافة أكثر من ملف — مستند أو صورة)</span>
+              </div>
+
+              <div v-if="attachments.length" class="d-flex flex-wrap gap-3 mb-3">
+                <div
+                  v-for="att in attachments"
+                  :key="att.id"
+                  class="d-flex align-center gap-2 pa-2"
+                  style="border:1px solid rgba(var(--v-border-color),var(--v-border-opacity));border-radius:8px;max-width:220px"
+                >
+                  <VAvatar v-if="att.is_image" :image="att.url" size="32" rounded />
+                  <VAvatar v-else size="32" rounded color="secondary" variant="tonal">
+                    <VIcon icon="tabler-file-text" size="16" />
+                  </VAvatar>
+                  <a
+                    :href="att.url"
+                    target="_blank"
+                    rel="noopener"
+                    class="text-body-2 text-truncate"
+                    style="max-width:100px"
+                  >{{ att.label || 'ملف' }}</a>
+                  <VBtn
+                    icon
+                    size="x-small"
+                    variant="text"
+                    color="error"
+                    :loading="attachmentDeletingId === att.id"
+                    @click="removeAttachment(att.id)"
+                  >
+                    <VIcon icon="tabler-x" size="14" />
+                  </VBtn>
+                </div>
+              </div>
+
+              <div class="d-flex align-center gap-2">
+                <VFileInput
+                  label="إضافة مرفقات جديدة"
+                  prepend-inner-icon="tabler-paperclip"
+                  prepend-icon=""
+                  multiple
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+                  density="compact"
+                  style="font-family:Cairo,sans-serif;flex:1"
+                  :model-value="newAttachmentFiles"
+                  @update:model-value="newAttachmentFiles = $event ?? []"
+                />
+                <VBtn
+                  :disabled="!newAttachmentFiles.length"
+                  :loading="attachmentUploading"
+                  color="primary"
+                  variant="tonal"
+                  @click="uploadAttachments"
+                >
+                  رفع
+                </VBtn>
+              </div>
             </VCol>
           </VRow>
         </VCardText>

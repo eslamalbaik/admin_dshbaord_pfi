@@ -214,10 +214,10 @@ class TenderController extends Controller
         }
         // "تاريخ نشر العطاء" بمودال التصفية (شاشة العطاءات، تطبيق المقاول)
         if ($request->filled('created_from')) {
-            $query->whereDate('created_at', '>=', $request->date('created_from'));
+            $query->whereDate('published_at', '>=', $request->date('created_from'));
         }
         if ($request->filled('created_to')) {
-            $query->whereDate('created_at', '<=', $request->date('created_to'));
+            $query->whereDate('published_at', '<=', $request->date('created_to'));
         }
         if ($request->filled('deadline_from')) {
             $query->whereDate('deadline', '>=', $request->date('deadline_from'));
@@ -241,7 +241,7 @@ class TenderController extends Controller
                         });
                     }
                     if (in_array('closing_soon', $states, true)) {
-                        $q->orWhereBetween('deadline', [now()->toDateString(), now()->addDays(7)->toDateString()]);
+                        $q->orWhereBetween('deadline', [now()->toDateString(), now()->addDays(4)->toDateString()]);
                     }
                 });
             }
@@ -299,13 +299,13 @@ class TenderController extends Controller
             'category'            => $t->category,
             'budget'              => $t->budget,
             'deadline'            => $t->deadline?->toDateString(),
+            'published_at'        => $t->published_at?->toDateString(),
             'status'              => $t->status,
             'is_active'           => $t->is_active,
             'is_new'              => $t->is_new,
             'is_updated'          => $t->is_updated,
             'closing_soon'        => $t->closing_soon,
             'archived_at'         => $t->archived_at?->toDateString(),
-            'bids_count'          => $t->bids_count,
             'submission_types'    => $t->submission_types,
             'submission_email'    => $t->submission_email,
             'submission_phone'    => $t->submission_phone,
@@ -313,9 +313,10 @@ class TenderController extends Controller
                 ? Storage::disk('public')->url($t->submission_file)
                 : null,
             'attachments'         => $t->attachments->map(fn ($a) => [
-                'id'    => $a->id,
-                'label' => $a->label,
-                'url'   => $a->file_url,
+                'id'       => $a->id,
+                'label'    => $a->label,
+                'url'      => $a->file_url,
+                'is_image' => $a->is_image,
             ])->values(),
             'external_url'        => $t->external_url,
             'is_bookmarked'       => $bookmarkedIds?->contains($t->id) ?? false,
@@ -332,7 +333,7 @@ class TenderController extends Controller
     public function storeAttachment(Request $request, Tender $tender)
     {
         $data = $request->validate([
-            'file'  => 'required|file|mimes:pdf,doc,docx|max:10240',
+            'file'  => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png,webp|max:10240',
             'label' => 'nullable|string|max:255',
         ]);
 
@@ -344,7 +345,10 @@ class TenderController extends Controller
         ]);
 
         return $this->success([
-            'id' => $attachment->id, 'label' => $attachment->label, 'url' => $attachment->file_url,
+            'id'       => $attachment->id,
+            'label'    => $attachment->label,
+            'url'      => $attachment->file_url,
+            'is_image' => $attachment->is_image,
         ], 'تمت إضافة المرفق بنجاح.', 201);
     }
 

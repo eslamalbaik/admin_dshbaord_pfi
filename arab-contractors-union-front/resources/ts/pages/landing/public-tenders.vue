@@ -6,6 +6,13 @@ definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false
 
 const BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
+interface TenderAttachment {
+  id: number
+  label: string | null
+  url: string
+  is_image: boolean
+}
+
 interface Tender {
   id: number
   title: string
@@ -13,11 +20,14 @@ interface Tender {
   category: string | null
   budget: string | null
   deadline: string | null
+  published_at: string | null
   status: 'open' | 'closed' | 'cancelled'
+  closing_soon: boolean
   submission_types: string[] | null
   submission_email: string | null
   submission_phone: string | null
   submission_file_url: string | null
+  attachments: TenderAttachment[]
   external_url: string | null
   updated_at: string
 }
@@ -52,7 +62,7 @@ const sorts = [
 const categories = ref<string[]>([])
 
 const statusLabel: Record<string, string> = { open: 'مفتوحة', closed: 'مغلقة', cancelled: 'ملغاة' }
-const statusClass: Record<string, string> = { open: 'status-open', closed: 'status-closed', cancelled: 'status-closing' }
+const statusClass: Record<string, string> = { open: 'status-open', closed: 'status-closed', cancelled: 'status-closed' }
 
 const cardColors = ['#2e7d32', '#1a237e', '#e65100', '#6a1b9a', '#c62828', '#00695c']
 const colorFor = (id: number) => cardColors[id % cardColors.length]
@@ -196,6 +206,7 @@ function openTender(t: Tender) {
                       :style="`background:${colorFor(t.id)}15;color:${colorFor(t.id)};border-color:${colorFor(t.id)}40`"
                     >{{ t.category }}</span>
                     <span class="tender-status" :class="statusClass[t.status]">{{ statusLabel[t.status] ?? t.status }}</span>
+                    <span v-if="t.closing_soon" class="tender-status status-closing">ينتهي قريباً</span>
                   </div>
                   <h3 class="tender-title">{{ t.title }}</h3>
                 </div>
@@ -205,6 +216,7 @@ function openTender(t: Tender) {
                 </div>
               </div>
               <div class="tender-info">
+                <span><Calendar :size="13" /> تاريخ النشر: {{ fmtDate(t.published_at) }}</span>
                 <span><Calendar :size="13" /> آخر موعد: {{ fmtDate(t.deadline) }}</span>
                 <span><Calendar :size="13" /> آخر تحديث: {{ fmtDate(t.updated_at) }}</span>
               </div>
@@ -219,6 +231,20 @@ function openTender(t: Tender) {
                     target="_blank"
                     rel="noopener"
                   ><FileText :size="13" /> ملف العطاء</a>
+                </div>
+                <div v-if="t.attachments?.length" class="tender-attachments">
+                  <a
+                    v-for="att in t.attachments"
+                    :key="att.id"
+                    :href="att.url"
+                    target="_blank"
+                    rel="noopener"
+                    class="tender-attachment"
+                  >
+                    <img v-if="att.is_image" :src="att.url" :alt="att.label ?? 'مرفق'" class="tender-attachment-img" />
+                    <FileText v-else :size="13" />
+                    <span>{{ att.label || 'مرفق' }}</span>
+                  </a>
                 </div>
               </div>
             </div>
@@ -309,6 +335,10 @@ function openTender(t: Tender) {
 .tender-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
 .tender-details { margin-top: .75rem; padding-top: .75rem; border-top: 1px dashed #e5e7eb; font-size: .85rem; color: #6b7280; line-height: 1.8; }
 .tender-details a { color: #1a237e; display: inline-flex; align-items: center; gap: .3rem; }
+.tender-attachments { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
+.tender-attachment { display: flex; align-items: center; gap: .4rem; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 8px; padding: .3rem .6rem; font-size: .78rem; color: #1a237e; text-decoration: none; }
+.tender-attachment:hover { background: #e8eaf6; }
+.tender-attachment-img { width: 18px; height: 18px; object-fit: cover; border-radius: 4px; }
 .empty-state { text-align: center; padding: 4rem 2rem; color: #9ca3af; }
 .empty-state p { font-size: 1rem; margin-top: 1rem; }
 

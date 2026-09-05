@@ -146,7 +146,6 @@ class UnionSeeder extends Seeder
                 array_merge($data, [
                     'description' => 'تفاصيل عطاء ' . $data['title'],
                     'deadline'    => Carbon::now()->addDays(rand(15, 60)),
-                    'bids_count'  => rand(0, 8),
                     'created_by'  => $admin->id,
                 ])
             );

@@ -529,7 +529,7 @@ async function fetchTenders() {
     if (tenderSearch.value) params.set('search', tenderSearch.value)
     params.set('per_page', '10')
 
-    const r = await fetch(`${BASE}/api/v1/tenders-public?${params}`).then(res => res.json())
+    const r = await axios.get(`${BASE}/api/v1/contractor/tenders?${params}`, { headers: apiHeaders() }).then(res => res.data)
     latestTenders.value = r.items ?? []
     for (const t of latestTenders.value) {
       if (t.category && !tenderCategories.value.includes(t.category))
@@ -1231,10 +1231,15 @@ function downloadDoc(url: string, title: string) {
             <div v-if="!latestTenders.length" class="docs-hint">لا توجد عطاءات مطابقة لهذا الفلتر.</div>
             <div class="feed-list">
               <a v-for="t in latestTenders" :key="t.id" :href="t.external_url || '/landing/public-tenders'" class="feed-card" target="_blank">
-                <h4>{{ t.title }}</h4>
+                <h4>
+                  {{ t.title }}
+                  <span v-if="t.closing_soon" class="tender-closing-badge">ينتهي قريباً</span>
+                </h4>
                 <div class="fc-meta">
+                  <span><CalendarDays :size="14"/> نُشر: {{ t.published_at ? new Date(t.published_at).toLocaleDateString('ar-EG') : '—' }}</span>
                   <span><CalendarDays :size="14"/> إغلاق: {{ t.deadline ? new Date(t.deadline).toLocaleDateString('ar-EG') : '—' }}</span>
                   <span v-if="t.budget"><Wallet :size="14"/> {{ Number(t.budget).toLocaleString() }} $</span>
+                  <span v-if="t.attachments?.length"><Paperclip :size="14"/> {{ t.attachments.length }} مرفق</span>
                 </div>
               </a>
             </div>
@@ -1631,8 +1636,9 @@ textarea.md-fi { resize: vertical; }
 }
 .feed-card:hover { border-color: var(--text-muted); transform: translateX(-5px); }
 .feed-card h4 { font-size: 1.05rem; font-weight: 800; margin-bottom: 0.5rem; color: var(--primary); }
-.fc-meta { display: flex; gap: 1rem; font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
+.fc-meta { display: flex; gap: 1rem; font-size: 0.8rem; color: var(--text-muted); font-weight: 600; flex-wrap: wrap; }
 .fc-meta span { display: flex; align-items: center; gap: 0.3rem; }
+.tender-closing-badge { display: inline-block; margin-inline-start: 0.5rem; font-size: 0.7rem; font-weight: 700; color: #e65100; background: #fff8e1; border-radius: 50px; padding: 0.15rem 0.6rem; vertical-align: middle; }
 .md-link { font-size: 0.9rem; font-weight: 700; color: var(--accent); text-decoration: none; }
 
 /* ─── Utils ─── */
