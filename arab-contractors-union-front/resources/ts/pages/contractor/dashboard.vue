@@ -140,6 +140,7 @@ const duesTotalJod = ref(0)
 const duesPaidJod = ref(0)
 const duesPaidPercentage = ref(0)
 const duesCounts = ref({ unpaid: 0, pending_review: 0 })
+const feeBreakdown = ref<{ fields: Array<{ field_name: string; counted_specialty?: { grade_label: string }; rate_percent: number; amount_jod: number }>; total_before_discount_jod: number } | null>(null)
 
 interface PendingDuesPayment {
   id: number; description: string; amount: string; currency: string
@@ -168,6 +169,7 @@ async function fetchFinancial() {
     duesPaidPercentage.value = Number(items?.summary?.dues_paid_percentage ?? 0)
     duesCounts.value = items?.dues_counts ?? { unpaid: 0, pending_review: 0 }
     pendingDuesPayments.value = items?.pending_dues_payments ?? []
+    feeBreakdown.value = items?.current_year_fee_breakdown ?? null
   } catch {}
 }
 
@@ -225,11 +227,15 @@ const editForm = ref({
 // ─── محرّر التخصصات والتصنيفات ───
 interface SpecRow { field_lk_type: number | null; specialization_lk_type: number | null; classification: string | null }
 interface CatalogItem { id: number; name: string }
-interface GradeItem { value: string; label: string; level: number | null }
+interface GradeItem { value: string; label: string; level: number | null; eligible_fields: number[] | null }
+interface OverallGradeItem { value: string; label: string }
+function gradesFor(fieldLkType: number | null) {
+  return catalog.value.grades.filter(g => !g.eligible_fields || g.eligible_fields.includes(fieldLkType as number))
+}
 const rawSpecialties = ref<SpecRow[]>([])
 const editClassification = ref<string>('')
 const editSpecialties = ref<SpecRow[]>([])
-const catalog = ref<{ fields: CatalogItem[]; specializations: CatalogItem[]; grades: GradeItem[] }>({ fields: [], specializations: [], grades: [] })
+const catalog = ref<{ fields: CatalogItem[]; specializations: CatalogItem[]; grades: GradeItem[]; overall_grades: OverallGradeItem[] }>({ fields: [], specializations: [], grades: [], overall_grades: [] })
 
 async function fetchCatalog() {
   if (catalog.value.fields.length) return
@@ -959,7 +965,7 @@ function downloadDoc(url: string, title: string) {
                   <label>التصنيف العام</label>
                   <select v-model="editClassification" class="md-fi">
                     <option value="">— غير محدد —</option>
-                    <option v-for="g in catalog.grades" :key="g.value" :value="g.value">{{ g.label }} ({{ g.value }})</option>
+                    <option v-for="g in catalog.overall_grades" :key="g.value" :value="g.value">{{ g.label }} ({{ g.value }})</option>
                   </select>
                 </div>
 
@@ -984,7 +990,7 @@ function downloadDoc(url: string, title: string) {
                     <label>الدرجة</label>
                     <select v-model="row.classification" class="md-fi">
                       <option :value="null">— غير محدد —</option>
-                      <option v-for="g in catalog.grades" :key="g.value" :value="g.value">{{ g.label }}</option>
+                      <option v-for="g in gradesFor(row.field_lk_type)" :key="g.value" :value="g.value">{{ g.label }}</option>
                     </select>
                   </div>
                   <button type="button" class="spec-row-remove" title="حذف" @click="removeSpecRow(i)"><X :size="16" /></button>
@@ -1100,6 +1106,30 @@ function downloadDoc(url: string, title: string) {
                 <span v-if="duesCounts.unpaid" class="md-badge badge-red">{{ duesCounts.unpaid }} غير مدفوع</span>
                 <span v-if="duesCounts.pending_review" class="md-badge badge-yellow">{{ duesCounts.pending_review }} قيد المراجعة</span>
               </div>
+            </div>
+
+            <!-- تفصيل احتساب رسوم السنة الحالية (محرّك الاحتساب الآلي — المادة 37) -->
+            <div v-if="feeBreakdown?.fields?.length" class="fee-breakdown-card">
+              <h4 class="fbc-title">كيف احتُسبت رسومك لهذا العام</h4>
+              <table class="fbc-table">
+                <thead>
+                  <tr>
+                    <th>المجال</th>
+                    <th>الدرجة المعتمدة</th>
+                    <th>النسبة</th>
+                    <th>القيمة (د.أ)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="f in feeBreakdown.fields" :key="f.field_name">
+                    <td>{{ f.field_name }}</td>
+                    <td>{{ f.counted_specialty?.grade_label ?? '—' }}</td>
+                    <td>{{ f.rate_percent }}%</td>
+                    <td>{{ f.amount_jod }}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p class="fbc-total">الإجمالي: <strong>{{ feeBreakdown.total_before_discount_jod }} د.أ</strong></p>
             </div>
 
             <!-- تحويلات قيد المراجعة (بانتظار اعتماد المحاسبة) -->
@@ -1515,6 +1545,12 @@ textarea.md-fi { resize: vertical; }
 .dsc-val.danger { color: #fca5a5; }
 .dsc-val.success { color: #86efac; }
 .dsc-progress-track { height: 6px; background: rgba(255,255,255,0.2); border-radius: 999px; overflow: hidden; margin-bottom: 0.85rem; }
+.fee-breakdown-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; }
+.fbc-title { font-size: 0.95rem; font-weight: 800; margin-bottom: 0.85rem; }
+.fbc-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.fbc-table th, .fbc-table td { padding: 0.5rem 0.4rem; text-align: right; border-bottom: 1px solid #f0f0f0; }
+.fbc-table th { font-weight: 700; color: #6b7280; }
+.fbc-total { margin-top: 0.75rem; font-size: 0.9rem; text-align: left; }
 .dsc-progress-fill { height: 100%; background: #fff; border-radius: 999px; transition: width 0.3s; }
 .dsc-badges { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 

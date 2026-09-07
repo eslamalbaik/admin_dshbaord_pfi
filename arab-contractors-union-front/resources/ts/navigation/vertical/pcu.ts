@@ -58,6 +58,11 @@ if (!isAccountant) {
 	  icon: { icon: 'tabler-alert-triangle' },
 	  to: 'contractors-penalties',
 	})
+	menuItems.push({
+	  title: 'الحسابات البنكية',
+	  icon: { icon: 'tabler-building-bank' },
+	  to: 'settings-bank-accounts',
+	})
 
 // 4. العطاءات وسوق الآليات والوثائق (للأدمن فقط)
 if (!isAccountant) {
@@ -114,6 +119,11 @@ if (!isAccountant) {
     icon: { icon: 'tabler-calendar-event' },
     to: 'events',
   })
+  menuItems.push({
+    title: 'التعميمات',
+    icon: { icon: 'tabler-speakerphone' },
+    to: 'announcements',
+  })
 }
 
 // 5. التقارير والإشعارات (مشتركة)
@@ -153,14 +163,14 @@ if (!isAccountant) {
     to: 'settings-app-settings',
   })
   menuItems.push({
-    title: 'الحسابات البنكية',
-    icon: { icon: 'tabler-building-bank' },
-    to: 'settings-bank-accounts',
-  })
-  menuItems.push({
     title: 'الصفحات الديناميكية',
     icon: { icon: 'tabler-file-plus' },
     to: 'settings-pages',
+  })
+  menuItems.push({
+    title: 'رسوم الدرجات',
+    icon: { icon: 'tabler-cash' },
+    to: 'settings-grade-fees',
   })
 }
 

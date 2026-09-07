@@ -30,6 +30,7 @@ interface DueItem {
   source: string
   due_date: string | null
   notes: string | null
+  discount_amount_jod: string | number | null
 }
 
 const successMessage = ref('')
@@ -309,6 +310,170 @@ const importMutation = useMutation({
   },
   onError: (e: any) => flash(e?.response?.data?.message || 'فشل الاستيراد.', true),
 })
+
+// ─── احسب الرسوم (محرّك الاحتساب الآلي — المادة 37) ───
+const calcDialog = ref(false)
+const calculatingFor = ref<ContractorRow | null>(null)
+const calcForm = ref({ year: new Date().getFullYear(), discount_type: '' as '' | 'percent' | 'fixed', discount_value: '', discount_reason: '' })
+const calcPreview = ref<any>(null)
+const calcError = ref('')
+
+function openCalculateFees(c: ContractorRow) {
+  calculatingFor.value = c
+  calcForm.value = { year: new Date().getFullYear(), discount_type: '', discount_value: '', discount_reason: '' }
+  calcPreview.value = null
+  calcError.value = ''
+  calcDialog.value = true
+}
+
+function calcPayload() {
+  const payload: any = { year: calcForm.value.year }
+  if (calcForm.value.discount_type) {
+    payload.discount_type = calcForm.value.discount_type
+    payload.discount_value = calcForm.value.discount_value
+    payload.discount_reason = calcForm.value.discount_reason || undefined
+  }
+
+  return payload
+}
+
+const previewFeeMutation = useMutation({
+  mutationFn: async () => (await api.post(
+    `/api/v1/dashboard/contractors/${calculatingFor.value!.contractor_id}/dues/calculate-fee`,
+    calcPayload(),
+  )).data,
+  onSuccess: (d: any) => {
+    calcPreview.value = d.items
+    calcError.value = ''
+  },
+  onError: (e: any) => {
+    calcPreview.value = e?.response?.data?.errors?.breakdown ?? null
+    calcError.value = e?.response?.data?.message || 'تعذّر احتساب الرسوم.'
+  },
+})
+
+const generateFeeMutation = useMutation({
+  mutationFn: async (force: boolean) => (await api.post(
+    `/api/v1/dashboard/contractors/${calculatingFor.value!.contractor_id}/dues/generate-fee`,
+    { ...calcPayload(), force },
+  )).data,
+  onSuccess: (d: any) => {
+    calcDialog.value = false
+    flash(d.items?.warning ? `${d.message} — ${d.items.warning}` : d.message)
+    refreshAll()
+  },
+  onError: (e: any) => {
+    if (e?.response?.status === 409) {
+      calcError.value = `${e.response.data.message} (رقم الذمة: ${e.response.data.errors?.existing_due_id})`
+    }
+    else {
+      calcError.value = e?.response?.data?.message || 'فشل توليد ذمة الرسوم.'
+    }
+  },
+})
+
+// ─── توليد للكل (دفعة واحدة) ───
+const bulkGenDialog = ref(false)
+const bulkGenForm = ref({ year: new Date().getFullYear() })
+const bulkGenResult = ref<any>(null)
+
+function openBulkGenerate() {
+  bulkGenForm.value = { year: new Date().getFullYear() }
+  bulkGenResult.value = null
+  bulkGenDialog.value = true
+}
+
+const bulkGenMutation = useMutation({
+  mutationFn: async (dryRun: boolean) => (await api.post('/api/v1/dashboard/dues/generate-fee/bulk', {
+    year: bulkGenForm.value.year,
+    dry_run: dryRun,
+  }, { timeout: 300000 })).data,
+  onSuccess: (d: any) => {
+    bulkGenResult.value = d.items
+    if (d.items?.created_count) {
+      flash(`تم توليد ${d.items.created_count} ذمة رسوم.`)
+      refreshAll()
+    }
+  },
+  onError: (e: any) => flash(e?.response?.data?.message || 'فشل التوليد الجماعي.', true),
+})
+
+// ─── خصم جماعي — اختيار صريح (checkboxes) ───
+const selectedDueIds = ref<number[]>([])
+
+watch(expandedDues, () => selectedDueIds.value = [])
+
+const allDuesSelected = computed(() =>
+  expandedDues.value.length > 0 && selectedDueIds.value.length === expandedDues.value.length)
+
+function toggleSelectAllDues() {
+  selectedDueIds.value = allDuesSelected.value ? [] : expandedDues.value.map(d => d.id)
+}
+
+const selectedDiscountDialog = ref(false)
+const selectedDiscountForm = ref({ discount_type: 'percent' as 'percent' | 'fixed', discount_value: '', discount_reason: '' })
+
+const applySelectedDiscountMutation = useMutation({
+  mutationFn: async () => (await api.post('/api/v1/dashboard/dues/discount/bulk', {
+    mode: 'ids',
+    ids: selectedDueIds.value,
+    ...selectedDiscountForm.value,
+  })).data,
+  onSuccess: (d: any) => {
+    selectedDiscountDialog.value = false
+    selectedDueIds.value = []
+    flash(`تم تطبيق الخصم على ${d.items?.applied_count ?? 0} ذمة.`)
+    refreshAll()
+  },
+  onError: (e: any) => flash(e?.response?.data?.message || 'فشل تطبيق الخصم.', true),
+})
+
+// ─── خصم جماعي — بمعايير (سنة/حالة/مصدر) عبر كل المقاولين ───
+const criteriaDiscountDialog = ref(false)
+const criteriaForm = ref({
+  year: '' as string | number,
+  status: '' as string,
+  source: '' as string,
+  discount_type: 'percent' as 'percent' | 'fixed',
+  discount_value: '',
+  discount_reason: '',
+})
+const criteriaPreview = ref<any>(null)
+
+function openCriteriaDiscount() {
+  criteriaForm.value = { year: '', status: '', source: '', discount_type: 'percent', discount_value: '', discount_reason: '' }
+  criteriaPreview.value = null
+  criteriaDiscountDialog.value = true
+}
+
+function criteriaPayload() {
+  return {
+    mode: 'criteria',
+    criteria: {
+      year: criteriaForm.value.year || undefined,
+      status: criteriaForm.value.status || undefined,
+      source: criteriaForm.value.source || undefined,
+    },
+    discount_type: criteriaForm.value.discount_type,
+    discount_value: criteriaForm.value.discount_value,
+    discount_reason: criteriaForm.value.discount_reason || undefined,
+  }
+}
+
+const criteriaDiscountMutation = useMutation({
+  mutationFn: async (dryRun: boolean) => (await api.post('/api/v1/dashboard/dues/discount/bulk', {
+    ...criteriaPayload(),
+    dry_run: dryRun,
+  })).data,
+  onSuccess: (d: any) => {
+    criteriaPreview.value = d.items
+    if (!('total_discount_impact_jod' in (d.items ?? {}))) {
+      flash(`تم تطبيق الخصم على ${d.items?.applied_count ?? 0} ذمة.`)
+      refreshAll()
+    }
+  },
+  onError: (e: any) => flash(e?.response?.data?.message || 'فشل تطبيق الخصم الجماعي.', true),
+})
 </script>
 
 <template>
@@ -320,7 +485,23 @@ const importMutation = useMutation({
           صف لكل شركة — اضغط على الشركة لعرض كل سنواتها، وسجّل الدفعات الواردة لتوزيعها تلقائياً
         </p>
       </div>
-      <div class="d-flex gap-2">
+      <div class="d-flex gap-2 flex-wrap">
+        <VBtn
+          variant="tonal"
+          color="info"
+          prepend-icon="tabler-percentage"
+          @click="openCriteriaDiscount"
+        >
+          خصم جماعي بمعايير
+        </VBtn>
+        <VBtn
+          variant="tonal"
+          color="primary"
+          prepend-icon="tabler-calculator"
+          @click="openBulkGenerate"
+        >
+          توليد رسوم للكل
+        </VBtn>
         <VBtn
           variant="tonal"
           color="success"
@@ -376,6 +557,15 @@ const importMutation = useMutation({
               <span dir="ltr">ILS: {{ rates?.items?.latest?.ILS?.rate_to_jod ?? '—' }}</span>
               <span dir="ltr">USD: {{ rates?.items?.latest?.USD?.rate_to_jod ?? '—' }}</span>
             </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+      <VCol cols="12" md="3">
+        <VCard>
+          <VCardText>
+            <p class="text-body-2 text-medium-emphasis mb-1">رسوم تسجيل (أول انتساب)</p>
+            <h3 class="text-h5">{{ summary?.items?.registration_fees?.total_jod ?? '—' }} د.أ</h3>
+            <p class="text-caption text-medium-emphasis mb-0">{{ summary?.items?.registration_fees?.dues_count ?? 0 }} ذمة</p>
           </VCardText>
         </VCard>
       </VCol>
@@ -449,6 +639,13 @@ const importMutation = useMutation({
                 <VBtn
                   size="small"
                   variant="text"
+                  icon="tabler-calculator"
+                  title="احسب الرسوم السنوية (محرّك الاحتساب الآلي)"
+                  @click="openCalculateFees(c)"
+                />
+                <VBtn
+                  size="small"
+                  variant="text"
                   icon="tabler-plus"
                   title="إضافة ذمة لهذه الشركة"
                   @click="openCreateDue(c)"
@@ -460,10 +657,18 @@ const importMutation = useMutation({
             <tr v-if="expandedId === c.contractor_id">
               <td colspan="8" style="background: rgba(var(--v-theme-primary), 0.03); padding: 0;">
                 <VProgressLinear v-if="expandedLoading" indeterminate color="primary" />
-                <div v-else class="overflow-x-auto">
+                <template v-else>
+                <div v-if="selectedDueIds.length" class="d-flex align-center gap-3 pa-2" style="background: rgba(var(--v-theme-info), 0.08);">
+                  <span class="text-body-2">{{ selectedDueIds.length }} ذمة محدَّدة</span>
+                  <VBtn size="small" color="info" @click="selectedDiscountDialog = true">تطبيق خصم على المحدَّد</VBtn>
+                </div>
+                <div class="overflow-x-auto">
                 <VTable density="compact" style="background: transparent;">
                   <thead>
                     <tr>
+                      <th style="inline-size: 36px;">
+                        <VCheckboxBtn :model-value="allDuesSelected" @update:model-value="toggleSelectAllDues" />
+                      </th>
                       <th>السنة</th>
                       <th>البيان</th>
                       <th>المبلغ (د.أ)</th>
@@ -475,8 +680,15 @@ const importMutation = useMutation({
                   </thead>
                   <tbody>
                     <tr v-for="d in expandedDues" :key="d.id">
+                      <td><VCheckboxBtn v-model="selectedDueIds" :value="d.id" /></td>
                       <td>{{ d.year ?? '—' }}</td>
-                      <td>{{ d.description }}</td>
+                      <td>
+                        {{ d.description }}
+                        <VChip v-if="d.source === 'fee_engine'" size="x-small" color="primary" variant="tonal" class="ms-1">محرّك الاحتساب</VChip>
+                        <VChip v-if="d.discount_amount_jod" size="x-small" color="info" variant="tonal" class="ms-1">
+                          خصم {{ d.discount_amount_jod }} د.أ
+                        </VChip>
+                      </td>
                       <td>{{ d.amount_jod }}</td>
                       <td>{{ d.paid_jod }}</td>
                       <td>{{ d.remaining_jod }}</td>
@@ -499,6 +711,7 @@ const importMutation = useMutation({
                   </tbody>
                 </VTable>
                 </div>
+                </template>
               </td>
             </tr>
           </template>
@@ -750,6 +963,290 @@ const importMutation = useMutation({
             @click="saveDueMutation.mutate()"
           >
             حفظ
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- ─── Dialog احسب الرسوم (محرّك الاحتساب الآلي) ─── -->
+    <VDialog v-model="calcDialog" max-width="720">
+      <VCard :title="`احتساب رسوم العضوية — ${calculatingFor?.name ?? ''}`">
+        <VCardText>
+          <VAlert v-if="calcError" type="error" variant="tonal" density="compact" class="mb-4">
+            {{ calcError }}
+          </VAlert>
+
+          <VRow dense>
+            <VCol cols="12" md="4">
+              <VTextField v-model.number="calcForm.year" label="السنة" type="number" dir="ltr" />
+            </VCol>
+            <VCol cols="12" md="4">
+              <VSelect
+                v-model="calcForm.discount_type"
+                :items="[{ title: 'بدون خصم', value: '' }, { title: 'نسبة مئوية', value: 'percent' }, { title: 'مبلغ ثابت', value: 'fixed' }]"
+                label="نوع الخصم (اختياري)"
+              />
+            </VCol>
+            <VCol v-if="calcForm.discount_type" cols="12" md="4">
+              <VTextField
+                v-model="calcForm.discount_value"
+                :label="calcForm.discount_type === 'percent' ? 'نسبة الخصم %' : 'مبلغ الخصم (د.أ)'"
+                type="number"
+                dir="ltr"
+              />
+            </VCol>
+            <VCol v-if="calcForm.discount_type" cols="12">
+              <VTextField v-model="calcForm.discount_reason" label="سبب الخصم" dir="rtl" />
+            </VCol>
+          </VRow>
+
+          <VBtn
+            class="mt-2"
+            variant="tonal"
+            color="primary"
+            :loading="previewFeeMutation.isPending.value"
+            @click="previewFeeMutation.mutate()"
+          >
+            احسب
+          </VBtn>
+
+          <template v-if="calcPreview">
+            <VDivider class="my-4" />
+            <div class="overflow-x-auto">
+              <VTable density="compact">
+                <thead>
+                  <tr>
+                    <th>المجال</th>
+                    <th>الدرجة المعتمدة</th>
+                    <th>النوع</th>
+                    <th>النسبة</th>
+                    <th>القيمة (د.أ)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="f in calcPreview.breakdown?.fields ?? []" :key="f.field_id">
+                    <td>{{ f.field_name }}</td>
+                    <td>{{ f.counted_specialty?.grade_label ?? '—' }}</td>
+                    <td>
+                      <VChip v-if="f.fee_type === 'registration'" size="x-small" color="primary" variant="tonal">رسم تسجيل</VChip>
+                      <span v-else>رسم سنوي</span>
+                    </td>
+                    <td>{{ f.rate_percent }}%</td>
+                    <td>{{ f.amount_jod }}</td>
+                  </tr>
+                </tbody>
+              </VTable>
+            </div>
+            <VAlert v-if="calcPreview.breakdown?.is_new_registration_year" type="info" variant="tonal" density="compact" class="mt-2">
+              أول سنة انتساب — رسم التسجيل مُطبَّق على المجال الأعلى بدل الرسم السنوي.
+            </VAlert>
+            <VRow dense class="mt-2">
+              <VCol cols="6" md="4">
+                <p class="text-caption text-medium-emphasis mb-0">الإجمالي قبل الخصم</p>
+                <strong>{{ calcPreview.total_before_discount_jod }} د.أ</strong>
+              </VCol>
+              <VCol v-if="calcPreview.discount_amount_jod" cols="6" md="4">
+                <p class="text-caption text-medium-emphasis mb-0">قيمة الخصم</p>
+                <strong class="text-info">{{ calcPreview.discount_amount_jod }} د.أ</strong>
+              </VCol>
+              <VCol cols="6" md="4">
+                <p class="text-caption text-medium-emphasis mb-0">الإجمالي المستحَق</p>
+                <strong class="text-success">{{ calcPreview.total_after_discount_jod }} د.أ</strong>
+              </VCol>
+            </VRow>
+          </template>
+        </VCardText>
+        <VCardActions class="justify-end pb-4 px-6">
+          <VBtn variant="tonal" color="secondary" @click="calcDialog = false">إلغاء</VBtn>
+          <VBtn
+            v-if="calcPreview && !calcPreview.unresolvable"
+            color="success"
+            :loading="generateFeeMutation.isPending.value"
+            @click="generateFeeMutation.mutate(false)"
+          >
+            توليد الذمة
+          </VBtn>
+          <VBtn
+            v-if="calcPreview && !calcPreview.unresolvable"
+            variant="tonal"
+            color="warning"
+            :loading="generateFeeMutation.isPending.value"
+            @click="generateFeeMutation.mutate(true)"
+          >
+            توليد (استبدال إن وُجدت)
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- ─── Dialog توليد رسوم للكل ─── -->
+    <VDialog v-model="bulkGenDialog" max-width="720">
+      <VCard title="توليد رسوم العضوية لجميع المقاولين">
+        <VCardText>
+          <VAlert type="info" variant="tonal" density="compact" class="mb-4">
+            يُنشئ ذمة رسوم لكل مقاول لديه تخصصات مسجَّلة وليس لديه ذمة رسوم سابقة لنفس السنة.
+            استخدم "معاينة" أولاً لمراجعة من سيُنشأ له ذمة ومن سيُستثنى (بيانات غير موحَّدة).
+          </VAlert>
+
+          <VTextField v-model.number="bulkGenForm.year" label="السنة" type="number" dir="ltr" style="max-width: 200px;" />
+
+          <template v-if="bulkGenResult">
+            <VDivider class="my-4" />
+            <VRow dense>
+              <VCol cols="4">
+                <p class="text-caption text-medium-emphasis mb-0">سيُنشأ لهم / أُنشئ</p>
+                <strong class="text-success">{{ bulkGenResult.would_create?.length ?? 0 }}</strong>
+              </VCol>
+              <VCol cols="4">
+                <p class="text-caption text-medium-emphasis mb-0">لديهم ذمة مسبقاً (تُستثنى)</p>
+                <strong>{{ bulkGenResult.would_skip_existing?.length ?? 0 }}</strong>
+              </VCol>
+              <VCol cols="4">
+                <p class="text-caption text-medium-emphasis mb-0">بيانات غير موحَّدة (تُستثنى)</p>
+                <strong class="text-error">{{ bulkGenResult.unresolvable?.length ?? 0 }}</strong>
+              </VCol>
+            </VRow>
+          </template>
+        </VCardText>
+        <VCardActions class="justify-end pb-4 px-6">
+          <VBtn variant="tonal" color="secondary" @click="bulkGenDialog = false">إغلاق</VBtn>
+          <VBtn
+            variant="tonal"
+            color="info"
+            :loading="bulkGenMutation.isPending.value"
+            @click="bulkGenMutation.mutate(true)"
+          >
+            معاينة (بدون كتابة)
+          </VBtn>
+          <VBtn
+            color="success"
+            :loading="bulkGenMutation.isPending.value"
+            @click="bulkGenMutation.mutate(false)"
+          >
+            توليد فعلي
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- ─── Dialog خصم على المحدَّد (checkboxes) ─── -->
+    <VDialog v-model="selectedDiscountDialog" max-width="480">
+      <VCard title="تطبيق خصم على الذمم المحدَّدة">
+        <VCardText>
+          <p class="text-body-2 mb-4">سيُطبَّق الخصم على {{ selectedDueIds.length }} ذمة محدَّدة.</p>
+          <VRow dense>
+            <VCol cols="12" md="6">
+              <VSelect
+                v-model="selectedDiscountForm.discount_type"
+                :items="[{ title: 'نسبة مئوية', value: 'percent' }, { title: 'مبلغ ثابت', value: 'fixed' }]"
+                label="نوع الخصم"
+              />
+            </VCol>
+            <VCol cols="12" md="6">
+              <VTextField
+                v-model="selectedDiscountForm.discount_value"
+                :label="selectedDiscountForm.discount_type === 'percent' ? 'نسبة الخصم %' : 'مبلغ الخصم (د.أ)'"
+                type="number"
+                dir="ltr"
+              />
+            </VCol>
+            <VCol cols="12">
+              <VTextField v-model="selectedDiscountForm.discount_reason" label="سبب الخصم" dir="rtl" />
+            </VCol>
+          </VRow>
+        </VCardText>
+        <VCardActions class="justify-end pb-4 px-6">
+          <VBtn variant="tonal" color="secondary" @click="selectedDiscountDialog = false">إلغاء</VBtn>
+          <VBtn
+            color="info"
+            :disabled="!selectedDiscountForm.discount_value"
+            :loading="applySelectedDiscountMutation.isPending.value"
+            @click="applySelectedDiscountMutation.mutate()"
+          >
+            تطبيق الخصم
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- ─── Dialog خصم جماعي بمعايير ─── -->
+    <VDialog v-model="criteriaDiscountDialog" max-width="620">
+      <VCard title="خصم جماعي بمعايير (سنة / حالة / مصدر)">
+        <VCardText>
+          <VAlert type="warning" variant="tonal" density="compact" class="mb-4">
+            يطبَّق الخصم على كل الذمم المطابقة عبر جميع المقاولين — استخدم "معاينة" أولاً للتأكد من العدد والأثر قبل الالتزام.
+          </VAlert>
+
+          <VRow dense>
+            <VCol cols="12" md="4">
+              <VTextField v-model="criteriaForm.year" label="السنة (اختياري)" type="number" dir="ltr" />
+            </VCol>
+            <VCol cols="12" md="4">
+              <VSelect
+                v-model="criteriaForm.status"
+                :items="[{ title: 'أي حالة', value: '' }, { title: 'غير مسدَّدة', value: 'unpaid' }, { title: 'مسدَّدة جزئياً', value: 'partially_paid' }, { title: 'مسدَّدة', value: 'paid' }]"
+                label="الحالة (اختياري)"
+              />
+            </VCol>
+            <VCol cols="12" md="4">
+              <VSelect
+                v-model="criteriaForm.source"
+                :items="[{ title: 'أي مصدر', value: '' }, { title: 'محرّك الاحتساب', value: 'fee_engine' }, { title: 'يدوي', value: 'manual' }, { title: 'استيراد قديم', value: 'legacy_import' }]"
+                label="المصدر (اختياري)"
+              />
+            </VCol>
+            <VCol cols="12" md="6">
+              <VSelect
+                v-model="criteriaForm.discount_type"
+                :items="[{ title: 'نسبة مئوية', value: 'percent' }, { title: 'مبلغ ثابت', value: 'fixed' }]"
+                label="نوع الخصم"
+              />
+            </VCol>
+            <VCol cols="12" md="6">
+              <VTextField
+                v-model="criteriaForm.discount_value"
+                :label="criteriaForm.discount_type === 'percent' ? 'نسبة الخصم %' : 'مبلغ الخصم (د.أ)'"
+                type="number"
+                dir="ltr"
+              />
+            </VCol>
+            <VCol cols="12">
+              <VTextField v-model="criteriaForm.discount_reason" label="سبب الخصم" dir="rtl" />
+            </VCol>
+          </VRow>
+
+          <template v-if="criteriaPreview && 'total_discount_impact_jod' in criteriaPreview">
+            <VDivider class="my-4" />
+            <VRow dense>
+              <VCol cols="6">
+                <p class="text-caption text-medium-emphasis mb-0">عدد الذمم المطابقة</p>
+                <strong>{{ criteriaPreview.matched_count }}</strong>
+              </VCol>
+              <VCol cols="6">
+                <p class="text-caption text-medium-emphasis mb-0">إجمالي أثر الخصم (د.أ)</p>
+                <strong class="text-info">{{ criteriaPreview.total_discount_impact_jod }}</strong>
+              </VCol>
+            </VRow>
+          </template>
+        </VCardText>
+        <VCardActions class="justify-end pb-4 px-6">
+          <VBtn variant="tonal" color="secondary" @click="criteriaDiscountDialog = false">إغلاق</VBtn>
+          <VBtn
+            variant="tonal"
+            color="info"
+            :disabled="!criteriaForm.discount_value"
+            :loading="criteriaDiscountMutation.isPending.value"
+            @click="criteriaDiscountMutation.mutate(true)"
+          >
+            معاينة (بدون كتابة)
+          </VBtn>
+          <VBtn
+            color="error"
+            :disabled="!criteriaForm.discount_value"
+            :loading="criteriaDiscountMutation.isPending.value"
+            @click="criteriaDiscountMutation.mutate(false)"
+          >
+            تطبيق فعلياً
           </VBtn>
         </VCardActions>
       </VCard>

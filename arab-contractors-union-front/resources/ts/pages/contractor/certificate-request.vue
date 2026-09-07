@@ -42,6 +42,14 @@ interface RequirementIssue {
   due_date: string | null
 }
 
+interface MembershipStatus {
+  eligible: boolean
+  paid_percentage: number
+  required_percent: number
+  remaining_to_95_jod: number
+  current_year: number
+}
+
 const contractor = ref<Contractor | null>(null)
 const requests = ref<CertificateRequest[]>([])
 const requirementIssues = ref<RequirementIssue[]>([])
@@ -51,6 +59,7 @@ const missingProfileFields = ref<string[]>([])
 const showForm = ref(false)
 const successMessage = ref('')
 const errorMessage = ref('')
+const membershipStatus = ref<MembershipStatus | null>(null)
 
 const form = ref({
   type: '',
@@ -100,6 +109,9 @@ async function fetchData() {
     canRequest.value = r.data.items?.can_request ?? true
     profileDataComplete.value = r.data.items?.profile_data_complete ?? true
     missingProfileFields.value = r.data.items?.missing_profile_fields ?? []
+
+    const s = await axios.get(`${BASE}/api/v1/contractor/certificates/status`, { headers: apiHeaders() })
+    membershipStatus.value = s.data.items?.membership ?? null
   } catch (e: any) {
     if (e?.response?.status === 401) authError.value = true
   } finally {
@@ -110,6 +122,11 @@ async function fetchData() {
 async function submitRequest() {
   if (!form.value.type) {
     errorMessage.value = 'الرجاء اختيار نوع الشهادة المطلوبة'
+    return
+  }
+
+  if (form.value.type === 'membership' && membershipStatus.value && !membershipStatus.value.eligible) {
+    errorMessage.value = `يتبقى لك سداد ${membershipStatus.value.remaining_to_95_jod} دينار للوصول إلى حد الـ 95% واستخراج شهادتك تلقائياً.`
     return
   }
 
@@ -148,6 +165,9 @@ async function submitRequest() {
 function downloadCertificate(url: string, id: number) {
   window.open(url, '_blank')
 }
+
+const showMembershipEligibility = computed(() => form.value.type === 'membership' && membershipStatus.value !== null)
+const membershipEligible = computed(() => membershipStatus.value?.eligible ?? false)
 
 const typeLabel = computed(() => {
   const labels: Record<string, string> = {
@@ -330,6 +350,16 @@ function fmtMoney(v: string | number | null) {
               </div>
             </div>
 
+            <!-- Membership 95% Eligibility Banner -->
+            <div v-if="showMembershipEligibility && !membershipEligible" class="alert alert-error">
+              <AlertCircle :size="18" />
+              <span>يتبقى لك سداد {{ membershipStatus?.remaining_to_95_jod }} دينار للوصول إلى حد الـ 95% واستخراج شهادتك تلقائياً.</span>
+            </div>
+            <div v-else-if="showMembershipEligibility && membershipEligible" class="alert alert-success">
+              <CheckCircle :size="18" />
+              <span>نسبة سداد ذمم {{ membershipStatus?.current_year }} — {{ membershipStatus?.paid_percentage }}% — مؤهل لتقديم طلب شهادة العضوية.</span>
+            </div>
+
             <!-- Notes -->
             <div class="form-group">
               <label>ملاحظات إضافية (اختياري)</label>
@@ -357,7 +387,11 @@ function fmtMoney(v: string | number | null) {
 
             <!-- Submit -->
             <div class="form-actions">
-              <button type="submit" class="submit-btn" :disabled="isSubmitting">
+              <button
+                type="submit"
+                class="submit-btn"
+                :disabled="isSubmitting || (showMembershipEligibility && !membershipEligible)"
+              >
                 <Send v-if="!isSubmitting" :size="16" />
                 <span class="spinner-small" v-else></span>
                 {{ isSubmitting ? 'جاري الإرسال...' : 'تقديم الطلب' }}

@@ -17,6 +17,7 @@ interface ReportSummary {
   revenueChart: number[]
   contractorsChart: number[]
   paymentTypes: Record<string, number>
+  registrationFees?: { dues_count: number; total_jod: number }
 }
 
 // ─── State ────────────────────────────────────────────────────
@@ -387,6 +388,20 @@ onMounted(fetchSummary)
               </div>
               <div class="text-body-2 text-medium-emphasis mt-1">
                 غرامات صادرة ({{ formatCurrency(summary.penaltiesAmount) }})
+              </div>
+            </VCardText>
+          </VCard>
+        </VCol>
+
+        <VCol v-if="period === 'annual' && summary.registrationFees" cols="12" sm="6" md="3">
+          <VCard elevation="1">
+            <VCardText class="text-center py-5">
+              <VIcon icon="tabler-user-plus" size="38" color="primary" class="mb-2" />
+              <div class="text-h5 font-weight-bold text-primary">
+                {{ summary.registrationFees.total_jod }} د.أ
+              </div>
+              <div class="text-body-2 text-medium-emphasis mt-1">
+                رسوم تسجيل أول انتساب ({{ summary.registrationFees.dues_count }} ذمة)
               </div>
             </VCardText>
           </VCard>

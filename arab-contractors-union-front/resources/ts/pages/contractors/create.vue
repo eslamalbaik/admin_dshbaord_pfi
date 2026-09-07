@@ -146,7 +146,18 @@ const specializationOptions = [
   { title: 'حفر آبار', value: 220 },
 ]
 
-const classOptions = ['أ', 'ب', 'ج', 'د', 'الأولى أ', 'الأولى ب', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة']
+// درجات التصنيف الموحَّدة (المادة 37) — "اولى أ" لا تصحّ إلا لمجالي طرق(20) وابنية(30)
+const TOP_TIER_FIELDS = [20, 30]
+const gradeOptions = [
+  { title: 'الدرجة الأولى (1)', value: 'اولى أ' },
+  { title: 'الدرجة الأولى', value: 'اولى ب' },
+  { title: 'الدرجة الثانية', value: 'ثانية' },
+  { title: 'الدرجة الثالثة', value: 'ثالثة' },
+  { title: 'الدرجة الرابعة', value: 'رابعة' },
+  { title: 'الدرجة الخامسة', value: 'خامسة' },
+]
+const gradeOptionsFor = (fieldLkType: number | null) =>
+  TOP_TIER_FIELDS.includes(fieldLkType as number) ? gradeOptions : gradeOptions.filter(g => g.value !== 'اولى أ')
 
 const nextStep = () => { if (step.value < 4) step.value++ }
 const prevStep = () => { if (step.value > 1) step.value-- }
@@ -382,7 +393,9 @@ const submit = async () => {
               <VCol cols="12" md="3">
                 <VSelect
                   v-model="spec.classification"
-                  :items="classOptions"
+                  :items="gradeOptionsFor(spec.field_lk_type)"
+                  item-title="title"
+                  item-value="value"
                   label="تصنيف المقاول لهذا المجال *"
                   :rules="[v => !!v || 'مطلوب']"
                 />
