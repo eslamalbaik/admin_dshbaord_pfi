@@ -35,6 +35,12 @@ class ContractorDueController extends Controller
             'notes'             => $d->notes,
             'created_by'        => $d->createdBy?->name,
             'created_at'        => $d->created_at,
+            'discount_type'        => $d->discount_type,
+            'discount_value'       => $d->discount_value,
+            'discount_amount_jod'  => $d->discount_amount_jod,
+            'discount_reason'      => $d->discount_reason,
+            'original_amount_jod'  => $d->original_amount_jod,
+            'fee_breakdown'        => $d->fee_breakdown,
         ];
     }
 
@@ -337,6 +343,7 @@ class ContractorDueController extends Controller
                 ->groupBy('year')
                 ->orderBy('year')
                 ->get(),
+            'registration_fees' => ContractorDue::registrationFeesSummary(),
         ]);
     }
 
@@ -384,6 +391,13 @@ class ContractorDueController extends Controller
             'notes'       => 'nullable|string|max:2000',
         ]);
 
+        if ($due->source === 'fee_engine' && array_key_exists('amount_jod', $data)) {
+            return $this->error(
+                'هذه الذمة صادرة عن محرّك احتساب الرسوم — استخدم مسار إعادة التوليد أو مسار الخصم بدل تعديل المبلغ مباشرة.',
+                422,
+            );
+        }
+
         $due->update($data);
 
         // إعادة احتساب الحالة إن تغيّر المبلغ
@@ -423,6 +437,10 @@ class ContractorDueController extends Controller
 
         $amount = (float) ($data['amount_jod'] ?? $due->remaining_jod);
 
+        if ($amount > $due->remaining_jod) {
+            return $this->error('المبلغ المراد تسويته يتجاوز المتبقي على هذه الذمة.', 422);
+        }
+
         if (isset($payment)) {
             $available = $payment->amount_jod - $payment->used_amount_jod;
             if ($amount > $available) {
@@ -455,5 +473,306 @@ class ContractorDueController extends Controller
         $this->financeLog('due.deleted', ['due_id' => $due->id, 'contractor_id' => $due->contractor_id]);
 
         return $this->success(message: 'تم حذف الذمة.');
+    }
+
+    private function validateFeeRequest(Request $request): array
+    {
+        return $request->validate([
+            'year'             => 'required|integer|between:1990,2100',
+            'discount_type'    => 'nullable|in:percent,fixed',
+            'discount_value'   => 'required_with:discount_type|nullable|numeric|min:0.01',
+            'discount_reason'  => 'nullable|string|max:255',
+        ]);
+    }
+
+    /** يطبّق خصماً اختيارياً على مبلغ إجمالي (معاينة فقط، لا يكتب شيء) */
+    private function previewDiscount(float $total, ?string $type, ?float $value): float
+    {
+        if (! $type || ! $value) {
+            return $total;
+        }
+
+        $discounted = $type === 'percent' ? $total * (1 - $value / 100) : $total - $value;
+
+        return round(max(0, $discounted), 2);
+    }
+
+    /**
+     * POST /api/v1/dashboard/contractors/{contractor}/dues/calculate-fee
+     * معاينة احتساب رسوم العضوية السنوية لمقاول — بدون كتابة أي شيء.
+     */
+    public function calculateFee(Request $request, \App\Models\Contractor $contractor)
+    {
+        $data = $this->validateFeeRequest($request);
+
+        $breakdown = app(\App\Services\MembershipFeeCalculator::class)->calculate($contractor, $data['year']);
+
+        if ($breakdown['unresolvable']) {
+            return $this->error(
+                'تعذّر احتساب الرسوم — يوجد تخصص بدرجة غير موحَّدة على هذا المقاول. شغّل أمر contractor:normalize-specialty-grades أولاً.',
+                422,
+                ['breakdown' => $breakdown],
+            );
+        }
+
+        $total = $breakdown['total_before_discount_jod'];
+        $final = $this->previewDiscount($total, $data['discount_type'] ?? null, $data['discount_value'] ?? null);
+
+        return $this->success([
+            'breakdown'                 => $breakdown,
+            'total_before_discount_jod' => $total,
+            'discount_amount_jod'       => round($total - $final, 2),
+            'total_after_discount_jod'  => $final,
+        ]);
+    }
+
+    /**
+     * POST /api/v1/dashboard/contractors/{contractor}/dues/generate-fee
+     * يولّد (أو يحدّث مع force=true) ذمة رسوم عضوية لمقاول عن سنة معيَّنة.
+     */
+    public function generateFee(Request $request, \App\Models\Contractor $contractor)
+    {
+        $data  = $this->validateFeeRequest($request);
+        $force = $request->boolean('force');
+
+        $breakdown = app(\App\Services\MembershipFeeCalculator::class)->calculate($contractor, $data['year']);
+
+        if ($breakdown['unresolvable']) {
+            return $this->error(
+                'تعذّر احتساب الرسوم — يوجد تخصص بدرجة غير موحَّدة على هذا المقاول. شغّل أمر contractor:normalize-specialty-grades أولاً.',
+                422,
+                ['breakdown' => $breakdown],
+            );
+        }
+
+        $existingFeeEngine = ContractorDue::where('contractor_id', $contractor->id)
+            ->where('year', $data['year'])
+            ->where('source', 'fee_engine')
+            ->first();
+
+        if ($existingFeeEngine && ! $force) {
+            return $this->error(
+                'يوجد بالفعل ذمة رسوم مُولَّدة لهذا المقاول عن هذه السنة.',
+                409,
+                ['existing_due_id' => $existingFeeEngine->id],
+            );
+        }
+
+        $total = $breakdown['total_before_discount_jod'];
+        $final = $this->previewDiscount($total, $data['discount_type'] ?? null, $data['discount_value'] ?? null);
+
+        $attributes = [
+            'contractor_id'        => $contractor->id,
+            'year'                 => $data['year'],
+            'description'          => "رسوم اشتراك سنة {$data['year']} (محرّك الاحتساب الآلي)",
+            'amount_jod'           => $final,
+            'original_amount_jod'  => $total !== $final ? $total : null,
+            'discount_type'        => $data['discount_type'] ?? null,
+            'discount_value'       => $data['discount_value'] ?? null,
+            'discount_amount_jod'  => $total !== $final ? round($total - $final, 2) : null,
+            'discount_reason'      => $data['discount_reason'] ?? null,
+            'discount_by'          => isset($data['discount_type']) ? Auth::id() : null,
+            'fee_breakdown'        => $breakdown,
+            'source'               => 'fee_engine',
+        ];
+
+        if ($existingFeeEngine) {
+            $existingFeeEngine->update($attributes);
+            $existingFeeEngine->applyPayment(0);
+            $due = $existingFeeEngine->fresh(['contractor:id,name,membership_number']);
+        } else {
+            $attributes['created_by'] = Auth::id();
+            $due = ContractorDue::create($attributes);
+            $due->update(['reference_number' => ContractorDue::generateReferenceNumber($due)]);
+            $due = $due->fresh(['contractor:id,name,membership_number']);
+        }
+
+        $otherExisting = ContractorDue::where('contractor_id', $contractor->id)
+            ->where('year', $data['year'])
+            ->where('source', '!=', 'fee_engine')
+            ->exists();
+
+        $this->financeLog('due.fee_generated', ['due_id' => $due->id, 'contractor_id' => $contractor->id, 'year' => $data['year'], 'force' => $force]);
+
+        return $this->success([
+            'due'     => $this->format($due),
+            'warning' => $otherExisting ? 'يوجد بالفعل ذمة أخرى (غير محرّك الاحتساب) لنفس المقاول والسنة — تحقّق من عدم ازدواج الرسوم.' : null,
+        ], 'تم توليد ذمة الرسوم بنجاح.');
+    }
+
+    /**
+     * POST /api/v1/dashboard/dues/generate-fee/bulk
+     * توليد رسوم العضوية لعدة مقاولين دفعة واحدة (أو للكل)، مع معاينة dry_run قبل الالتزام.
+     */
+    public function generateFeeBulk(Request $request)
+    {
+        $data = $request->validate([
+            'year'            => 'required|integer|between:1990,2100',
+            'contractor_ids'  => 'nullable|array',
+            'contractor_ids.*' => 'integer|exists:contractors,id',
+            'dry_run'         => 'boolean',
+        ]);
+
+        $query = \App\Models\Contractor::query()->whereNotNull('specialties');
+        if (! empty($data['contractor_ids'])) {
+            $query->whereIn('id', $data['contractor_ids']);
+        }
+
+        $wouldCreate = [];
+        $wouldSkipExisting = [];
+        $unresolvable = [];
+        $created = 0;
+        $dryRun = $request->boolean('dry_run');
+
+        $query->chunkById(100, function ($contractors) use ($data, $dryRun, &$wouldCreate, &$wouldSkipExisting, &$unresolvable, &$created) {
+            foreach ($contractors as $contractor) {
+                $exists = ContractorDue::where('contractor_id', $contractor->id)
+                    ->where('year', $data['year'])
+                    ->where('source', 'fee_engine')
+                    ->exists();
+
+                if ($exists) {
+                    $wouldSkipExisting[] = ['contractor_id' => $contractor->id, 'name' => $contractor->name];
+                    continue;
+                }
+
+                $breakdown = app(\App\Services\MembershipFeeCalculator::class)->calculate($contractor, $data['year']);
+
+                if ($breakdown['unresolvable']) {
+                    $unresolvable[] = ['contractor_id' => $contractor->id, 'name' => $contractor->name];
+                    continue;
+                }
+
+                if ($dryRun) {
+                    $wouldCreate[] = ['contractor_id' => $contractor->id, 'name' => $contractor->name, 'total_jod' => $breakdown['total_before_discount_jod']];
+                    continue;
+                }
+
+                $due = ContractorDue::create([
+                    'contractor_id' => $contractor->id,
+                    'year'          => $data['year'],
+                    'description'   => "رسوم اشتراك سنة {$data['year']} (محرّك الاحتساب الآلي)",
+                    'amount_jod'    => $breakdown['total_before_discount_jod'],
+                    'fee_breakdown' => $breakdown,
+                    'source'        => 'fee_engine',
+                    'created_by'    => Auth::id(),
+                ]);
+                $due->update(['reference_number' => ContractorDue::generateReferenceNumber($due)]);
+                $wouldCreate[] = ['contractor_id' => $contractor->id, 'name' => $contractor->name, 'total_jod' => $breakdown['total_before_discount_jod']];
+                $created++;
+            }
+        });
+
+        $this->financeLog('due.fee_generated_bulk', ['year' => $data['year'], 'created' => $created, 'dry_run' => $dryRun]);
+
+        return $this->success([
+            'would_create'        => $wouldCreate,
+            'would_skip_existing' => $wouldSkipExisting,
+            'unresolvable'        => $unresolvable,
+            'created_count'       => $created,
+        ]);
+    }
+
+    /**
+     * POST /api/v1/dashboard/dues/{due}/discount
+     * خصم إداري فردي على ذمة قائمة (المادة 37/ت).
+     */
+    public function applyDiscount(Request $request, ContractorDue $due)
+    {
+        $data = $request->validate([
+            'discount_type'   => 'required|in:percent,fixed',
+            'discount_value'  => 'required|numeric|min:0.01',
+            'discount_reason' => 'nullable|string|max:255',
+        ]);
+
+        try {
+            $due->applyDiscount($data['discount_type'], $data['discount_value'], $data['discount_reason'] ?? null, Auth::id());
+        } catch (\InvalidArgumentException $e) {
+            return $this->error($e->getMessage(), 422);
+        }
+
+        $this->financeLog('due.discount_applied', [
+            'due_id' => $due->id, 'discount_type' => $data['discount_type'], 'discount_value' => $data['discount_value'],
+        ]);
+
+        return $this->success($this->format($due->fresh(['contractor:id,name,membership_number'])), 'تم تطبيق الخصم بنجاح.');
+    }
+
+    /**
+     * POST /api/v1/dashboard/dues/discount/bulk
+     * خصم إداري جماعي (المادة 37/ت) — اختيار صريح بمعرّفات الذمم أو بمعايير (سنة/حالة/مصدر).
+     */
+    public function applyDiscountBulk(Request $request)
+    {
+        $data = $request->validate([
+            'mode'                => 'required|in:ids,criteria',
+            'ids'                 => 'required_if:mode,ids|array|max:200',
+            'ids.*'               => 'integer|exists:contractor_dues,id',
+            'criteria'            => 'required_if:mode,criteria|array',
+            'criteria.year'       => 'nullable|integer|between:1990,2100',
+            'criteria.status'     => 'nullable|in:unpaid,partially_paid,paid',
+            'criteria.source'     => 'nullable|in:legacy_import,manual,fee_engine',
+            'discount_type'       => 'required|in:percent,fixed',
+            'discount_value'      => 'required|numeric|min:0.01',
+            'discount_reason'     => 'nullable|string|max:255',
+            'dry_run'             => 'boolean',
+        ]);
+
+        $query = ContractorDue::query();
+
+        if ($data['mode'] === 'ids') {
+            $query->whereIn('id', $data['ids']);
+        } else {
+            $c = $data['criteria'];
+            if (! empty($c['year'])) {
+                $query->where('year', $c['year']);
+            }
+            if (! empty($c['status'])) {
+                $query->where('status', $c['status']);
+            }
+            if (! empty($c['source'])) {
+                $query->where('source', $c['source']);
+            }
+        }
+
+        $dues = $query->get();
+
+        if ($request->boolean('dry_run')) {
+            $impact = $dues->sum(function ($due) use ($data) {
+                $original = (float) ($due->original_amount_jod ?? $due->amount_jod);
+                $newAmount = $data['discount_type'] === 'percent'
+                    ? $original * (1 - $data['discount_value'] / 100)
+                    : $original - $data['discount_value'];
+
+                return round($original - max(0, $newAmount), 2);
+            });
+
+            return $this->success([
+                'matched_count'            => $dues->count(),
+                'total_discount_impact_jod' => round($impact, 2),
+            ]);
+        }
+
+        $applied = 0;
+        $skipped = [];
+
+        foreach ($dues as $due) {
+            try {
+                $due->applyDiscount($data['discount_type'], $data['discount_value'], $data['discount_reason'] ?? null, Auth::id());
+                $applied++;
+            } catch (\InvalidArgumentException $e) {
+                $skipped[] = ['due_id' => $due->id, 'reason' => $e->getMessage()];
+            }
+        }
+
+        $this->financeLog('due.discount_applied_bulk', [
+            'mode' => $data['mode'], 'matched' => $dues->count(), 'applied' => $applied, 'skipped' => count($skipped),
+        ]);
+
+        return $this->success([
+            'matched_count' => $dues->count(),
+            'applied_count' => $applied,
+            'skipped'       => $skipped,
+        ], 'تم تطبيق الخصم الجماعي بنجاح.');
     }
 }

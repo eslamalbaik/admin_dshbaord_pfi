@@ -192,6 +192,11 @@ Route::prefix('v1')->group(function () {
     Route::get('terms', [TermsController::class, 'public']);
 
     // --------------------------------------------------------
+    //  Privacy Policy — Public (no auth)
+    // --------------------------------------------------------
+    Route::get('privacy-policy', [TermsController::class, 'publicPrivacy']);
+
+    // --------------------------------------------------------
     //  Legal Library — Public (no auth)
     // --------------------------------------------------------
     Route::get('legal-files', [LegalFileController::class, 'publicIndex']);
@@ -200,6 +205,11 @@ Route::prefix('v1')->group(function () {
     //  Bank Accounts (شاشة الدفع) — Public (no auth)
     // --------------------------------------------------------
     Route::get('bank-accounts', [BankAccountController::class, 'publicIndex']);
+
+    // --------------------------------------------------------
+    //  Certificate Verification (QR) — Public (no auth)
+    // --------------------------------------------------------
+    Route::get('certificates/verify/{token}', [\App\Http\Controllers\Api\CertificateRequestController::class, 'verify']);
 
     // --------------------------------------------------------
     //  Landing Home — Public (كل بيانات الصفحة الرئيسية في نداء واحد)
@@ -434,6 +444,23 @@ Route::prefix('v1')->group(function () {
             // أسعار الصرف (عرض + override يدوي)
             Route::get('dashboard/exchange-rates',  [\App\Http\Controllers\Api\ExchangeRateController::class, 'index']);
             Route::post('dashboard/exchange-rates', [\App\Http\Controllers\Api\ExchangeRateController::class, 'store']);
+
+            // جدول رسوم الدرجات — قراءة فقط هنا (التعديل صلاحية أدمن، أدناه)
+            Route::get('dashboard/grade-fees', [\App\Http\Controllers\Api\GradeFeeController::class, 'index']);
+
+            // محرّك احتساب رسوم العضوية (المادة 37) — معاينة/توليد فردي وجماعي
+            Route::post('dashboard/contractors/{contractor}/dues/calculate-fee', [\App\Http\Controllers\Api\ContractorDueController::class, 'calculateFee']);
+            Route::post('dashboard/contractors/{contractor}/dues/generate-fee',  [\App\Http\Controllers\Api\ContractorDueController::class, 'generateFee']);
+            Route::post('dashboard/dues/generate-fee/bulk',                     [\App\Http\Controllers\Api\ContractorDueController::class, 'generateFeeBulk']);
+
+            // خصم فردي على ذمة قائمة (المادة 37/ت)
+            Route::post('dashboard/dues/{due}/discount', [\App\Http\Controllers\Api\ContractorDueController::class, 'applyDiscount']);
+        });
+
+        // صلاحية أدمن فقط — تعديل رسوم الدرجات والخصم الجماعي (المادة 37/ت تُطر هذه كصلاحية مجلس إدارة)
+        Route::middleware('role:admin')->group(function () {
+            Route::put('dashboard/grade-fees/{gradeFee}', [\App\Http\Controllers\Api\GradeFeeController::class, 'update']);
+            Route::post('dashboard/dues/discount/bulk',   [\App\Http\Controllers\Api\ContractorDueController::class, 'applyDiscountBulk']);
         });
 
         // --------------------------------------------------------

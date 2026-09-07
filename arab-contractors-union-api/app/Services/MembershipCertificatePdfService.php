@@ -4,8 +4,10 @@ namespace App\Services;
 
 use App\Models\CertificateRequest;
 use App\Support\ContractorLookups;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
 use Mpdf\Mpdf;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 /**
  * توليد PDF شهادة العضوية (REQ-02) بمحرّك mPDF — بديل مسار LibreOffice.
@@ -83,6 +85,13 @@ class MembershipCertificatePdfService
         $addressEsc       = e($address);
         $membershipNumber = e($contractor->membership_number);
 
+        // رمز QR للتحقق من صحة الشهادة — يحوّل لصفحة تحقق عامة تتحقق من certificate_requests.id
+        // المشفَّر (Crypt) دون كشف بيانات مالية، ويعكس حالة الشهادة اللحظية (صادرة/ملغاة)
+        $verifyToken = Crypt::encryptString(json_encode(['id' => $certRequest->id, 'serial' => $serial]));
+        $verifyUrl   = rtrim(config('app.frontend_url'), '/') . '/certificates/verify/' . urlencode($verifyToken);
+        $qrSvg       = base64_encode(QrCode::format('svg')->size(120)->generate($verifyUrl));
+        $qrImgTag    = '<img src="data:image/svg+xml;base64,' . $qrSvg . '" width="60" height="60">';
+
         $html = <<<HTML
 <style>
   body { font-family: xbriyaz; direction: rtl; color: #111; font-size: 14px; line-height: 2.1; }
@@ -108,8 +117,8 @@ class MembershipCertificatePdfService
 
 <table class="meta">
   <tr>
-    <td style="text-align:right;">الرقـم: {$serial}</td>
-    <td style="text-align:left;">التاريخ: {$issuedAt}</td>
+    <td style="text-align:right; vertical-align:middle;">الرقـم: {$serial}<br>التاريخ: {$issuedAt}</td>
+    <td style="text-align:left; vertical-align:middle;">{$qrImgTag}</td>
   </tr>
 </table>
 
@@ -192,6 +201,9 @@ HTML;
         $mpdf->SetHTMLFooter('<img src="' . $footerImg . '" style="width:100%;">');
 
         $mpdf->WriteHTML($html);
+
+        // قفل تعديل/نسخ المحتوى بكلمة سر مالك — بدون كلمة سر مستخدم، فالملف يُفتح ويُطبع بحرية
+        $mpdf->SetProtection(['print', 'copy'], '', config('app.certificate_pdf_owner_password'));
 
         $path = $preview
             ? "certificates/preview/{$serial}.pdf"

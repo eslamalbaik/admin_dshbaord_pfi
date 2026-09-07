@@ -144,6 +144,21 @@ HTML;
 HTML;
         }
 
+        if ($period === 'annual' && isset($data['registrationFees'])) {
+            $regCount = $data['registrationFees']['dues_count'];
+            $regTotal = number_format((float) $data['registrationFees']['total_jod'], 2);
+            $html .= <<<HTML
+<div class="section-title">رسوم التسجيل — أول انتساب (المادة 37)</div>
+<table class="data-table">
+  <thead><tr><th>البيان</th><th>القيمة</th></tr></thead>
+  <tbody>
+    <tr><td>عدد ذمم أول انتساب هذه السنة</td><td>{$regCount} ذمة</td></tr>
+    <tr><td>إجمالي رسوم التسجيل</td><td class="blue">{$regTotal} د.أ</td></tr>
+  </tbody>
+</table>
+HTML;
+        }
+
         $html .= <<<HTML
 <div class="section-title">الإيرادات الشهرية (₪)</div>
 <table class="data-table">
@@ -327,10 +342,14 @@ HTML;
             ->pluck('total', 'type')
             ->toArray();
 
+        // رسوم التسجيل (المادة 37) — ذمم أول سنة انتساب لهذه السنة تحديداً
+        $registrationFees = \App\Models\ContractorDue::registrationFeesSummary($year);
+
         return compact(
             'revenue', 'newContractors', 'activeMemberships',
             'penaltiesIssued', 'penaltiesAmount', 'penaltiesPaid',
-            'tenders', 'revenueChart', 'contractorsChart', 'paymentTypes'
+            'tenders', 'revenueChart', 'contractorsChart', 'paymentTypes',
+            'registrationFees'
         );
     }
 

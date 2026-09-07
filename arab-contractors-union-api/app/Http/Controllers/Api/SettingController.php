@@ -208,18 +208,26 @@ class SettingController extends Controller
             ->map(fn ($name, $id) => ['id' => (int) $id, 'name' => $name])
             ->values();
 
-        $grades = collect(\App\Models\Contractor::CLASSIFICATION_LABELS)
+        // درجات التخصص لكل مجال/اختصاص (specialties[].classification) — الرمز الموحَّد الجديد (REQ-FEE-01)
+        $grades = collect(\App\Support\ContractorLookups::SPECIALTY_GRADE_LABELS)
             ->map(fn ($label, $value) => [
-                'value' => $value,
-                'label' => $label,
-                'level' => \App\Support\ContractorLookups::GRADE_LEVELS[$value] ?? null,
+                'value'           => $value,
+                'label'           => $label,
+                'level'           => \App\Support\ContractorLookups::GRADE_LEVELS[$value] ?? null,
+                'eligible_fields' => in_array($value, ['اولى أ'], true) ? \App\Support\ContractorLookups::TOP_TIER_FIELDS : null,
             ])
+            ->values();
+
+        // التصنيف العام لعمود contractors.classification المنفصل — يبقى بصيغته القديمة عمداً (لم يُشمل بالتطبيع)
+        $overallGrades = collect(\App\Models\Contractor::CLASSIFICATION_LABELS)
+            ->map(fn ($label, $value) => ['value' => $value, 'label' => $label])
             ->values();
 
         return $this->success([
             'fields'          => $mapToList(\App\Support\ContractorLookups::FIELDS),
             'specializations' => $mapToList(\App\Support\ContractorLookups::SPECIALIZATIONS),
             'grades'          => $grades,
+            'overall_grades'  => $overallGrades,
         ], 'تم جلب كتالوج التخصصات بنجاح');
     }
 

@@ -216,6 +216,44 @@ class Contractor extends Authenticatable
         return ['total' => $total, 'paid' => $paid, 'outstanding' => round($total - $paid, 2)];
     }
 
+    /** @return array{total: float, paid: float, outstanding: float} ذمم السنة الحالية فقط (year = هذه السنة) */
+    public function currentYearDuesTotals(): array
+    {
+        $totals = $this->dues()
+            ->where('year', now()->year)
+            ->selectRaw('COALESCE(SUM(amount_jod), 0) as total, COALESCE(SUM(paid_jod), 0) as paid')
+            ->first();
+
+        $total = (float) $totals->total;
+        $paid  = (float) $totals->paid;
+
+        return ['total' => $total, 'paid' => $paid, 'outstanding' => round($total - $paid, 2)];
+    }
+
+    /** نسبة سداد ذمم السنة الحالية — 100% إن لم توجد ذمم مسجّلة لهذه السنة بعد */
+    public function currentYearDuesPaidPercentage(): float
+    {
+        $totals = $this->currentYearDuesTotals();
+
+        if ($totals['total'] <= 0) {
+            return 100.0;
+        }
+
+        return round(($totals['paid'] / $totals['total']) * 100, 2);
+    }
+
+    /** المبلغ بالدينار اللازم سداده لبلوغ نسبة 95% من ذمم السنة الحالية — 0 إن لم توجد ذمم لهذه السنة */
+    public function remainingToReach95PercentJod(): float
+    {
+        $totals = $this->currentYearDuesTotals();
+
+        if ($totals['total'] <= 0) {
+            return 0.0;
+        }
+
+        return max(0.0, round($totals['total'] * self::MEMBERSHIP_CERT_MIN_PAID_PERCENT / 100 - $totals['paid'], 2));
+    }
+
     /**
      * هامش السماح المسموح بالدينار لإصدار شهادة العضوية — أيهما أقل: 5% من إجمالي
      * الذمم أو سقف {@see MEMBERSHIP_CERT_MAX_MARGIN_JOD} — لمنع حسابات الذمم الكبيرة
@@ -228,10 +266,10 @@ class Contractor extends Authenticatable
         return min($total * (100 - self::MEMBERSHIP_CERT_MIN_PAID_PERCENT) / 100, self::MEMBERSHIP_CERT_MAX_MARGIN_JOD);
     }
 
-    /** هل الذمة المتبقية تقع ضمن هامش السماح (5% أو 50 دينار، أيهما أقل) لإصدار شهادة العضوية؟ */
+    /** هل نسبة سداد ذمم السنة الحالية تبلغ 95% فأكثر؟ (REQ-02 — محرك الاحتساب الآلي) */
     public function isEligibleForMembershipCertificate(): bool
     {
-        return $this->duesTotals()['outstanding'] <= $this->membershipCertAllowedMarginJod();
+        return $this->currentYearDuesPaidPercentage() >= self::MEMBERSHIP_CERT_MIN_PAID_PERCENT;
     }
 
     public function documents()

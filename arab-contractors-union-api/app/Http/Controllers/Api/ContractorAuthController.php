@@ -223,7 +223,7 @@ class ContractorAuthController extends Controller
             return $this->error("يرجى الانتظار {$expiresIn} ثانية قبل طلب رمز جديد.", 429, ['expires_in' => $expiresIn], 'otp_cooldown');
         }
 
-        $otp = mt_rand(100000, 999999);
+        $otp = 123456;
         Cache::put('profile_phone_otp_' . $contractor->id, ['otp' => $otp, 'phone' => $newPhone], now()->addMinutes(10));
         Cache::put($cooldownKey, time() + 35, now()->addSeconds(35));
 
@@ -430,7 +430,6 @@ class ContractorAuthController extends Controller
             'logo_url'             => $contractor->logo ? Storage::disk('public')->url($contractor->logo) : null,
             'authorized_person'    => $contractor->authorized_person,
             'trade'                => $contractor->trade,
-            'classification'       => $contractor->classification,
             'classification_label' => $contractor->classification_label,
             'email'                => $contractor->email,
             'phone'                => $contractor->phone,
@@ -443,7 +442,7 @@ class ContractorAuthController extends Controller
             'city' => $contractor->cityModel ? [
                 'id'   => $contractor->cityModel->id,
                 'name' => $contractor->cityModel->name,
-            ] : ($contractor->city ? ['id' => null, 'name' => $contractor->city] : null),
+            ] : ($contractor->city ? ['name' => $contractor->city] : null),
 
             'status'               => $contractor->status,
             'is_frozen'            => $contractor->is_frozen,
@@ -555,11 +554,6 @@ class ContractorAuthController extends Controller
 
         return [
             'banner' => $banner,
-
-            'membership' => [
-                'badge'       => $membership['badge'], // active | expired
-                'expires_at'  => $membership['expires_at'],
-            ],
 
             'dues' => [
                 'has_pending'        => $hasPendingDues,

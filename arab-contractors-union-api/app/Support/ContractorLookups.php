@@ -2,8 +2,6 @@
 
 namespace App\Support;
 
-use App\Models\Contractor;
-
 /**
  * جداول المرجعية للمجالات والاختصاصات والدرجات (مصدر واحد — REQ-08).
  * تُستخدم في Get Profile وتصدير الـ PDF بدل تكرار الخرائط في كل مكان.
@@ -46,14 +44,31 @@ class ContractorLookups
         220 => 'حفر آبار',
     ];
 
-    /** المستوى الرقمي لكل درجة تصنيف (أ = 1 ... هـ = 5) */
+    /**
+     * المستوى الرقمي لكل درجة تصنيف — رمز موحَّد (canonical) بعد تطبيع البيانات (REQ-FEE-01).
+     * الأقل رقماً = الأعلى درجة. "اولى أ" درجة خاصة لا تصحّ إلا لمجالي طرق(20) وابنية(30).
+     */
     public const GRADE_LEVELS = [
-        'أ'  => 1,
-        'ب'  => 2,
-        'ج'  => 3,
-        'د'  => 4,
-        'هـ' => 5,
+        'اولى أ' => 1,
+        'اولى ب' => 2,
+        'ثانية'  => 3,
+        'ثالثة'  => 4,
+        'رابعة'  => 5,
+        'خامسة'  => 6,
     ];
+
+    /** مسمّيات درجات التخصص (خاصة بـ specialties[].classification) — منفصلة عن Contractor::CLASSIFICATION_LABELS */
+    public const SPECIALTY_GRADE_LABELS = [
+        'اولى أ' => 'الدرجة الأولى (1)',
+        'اولى ب' => 'الدرجة الأولى',
+        'ثانية'  => 'الدرجة الثانية',
+        'ثالثة'  => 'الدرجة الثالثة',
+        'رابعة'  => 'الدرجة الرابعة',
+        'خامسة'  => 'الدرجة الخامسة',
+    ];
+
+    /** المجالات التي تصحّ لها درجة "اولى أ" الخاصة (المادة 37) */
+    public const TOP_TIER_FIELDS = [20, 30];
 
     public static function fieldName(?int $type): string
     {
@@ -91,7 +106,7 @@ class ContractorLookups
                 'spec_id'     => $specId,
                 'spec_name'   => self::specializationName($specId),
                 'grade'       => $grade,
-                'grade_label' => $grade ? (Contractor::CLASSIFICATION_LABELS[$grade] ?? $grade) : null,
+                'grade_label' => $grade ? (self::SPECIALTY_GRADE_LABELS[$grade] ?? $grade) : null,
                 'grade_level' => $grade ? (self::GRADE_LEVELS[$grade] ?? null) : null,
             ];
         }

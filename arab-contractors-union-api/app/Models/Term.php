@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Term extends Model
 {
     protected $fillable = [
+        'type',
         'title',
         'title_en',
         'body',

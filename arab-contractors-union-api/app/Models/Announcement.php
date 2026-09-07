@@ -10,7 +10,7 @@ class Announcement extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'title', 'body', 'image', 'is_published', 'is_pinned', 'published_at', 'created_by',
+        'title', 'number', 'category', 'body', 'image', 'attachment', 'is_published', 'is_pinned', 'published_at', 'created_by',
     ];
 
     protected $casts = [

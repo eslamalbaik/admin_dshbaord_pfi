@@ -37,6 +37,7 @@ class LegalFileController extends Controller
             'formatted_size' => $f->formatted_size,
             'sort'           => $f->sort,
             'is_active'      => $f->is_active,
+            'is_featured'    => $f->is_featured,
             'created_at'     => $f->created_at,
         ];
     }
@@ -46,33 +47,47 @@ class LegalFileController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * GET /api/v1/legal-files?category=legislation
-     * Returns active files, grouped by category if no filter provided.
+     * GET /api/v1/legal-files?category=legislation&search=...
+     * شاشة "المكتبة القانونية" — بحث + تبويبات تصنيف + عداد لكل تبويب + قسم "الأكثر طلباً".
+     * category=all أو بدون تمريره: بدون فلترة تصنيف (لكن "الكل" بالنتيجة).
      */
     public function publicIndex(Request $request)
     {
-        $query = LegalFile::where('is_active', true)
-            ->orderBy('sort')
-            ->orderBy('id');
+        $hasCategory = $request->filled('category') && $request->category !== 'all';
 
-        if ($request->filled('category')) {
+        $query = LegalFile::where('is_active', true);
+
+        if ($hasCategory) {
             $query->where('category', $request->category);
         }
 
-        $files = $query->get()->map(fn($f) => $this->format($f));
-
-        // Group by category when no filter
-        if (! $request->filled('category')) {
-            $grouped = $files->groupBy('category')->map(fn($group, $cat) => [
-                'category'       => $cat,
-                'category_label' => $this->categoryLabels[$cat] ?? $cat,
-                'files'          => $group->values(),
-            ])->values();
-
-            return $this->success(['groups' => $grouped]);
+        if ($request->filled('search')) {
+            $q = $request->search;
+            $query->where(fn($qb) => $qb->where('title', 'like', "%{$q}%")
+                ->orWhere('title_en', 'like', "%{$q}%")
+                ->orWhere('description', 'like', "%{$q}%"));
         }
 
-        return $this->success(['files' => $files->values()]);
+        $files = $query->orderByDesc('is_featured')->orderBy('sort')->orderBy('id')
+            ->get()->map(fn($f) => $this->format($f))->values();
+
+        $counts = LegalFile::where('is_active', true)
+            ->selectRaw('category, count(*) as count')
+            ->groupBy('category')
+            ->pluck('count', 'category');
+
+        $categories = collect($this->categoryLabels)->map(fn($label, $cat) => [
+            'value' => $cat,
+            'label' => $label,
+            'count' => (int) ($counts[$cat] ?? 0),
+        ])->values();
+
+        return $this->success([
+            'total'      => (int) $counts->sum(),
+            'categories' => $categories,
+            'featured'   => $files->where('is_featured', true)->values(),
+            'files'      => $files,
+        ]);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -112,6 +127,7 @@ class LegalFileController extends Controller
             'category'       => 'required|in:legislation,mou,other',
             'sort'           => 'nullable|integer|min:0',
             'is_active'      => 'boolean',
+            'is_featured'    => 'boolean',
             'file'           => 'required|file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx|max:51200', // 50 MB max
         ]);
 
@@ -130,6 +146,7 @@ class LegalFileController extends Controller
             'size'           => $file->getSize(),
             'sort'           => $data['sort'] ?? 0,
             'is_active'      => $data['is_active'] ?? true,
+            'is_featured'    => $data['is_featured'] ?? false,
             'uploaded_by'    => Auth::id(),
         ]);
 
@@ -147,6 +164,7 @@ class LegalFileController extends Controller
             'category'       => 'required|in:legislation,mou,other',
             'sort'           => 'nullable|integer|min:0',
             'is_active'      => 'boolean',
+            'is_featured'    => 'boolean',
             'file'           => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx|max:51200',
         ]);
 
@@ -168,6 +186,7 @@ class LegalFileController extends Controller
             'category'       => $data['category'],
             'sort'           => $data['sort'] ?? $legalFile->sort,
             'is_active'      => $data['is_active'] ?? $legalFile->is_active,
+            'is_featured'    => $data['is_featured'] ?? $legalFile->is_featured,
         ]);
 
         return $this->success($this->format($legalFile->fresh()), 'تم تحديث الملف بنجاح.');

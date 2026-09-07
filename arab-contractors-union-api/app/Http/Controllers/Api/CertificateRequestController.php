@@ -92,7 +92,7 @@ class CertificateRequestController extends Controller
     {
         $contractor = $request->user();
         $issues     = $this->requirementIssues($contractor);
-        $percent    = $contractor->duesPaidPercentage();
+        $percent    = $contractor->currentYearDuesPaidPercentage();
 
         $latestMembershipCert = $contractor->certificateRequests()
             ->where('type', 'membership')
@@ -116,8 +116,8 @@ class CertificateRequestController extends Controller
                     && $contractor->isEligibleForMembershipCertificate(),
                 'paid_percentage'   => $percent,
                 'required_percent'  => \App\Models\Contractor::MEMBERSHIP_CERT_MIN_PAID_PERCENT,
-                // هامش السماح الفعلي: أيهما أقل بين 5% من الإجمالي أو سقف مطلق 50 دينار (إطار الحوكمة)
-                'allowed_margin_jod' => $contractor->membershipCertAllowedMarginJod(),
+                'remaining_to_95_jod' => $contractor->remainingToReach95PercentJod(),
+                'current_year'      => now()->year,
                 'outstanding_jod'   => $contractor->outstandingDuesTotal(),
                 'requirement_issues' => $issues,
                 'profile_data_complete' => $contractor->profile_data_complete,
@@ -178,20 +178,20 @@ class CertificateRequestController extends Controller
             );
         }
 
-        // شهادة العضوية تحديداً تشترط أن تقع الذمة المتبقية ضمن هامش السماح
-        // (أيهما أقل: 5% من إجمالي الذمم أو 50 دينار — إطار الحوكمة، اجتماع مجلس الإدارة)
+        // شهادة العضوية تحديداً تشترط بلوغ نسبة سداد ذمم السنة الحالية 95% (محرك الاحتساب الآلي — REQ-02)
         if ($data['type'] === 'membership' && ! $contractor->isEligibleForMembershipCertificate()) {
-            $percent = $contractor->duesPaidPercentage();
-            $margin  = $contractor->membershipCertAllowedMarginJod();
+            $percent   = $contractor->currentYearDuesPaidPercentage();
+            $remaining = $contractor->remainingToReach95PercentJod();
             $outstanding = $contractor->outstandingDuesTotal();
 
             return $this->error(
-                "الذمة المتبقية عليك {$outstanding} دينار — تتجاوز هامش السماح المسموح ({$margin} دينار) لإصدار شهادة العضوية.",
+                "يتبقى لك سداد {$remaining} دينار للوصول إلى حد الـ 95% واستخراج شهادتك تلقائياً.",
                 403,
                 [
                     'paid_percentage'   => $percent,
                     'outstanding_jod'   => $outstanding,
-                    'allowed_margin_jod' => $margin,
+                    'remaining_to_95_jod' => $remaining,
+                    'current_year'      => now()->year,
                     'remaining_dues'   => $contractor->dues()->outstanding()->get()->map(fn ($d) => [
                         'id'           => $d->id,
                         'description'  => $d->description,
@@ -510,5 +510,35 @@ class CertificateRequestController extends Controller
             'تم إصدار شهادة العضوية بنجاح.',
             201,
         );
+    }
+
+    /**
+     * GET /api/v1/certificates/verify/{token}
+     * تحقق عام (بدون تسجيل دخول) من صحة شهادة عبر رمز QR — لا يكشف أي بيانات مالية.
+     */
+    public function verify(string $token)
+    {
+        try {
+            $payload = json_decode(\Illuminate\Support\Facades\Crypt::decryptString(urldecode($token)), true);
+            $certRequest = CertificateRequest::find($payload['id'] ?? null);
+        } catch (\Throwable $e) {
+            $certRequest = null;
+        }
+
+        if (! $certRequest || $certRequest->status !== 'issued') {
+            return $this->success(['valid' => false]);
+        }
+
+        $serial = 'MC-' . str_pad((string) $certRequest->id, 6, '0', STR_PAD_LEFT);
+
+        return $this->success([
+            'valid'                   => true,
+            'contractor_name'         => $certRequest->contractor?->name,
+            'membership_number'       => $certRequest->contractor?->membership_number,
+            'type_label'              => $certRequest->type_label,
+            'serial'                  => $serial,
+            'issued_at'               => $certRequest->issued_at,
+            'membership_valid_until'  => $certRequest->contractor?->activeMembership?->expires_at?->toDateString(),
+        ]);
     }
 }

@@ -14,15 +14,54 @@ class AnnouncementController extends Controller
 {
     use ApiResponseTrait;
 
-    // GET /api/v1/announcements — عام (بدون توكن)، منشور فقط
+    /**
+     * GET /api/v1/announcements — شاشة "التعميمات": بحث + تبويب "عاجل وهام" + تبويب تصنيف + عداد لكل تبويب.
+     * filter=urgent → is_pinned فقط | category=<قيمة> (وليست all) → فلترة بالتصنيف | بدون أي منهما → الكل
+     */
     public function index(Request $request)
     {
-        $paginator = Announcement::published()
-            ->latest('published_at')
-            ->select(['id', 'title', 'body', 'image', 'is_pinned', 'published_at'])
+        $query = Announcement::published();
+
+        if ($request->filled('search')) {
+            $q = $request->search;
+            $query->where(fn ($qb) => $qb->where('title', 'like', "%{$q}%")
+                ->orWhere('number', 'like', "%{$q}%")
+                ->orWhere('body', 'like', "%{$q}%"));
+        }
+
+        if ($request->filled('filter') && $request->filter === 'urgent') {
+            $query->where('is_pinned', true);
+        } elseif ($request->filled('category') && $request->category !== 'all') {
+            $query->where('category', $request->category);
+        }
+
+        $paginator = $query->latest('published_at')
+            ->select(['id', 'title', 'number', 'category', 'body', 'image', 'attachment', 'is_pinned', 'published_at'])
             ->paginate($request->integer('per_page', 15));
 
-        return $this->paginated($paginator);
+        $categories = Announcement::published()
+            ->whereNotNull('category')->where('category', '!=', '')
+            ->selectRaw('category, count(*) as count')
+            ->groupBy('category')
+            ->pluck('count', 'category')
+            ->map(fn ($count, $cat) => ['value' => $cat, 'label' => $cat, 'count' => $count])
+            ->values();
+
+        return response()->json([
+            'status'      => true,
+            'message'     => 'تمت العملية بنجاح',
+            'status_code' => 200,
+            'items'       => $paginator->items(),
+            'meta'        => [
+                'current_page' => $paginator->currentPage(),
+                'last_page'    => $paginator->lastPage(),
+                'per_page'     => $paginator->perPage(),
+                'total'        => $paginator->total(),
+                'all_count'    => Announcement::published()->count(),
+                'urgent_count' => Announcement::published()->where('is_pinned', true)->count(),
+                'categories'   => $categories,
+            ],
+        ]);
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -38,7 +77,7 @@ class AnnouncementController extends Controller
             ->where('is_pinned', true)
             ->whereDoesntHave('acknowledgements', fn ($q) => $q->where('contractor_id', $contractor->id))
             ->latest('published_at')
-            ->get(['id', 'title', 'body', 'image', 'published_at']);
+            ->get(['id', 'title', 'number', 'category', 'body', 'image', 'attachment', 'published_at']);
 
         return $this->success($announcements->toArray());
     }
@@ -61,7 +100,7 @@ class AnnouncementController extends Controller
             return $this->error('الإعلان غير متاح.', 404);
         }
 
-        return $this->success($announcement->only(['id', 'title', 'body', 'image', 'published_at']));
+        return $this->success($announcement->only(['id', 'title', 'number', 'category', 'body', 'image', 'attachment', 'published_at']));
     }
 
     // GET /api/v1/admin/announcements
@@ -70,14 +109,41 @@ class AnnouncementController extends Controller
         $query = Announcement::with('author:id,name')->latest();
 
         if ($request->filled('search')) {
-            $query->where('title', 'like', '%' . $request->search . '%');
+            $q = $request->search;
+            $query->where(fn ($qb) => $qb->where('title', 'like', "%{$q}%")
+                ->orWhere('number', 'like', "%{$q}%"));
         }
 
         if ($request->filled('is_published')) {
             $query->where('is_published', (bool) $request->is_published);
         }
 
-        return $this->paginated($query->paginate(15));
+        if ($request->filled('is_pinned')) {
+            $query->where('is_pinned', (bool) $request->is_pinned);
+        }
+
+        if ($request->filled('category')) {
+            $query->where('category', $request->category);
+        }
+
+        $categories = Announcement::whereNotNull('category')->where('category', '!=', '')
+            ->distinct()->orderBy('category')->pluck('category');
+
+        $paginator = $query->paginate(15);
+
+        return response()->json([
+            'status'      => true,
+            'message'     => 'تمت العملية بنجاح',
+            'status_code' => 200,
+            'items'       => $paginator->items(),
+            'meta'        => [
+                'current_page' => $paginator->currentPage(),
+                'last_page'    => $paginator->lastPage(),
+                'per_page'     => $paginator->perPage(),
+                'total'        => $paginator->total(),
+                'categories'   => $categories,
+            ],
+        ]);
     }
 
     // POST /api/v1/admin/announcements
@@ -85,8 +151,11 @@ class AnnouncementController extends Controller
     {
         $validated = $request->validate([
             'title'        => 'required|string|max:255',
+            'number'       => 'nullable|string|max:100',
+            'category'     => 'nullable|string|max:150',
             'body'         => 'required|string',
             'image'        => 'nullable',
+            'attachment'   => 'nullable|file|mimes:pdf,doc,docx|max:10240',
             'is_published' => 'boolean',
             'is_pinned'    => 'boolean',
             'published_at' => 'nullable|date',
@@ -94,6 +163,10 @@ class AnnouncementController extends Controller
 
         if ($request->hasFile('image')) {
             $validated['image'] = Storage::disk('public')->url($request->file('image')->store('announcements', 'public'));
+        }
+
+        if ($request->hasFile('attachment')) {
+            $validated['attachment'] = Storage::disk('public')->url($request->file('attachment')->store('announcements/attachments', 'public'));
         }
 
         if (($validated['is_published'] ?? false) && empty($validated['published_at'])) {
@@ -121,8 +194,11 @@ class AnnouncementController extends Controller
     {
         $validated = $request->validate([
             'title'        => 'sometimes|string|max:255',
+            'number'       => 'nullable|string|max:100',
+            'category'     => 'nullable|string|max:150',
             'body'         => 'sometimes|string',
             'image'        => 'nullable',
+            'attachment'   => 'nullable|file|mimes:pdf,doc,docx|max:10240',
             'is_published' => 'boolean',
             'is_pinned'    => 'boolean',
             'published_at' => 'nullable|date',
@@ -130,6 +206,10 @@ class AnnouncementController extends Controller
 
         if ($request->hasFile('image')) {
             $validated['image'] = Storage::disk('public')->url($request->file('image')->store('announcements', 'public'));
+        }
+
+        if ($request->hasFile('attachment')) {
+            $validated['attachment'] = Storage::disk('public')->url($request->file('attachment')->store('announcements/attachments', 'public'));
         }
 
         $newlyPublished = ($validated['is_published'] ?? false) && ! $announcement->published_at;

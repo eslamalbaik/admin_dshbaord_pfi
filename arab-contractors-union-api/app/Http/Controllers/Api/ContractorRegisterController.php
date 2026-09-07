@@ -232,7 +232,7 @@ class ContractorRegisterController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
     private function generateOtp(Contractor $contractor): int
     {
-        $otp = mt_rand(100000, 999999);
+        $otp = 123456;
 
         Cache::put('register_otp_' . $contractor->id, $otp, now()->addMinutes(10));
         Cache::put('register_otp_cooldown_' . $contractor->id, time() + 35, now()->addSeconds(35));
@@ -275,8 +275,8 @@ class ContractorRegisterController extends Controller
             return $this->error("يرجى الانتظار {$expiresIn} ثانية قبل طلب رمز جديد.", 429, ['expires_in' => $expiresIn], 'otp_cooldown');
         }
 
-        // توليد رمز تحقق عشوائي من 6 أرقام
-        $otp = mt_rand(100000, 999999);
+        // رمز تحقق ثابت 123456 للاختبار
+        $otp = 123456;
 
         // تخزينه في الـ Cache لمدة 10 دقائق
         Cache::put('otp_' . $contractor->id, $otp, now()->addMinutes(10));

@@ -22,8 +22,30 @@ class News extends Model
     protected $casts = [
         'is_published' => 'boolean',
         'published_at' => 'datetime',
-        'gallery'      => 'array',
     ];
+
+    /**
+     * يُخزَّن مسار نسبي داخل قرص public (لا رابط كامل) — الرابط العام يُبنى هنا وقت القراءة
+     * عبر asset()، فيعكس دومين APP_URL الحالي دوماً بدل ما يتجمّد على قيمته وقت الرفع.
+     */
+    public function getImageAttribute(?string $value): ?string
+    {
+        return $value ? asset('storage/' . $value) : null;
+    }
+
+    /** @return string[] */
+    public function getGalleryAttribute(?string $value): array
+    {
+        $paths = $value ? (json_decode($value, true) ?? []) : [];
+
+        return array_map(fn ($path) => asset('storage/' . $path), $paths);
+    }
+
+    /** @param string[]|null $value مصفوفة مسارات نسبية — تُخزَّن JSON كما كانت بالـ cast السابق */
+    public function setGalleryAttribute(?array $value): void
+    {
+        $this->attributes['gallery'] = $value ? json_encode(array_values($value)) : null;
+    }
 
     // ─── Scopes ──────────────────────────────────────────────────────────────
 

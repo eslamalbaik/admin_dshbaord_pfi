@@ -19,6 +19,9 @@ return [
 
     'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
 
+    // كلمة سر المالك (owner password) لحماية PDF الشهادات من التعديل/النسخ — لا تُطلب لفتح الملف
+    'certificate_pdf_owner_password' => env('CERTIFICATE_PDF_OWNER_PASSWORD', 'union-cert-2026'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment

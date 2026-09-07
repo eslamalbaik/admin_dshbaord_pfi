@@ -189,6 +189,10 @@ class ContractorDashboardController extends Controller
                 'dues_paid_jod'        => number_format($duesTotals['paid'], 2, '.', ''),
                 'dues_paid_percentage' => $contractor->duesPaidPercentage(),
             ],
+            // لقطة احتساب رسوم السنة الحالية (محرّك الاحتساب الآلي — المادة 37)، إن وُجدت
+            'current_year_fee_breakdown' => $dues
+                ->first(fn ($d) => $d->source === 'fee_engine' && $d->year === now()->year)
+                ?->fee_breakdown,
             // تبويب "المستحقات": بادجات الأعداد (غير مدفوع / قيد المراجعة) لعرضها فوق القائمة
             'dues_counts' => [
                 'unpaid'         => $dues->where('status', '!=', 'paid')->count(),
