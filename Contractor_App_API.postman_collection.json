@@ -61,6 +61,27 @@
     {
       "key": "page_slug",
       "value": "about-us"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "string",
+      "description": "Bearer token لمستخدم أدمن — يُجلب من POST /api/v1/auth/login (email/password)"
+    },
+    {
+      "key": "announcement_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "legal_file_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "term_id",
+      "value": "1",
+      "type": "string"
     }
   ],
   "item": [
@@ -623,7 +644,7 @@
                 "profile"
               ]
             },
-            "description": "**GET** `/api/v1/contractor/auth/profile`\n\nالملف الشخصي **الكامل**: كل التفاصيل (العمارة، الطابق، رأس المال، الشركاء، الاختصاصات) + روابط الملفات المرفقة + `classification_label` (درجة أولى، درجة ثانية...).\n\nيُستدعى **فقط عند فتح شاشة الملف الشخصي** — وليس بعد كل تسجيل دخول (فصل البيانات الثقيلة عن اللوجن).\n\n**`account_status`** — بطاقة شاشة \"حسابي\" (عضوية نشطة / منتهية / عليها ذمم):\n- `banner`: بانر واحد بالأولوية — `membership_expired` (أحمر) > `dues_overdue` (برتقالي) > `membership_active` (أخضر). يحوي `message` و`cta_label` جاهزين بالدينار، و`cta` (`renew_membership` | `pay_dues` | `null`).\n- `membership.badge`: `active` | `expired`.\n- `dues`: `has_pending` + `outstanding_amount` (ذمم + غرامات غير مسدَّدة + دفعات معلّقة) + `badge` (\"مستحقات\" أو null).\n- `certificates.locked` + `lock_reason` — قفل الشهادات (عضوية منتهية أو ذمم أو حساب مجمّد).\n- `equipment_subscription`: `active` + `badge` (\"نشط\" أو \"تجديد الاشتراك\") + `expires_at`."
+            "description": "**GET** `/api/v1/contractor/auth/profile`\n\nالملف الشخصي **الكامل**: كل التفاصيل (العمارة، الطابق، رأس المال، الشركاء، الاختصاصات) + روابط الملفات المرفقة + `classification_label` (درجة أولى، درجة ثانية...).\n\nيُستدعى **فقط عند فتح شاشة الملف الشخصي** — وليس بعد كل تسجيل دخول (فصل البيانات الثقيلة عن اللوجن).\n\n**`account_status`** — بطاقة شاشة \"حسابي\" (عضوية نشطة / منتهية / عليها ذمم):\n- `banner`: بانر واحد بالأولوية — `membership_expired` (أحمر) > `dues_overdue` (برتقالي) > `membership_active` (أخضر). يحوي `message` و`cta_label` جاهزين بالدينار، و`cta` (`renew_membership` | `pay_dues` | `null`). (بيانات العضوية نفسها — الحالة وتاريخ الانتهاء — بالحقل `membership` بمستوى الاستجابة الأعلى، مش داخل `account_status`.)\n- `dues`: `has_pending` + `outstanding_amount` (ذمم + غرامات غير مسدَّدة + دفعات معلّقة) + `badge` (\"مستحقات\" أو null).\n- `certificates.locked` + `lock_reason` — قفل الشهادات (عضوية منتهية أو ذمم أو حساب مجمّد).\n- `equipment_subscription`: `active` + `badge` (\"نشط\" أو \"تجديد الاشتراك\") + `expires_at`."
           }
         },
         {
@@ -1959,7 +1980,7 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/announcements?per_page=15",
+              "raw": "{{base_url}}/announcements?per_page=15&search=&filter=&category=",
               "host": [
                 "{{base_url}}"
               ],
@@ -1970,10 +1991,28 @@
                 {
                   "key": "per_page",
                   "value": "15"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "بحث بالعنوان/رقم التعميم/النص",
+                  "disabled": true
+                },
+                {
+                  "key": "filter",
+                  "value": "urgent",
+                  "description": "urgent = عاجل وهام فقط (is_pinned)",
+                  "disabled": true
+                },
+                {
+                  "key": "category",
+                  "value": "",
+                  "description": "فلترة بتصنيف محدد",
+                  "disabled": true
                 }
               ]
             },
-            "description": "**GET** `/api/v1/announcements` — *عام*\n\nكيان مستقل عن الأخبار (news) — إعلانات الاتحاد المنشورة فقط، مُرقّمة. `announcements_count` بشاشة هوم المقاول يعتمد على هالجدول."
+            "description": "**GET** `/api/v1/announcements` — *عام*\n\nكيان مستقل عن الأخبار (news) — إعلانات/تعميمات الاتحاد المنشورة فقط، مُرقّمة. `announcements_count` بشاشة هوم المقاول يعتمد على هالجدول.\n\n**Query params (اختيارية):**\n\n| المعامل | الوصف |\n|---|---|\n| `search` | بحث بالعنوان أو رقم التعميم أو النص |\n| `filter=urgent` | التعميمات المثبّتة \"عاجل وهام\" فقط (`is_pinned`) |\n| `category` | فلترة بتصنيف محدد (قيمة حرة يحددها الأدمن) |\n\n**النجاح 200:** كل عنصر فيه `id, title, number, category, body, image, attachment, is_pinned, published_at`.\n`meta` فيها إضافة لبيانات الصفحات: `all_count`, `urgent_count`, `categories: [{value,label,count}]` — لعرض تبويبات الشاشة وعدّاداتها."
           }
         },
         {
@@ -1996,7 +2035,7 @@
                 "1"
               ]
             },
-            "description": "**GET** `/api/v1/announcements/{id}` — *عام*\n\n**الأخطاء:** `404` إن لم يوجد الإعلان أو لم يُنشر."
+            "description": "**GET** `/api/v1/announcements/{id}` — *عام*\n\nيرجع `id, title, number, category, body, image, attachment, published_at`.\n\n**الأخطاء:** `404` إن لم يوجد الإعلان أو لم يُنشر."
           }
         },
         {
@@ -2024,7 +2063,7 @@
                 "pending"
               ]
             },
-            "description": "GET /api/v1/contractor/circulars/pending - circulars needing read acknowledgement (first-open pop-up)."
+            "description": "**GET** `/api/v1/contractor/circulars/pending` — التعميمات المثبّتة \"عاجل وهام\" (`is_pinned=true`) التي لم يُقرّ المقاول بقراءتها بعد — تُعرض كـ Pop-up لمرة واحدة عند فتح التطبيق.\n\nكل عنصر فيه `id, title, number, category, body, image, attachment, published_at`."
           }
         },
         {
@@ -2053,7 +2092,7 @@
                 "acknowledge"
               ]
             },
-            "description": "POST /api/v1/contractor/circulars/{id}/acknowledge"
+            "description": "**POST** `/api/v1/contractor/circulars/{id}/acknowledge` — تسجيل إقرار قراءة التعميم (بحيث ما يظهر بـ Pending Circulars مرة ثانية لنفس المقاول)."
           }
         }
       ]
@@ -2448,15 +2487,23 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/legal-files",
+              "raw": "{{base_url}}/legal-files?search=",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "legal-files"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "بحث بعنوان/وصف الملف",
+                  "disabled": true
+                }
               ]
             },
-            "description": "**GET** `/api/v1/legal-files` — *عام*\n\nملفات الاتحاد القانونية **مجمّعة حسب التصنيف** (تشريعات، مذكرات تفاهم، أخرى).\n\n**النجاح 200:**\n```json\n{ \"items\": { \"groups\": [ { \"category\":\"legislation\", \"category_label\":\"تشريعات\", \"files\":[ {\"id\":1,\"title\":\"...\",\"url\":\"...\",\"formatted_size\":\"1.2 MB\"} ] } ] } }\n```"
+            "description": "**GET** `/api/v1/legal-files` — *عام*\n\nشاشة \"المكتبة القانونية\": بحث + تبويبات تصنيف بعدّاد لكل تبويب + قسم \"الأكثر طلباً\".\n\n**النجاح 200:**\n```json\n{\n  \"items\": {\n    \"total\": 12,\n    \"categories\": [ { \"value\": \"legislation\", \"label\": \"تشريعات\", \"count\": 8 } ],\n    \"featured\": [ { \"id\": 1, \"title\": \"...\", \"is_featured\": true, \"formatted_size\": \"3.2 MB\", \"url\": \"...\" } ],\n    \"files\": [ { \"id\": 1, \"title\": \"...\", \"category\": \"legislation\", \"formatted_size\": \"1.2 MB\", \"url\": \"...\" } ]\n  }\n}\n```"
           }
         },
         {
@@ -2470,7 +2517,7 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/legal-files?category=legislation",
+              "raw": "{{base_url}}/legal-files?category=legislation&search=",
               "host": [
                 "{{base_url}}"
               ],
@@ -2481,10 +2528,65 @@
                 {
                   "key": "category",
                   "value": "legislation"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "بحث بعنوان/وصف الملف",
+                  "disabled": true
                 }
               ]
             },
-            "description": "**GET** `/api/v1/legal-files?category=legislation` — *عام*\n\nتصفية ملفات تصنيف واحد. القيم: `legislation` | `mou` | `other`.\nعند تمرير `category` يرجع `items.files` كقائمة مباشرة (بدون تجميع)."
+            "description": "**GET** `/api/v1/legal-files?category=legislation` — *عام*\n\nتصفية ملفات تصنيف واحد. القيم: `legislation` | `mou` | `other` (أو `category=all` = بدون فلترة).\nالاستجابة نفس شكل `Legal Files` (`total`, `categories`, `featured`, `files`) لكن `files` مفلترة بالتصنيف المطلوب."
+          }
+        }
+      ]
+    },
+    {
+      "name": "📜 Terms & Privacy Policy",
+      "item": [
+        {
+          "name": "Terms & Conditions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/terms",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "terms"
+              ]
+            },
+            "description": "**GET** `/api/v1/terms` — *عام*\n\nنصوص الشروط والأحكام فقط (`type=terms`, `is_active=true`)، مرتبة حسب `sort`. تُعرض بشاشة \"الموافقة على الشروط\" أثناء التسجيل.\n\n**النجاح 200:**\n```json\n[\n  { \"id\": 1, \"title\": \"...\", \"title_en\": \"...\", \"body\": \"...\", \"body_en\": \"...\", \"sort\": 0 }\n]\n```"
+          }
+        },
+        {
+          "name": "Privacy Policy",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/privacy-policy",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "privacy-policy"
+              ]
+            },
+            "description": "**GET** `/api/v1/privacy-policy` — *عام*\n\nنصوص سياسة الخصوصية فقط (`type=privacy`, `is_active=true`) — نفس شكل استجابة `/terms` تماماً.\n\n**النجاح 200:**\n```json\n[\n  { \"id\": 3, \"title\": \"مقدمة عامة\", \"title_en\": null, \"body\": \"...\", \"body_en\": null, \"sort\": 0 }\n]\n```"
           }
         }
       ]
@@ -2996,6 +3098,654 @@
             },
             "description": "**GET** `/api/v1/app/settings` — *عام (بدون توكن)*\n\nمعلومات الدفع (payment_info.bank_accounts)، تواصل الدعم، روابط تواصل اجتماعي، وexchange_rates الجديد: {ILS: {rate_to_jod, source, fetched_at}, USD: {...}} — سعر متوسط buy/sell من سلطة النقد الفلسطينية (نفس مصدر تأكيد المحاسب)، للمعاينة الحية قبل رفع إشعار التحويل."
           }
+        }
+      ]
+    },
+    {
+      "name": "🔑 Admin Dashboard",
+      "description": "راوتات لوحة تحكم الأدمن (auth:sanctum) — استخدم {{admin_token}} كـ Bearer، يُجلب من POST {{base_url}}/auth/login بحساب أدمن (email/password).",
+      "item": [
+        {
+          "name": "Announcements",
+          "item": [
+            {
+              "name": "List Announcements (Admin)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin/announcements?search=&category=&is_pinned=&is_published=",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "announcements"
+                  ],
+                  "query": [
+                    {
+                      "key": "search",
+                      "value": "",
+                      "type": "text",
+                      "description": "بحث بالعنوان أو رقم التعميم"
+                    },
+                    {
+                      "key": "category",
+                      "value": "",
+                      "type": "text",
+                      "description": "فلترة بتصنيف محدد"
+                    },
+                    {
+                      "key": "is_pinned",
+                      "value": "",
+                      "type": "text",
+                      "description": "1 = عاجل وهام فقط"
+                    },
+                    {
+                      "key": "is_published",
+                      "value": "",
+                      "type": "text",
+                      "description": "1 = منشور | 0 = مسودة"
+                    }
+                  ]
+                },
+                "description": "**GET** `/api/v1/admin/announcements` — *أدمن (auth:sanctum)*\n\nقائمة كل التعميمات (منشورة ومسودات)، مُرقّمة (15/صفحة).\n\n**النجاح 200:** `items` + `meta.categories` (قائمة كل التصنيفات المستخدمة حالياً، لبناء select بلوحة التحكم)."
+              }
+            },
+            {
+              "name": "Create Announcement",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin/announcements",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "announcements"
+                  ]
+                },
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "title",
+                      "value": "تحديث اشتراطات السلامة المهنية",
+                      "type": "text"
+                    },
+                    {
+                      "key": "number",
+                      "value": "2026/108",
+                      "type": "text"
+                    },
+                    {
+                      "key": "category",
+                      "value": "تعميمات الشؤون الفنية والتصنيف",
+                      "type": "text"
+                    },
+                    {
+                      "key": "body",
+                      "value": "نص التعميم الكامل...",
+                      "type": "text"
+                    },
+                    {
+                      "key": "is_published",
+                      "value": "1",
+                      "type": "text"
+                    },
+                    {
+                      "key": "is_pinned",
+                      "value": "1",
+                      "type": "text",
+                      "description": "1 = عاجل وهام — يظهر Pop-up لمرة واحدة بتطبيق المقاول"
+                    },
+                    {
+                      "key": "published_at",
+                      "value": "",
+                      "type": "text",
+                      "description": "اختياري — الآن افتراضياً",
+                      "disabled": true
+                    },
+                    {
+                      "key": "image",
+                      "value": "",
+                      "type": "file",
+                      "disabled": true
+                    },
+                    {
+                      "key": "attachment",
+                      "value": "",
+                      "type": "file",
+                      "description": "PDF/DOC/DOCX — حتى 10MB",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "**POST** `/api/v1/admin/announcements` — *أدمن*\n\n`multipart/form-data`. عند `is_published=1` يُبعث Push Notification لكل المقاولين."
+              }
+            },
+            {
+              "name": "Update Announcement",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin/announcements/{{announcement_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "announcements",
+                    "{{announcement_id}}"
+                  ]
+                },
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "_method",
+                      "value": "PUT",
+                      "type": "text"
+                    },
+                    {
+                      "key": "title",
+                      "value": "عنوان محدَّث",
+                      "type": "text"
+                    },
+                    {
+                      "key": "number",
+                      "value": "2026/108",
+                      "type": "text"
+                    },
+                    {
+                      "key": "category",
+                      "value": "تعميمات الشؤون الفنية والتصنيف",
+                      "type": "text"
+                    },
+                    {
+                      "key": "body",
+                      "value": "نص محدَّث",
+                      "type": "text"
+                    },
+                    {
+                      "key": "is_published",
+                      "value": "1",
+                      "type": "text"
+                    },
+                    {
+                      "key": "is_pinned",
+                      "value": "0",
+                      "type": "text"
+                    },
+                    {
+                      "key": "image",
+                      "value": "",
+                      "type": "file",
+                      "disabled": true
+                    },
+                    {
+                      "key": "attachment",
+                      "value": "",
+                      "type": "file",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "**PUT** `/api/v1/admin/announcements/{id}` (مُرسلة كـ POST + `_method=PUT` لدعم رفع ملفات) — *أدمن*"
+              }
+            },
+            {
+              "name": "Delete Announcement",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin/announcements/{{announcement_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "announcements",
+                    "{{announcement_id}}"
+                  ]
+                },
+                "description": "**DELETE** `/api/v1/admin/announcements/{id}` — *أدمن* (Soft delete)"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Legal Library",
+          "item": [
+            {
+              "name": "List Legal Files (Admin)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/dashboard/legal-files?category=&search=",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "dashboard",
+                    "legal-files"
+                  ],
+                  "query": [
+                    {
+                      "key": "category",
+                      "value": "",
+                      "type": "text",
+                      "description": "legislation | mou | other"
+                    },
+                    {
+                      "key": "search",
+                      "value": "",
+                      "type": "text",
+                      "description": "بحث بالعنوان"
+                    }
+                  ]
+                },
+                "description": "**GET** `/api/v1/dashboard/legal-files` — *أدمن*\n\nقائمة مُرقّمة (20/صفحة) — كل ملف فيها `is_featured` (الأكثر طلباً)."
+              }
+            },
+            {
+              "name": "Upload Legal File",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/dashboard/legal-files",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "dashboard",
+                    "legal-files"
+                  ]
+                },
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "title",
+                      "value": "الشروط العامة لعقد المقاولة",
+                      "type": "text"
+                    },
+                    {
+                      "key": "title_en",
+                      "value": "",
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "description",
+                      "value": "",
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "description_en",
+                      "value": "",
+                      "type": "text",
+                      "disabled": true
+                    },
+                    {
+                      "key": "category",
+                      "value": "legislation",
+                      "type": "text",
+                      "description": "legislation | mou | other"
+                    },
+                    {
+                      "key": "sort",
+                      "value": "0",
+                      "type": "text"
+                    },
+                    {
+                      "key": "is_active",
+                      "value": "1",
+                      "type": "text"
+                    },
+                    {
+                      "key": "is_featured",
+                      "value": "0",
+                      "type": "text",
+                      "description": "1 = يظهر بقسم \"الأكثر طلباً\""
+                    },
+                    {
+                      "key": "file",
+                      "value": "",
+                      "type": "file",
+                      "description": "PDF/DOC/DOCX/XLS/XLSX/PPT/PPTX — حتى 50MB"
+                    }
+                  ]
+                },
+                "description": "**POST** `/api/v1/dashboard/legal-files` — *أدمن*"
+              }
+            },
+            {
+              "name": "Update Legal File",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/dashboard/legal-files/{{legal_file_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "dashboard",
+                    "legal-files",
+                    "{{legal_file_id}}"
+                  ]
+                },
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "_method",
+                      "value": "PUT",
+                      "type": "text"
+                    },
+                    {
+                      "key": "title",
+                      "value": "عنوان محدَّث",
+                      "type": "text"
+                    },
+                    {
+                      "key": "category",
+                      "value": "legislation",
+                      "type": "text"
+                    },
+                    {
+                      "key": "sort",
+                      "value": "0",
+                      "type": "text"
+                    },
+                    {
+                      "key": "is_active",
+                      "value": "1",
+                      "type": "text"
+                    },
+                    {
+                      "key": "is_featured",
+                      "value": "1",
+                      "type": "text"
+                    },
+                    {
+                      "key": "file",
+                      "value": "",
+                      "type": "file",
+                      "description": "اختياري — استبدال الملف الحالي",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "**PUT** `/api/v1/dashboard/legal-files/{id}` (POST + `_method=PUT`) — *أدمن*"
+              }
+            },
+            {
+              "name": "Delete Legal File",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/dashboard/legal-files/{{legal_file_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "dashboard",
+                    "legal-files",
+                    "{{legal_file_id}}"
+                  ]
+                },
+                "description": "**DELETE** `/api/v1/dashboard/legal-files/{id}` — *أدمن* (يحذف الملف من التخزين أيضاً)"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Terms & Privacy Policy",
+          "item": [
+            {
+              "name": "List (all types)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/dashboard/terms",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "dashboard",
+                    "terms"
+                  ]
+                },
+                "description": "**GET** `/api/v1/dashboard/terms` — *أدمن*\n\nكل الفقرات (terms + privacy) بدون فلترة."
+              }
+            },
+            {
+              "name": "List (filter by type)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/dashboard/terms?type=privacy",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "dashboard",
+                    "terms"
+                  ],
+                  "query": [
+                    {
+                      "key": "type",
+                      "value": "privacy",
+                      "type": "text",
+                      "description": "terms | privacy"
+                    }
+                  ]
+                },
+                "description": "**GET** `/api/v1/dashboard/terms?type=privacy` — *أدمن*"
+              }
+            },
+            {
+              "name": "Create Term",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/dashboard/terms",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "dashboard",
+                    "terms"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"type\": \"terms\",\n  \"title\": \"بند جديد\",\n  \"title_en\": \"New clause\",\n  \"body\": \"نص البند بالعربي\",\n  \"body_en\": \"Clause body in English\",\n  \"sort\": 0,\n  \"is_active\": true\n}"
+                },
+                "description": "**POST** `/api/v1/dashboard/terms` — *أدمن*\n\n`type` اختياري (افتراضي `terms`) — مرّر `\"privacy\"` لإضافة فقرة سياسة خصوصية."
+              }
+            },
+            {
+              "name": "Update Term",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/dashboard/terms/{{term_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "dashboard",
+                    "terms",
+                    "{{term_id}}"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"type\": \"privacy\",\n  \"title\": \"عنوان محدَّث\",\n  \"body\": \"نص محدَّث\",\n  \"sort\": 1,\n  \"is_active\": true\n}"
+                },
+                "description": "**PUT** `/api/v1/dashboard/terms/{id}` — *أدمن*\n\nيقدر يحوّل الفقرة بين `terms` و`privacy` بتغيير `type`."
+              }
+            },
+            {
+              "name": "Delete Term",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/dashboard/terms/{{term_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "dashboard",
+                    "terms",
+                    "{{term_id}}"
+                  ]
+                },
+                "description": "**DELETE** `/api/v1/dashboard/terms/{id}` — *أدمن*"
+              }
+            }
+          ]
         }
       ]
     }
