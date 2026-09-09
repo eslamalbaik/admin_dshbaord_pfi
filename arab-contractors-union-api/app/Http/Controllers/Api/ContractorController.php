@@ -260,7 +260,17 @@ class ContractorController extends Controller
     // DELETE /api/contractors/{id}
     public function destroy(Contractor $contractor)
     {
+        // الأعمدة الفريدة (phone, email, license_number, commercial_register, membership_number)
+        // تبقى بجدول contractors بعد الحذف الناعم وتصطدم بقيد unique عند إعادة تسجيل نفس البيانات —
+        // نلحق بها لاحقة بمعرّف السجل حتى تتحرر القيمة الأصلية لإعادة الاستخدام مع بقاء أثرها بالسجل المؤرشف.
+        $suffix = '_deleted_' . $contractor->id;
+        $mangled = collect(['phone', 'email', 'license_number', 'commercial_register', 'membership_number'])
+            ->mapWithKeys(fn ($field) => [$field => $contractor->{$field} ? $contractor->{$field} . $suffix : null])
+            ->all();
+
+        $contractor->update($mangled);
         $contractor->delete();
+
         return $this->success(message: 'تم حذف المقاول بنجاح.');
     }
 

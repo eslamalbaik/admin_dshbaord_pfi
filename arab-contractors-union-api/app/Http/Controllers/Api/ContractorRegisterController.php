@@ -202,6 +202,9 @@ class ContractorRegisterController extends Controller
         $contractor->update([
             'password'          => Hash::make($request->password),
             'profile_completed' => true,
+            // فتح الحساب من التطبيق ينقل الحالة من "معلّق" إلى "نشط" تلقائياً —
+            // 'expired' تبقى كما هي لأنها تخص انتهاء العضوية لا اكتمال التسجيل.
+            ...($contractor->status === 'pending' ? ['status' => 'active'] : []),
         ]);
 
         // حذف التوكنات القديمة

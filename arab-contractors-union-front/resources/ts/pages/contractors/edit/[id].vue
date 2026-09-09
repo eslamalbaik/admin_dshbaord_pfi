@@ -197,12 +197,12 @@ const submit = async () => {
     fd.append('_method', 'PUT') // Laravel uses PUT for file updates via POST request
     
     Object.entries(form.value).forEach(([k, v]) => {
-      if (v !== null && v !== '') {
+      if (v !== null) {
         if (k === 'partners' && Array.isArray(v)) {
-          if (v.length > 0) fd.append(k, v.join(','))
+          fd.append(k, v.join(','))
         } else if (k === 'specialties' && Array.isArray(v)) {
           fd.append(k, JSON.stringify(v))
-        } else {
+        } else if (!(v instanceof File) || v.size > 0) {
           fd.append(k, v as any)
         }
       }

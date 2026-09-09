@@ -130,8 +130,9 @@ const changeStatus = async (contractor: any, status: string) => {
     await api.patch(`/api/v1/contractors/${contractor.id}/status`, { status })
     contractor.status = status
   }
-  catch (err) {
+  catch (err: any) {
     console.error(err)
+    notify(err?.response?.data?.message ?? 'تعذّر تحديث حالة المقاول.', 'error')
   }
   finally {
     statusUpdating.value = null

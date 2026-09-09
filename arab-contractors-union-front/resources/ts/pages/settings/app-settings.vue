@@ -104,7 +104,7 @@ const saveMutation = useMutation({
   },
 })
 
-// ─── رفع الشعار ───
+// ─── رفع الشعار (تلقائي فور اختيار الملف) ───
 const logoFile = ref<File[]>([])
 const logoMutation = useMutation({
   mutationFn: async () => {
@@ -121,10 +121,15 @@ const logoMutation = useMutation({
   },
   onError: (e: any) => {
     errorMessage.value = e?.response?.data?.message || 'فشل رفع الشعار.'
+    logoFile.value = []
   },
 })
+watch(logoFile, files => {
+  if (files.length)
+    logoMutation.mutate()
+})
 
-// ─── رفع صورة الغلاف (شاشة "عن الاتحاد" بالتطبيق) ───
+// ─── رفع صورة الغلاف (شاشة "عن الاتحاد" بالتطبيق) — تلقائي فور اختيار الملف ───
 const coverImageFile = ref<File[]>([])
 const coverImageMutation = useMutation({
   mutationFn: async () => {
@@ -141,7 +146,12 @@ const coverImageMutation = useMutation({
   },
   onError: (e: any) => {
     errorMessage.value = e?.response?.data?.message || 'فشل رفع صورة الغلاف.'
+    coverImageFile.value = []
   },
+})
+watch(coverImageFile, files => {
+  if (files.length)
+    coverImageMutation.mutate()
 })
 </script>
 
@@ -182,17 +192,11 @@ const coverImageMutation = useMutation({
               accept="image/*"
               density="compact"
               prepend-icon="tabler-upload"
-            />
-            <VBtn
-              size="small"
-              color="primary"
-              variant="tonal"
-              :disabled="!logoFile.length"
               :loading="logoMutation.isPending.value"
-              @click="logoMutation.mutate()"
-            >
-              رفع الشعار
-            </VBtn>
+              :disabled="logoMutation.isPending.value"
+              hint="يُرفع تلقائيًا فور الاختيار"
+              persistent-hint
+            />
           </VCol>
           <VCol cols="12" md="3" class="text-center">
             <VAvatar :size="120" rounded="lg" color="secondary" variant="tonal" class="mb-3">
@@ -205,17 +209,11 @@ const coverImageMutation = useMutation({
               accept="image/*"
               density="compact"
               prepend-icon="tabler-upload"
-            />
-            <VBtn
-              size="small"
-              color="primary"
-              variant="tonal"
-              :disabled="!coverImageFile.length"
               :loading="coverImageMutation.isPending.value"
-              @click="coverImageMutation.mutate()"
-            >
-              رفع صورة الغلاف
-            </VBtn>
+              :disabled="coverImageMutation.isPending.value"
+              hint="تُرفع تلقائيًا فور الاختيار"
+              persistent-hint
+            />
           </VCol>
           <VCol cols="12" md="6">
             <VRow>

@@ -82,6 +82,11 @@
       "key": "term_id",
       "value": "1",
       "type": "string"
+    },
+    {
+      "key": "contractor_id",
+      "value": "1",
+      "type": "string"
     }
   ],
   "item": [
@@ -2318,7 +2323,7 @@
                 "contact"
               ]
             },
-            "description": "GET /api/v1/app/contact - public, no token.\n\nNote: the support-ticket system (contractor/support-tickets) is frozen per REQ-23 (direct phone/whatsapp instead of in-app tickets) - routes exist in code but are commented out, not reachable currently."
+            "description": "GET /api/v1/app/contact - public, no token."
           }
         },
         {
@@ -2401,6 +2406,12 @@
                   "key": "message",
                   "value": "ما بقدر ادخل عالتطبيق من امبارح",
                   "type": "text"
+                },
+                {
+                  "key": "attachment",
+                  "type": "file",
+                  "src": [],
+                  "disabled": true
                 }
               ]
             }
@@ -3743,6 +3754,604 @@
                   ]
                 },
                 "description": "**DELETE** `/api/v1/dashboard/terms/{id}` — *أدمن*"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Contractors",
+          "item": [
+            {
+              "name": "List Contractors",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/contractors?search=&status=&page=1&per_page=10",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "contractors"
+                  ],
+                  "query": [
+                    {
+                      "key": "search",
+                      "value": "",
+                      "type": "text",
+                      "description": "بحث بالاسم/رقم الرخصة/البريد/رقم العضوية/السجل التجاري"
+                    },
+                    {
+                      "key": "status",
+                      "value": "",
+                      "type": "text",
+                      "description": "active | pending | expired | suspended"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1",
+                      "type": "text"
+                    },
+                    {
+                      "key": "per_page",
+                      "value": "10",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "description": "**GET** `/api/v1/contractors` — *أدمن/محاسب* — قائمة مُرقّمة."
+              }
+            },
+            {
+              "name": "Next Membership Number",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/contractors/next-membership-number",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "contractors",
+                    "next-membership-number"
+                  ]
+                },
+                "description": "**GET** `/api/v1/contractors/next-membership-number` — *أدمن* — رقم العضوية التالي (تسلسل جديد `{n}_g` بدءًا من 928).\n\n**ملاحظة:** المسار الثابت هذا مُعرَّف قبل `apiResource('contractors', ...)` بالكود حتى لا يُلتقط `next-membership-number` كمعرّف `{contractor}`."
+              }
+            },
+            {
+              "name": "Create Contractor (multipart)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/contractors",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "contractors"
+                  ]
+                },
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    { "key": "name", "value": "شركة اختبار للمقاولات", "type": "text" },
+                    { "key": "membership_number", "value": "930_g", "type": "text" },
+                    { "key": "commercial_register", "value": "123456789", "type": "text" },
+                    { "key": "license_number", "value": "12345", "type": "text" },
+                    { "key": "phone", "value": "0599123456", "type": "text" },
+                    { "key": "email", "value": "test-contractor@example.com", "type": "text" },
+                    { "key": "address", "value": "غزة - الرمال", "type": "text" },
+                    { "key": "owner_name", "value": "أحمد محمد", "type": "text" },
+                    { "key": "authorized_person", "value": "أحمد محمد", "type": "text" },
+                    { "key": "established_date", "value": "2020-01-01", "type": "text" },
+                    { "key": "specialties", "value": "[{\"field_lk_type\":20,\"specialization_lk_type\":20,\"classification\":\"ثالثة\"}]", "type": "text" },
+                    { "key": "cr_file", "type": "file", "src": [], "disabled": true }
+                  ]
+                },
+                "description": "**POST** `/api/v1/contractors` — *أدمن* — تسجيل مقاول جديد من لوحة التحكم.\n\n`membership_number`/`commercial_register`/`license_number`/`email`/`phone` فريدة — الحذف soft-delete يُحرّرها تلقائيًا (يُلحق بها `_deleted_{id}` عند الحذف)."
+              }
+            },
+            {
+              "name": "Get Contractor",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/contractors/{{contractor_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "contractors",
+                    "{{contractor_id}}"
+                  ]
+                },
+                "description": "**GET** `/api/v1/contractors/{id}` — *أدمن*"
+              }
+            },
+            {
+              "name": "Update Contractor (multipart)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/contractors/{{contractor_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "contractors",
+                    "{{contractor_id}}"
+                  ]
+                },
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    { "key": "_method", "value": "PUT", "type": "text", "description": "Laravel method-spoofing — الفورم multipart لدعم رفع الملفات" },
+                    { "key": "name", "value": "شركة اختبار للمقاولات", "type": "text" },
+                    { "key": "membership_number", "value": "930_g", "type": "text" },
+                    { "key": "commercial_register", "value": "123456789", "type": "text" },
+                    { "key": "owner_name", "value": "أحمد محمد", "type": "text" },
+                    { "key": "authorized_person", "value": "أحمد محمد", "type": "text" }
+                  ]
+                },
+                "description": "**POST** `/api/v1/contractors/{id}` مع `_method=PUT` — *أدمن* — نفس أسلوب لوحة التحكم (POST + method-spoofing لدعم multipart) بدل PUT مباشر."
+              }
+            },
+            {
+              "name": "Change Status",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/contractors/{{contractor_id}}/status",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "contractors",
+                    "{{contractor_id}}",
+                    "status"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"active\"\n}"
+                },
+                "description": "**PATCH** `/api/v1/contractors/{id}/status` — *أدمن* — `status`: active | pending | expired | suspended."
+              }
+            },
+            {
+              "name": "Generate QR",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/contractors/{{contractor_id}}/qr",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "contractors",
+                    "{{contractor_id}}",
+                    "qr"
+                  ]
+                },
+                "description": "**POST** `/api/v1/contractors/{id}/qr` — *أدمن* — يولّد QR صالح 24 ساعة."
+              }
+            },
+            {
+              "name": "Delete Contractor",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/contractors/{{contractor_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "contractors",
+                    "{{contractor_id}}"
+                  ]
+                },
+                "description": "**DELETE** `/api/v1/contractors/{id}` — *أدمن* — حذف ناعم (soft-delete). الحقول الفريدة (phone/email/license_number/commercial_register/membership_number) تُلحَق بلاحقة `_deleted_{id}` تلقائيًا حتى تتحرر لإعادة الاستخدام."
+              }
+            }
+          ]
+        },
+        {
+          "name": "App Settings",
+          "item": [
+            {
+              "name": "Get Settings",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/dashboard/settings",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "dashboard",
+                    "settings"
+                  ]
+                },
+                "description": "**GET** `/api/v1/dashboard/settings` — *أدمن* — كل الإعدادات key/value (union_name, union_logo, social_*, ...)."
+              }
+            },
+            {
+              "name": "Update Settings",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/dashboard/settings",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "dashboard",
+                    "settings"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"settings\": [\n    { \"key\": \"union_name\", \"value\": \"اتحاد المقاولين الفلسطينيين - غزة\", \"group\": \"about\" },\n    { \"key\": \"support_whatsapp\", \"value\": \"+970599123456\", \"group\": \"contact\" }\n  ]\n}"
+                },
+                "description": "**PUT** `/api/v1/dashboard/settings` — *أدمن* — تحديث مجموعة إعدادات دفعة واحدة. لا يشمل `union_logo`/`union_cover_image` — لهم مسار رفع منفصل."
+              }
+            },
+            {
+              "name": "Upload Logo",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/dashboard/settings/logo",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "dashboard",
+                    "settings",
+                    "logo"
+                  ]
+                },
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    { "key": "logo", "type": "file", "src": [], "description": "png/jpg/jpeg/svg/webp — حتى 2 ميجا" }
+                  ]
+                },
+                "description": "**POST** `/api/v1/dashboard/settings/logo` — *أدمن* — يستبدل الشعار الحالي (يحذف القديم من التخزين)."
+              }
+            },
+            {
+              "name": "Upload Cover Image",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/dashboard/settings/cover-image",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "dashboard",
+                    "settings",
+                    "cover-image"
+                  ]
+                },
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    { "key": "cover_image", "type": "file", "src": [], "description": "png/jpg/jpeg/webp — حتى 4 ميجا" }
+                  ]
+                },
+                "description": "**POST** `/api/v1/dashboard/settings/cover-image` — *أدمن* — صورة غلاف شاشة \"عن الاتحاد\" بالتطبيق."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Support Tickets (Admin)",
+          "item": [
+            {
+              "name": "List Support Tickets (Admin)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/dashboard/support-tickets?status=&category=&search=",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "dashboard",
+                    "support-tickets"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "",
+                      "type": "text",
+                      "description": "open | in_progress | answered | closed"
+                    },
+                    {
+                      "key": "category",
+                      "value": "",
+                      "type": "text",
+                      "description": "technical | complaint | inquiry | suggestion | other"
+                    },
+                    {
+                      "key": "search",
+                      "value": "",
+                      "type": "text",
+                      "description": "بحث بالعنوان أو اسم المقاول"
+                    }
+                  ]
+                },
+                "description": "**GET** `/api/v1/dashboard/support-tickets` — *أدمن* — قائمة مُرقّمة (15/صفحة)."
+              }
+            },
+            {
+              "name": "Get Support Ticket (Admin)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/dashboard/support-tickets/{{ticket_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "dashboard",
+                    "support-tickets",
+                    "{{ticket_id}}"
+                  ]
+                },
+                "description": "**GET** `/api/v1/dashboard/support-tickets/{id}` — *أدمن*"
+              }
+            },
+            {
+              "name": "Reply to Support Ticket (Admin)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/dashboard/support-tickets/{{ticket_id}}/reply",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "dashboard",
+                    "support-tickets",
+                    "{{ticket_id}}",
+                    "reply"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reply\": \"تم حل المشكلة، الرجاء إعادة تسجيل الدخول.\"\n}"
+                },
+                "description": "**POST** `/api/v1/dashboard/support-tickets/{id}/reply` — *أدمن* — يرسل بريد + إشعار داخل التطبيق للمقاول."
+              }
+            },
+            {
+              "name": "Update Ticket Status (Admin)",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/dashboard/support-tickets/{{ticket_id}}/status",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "dashboard",
+                    "support-tickets",
+                    "{{ticket_id}}",
+                    "status"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"in_progress\"\n}"
+                },
+                "description": "**PATCH** `/api/v1/dashboard/support-tickets/{id}/status` — *أدمن* — status: open | in_progress | answered | closed."
+              }
+            },
+            {
+              "name": "Delete Support Ticket (Admin)",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{admin_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/dashboard/support-tickets/{{ticket_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "dashboard",
+                    "support-tickets",
+                    "{{ticket_id}}"
+                  ]
+                },
+                "description": "**DELETE** `/api/v1/dashboard/support-tickets/{id}` — *أدمن*"
               }
             }
           ]
