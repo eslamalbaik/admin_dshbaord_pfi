@@ -351,6 +351,7 @@ Route::prefix('v1')->group(function () {
              ->only(['index', 'store', 'show', 'update', 'destroy']);
         Route::post('contractors/{contractor}/qr', [ContractorController::class, 'generateQR']);
         Route::patch('contractors/{contractor}/status', [ContractorController::class, 'changeStatus']);
+        Route::patch('contractors/{contractor}/contact', [ContractorController::class, 'updateContact']);
 
         // --------------------------------------------------------
         //  Memberships

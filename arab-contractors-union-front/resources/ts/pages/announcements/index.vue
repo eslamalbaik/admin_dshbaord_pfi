@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import api from '@/plugins/axios'
+import { firstFile, type SingleFileModel } from '@/utils/files'
 
 definePage({ meta: { requiresAdmin: true, adminOnly: true } })
 
@@ -75,13 +76,13 @@ const formDialog = ref(false)
 const formLoading = ref(false)
 const isEditing = ref(false)
 const form = ref(emptyForm())
-const imageFile = ref<File[]>([])
-const attachmentFile = ref<File[]>([])
+const imageFile = ref<SingleFileModel>(null)
+const attachmentFile = ref<SingleFileModel>(null)
 
 const openCreate = () => {
   form.value = emptyForm()
-  imageFile.value = []
-  attachmentFile.value = []
+  imageFile.value = null
+  attachmentFile.value = null
   isEditing.value = false
   formDialog.value = true
 }
@@ -98,8 +99,8 @@ const openEdit = (item: any) => {
     published_at: item.published_at ? item.published_at.substring(0, 10) : '',
     attachmentName: item.attachment ? item.attachment.split('/').pop() : '',
   }
-  imageFile.value = []
-  attachmentFile.value = []
+  imageFile.value = null
+  attachmentFile.value = null
   isEditing.value = true
   formDialog.value = true
 }
@@ -119,8 +120,11 @@ const saveAnnouncement = async () => {
     if (form.value.number) fd.append('number', form.value.number)
     if (form.value.category) fd.append('category', form.value.category)
     if (form.value.published_at) fd.append('published_at', form.value.published_at)
-    if (imageFile.value[0]) fd.append('image', imageFile.value[0])
-    if (attachmentFile.value[0]) fd.append('attachment', attachmentFile.value[0])
+    const image = firstFile(imageFile.value)
+    const attachment = firstFile(attachmentFile.value)
+
+    if (image) fd.append('image', image)
+    if (attachment) fd.append('attachment', attachment)
 
     if (isEditing.value) {
       fd.append('_method', 'PUT')

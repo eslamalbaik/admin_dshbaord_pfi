@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import api from '@/plugins/axios'
+import { firstFile, type SingleFileModel } from '@/utils/files'
 
 definePage({ meta: { requiresAdmin: true } })
 
@@ -38,7 +39,7 @@ const isFormOpen = ref(false)
 const isEditing = ref(false)
 const editingId = ref<number | null>(null)
 const form = ref<any>(emptyForm())
-const logoFile = ref<File[]>([])
+const logoFile = ref<SingleFileModel>(null)
 const formError = ref('')
 
 const openCreate = () => {
@@ -46,7 +47,7 @@ const openCreate = () => {
   editingId.value = null
   form.value = emptyForm()
   form.value.sort = accounts.value.length
-  logoFile.value = []
+  logoFile.value = null
   formError.value = ''
   isFormOpen.value = true
 }
@@ -55,7 +56,7 @@ const openEdit = (a: any) => {
   isEditing.value = true
   editingId.value = a.id
   form.value = { ...a }
-  logoFile.value = []
+  logoFile.value = null
   formError.value = ''
   isFormOpen.value = true
 }
@@ -67,8 +68,9 @@ const saveMutation = useMutation({
       fd.append(key, form.value[key] ?? '')
     fd.append('is_active', form.value.is_active ? '1' : '0')
     fd.append('sort', String(form.value.sort ?? 0))
-    if (logoFile.value.length)
-      fd.append('logo', logoFile.value[0])
+    const logo = firstFile(logoFile.value)
+    if (logo)
+      fd.append('logo', logo)
 
     if (isEditing.value) {
       fd.append('_method', 'PUT')

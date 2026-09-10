@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import api from '@/plugins/axios'
+import { firstFile, type SingleFileModel } from '@/utils/files'
 
 definePage({ meta: { requiresAdmin: true } })
 
@@ -105,52 +106,60 @@ const saveMutation = useMutation({
 })
 
 // ─── رفع الشعار (تلقائي فور اختيار الملف) ───
-const logoFile = ref<File[]>([])
+const logoFile = ref<SingleFileModel>(null)
 const logoMutation = useMutation({
   mutationFn: async () => {
+    const file = firstFile(logoFile.value)
+    if (!file)
+      throw new Error('لم يتم اختيار ملف.')
+
     const fd = new FormData()
-    fd.append('logo', logoFile.value[0])
+    fd.append('logo', file)
 
     return (await api.post('/api/v1/dashboard/settings/logo', fd)).data
   },
   onSuccess: (d: any) => {
     logoUrl.value = d?.items?.logo_url ?? logoUrl.value
-    logoFile.value = []
+    logoFile.value = null
     successMessage.value = 'تم رفع الشعار بنجاح.'
     setTimeout(() => successMessage.value = '', 4000)
   },
   onError: (e: any) => {
     errorMessage.value = e?.response?.data?.message || 'فشل رفع الشعار.'
-    logoFile.value = []
+    logoFile.value = null
   },
 })
-watch(logoFile, files => {
-  if (files.length)
+watch(logoFile, () => {
+  if (firstFile(logoFile.value))
     logoMutation.mutate()
 })
 
 // ─── رفع صورة الغلاف (شاشة "عن الاتحاد" بالتطبيق) — تلقائي فور اختيار الملف ───
-const coverImageFile = ref<File[]>([])
+const coverImageFile = ref<SingleFileModel>(null)
 const coverImageMutation = useMutation({
   mutationFn: async () => {
+    const file = firstFile(coverImageFile.value)
+    if (!file)
+      throw new Error('لم يتم اختيار ملف.')
+
     const fd = new FormData()
-    fd.append('cover_image', coverImageFile.value[0])
+    fd.append('cover_image', file)
 
     return (await api.post('/api/v1/dashboard/settings/cover-image', fd)).data
   },
   onSuccess: (d: any) => {
     coverImageUrl.value = d?.items?.cover_image_url ?? coverImageUrl.value
-    coverImageFile.value = []
+    coverImageFile.value = null
     successMessage.value = 'تم رفع صورة الغلاف بنجاح.'
     setTimeout(() => successMessage.value = '', 4000)
   },
   onError: (e: any) => {
     errorMessage.value = e?.response?.data?.message || 'فشل رفع صورة الغلاف.'
-    coverImageFile.value = []
+    coverImageFile.value = null
   },
 })
-watch(coverImageFile, files => {
-  if (files.length)
+watch(coverImageFile, () => {
+  if (firstFile(coverImageFile.value))
     coverImageMutation.mutate()
 })
 </script>

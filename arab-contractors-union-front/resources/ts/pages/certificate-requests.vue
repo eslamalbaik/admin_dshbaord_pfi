@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import api from '@/plugins/axios'
+import { firstFile, type SingleFileModel } from '@/utils/files'
 
 definePage({ meta: { requiresAdmin: true } })
 
@@ -54,7 +55,7 @@ const lastPage = computed(() => data.value?.meta?.last_page ?? 1)
 const isViewOpen = ref(false)
 const selected = ref<any>(null)
 const rejectReason = ref('')
-const certificateFile = ref<File[]>([])
+const certificateFile = ref<SingleFileModel>(null)
 const actionError = ref('')
 
 const detailQueryEnabled = computed(() => isViewOpen.value && !!selected.value?.id)
@@ -70,7 +71,7 @@ const detail = computed(() => detailData.value?.items ?? selected.value)
 const openRequest = (r: any) => {
   selected.value = r
   rejectReason.value = ''
-  certificateFile.value = []
+  certificateFile.value = null
   actionError.value = ''
   isViewOpen.value = true
 }
@@ -102,15 +103,19 @@ const rejectMutation = useMutation({
 
 const issueMutation = useMutation({
   mutationFn: async () => {
+    const file = firstFile(certificateFile.value)
+    if (!file)
+      throw new Error('لم يتم اختيار ملف الشهادة.')
+
     const fd = new FormData()
-    fd.append('certificate', certificateFile.value[0])
+    fd.append('certificate', file)
 
     return (await api.post(`/api/v1/dashboard/certificate-requests/${selected.value.id}/issue`, fd)).data
   },
   onSuccess: (d: any) => {
     refresh()
     selected.value = d?.items ?? selected.value
-    certificateFile.value = []
+    certificateFile.value = null
   },
   onError: (e: any) => actionError.value = e?.response?.data?.message || 'فشل إصدار الشهادة.',
 })
@@ -341,7 +346,7 @@ function fmtDate(d: string | null) {
             <VBtn
               color="success"
               prepend-icon="tabler-certificate"
-              :disabled="!certificateFile.length"
+              :disabled="!firstFile(certificateFile)"
               :loading="issueMutation.isPending.value"
               @click="issueMutation.mutate()"
             >

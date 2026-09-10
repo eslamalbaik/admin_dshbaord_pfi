@@ -46,6 +46,7 @@ declare module 'vue' {
     ScrollToTop: typeof import('./resources/ts/@core/components/ScrollToTop.vue')['default']
     Shortcuts: typeof import('./resources/ts/@core/components/Shortcuts.vue')['default']
     TablePagination: typeof import('./resources/ts/@core/components/TablePagination.vue')['default']
+    TermsManager: typeof import('./resources/ts/components/TermsManager.vue')['default']
     TheCustomizer: typeof import('./resources/ts/@core/components/TheCustomizer.vue')['default']
     ThemeSwitcher: typeof import('./resources/ts/@core/components/ThemeSwitcher.vue')['default']
     TiptapEditor: typeof import('./resources/ts/@core/components/TiptapEditor.vue')['default']

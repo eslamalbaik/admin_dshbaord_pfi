@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import api from '@/plugins/axios'
+import { toFileArray } from '@/utils/files'
 
 definePage({ meta: { requiresAdmin: true,
     adminOnly: true } })
@@ -50,7 +51,9 @@ const openEdit = async (item: any) => {
     submission_phone: item.submission_phone || '',
     submission_file:  null,
     external_url:     item.external_url || '',
+    issuing_entity:   item.issuing_entity || '',
   }
+  existingSubmissionFile.value = item.submission_file || ''
   attachments.value = Array.isArray(item.attachments) ? [...item.attachments] : []
   editDialog.value = true
 
@@ -62,6 +65,9 @@ const openEdit = async (item: any) => {
     console.error(err)
   }
 }
+
+// ملف التقديم الحالي المخزَّن (رابط) — يُعرض بالتعديل قبل اختيار ملف جديد
+const existingSubmissionFile = ref('')
 
 // ── مرفقات العطاء (متعددة — مستندات وصور) ──────────
 const attachments = ref<any[]>([])
@@ -109,7 +115,7 @@ const saveTender = async () => {
   try {
     const formData = new FormData()
     formData.append('_method', 'PATCH')
-    ;(['title','description','union_notes','category','deadline','status','submission_email','submission_phone','external_url'] as const)
+    ;(['title','issuing_entity','description','union_notes','category','deadline','status','submission_email','submission_phone','external_url'] as const)
       .forEach(k => formData.append(k, (editTender.value as any)[k] ?? ''))
     // إرسال المصفوفة
     const types: string[] = editTender.value.submission_types ?? []
@@ -157,6 +163,7 @@ const createDialog = ref(false)
 const createLoading = ref(false)
 const newTender = ref({
   title:            '',
+  issuing_entity:   '',
   description:      '',
   union_notes:      '',
   category:         '',
@@ -247,11 +254,61 @@ const fetchTenders = async () => {
 const getStatusColor = (s: string) => ({ open: 'success', closed: 'error', cancelled: 'secondary' }[s] || 'info')
 const getStatusLabel = (s: string) => ({ open: 'مفتوحة', closed: 'مغلقة', cancelled: 'ملغية' }[s] || s)
 
+// ── تصدير كشف Excel لعطاءات طُرحت خلال فترة معيّنة (تاريخ النشر) ──
+const exportDialog = ref(false)
+const exportFrom = ref(new Date().toISOString().slice(0, 8) + '01') // أول الشهر الحالي افتراضياً
+const exportTo = ref(new Date().toISOString().slice(0, 10))
+const exporting = ref(false)
+
+const runExport = async () => {
+  exporting.value = true
+  try {
+    const { data } = await api.get('/api/v1/tenders', {
+      params: {
+        created_from: exportFrom.value || undefined,
+        created_to: exportTo.value || undefined,
+        per_page: 1000,
+      },
+    })
+    const rows: any[] = data.data || data.items || []
+
+    const headerRow = ['الرقم المرجعي', 'عنوان العطاء', 'الجهة المعلنة', 'التصنيف', 'تاريخ النشر', 'آخر موعد للتقديم', 'الحالة']
+    const csvRows = [
+      headerRow,
+      ...rows.map(t => [
+        t.reference_number ?? '',
+        t.title ?? '',
+        t.issuing_entity ?? '',
+        t.category ?? '',
+        t.published_at ? new Date(t.published_at).toLocaleDateString('ar-EG') : '',
+        t.deadline ? new Date(t.deadline).toLocaleDateString('ar-EG') : '',
+        getStatusLabel(t.status),
+      ]),
+    ]
+
+    const csv = '﻿' + csvRows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+    const link = document.createElement('a')
+
+    link.href = url
+    link.download = `tenders-${exportFrom.value}-to-${exportTo.value}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+    exportDialog.value = false
+  } catch (err) {
+    console.error(err)
+    notify('تعذّر تصدير الكشف.', 'error')
+  } finally {
+    exporting.value = false
+  }
+}
+
 const createTender = async () => {
   createLoading.value = true
   try {
     const formData = new FormData()
     formData.append('title',       newTender.value.title)
+    formData.append('issuing_entity', newTender.value.issuing_entity)
     formData.append('description', newTender.value.description)
     formData.append('union_notes', newTender.value.union_notes)
     formData.append('category',    newTender.value.category)
@@ -272,7 +329,7 @@ const createTender = async () => {
 
     const { data } = await api.post('/api/v1/tenders', formData)
     createDialog.value = false
-    newTender.value = { title: '', description: '', union_notes: '', category: '', deadline: '', status: 'open', submission_types: [], submission_email: '', submission_phone: '', submission_file: null }
+    newTender.value = { title: '', issuing_entity: '', description: '', union_notes: '', category: '', deadline: '', status: 'open', submission_types: [], submission_email: '', submission_phone: '', submission_file: null, external_url: '' }
     notify('تم نشر العطاء بنجاح — أضف مرفقات العطاء الآن لو حابب')
     fetchTenders()
     // فتح نافذة التعديل مباشرة على العطاء الجديد — عشان إضافة المرفقات (بتحتاج id العطاء، مش متاحة وقت الإنشاء)
@@ -297,9 +354,14 @@ watchEffect(() => fetchTenders())
         <h1 class="text-h4 font-weight-bold" style="font-family:Cairo,sans-serif">العطاءات</h1>
         <p class="text-body-2 text-medium-emphasis mb-0" style="font-family:Cairo,sans-serif">إدارة عطاءات الاتحاد ومتابعة العروض</p>
       </div>
-      <VBtn color="primary" prepend-icon="tabler-plus" @click="createDialog = true">
-        عطاء جديد
-      </VBtn>
+      <div class="d-flex gap-2">
+        <VBtn variant="tonal" prepend-icon="tabler-file-spreadsheet" @click="exportDialog = true">
+          تصدير Excel
+        </VBtn>
+        <VBtn color="primary" prepend-icon="tabler-plus" @click="createDialog = true">
+          عطاء جديد
+        </VBtn>
+      </div>
     </div>
 
     <VCard>
@@ -444,6 +506,25 @@ watchEffect(() => fetchTenders())
       </VDataTableServer>
     </VCard>
 
+    <!-- Export Dialog — كشف Excel لعطاءات فترة معيّنة (حسب تاريخ النشر) -->
+    <VDialog v-model="exportDialog" max-width="420">
+      <VCard>
+        <VCardTitle style="font-family:Cairo,sans-serif">تصدير كشف Excel</VCardTitle>
+        <VCardText>
+          <p class="text-body-2 text-medium-emphasis mb-4" style="font-family:Cairo,sans-serif">
+            يُصدَّر كل عطاء طُرح (تاريخ النشر) ضمن الفترة المحددة
+          </p>
+          <VTextField v-model="exportFrom" type="date" label="من تاريخ" class="mb-4" style="font-family:Cairo,sans-serif" />
+          <VTextField v-model="exportTo" type="date" label="إلى تاريخ" style="font-family:Cairo,sans-serif" />
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="text" @click="exportDialog = false">إلغاء</VBtn>
+          <VBtn color="primary" :loading="exporting" @click="runExport">تصدير</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
     <!-- Create Tender Dialog -->
     <VDialog v-model="createDialog" max-width="520">
       <VCard>
@@ -452,6 +533,9 @@ watchEffect(() => fetchTenders())
           <VRow>
             <VCol cols="12">
               <VTextField v-model="newTender.title" label="عنوان العطاء" style="font-family:Cairo,sans-serif" />
+            </VCol>
+            <VCol cols="12">
+              <VTextField v-model="newTender.issuing_entity" label="الجهة المعلنة" prepend-inner-icon="tabler-building" style="font-family:Cairo,sans-serif" />
             </VCol>
             <VCol cols="12">
               <VTextarea v-model="newTender.description" label="وصف العطاء" rows="3" style="font-family:Cairo,sans-serif" />
@@ -577,6 +661,9 @@ watchEffect(() => fetchTenders())
               <VTextField v-model="editTender.title" label="عنوان العطاء" style="font-family:Cairo,sans-serif" />
             </VCol>
             <VCol cols="12">
+              <VTextField v-model="editTender.issuing_entity" label="الجهة المعلنة" prepend-inner-icon="tabler-building" style="font-family:Cairo,sans-serif" />
+            </VCol>
+            <VCol cols="12">
               <VTextarea v-model="editTender.description" label="وصف العطاء" rows="3" style="font-family:Cairo,sans-serif" />
             </VCol>
             <VCol cols="12">
@@ -648,6 +735,13 @@ watchEffect(() => fetchTenders())
               <VTextField v-model="editTender.submission_phone" label="رقم التواصل" prepend-inner-icon="tabler-phone" style="font-family:Cairo,sans-serif" />
             </VCol>
             <VCol v-if="(editTender.submission_types ?? []).includes('file')" cols="12">
+              <div v-if="existingSubmissionFile && !editTender.submission_file" class="d-flex align-center gap-2 mb-2">
+                <VIcon icon="tabler-file-check" size="18" color="success" />
+                <a :href="existingSubmissionFile" target="_blank" class="text-body-2" style="font-family:Cairo,sans-serif">
+                  الملف الحالي — عرض/تحميل
+                </a>
+                <span class="text-caption text-medium-emphasis">(اختر ملفاً جديداً لاستبداله)</span>
+              </div>
               <VFileInput
                 label="ملف التقديم (PDF أو Word)"
                 prepend-inner-icon="tabler-file-upload"
@@ -717,7 +811,7 @@ watchEffect(() => fetchTenders())
                   density="compact"
                   style="font-family:Cairo,sans-serif;flex:1"
                   :model-value="newAttachmentFiles"
-                  @update:model-value="newAttachmentFiles = $event ?? []"
+                  @update:model-value="newAttachmentFiles = toFileArray($event)"
                 />
                 <VBtn
                   :disabled="!newAttachmentFiles.length"

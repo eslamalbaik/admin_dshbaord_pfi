@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import api from '@/plugins/axios'
+import { firstFile, toFileArray, type SingleFileModel } from '@/utils/files'
 
 definePage({ meta: { requiresAdmin: true, adminOnly: true } })
 
@@ -31,6 +32,7 @@ const headers = [
   { title: 'العنوان', key: 'title' },
   { title: 'موعد الفعالية', key: 'event_date' },
   { title: 'المكان', key: 'event_location' },
+  { title: 'المهتمون', key: 'registrations_count', sortable: false },
   { title: 'الحالة', key: 'is_published' },
   { title: 'إجراءات', key: 'actions', sortable: false },
 ]
@@ -95,13 +97,14 @@ const formLoading = ref(false)
 const isEditing = ref(false)
 const form = ref(emptyForm())
 
-// VFileInput v-model must be a plain ref<File[]> — binding it through a computed
-// ternary silently breaks Vuetify's internal proxied model.
-const mainImageFile = ref<File[]>([])
+// VFileInput v-model must be a plain ref — binding it through a computed ternary
+// silently breaks Vuetify's internal proxied model. Single-file VFileInput emits
+// a bare `File` (not an array), so read it through firstFile().
+const mainImageFile = ref<SingleFileModel>(null)
 
 const openCreate = () => {
   form.value = emptyForm()
-  mainImageFile.value = []
+  mainImageFile.value = null
   isEditing.value = false
   formDialog.value = true
 }
@@ -129,7 +132,7 @@ const openEdit = (item: any) => {
     is_published: !!item.is_published,
     published_at: item.published_at ? item.published_at.substring(0, 10) : '',
   }
-  mainImageFile.value = []
+  mainImageFile.value = null
   isEditing.value = true
   formDialog.value = true
 }
@@ -160,7 +163,8 @@ const saveEvent = async () => {
       if (s.photo) fd.append(`speakers[${i}][photo]`, s.photo)
       fd.append(`speakers[${i}][is_keynote]`, s.is_keynote ? '1' : '0')
     })
-    if (mainImageFile.value[0]) fd.append('image', mainImageFile.value[0])
+    const mainImage = firstFile(mainImageFile.value)
+    if (mainImage) fd.append('image', mainImage)
     form.value.gallery.forEach(f => fd.append('gallery[]', f))
     form.value.removeGallery.forEach(url => fd.append('remove_gallery[]', url))
 
@@ -180,6 +184,65 @@ const saveEvent = async () => {
   } finally {
     formLoading.value = false
   }
+}
+
+// ── Attendees (المهتمون بالانضمام) ─────────────────
+interface Attendee {
+  contractor_id: number
+  name: string | null
+  membership_number: string | null
+  phone: string | null
+  registered_at: string | null
+}
+
+const attendeesDialog = ref(false)
+const attendeesLoading = ref(false)
+const attendeesEvent = ref<any>(null)
+const attendees = ref<Attendee[]>([])
+
+const attendeesHeaders = [
+  { title: 'المقاول', key: 'name' },
+  { title: 'رقم العضوية', key: 'membership_number' },
+  { title: 'الهاتف', key: 'phone' },
+  { title: 'تاريخ التسجيل', key: 'registered_at' },
+]
+
+const openAttendees = async (item: any) => {
+  attendeesEvent.value = item
+  attendees.value = []
+  attendeesDialog.value = true
+  attendeesLoading.value = true
+  try {
+    const { data } = await api.get(`/api/v1/admin/events/${item.id}/attendees`)
+    attendees.value = data.items?.attendees ?? []
+  } catch (err) {
+    console.error(err)
+    notify('تعذّر جلب قائمة المهتمين', 'error')
+  } finally {
+    attendeesLoading.value = false
+  }
+}
+
+const exportAttendees = () => {
+  const rows = [
+    ['الاسم', 'رقم العضوية', 'الهاتف', 'تاريخ التسجيل'],
+    ...attendees.value.map(a => [
+      a.name ?? '',
+      a.membership_number ?? '',
+      a.phone ?? '',
+      a.registered_at ? new Date(a.registered_at).toLocaleString('ar-PS') : '',
+    ]),
+  ]
+
+  // BOM لضمان قراءة Excel للعربية بترميز UTF-8
+  const csv = '﻿' + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+  const link = document.createElement('a')
+
+  link.href = url
+  link.download = `attendees-event-${attendeesEvent.value?.id}.csv`
+  link.click()
+  URL.revokeObjectURL(url)
 }
 
 // ── Delete ────────────────────────────────────────
@@ -263,6 +326,20 @@ const deleteEvent = async () => {
           {{ item.event_location || '—' }}
         </template>
 
+        <template #item.registrations_count="{ item }">
+          <VChip
+            :color="item.registrations_count ? 'info' : 'secondary'"
+            size="small"
+            label
+            :variant="item.registrations_count ? 'tonal' : 'outlined'"
+            style="cursor:pointer;font-family:Cairo,sans-serif"
+            @click="openAttendees(item)"
+          >
+            <VIcon icon="tabler-users" size="14" start />
+            {{ item.registrations_count ?? 0 }}
+          </VChip>
+        </template>
+
         <template #item.is_published="{ item }">
           <VChip :color="item.is_published ? 'success' : 'secondary'" size="small" label style="font-family:Cairo,sans-serif">
             {{ item.is_published ? 'منشور' : 'مسودة' }}
@@ -271,6 +348,10 @@ const deleteEvent = async () => {
 
         <template #item.actions="{ item }">
           <div class="d-flex align-center gap-1">
+            <VBtn icon size="small" variant="text" color="info" @click="openAttendees(item)">
+              <VIcon icon="tabler-users" />
+              <VTooltip activator="parent">المهتمون بالانضمام</VTooltip>
+            </VBtn>
             <VBtn icon size="small" variant="text" color="primary" @click="openEdit(item)">
               <VIcon icon="tabler-pencil" />
               <VTooltip activator="parent">تعديل</VTooltip>
@@ -324,7 +405,7 @@ const deleteEvent = async () => {
                 multiple
                 style="font-family:Cairo,sans-serif"
                 :model-value="form.gallery"
-                @update:model-value="form.gallery = $event ?? []"
+                @update:model-value="form.gallery = toFileArray($event)"
               />
             </VCol>
 
@@ -439,6 +520,62 @@ const deleteEvent = async () => {
           <VSpacer />
           <VBtn variant="tonal" @click="formDialog = false">إلغاء</VBtn>
           <VBtn color="primary" :loading="formLoading" @click="saveEvent">{{ isEditing ? 'حفظ التعديلات' : 'نشر' }}</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- Attendees Dialog -->
+    <VDialog v-model="attendeesDialog" max-width="760" scrollable>
+      <VCard>
+        <VCardTitle class="d-flex align-center justify-space-between flex-wrap gap-2" style="font-family:Cairo,sans-serif">
+          <div>
+            <div>المهتمون بالانضمام</div>
+            <div class="text-body-2 text-medium-emphasis">{{ attendeesEvent?.title }}</div>
+          </div>
+          <VBtn
+            size="small"
+            variant="tonal"
+            prepend-icon="tabler-download"
+            :disabled="!attendees.length"
+            @click="exportAttendees"
+          >
+            تصدير CSV
+          </VBtn>
+        </VCardTitle>
+
+        <VCardText>
+          <VProgressLinear v-if="attendeesLoading" indeterminate color="primary" class="mb-4" />
+
+          <div v-else-if="!attendees.length" class="text-center pa-6 text-medium-emphasis" style="font-family:Cairo,sans-serif">
+            لا يوجد مقاولون سجّلوا انضمامهم لهذه الفعالية بعد
+          </div>
+
+          <VDataTable
+            v-else
+            :headers="attendeesHeaders"
+            :items="attendees"
+            :items-per-page="10"
+            mobile-breakpoint="sm"
+          >
+            <template #item.name="{ item }">
+              <span class="font-weight-medium" style="font-family:Cairo,sans-serif">{{ item.name || '—' }}</span>
+            </template>
+            <template #item.membership_number="{ item }">
+              <span dir="ltr">{{ item.membership_number || '—' }}</span>
+            </template>
+            <template #item.phone="{ item }">
+              <a v-if="item.phone" :href="`tel:${item.phone}`" dir="ltr">{{ item.phone }}</a>
+              <span v-else>—</span>
+            </template>
+            <template #item.registered_at="{ item }">
+              {{ item.registered_at ? new Date(item.registered_at).toLocaleString('ar-PS', { dateStyle: 'medium', timeStyle: 'short' }) : '—' }}
+            </template>
+          </VDataTable>
+        </VCardText>
+
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" @click="attendeesDialog = false">إغلاق</VBtn>
         </VCardActions>
       </VCard>
     </VDialog>

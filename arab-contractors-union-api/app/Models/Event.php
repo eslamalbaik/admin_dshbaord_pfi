@@ -3,12 +3,13 @@
 namespace App\Models;
 
 use App\Models\Concerns\GeneratesSlug;
+use App\Models\Concerns\HasPublicMediaUrls;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Event extends Model
 {
-    use SoftDeletes, GeneratesSlug;
+    use SoftDeletes, GeneratesSlug, HasPublicMediaUrls;
 
     protected $fillable = [
         'title', 'slug', 'excerpt', 'body',
@@ -22,7 +23,7 @@ class Event extends Model
         'is_published'     => 'boolean',
         'published_at'     => 'datetime',
         'event_date'       => 'datetime',
-        'gallery'          => 'array',
+        // لا cast على gallery — الـ accessor/mutator في HasPublicMediaUrls يتولّياه
         'is_international' => 'boolean',
         'speakers'         => 'array',
     ];

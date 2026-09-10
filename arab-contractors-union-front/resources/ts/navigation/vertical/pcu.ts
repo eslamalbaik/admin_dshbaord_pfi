@@ -153,6 +153,11 @@ if (!isAccountant) {
     to: 'settings-terms',
   })
   menuItems.push({
+    title: 'سياسة الخصوصية',
+    icon: { icon: 'tabler-shield-lock' },
+    to: 'settings-privacy-policy',
+  })
+  menuItems.push({
     title: 'المكتبة القانونية',
     icon: { icon: 'tabler-library' },
     to: 'settings-legal-library',
@@ -161,6 +166,11 @@ if (!isAccountant) {
     title: 'إعدادات التطبيق',
     icon: { icon: 'tabler-adjustments' },
     to: 'settings-app-settings',
+  })
+  menuItems.push({
+    title: 'أسعار الصرف',
+    icon: { icon: 'tabler-currency-dollar' },
+    to: 'settings-exchange-rates',
   })
   menuItems.push({
     title: 'الصفحات الديناميكية',

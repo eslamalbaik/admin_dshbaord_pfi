@@ -68,6 +68,52 @@ const fetchContractors = async () => {
   }
 }
 
+// ── تصدير Excel (CSV) — يحترم فلاتر البحث/الحالة الحالية، يجيب كل النتائج بصفحة وحدة ──
+const exporting = ref(false)
+
+const exportContractors = async () => {
+  exporting.value = true
+  try {
+    const { data } = await api.get('/api/v1/contractors', {
+      params: { search: search.value, status: statusFilter.value, per_page: 10000 },
+    })
+    const rows: any[] = data.items || []
+
+    const headerRow = ['اسم المنشأة', 'رقم العضوية', 'رقم السجل التجاري', 'التخصص', 'التصنيف', 'المفوض بالتوقيع', 'رقم الجوال', 'البريد الإلكتروني', 'المدينة', 'الحالة', 'تاريخ الانضمام']
+    const csvRows = [
+      headerRow,
+      ...rows.map(c => [
+        c.name ?? '',
+        c.membership_number ?? '',
+        c.commercial_register ?? '',
+        c.trade ?? '',
+        c.classification ?? '',
+        c.authorized_person ?? '',
+        c.phone ?? '',
+        c.email ?? '',
+        c.city ?? '',
+        getStatusLabel(c.status),
+        c.created_at ? new Date(c.created_at).toLocaleDateString('ar-EG') : '',
+      ]),
+    ]
+
+    // BOM لضمان قراءة Excel للعربية بترميز UTF-8
+    const csv = '﻿' + csvRows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+    const link = document.createElement('a')
+
+    link.href = url
+    link.download = `contractors-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    console.error(err)
+    notify('تعذّر تصدير الكشف.', 'error')
+  } finally {
+    exporting.value = false
+  }
+}
+
 const getStatusColor = (status: string) => {
   switch (status) {
     case 'active': return 'success'
@@ -152,6 +198,42 @@ const openDetails = async (contractor: any) => {
   }
 }
 
+// ── تعديل سريع لاسم المفوض ورقم التواصل (من شاشة "عرض") ──
+const contactEditDialog = ref(false)
+const contactEditLoading = ref(false)
+const contactEditError = ref('')
+const contactForm = ref({ authorized_person: '', phone: '' })
+
+const openContactEdit = () => {
+  contactForm.value = {
+    authorized_person: detailsTarget.value?.authorized_person ?? '',
+    phone: detailsTarget.value?.phone ?? '',
+  }
+  contactEditError.value = ''
+  contactEditDialog.value = true
+}
+
+const saveContactEdit = async () => {
+  contactEditLoading.value = true
+  contactEditError.value = ''
+  try {
+    const { data } = await api.patch(`/api/v1/contractors/${detailsTarget.value.id}/contact`, contactForm.value)
+    detailsTarget.value = data.items ?? { ...detailsTarget.value, ...contactForm.value }
+    const row = contractors.value.find(c => c.id === detailsTarget.value.id)
+    if (row) {
+      row.authorized_person = detailsTarget.value.authorized_person
+      row.phone = detailsTarget.value.phone
+    }
+    contactEditDialog.value = false
+    notify('تم تحديث بيانات التواصل بنجاح.')
+  } catch (err: any) {
+    console.error(err)
+    contactEditError.value = err?.response?.data?.message ?? 'تعذّر تحديث بيانات التواصل.'
+  } finally {
+    contactEditLoading.value = false
+  }
+}
+
 const downloadFile = (url: string | null, title: string) => {
   if (!url) return
   const a = document.createElement('a')
@@ -225,9 +307,14 @@ const getSpecialtiesList = (contractor: any) => {
         <h1 class="text-h4 font-weight-bold" style="font-family:Cairo,sans-serif">المقاولون</h1>
         <p class="text-body-2 text-medium-emphasis mb-0" style="font-family:Cairo,sans-serif">إدارة جميع المقاولين المسجلين في الاتحاد</p>
       </div>
-      <VBtn color="primary" prepend-icon="tabler-plus" :to="{ name: 'contractors-create' }">
-        تسجيل مقاول جديد
-      </VBtn>
+      <div class="d-flex gap-2">
+        <VBtn variant="tonal" prepend-icon="tabler-file-spreadsheet" :loading="exporting" @click="exportContractors">
+          تصدير Excel
+        </VBtn>
+        <VBtn color="primary" prepend-icon="tabler-plus" :to="{ name: 'contractors-create' }">
+          تسجيل مقاول جديد
+        </VBtn>
+      </div>
     </div>
 
     <VCard>
@@ -354,7 +441,12 @@ const getSpecialtiesList = (contractor: any) => {
               </div>
             </VCol>
             <VCol cols="12" md="6">
-              <h3 class="text-h6 mb-3 text-primary">الإدارة والشركاء</h3>
+              <div class="d-flex align-center justify-space-between mb-3">
+                <h3 class="text-h6 text-primary mb-0">الإدارة والشركاء</h3>
+                <VBtn size="small" variant="text" prepend-icon="tabler-edit" @click="openContactEdit">
+                  تعديل المفوض والجوال
+                </VBtn>
+              </div>
               <p><strong>صاحب المنشأة:</strong> {{ detailsTarget.owner_name || '—' }}</p>
               <p><strong>أسماء الشركاء:</strong> {{ detailsTarget.partners || '—' }}</p>
               <p><strong>المفوض بالتوقيع:</strong> {{ detailsTarget.authorized_person || '—' }}</p>
@@ -395,6 +487,34 @@ const getSpecialtiesList = (contractor: any) => {
         <VCardActions>
           <VSpacer />
           <VBtn variant="tonal" @click="detailsDialog = false">إغلاق</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- Contact Edit Dialog — اسم المفوض ورقم التواصل -->
+    <VDialog v-model="contactEditDialog" max-width="440" persistent>
+      <VCard>
+        <VCardTitle style="font-family:Cairo,sans-serif">تعديل المفوض ورقم التواصل</VCardTitle>
+        <VCardText>
+          <VAlert v-if="contactEditError" type="error" variant="tonal" class="mb-4">
+            {{ contactEditError }}
+          </VAlert>
+          <VTextField
+            v-model="contactForm.authorized_person"
+            label="المفوض بالتوقيع"
+            class="mb-4"
+            style="font-family:Cairo,sans-serif"
+          />
+          <VTextField
+            v-model="contactForm.phone"
+            label="رقم الجوال"
+            dir="ltr"
+          />
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="text" @click="contactEditDialog = false">إلغاء</VBtn>
+          <VBtn color="primary" :loading="contactEditLoading" @click="saveContactEdit">حفظ</VBtn>
         </VCardActions>
       </VCard>
     </VDialog>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import api from '@/plugins/axios'
+import { firstFile, toFileArray, type SingleFileModel } from '@/utils/files'
 
 definePage({ meta: { requiresAdmin: true, adminOnly: true } })
 
@@ -90,14 +91,15 @@ const formLoading = ref(false)
 const isEditing = ref(false)
 const form = ref(emptyForm())
 
-// VFileInput v-model must be a plain ref<File[]> — binding it through a computed
-// ternary (`form.image ? [form.image] : []`) silently breaks Vuetify's internal
-// proxied model and the selected file never reaches form.image.
-const mainImageFile = ref<File[]>([])
+// VFileInput v-model must be a plain ref — binding it through a computed ternary
+// (`form.image ? [form.image] : []`) silently breaks Vuetify's internal proxied
+// model and the selected file never reaches form.image. Single-file VFileInput
+// emits a bare `File` (not an array), so read it through firstFile().
+const mainImageFile = ref<SingleFileModel>(null)
 
 const openCreate = () => {
   form.value = emptyForm()
-  mainImageFile.value = []
+  mainImageFile.value = null
   isEditing.value = false
   formDialog.value = true
 }
@@ -118,7 +120,7 @@ const openEdit = (item: any) => {
     is_published: !!item.is_published,
     published_at: item.published_at ? item.published_at.substring(0, 10) : '',
   }
-  mainImageFile.value = []
+  mainImageFile.value = null
   isEditing.value = true
   formDialog.value = true
 }
@@ -139,7 +141,8 @@ const saveNews = async () => {
     if (form.value.video_url) fd.append('video_url', form.value.video_url)
     if (form.value.external_url) fd.append('external_url', form.value.external_url)
     if (form.value.published_at) fd.append('published_at', form.value.published_at)
-    if (mainImageFile.value[0]) fd.append('image', mainImageFile.value[0])
+    const mainImage = firstFile(mainImageFile.value)
+    if (mainImage) fd.append('image', mainImage)
     form.value.gallery.forEach(f => fd.append('gallery[]', f))
     form.value.removeGallery.forEach(url => fd.append('remove_gallery[]', url))
 
@@ -322,7 +325,7 @@ const deleteNews = async () => {
                 multiple
                 style="font-family:Cairo,sans-serif"
                 :model-value="form.gallery"
-                @update:model-value="form.gallery = $event ?? []"
+                @update:model-value="form.gallery = toFileArray($event)"
               />
             </VCol>
 

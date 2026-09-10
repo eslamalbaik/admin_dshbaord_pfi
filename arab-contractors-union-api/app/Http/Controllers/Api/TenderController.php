@@ -280,7 +280,8 @@ class TenderController extends Controller
 
     private function perPage(Request $request): int
     {
-        return min($request->integer('per_page', 15), 100);
+        // سقف أعلى (بدل 100) يسمح بتصدير كشف Excel كامل من لوحة التحكم بدون تقسيم صفحات
+        return min($request->integer('per_page', 15), 1000);
     }
 
     // شكل العطاء المعروض للعامة/للمقاول — بدون created_by

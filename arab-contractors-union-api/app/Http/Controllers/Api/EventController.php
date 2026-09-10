@@ -23,6 +23,9 @@ class EventController extends Controller
     {
         $query = Event::published()->orderBy('event_date');
 
+        if ($request->filled('search'))
+            $query->where('title', 'like', '%' . $request->search . '%');
+
         $paginator = $query
             ->select([
                 'id', 'title', 'slug', 'excerpt', 'body', 'image', 'gallery',
@@ -170,7 +173,7 @@ class EventController extends Controller
     // GET /api/v1/admin/events
     public function adminIndex(Request $request)
     {
-        $query = Event::with('author:id,name')->latest();
+        $query = Event::with('author:id,name')->withCount('registrations')->latest();
 
         if ($request->filled('search'))
             $query->where('title', 'like', '%' . $request->search . '%');

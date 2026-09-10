@@ -62,6 +62,18 @@ class Tender extends Model
         return $this->belongsToMany(Contractor::class, 'tender_bookmarks');
     }
 
+    /**
+     * يُخزَّن مسار نسبي داخل قرص public — الرابط العام يُبنى هنا وقت القراءة عبر asset()
+     * بدل تجميده وقت الرفع (نفس نمط News/Event عبر HasPublicMediaUrls، بس لحقل مفرد باسم مختلف).
+     */
+    public function getSubmissionFileAttribute(?string $value): ?string
+    {
+        if (! $value)
+            return null;
+
+        return str_starts_with($value, 'http') ? $value : asset('storage/' . $value);
+    }
+
     /** فعّال = مفتوح ولم يتجاوز موعد التسليم بعد (REQ-09) */
     public function getIsActiveAttribute(): bool
     {

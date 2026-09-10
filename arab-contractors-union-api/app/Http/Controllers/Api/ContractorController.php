@@ -9,6 +9,7 @@ use App\Models\Contractor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class ContractorController extends Controller
@@ -40,33 +41,37 @@ class ContractorController extends Controller
         return $this->paginated($query->latest()->paginate($perPage));
     }
 
+    /**
+     * قيد unique على عمود يتجاهل صفوف soft-deleted — بدون whereNull('deleted_at') يمنع
+     * قاعدة Laravel الخام إعادة استخدام قيمة (جوال، بريد، رقم عضوية...) لمقاول محذوف سابقاً،
+     * لأنها تتحقق من كل الصفوف بالجدول مباشرة بدون المرور بـ global scope الخاص بـ SoftDeletes.
+     */
+    private function uniqueIgnoringSoftDeleted(string $column, $isUpdate, $contractorId): \Illuminate\Validation\Rules\Unique
+    {
+        $rule = Rule::unique('contractors', $column)->whereNull('deleted_at');
+
+        return $isUpdate ? $rule->ignore($contractorId) : $rule;
+    }
+
     private function getValidationRules($isUpdate = false, $contractorId = null)
     {
-        $uniqueMembership = $isUpdate ? "unique:contractors,membership_number,{$contractorId}" : "unique:contractors,membership_number";
-        $uniqueCR = $isUpdate ? "unique:contractors,commercial_register,{$contractorId}" : "unique:contractors,commercial_register";
-        $uniqueLicense = $isUpdate ? "unique:contractors,license_number,{$contractorId}" : "unique:contractors,license_number";
-        $uniqueEmail = $isUpdate ? "unique:contractors,email,{$contractorId}" : "unique:contractors,email";
-        // الجوال عليه قيد unique في قاعدة البيانات (contractors_phone_unique) — بدون هذه
-        // القاعدة يمرّ التحقق ويسقط الإدراج بخطأ SQL خام أمام المستخدم
-        $uniquePhone = $isUpdate ? "unique:contractors,phone,{$contractorId}" : "unique:contractors,phone";
-
         return [
             'name'                          => 'required|string|max:255',
             'membership_number'             => [
                 'required',
                 'string',
-                $uniqueMembership,
+                $this->uniqueIgnoringSoftDeleted('membership_number', $isUpdate, $contractorId),
                 new \App\Rules\MembershipNumber,
             ],
             'commercial_register'           => [
                 'required',
                 'digits:9',
-                $uniqueCR
+                $this->uniqueIgnoringSoftDeleted('commercial_register', $isUpdate, $contractorId),
             ],
             'license_number'                => [
                 'nullable',
                 'digits:5',
-                $uniqueLicense
+                $this->uniqueIgnoringSoftDeleted('license_number', $isUpdate, $contractorId),
             ],
             'status'                        => 'sometimes|in:active,pending,expired,suspended',
             'trade'                         => 'nullable|string|max:100',
@@ -77,8 +82,14 @@ class ContractorController extends Controller
             'established_date'              => 'nullable|date',
             'specialties'                   => 'nullable|string',
             'owner_name'                    => 'nullable|string|max:255',
-            'email'                         => "nullable|email|{$uniqueEmail}",
-            'phone'                         => "nullable|string|max:20|{$uniquePhone}",
+            'email'                         => [
+                'nullable', 'email',
+                $this->uniqueIgnoringSoftDeleted('email', $isUpdate, $contractorId),
+            ],
+            'phone'                         => [
+                'nullable', 'string', 'max:20',
+                $this->uniqueIgnoringSoftDeleted('phone', $isUpdate, $contractorId),
+            ],
             'city'                          => 'nullable|string|max:100',
             'governorate_id'                => 'nullable|integer|exists:governorates,id',
             'city_id'                       => 'nullable|integer|exists:cities,id',
@@ -284,6 +295,23 @@ class ContractorController extends Controller
         $contractor->update($validated);
 
         return $this->success($contractor->fresh()->toArray(), 'تم تحديث حالة المقاول بنجاح.');
+    }
+
+    // PATCH /api/contractors/{id}/contact — تعديل سريع لاسم المفوض ورقم التواصل من شاشة
+    // "عرض" (أيقونة العين) بدون المرور بفورم الملف الكامل (يتطلب حقولاً إلزامية أخرى)
+    public function updateContact(Request $request, Contractor $contractor)
+    {
+        $validated = $request->validate([
+            'authorized_person' => 'nullable|string|max:255',
+            'phone'              => [
+                'nullable', 'string', 'max:20',
+                $this->uniqueIgnoringSoftDeleted('phone', true, $contractor->id),
+            ],
+        ], $this->getValidationMessages());
+
+        $contractor->update($validated);
+
+        return $this->success($contractor->fresh()->toArray(), 'تم تحديث بيانات التواصل بنجاح.');
     }
 
     public function nextMembershipNumber()
