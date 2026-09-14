@@ -8,7 +8,7 @@
 	"variable": [
 		{
 			"key": "base_url",
-			"value": "https://api.pcu.org.ps/api/v1",
+			"value": "https://api.pcuorg.cloud/api/v1",
 			"type": "string"
 		},
 		{
@@ -681,34 +681,6 @@
 					}
 				},
 				{
-					"name": "Me",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json"
-							},
-							{
-								"key": "Authorization",
-								"value": "Bearer {{contractor_token}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/contractor/auth/me",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"contractor",
-								"auth",
-								"me"
-							]
-						},
-						"description": "**GET** `/api/v1/contractor/auth/me`\n\nيرجع بيانات المقاول + العضوية النشطة + عدد آلياته"
-					}
-				},
-				{
 					"name": "Get Profile",
 					"request": {
 						"method": "GET",
@@ -968,6 +940,247 @@
 							"mode": "raw",
 							"raw": "{\n  \"otp\": \"123456\"\n}"
 						}
+					}
+				},
+				{
+					"name": "Update Company Logo",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/auth/logo",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"auth",
+								"logo"
+							]
+						},
+						"description": "**POST** `/api/v1/contractor/auth/logo`\n\nرفع/استبدال شعار الشركة. **multipart/form-data** بحقل واحد `logo`.\n\n**التحقق:** صورة `jpg,jpeg,png,webp` بحد أقصى **4MB** — وإلا 422.\n\nالاستجابة تعيد **الملف الشخصي الكامل** بعد التحديث (نفس جسم `GET /contractor/auth/profile`) فلا حاجة لنداء إضافي.",
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "logo",
+									"type": "file",
+									"src": [],
+									"description": "مطلوب — jpg,jpeg,png,webp حتى 4MB"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Name Change Request — Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/auth/name-change-request",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"auth",
+								"name-change-request"
+							]
+						},
+						"description": "**GET** `/api/v1/contractor/auth/name-change-request`\n\nآخر طلب تعديل لاسم الشركة قدّمه المقاول — لعرض حالته ومنع التكرار في الواجهة.\n\nيعيد `items: null` إذا لم يسبق له تقديم أي طلب.\n\n**الحقول:** `current_name`, `requested_name`, `supporting_document_url`, `status` (`pending` | `approved` | `rejected`), `status_label`, `reject_reason`, `reviewed_by`, `reviewed_at`."
+					}
+				},
+				{
+					"name": "Name Change Request — Submit",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/auth/name-change-request",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"auth",
+								"name-change-request"
+							]
+						},
+						"description": "**POST** `/api/v1/contractor/auth/name-change-request` — **201**\n\nتقديم طلب تعديل اسم الشركة. **لا يتغيّر الاسم مباشرة** — الطلب يذهب لمراجعة الإدارة ويُشعَر الأدمن به.\n\n**multipart/form-data:**\n- `requested_name` — مطلوب، حتى 255 حرف\n- `supporting_document` — مطلوب، كتاب رسمي `pdf,jpg,jpeg,png` حتى **10MB**\n\n**422** إذا كان لديه طلب سابق بحالة `pending` (\"لديك طلب تعديل اسم سابق قيد المراجعة\").",
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "requested_name",
+									"value": "شركة المقاولون العرب للإنشاءات",
+									"type": "text",
+									"description": "مطلوب — الاسم الجديد المطلوب اعتماده"
+								},
+								{
+									"key": "supporting_document",
+									"type": "file",
+									"src": [],
+									"description": "مطلوب — كتاب رسمي pdf,jpg,jpeg,png حتى 10MB"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "🔔 Notifications",
+			"item": [
+				{
+					"name": "List Notifications",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/auth/notifications?page=1",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"auth",
+								"notifications"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								}
+							]
+						},
+						"description": "**GET** `/api/v1/contractor/auth/notifications`\n\nصندوق وارد المقاول — مُرقّم **15 لكل صفحة**، وغير المقروء **يظهر أولاً** ثم الأحدث فالأقدم.\n\n**الاستجابة:** `items.notifications` = `{ data, current_page, last_page, total }` بالإضافة إلى `items.unread_count` بنفس النداء (لا حاجة لنداء العدّاد معها)."
+					}
+				},
+				{
+					"name": "Unread Count",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/auth/notifications/unread-count",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"auth",
+								"notifications",
+								"unread-count"
+							]
+						},
+						"description": "**GET** `/api/v1/contractor/auth/notifications/unread-count`\n\nعدد الإشعارات غير المقروءة فقط (`items.unread_count`) — للشارة (badge) فوق أيقونة الجرس دون تحميل القائمة."
+					}
+				},
+				{
+					"name": "Mark All As Read",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/auth/notifications/read",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"auth",
+								"notifications",
+								"read"
+							]
+						},
+						"description": "**POST** `/api/v1/contractor/auth/notifications/read`\n\nتحديد **كل** الإشعارات كمقروءة. بلا جسم طلب. تعيد `items.unread_count = 0`."
+					}
+				},
+				{
+					"name": "Mark Notification As Read",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/auth/notifications/{{notification_id}}/mark-as-read",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"auth",
+								"notifications",
+								"{{notification_id}}",
+								"mark-as-read"
+							]
+						},
+						"description": "**PATCH** `/api/v1/contractor/auth/notifications/{id}/mark-as-read`\n\nتحديد إشعار واحد كمقروء. المعرّف **UUID** (إشعارات Laravel) وليس رقماً تسلسلياً — انسخه من `List Notifications`.\n\n**404** إذا لم يكن الإشعار يخص المقاول الحالي. تعيد `items.unread_count` المحدَّث."
 					}
 				}
 			]
@@ -1679,6 +1892,35 @@
 						},
 						"description": "**GET** `/api/v1/contractor/payments/{payment}`\n\nشاشة \"معاينة اشعار التحويل\" — تفاصيل تحويل واحد (status_label, reference_number, receipt_image_url, amount...). محمي بالملكية — 403 لو التحويل لمقاول تاني."
 					}
+				},
+				{
+					"name": "Payment Receipt (Signed URL)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/payments/{{payment_id}}/receipt",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"payments",
+								"{{payment_id}}",
+								"receipt"
+							]
+						},
+						"description": "**GET** `/api/v1/contractor/payments/{payment}/receipt`\n\nلا يعيد ملف PDF مباشرة — يعيد `items.signed_url` وهو **رابط موقَّع صالح 15 دقيقة** يُفتح/يُحمَّل منه الإيصال.\n\n**الأخطاء:**\n- **403** — الدفعة تخص مقاولاً آخر\n- **404** — حالة الدفعة ليست `paid` (الإيصال للدفعات المؤكَّدة فقط)\n- **409** — الإيصال قيد الإصدار في الخلفية (Job)، أعد المحاولة بعد قليل"
+					}
 				}
 			]
 		},
@@ -2313,14 +2555,14 @@
 							}
 						],
 						"url": {
-							"raw": "{{base_url}}/contractor/events/{{news_id}}",
+							"raw": "{{base_url}}/contractor/events/{{event_id}}",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
 								"contractor",
 								"events",
-								"{{news_id}}"
+								"{{event_id}}"
 							]
 						},
 						"description": "GET /api/v1/contractor/events/{id}"
@@ -2341,14 +2583,14 @@
 							}
 						],
 						"url": {
-							"raw": "{{base_url}}/contractor/events/{{news_id}}/join",
+							"raw": "{{base_url}}/contractor/events/{{event_id}}/join",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
 								"contractor",
 								"events",
-								"{{news_id}}",
+								"{{event_id}}",
 								"join"
 							]
 						},
@@ -2370,14 +2612,14 @@
 							}
 						],
 						"url": {
-							"raw": "{{base_url}}/contractor/events/{{news_id}}/join",
+							"raw": "{{base_url}}/contractor/events/{{event_id}}/join",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
 								"contractor",
 								"events",
-								"{{news_id}}",
+								"{{event_id}}",
 								"join"
 							]
 						},
