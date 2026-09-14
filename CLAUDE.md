@@ -31,6 +31,49 @@ npm run lint                      # eslint --fix
 ```
 Frontend `.env` needs `VITE_API_BASE_URL` pointing at the backend (`http://localhost:8000/api/v1` locally).
 
+## Deployment
+
+### Mirror repos — this monorepo is not what production pulls
+
+Each subdirectory is mirrored into its own GitHub repo with **unrelated history** (not subtrees, not submodules):
+
+| Subdirectory | Remote | Repo |
+|---|---|---|
+| `arab-contractors-union-api/` | `pcu-back` | `PcuGaza/PCU-Manager-Backend` |
+| `arab-contractors-union-front/` | `pcu-front` | `PcuGaza/PCU-Manager-Frontend` |
+
+A mirror commit's tree is an **exact copy** of the monorepo subdirectory tree. Build one with `git commit-tree <subtree-hash> -p <branch-tip> -m "<msg>"` and push the resulting hash to `refs/heads/<branch>` — never copy files by hand. Verify with `git rev-parse <new-commit>^{tree}` against `git rev-parse <monorepo-commit>:<subdir>`; they must match.
+
+Two branches per mirror, with **different message conventions**:
+
+- `development` — one squashed commit per sync: `sync: mirror <subdir> from monorepo (through <short-hash>)`
+- `deploy-new` — replays monorepo commits individually, keeping their **original messages**
+
+`pcu-front` also has `deploy-dist`, holding **pre-built output** (`index.html`, `assets/`, `.htaccess` at root) for a separate static host: `deploy: build from monorepo (frontend <development-hash>)`. It is *not* what the VPS serves.
+
+Pushing only to `development` does not reach production — production pulls `deploy-new`.
+
+### Production VPS (`srv1962001`, `187.77.172.48`)
+
+| | Backend | Frontend |
+|---|---|---|
+| Path | `/var/www/pcuorg/api` | `/var/www/pcuorg/front` |
+| Branch | `deploy-new` | `deploy-new` |
+| Serves | `https://api.pcuorg.cloud` (base `/api/v1`) | builds `dist/` locally via `npm run build` |
+| Deploy | `./deploy-vps.sh` | `./deploy-vps.sh` |
+
+Both `deploy-vps.sh` scripts back up before touching anything and roll back on failure. The API one aborts if the DB dump is incomplete; the frontend one restores the previous `dist/` if the build fails.
+
+**Do not use [deploy.sh](arab-contractors-union-api/deploy.sh)** — it targets the decommissioned InMotion cPanel host (`~/acu-api`, branch `development`, `ea-php82`).
+
+`GET /` returns 404 by design; smoke-test the API with `GET /api/v1/tenders-public` (public, no auth).
+
+`VITE_API_BASE_URL` in `.env.production` is **baked in at build time** and cannot be changed afterwards — verify it before building.
+
+### Uploads under `storage/app/public/`
+
+`.gitignore` excludes `contractors/`, `certificates/`, `receipts/`, `announcements/`, `events/`, `news/`. These once held committed dev placeholders; production has real uploads at the same paths. If a `git pull` ever aborts with *"local changes would be overwritten"* there, back up (`tar -czf ~/backup.tar.gz storage/app/public`) before discarding anything — a bare `git checkout -- storage/` restores placeholders over real files and the pull then deletes them.
+
 ## Architecture
 
 ### Two API surfaces under one route file
