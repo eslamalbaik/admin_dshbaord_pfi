@@ -11,14 +11,7 @@ class UserObserver
      */
     public function created(User $user): void
     {
-        if ($user->role === 'student') {
-            $stats = \App\Models\SystemStatistic::first();
-            if ($stats) {
-                $stats->increment('total_students');
-            } else {
-                \App\Models\SystemStatistic::create(['total_students' => 1]);
-            }
-        }
+        // 
     }
 
     /**

@@ -9,6 +9,11 @@ use Illuminate\Http\Request;
 class ContractorDashboardController extends Controller
 {
     use ApiResponseTrait;
+
+    public function __construct(
+        private \App\Services\ContractorFinancialService $financialService,
+        private \App\Services\MembershipStatusService $membershipStatusService
+    ) {}
     // ─────────────────────────────────────────────────────────────────────────
     //  GET /api/v1/contractor/dashboard
     // ─────────────────────────────────────────────────────────────────────────
@@ -169,9 +174,9 @@ class ContractorDashboardController extends Controller
         $totalPaid          = (float) $payments->where('status', 'paid')->sum('amount');
         $pendingPayments    = (float) $payments->where('status', 'pending')->sum('amount');
         $unpaidPenalties    = (float) $penalties->where('status', '!=', 'paid')->sum('amount');
-        $outstandingDues    = $contractor->outstandingDuesTotal();
-        $totalObligations   = $contractor->totalObligations();
-        $duesTotals         = $contractor->duesTotalsSummary();
+        $outstandingDues    = $this->financialService->outstandingDuesTotal($contractor);
+        $totalObligations   = $this->financialService->totalObligations($contractor);
+        $duesTotals         = $this->financialService->duesTotalsSummary($contractor);
 
         // ذمم "قيد المراجعة" (شاشة الذمم المالية) — تحويلات مرفوعة لتسديد ذمم بانتظار تأكيد المحاسبة،
         // مش عمود بجدول contractor_dues، مشتقة من Payment(type=dues_payment, status=pending)
@@ -187,7 +192,7 @@ class ContractorDashboardController extends Controller
                 // بطاقة شاشة "الذمم المالية": الرصيد المستحق / المدفوع / إجمالي الرسوم + نسبة السداد
                 'dues_total_jod'       => number_format($duesTotals['total'], 2, '.', ''),
                 'dues_paid_jod'        => number_format($duesTotals['paid'], 2, '.', ''),
-                'dues_paid_percentage' => $contractor->duesPaidPercentage(),
+                'dues_paid_percentage' => $this->financialService->duesPaidPercentage($contractor),
             ],
             // لقطة احتساب رسوم السنة الحالية (محرّك الاحتساب الآلي — المادة 37)، إن وُجدت
             'current_year_fee_breakdown' => $dues
@@ -262,7 +267,7 @@ class ContractorDashboardController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
     public function subscription(Request $request)
     {
-        return $this->success($request->user()->subscriptionStatus());
+        return $this->success($this->membershipStatusService->getSubscriptionStatus($request->user()));
     }
 
     // ─────────────────────────────────────────────────────────────────────────

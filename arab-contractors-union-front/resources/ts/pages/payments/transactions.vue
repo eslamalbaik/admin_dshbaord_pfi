@@ -9,6 +9,7 @@ const queryClient = useQueryClient()
 
 interface Payment {
   id: number
+  transaction_number: string | null
   contractor: string | null
   contractor_id: number
   amount: string
@@ -25,6 +26,10 @@ interface Payment {
   submitted_at: string | null
   confirmed_at: string | null
   created_at: string
+}
+
+function fmtDateTime(d: string | null) {
+  return d ? new Date(d).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' }) : '—'
 }
 
 const successMessage = ref('')
@@ -68,14 +73,26 @@ const { data: rates } = useQuery({
 const confirmDialog = ref(false)
 const confirming = ref<Payment | null>(null)
 const confirmRate = ref('')
+const confirmReceiptFile = ref<File[]>([])
+const confirmReceiptPreview = ref('')
 
 function openConfirm(p: Payment) {
   confirming.value = p
   confirmRate.value = p.currency !== 'JOD'
     ? String(rates.value?.items?.latest?.[p.currency]?.rate_to_jod ?? '')
     : ''
+  confirmReceiptFile.value = []
+  confirmReceiptPreview.value = ''
   confirmDialog.value = true
 }
+
+watch(confirmReceiptFile, files => {
+  if (confirmReceiptPreview.value)
+    URL.revokeObjectURL(confirmReceiptPreview.value)
+
+  const file = files[0]
+  confirmReceiptPreview.value = file && file.type.startsWith('image/') ? URL.createObjectURL(file) : ''
+})
 
 const jodEquivalent = computed(() => {
   if (!confirming.value) return null
@@ -86,11 +103,17 @@ const jodEquivalent = computed(() => {
 })
 
 const confirmMutation = useMutation({
-  mutationFn: async () => (await api.post(`/api/v1/payments/transactions/${confirming.value!.id}/confirm`,
-    confirming.value!.currency !== 'JOD' && confirmRate.value
-      ? { exchange_rate: confirmRate.value }
-      : {},
-  )).data,
+  mutationFn: async () => {
+    const form = new FormData()
+    if (confirming.value!.currency !== 'JOD' && confirmRate.value)
+      form.append('exchange_rate', confirmRate.value)
+    if (confirmReceiptFile.value[0])
+      form.append('receipt_image', confirmReceiptFile.value[0])
+
+    return (await api.post(`/api/v1/payments/transactions/${confirming.value!.id}/confirm`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })).data
+  },
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ['payments-transactions'] })
     confirmDialog.value = false
@@ -182,6 +205,7 @@ function fmtDate(d: string | null) {
         <thead>
           <tr>
             <th>#</th>
+            <th>الرقم المرجعي</th>
             <th>المقاول</th>
             <th>المبلغ</th>
             <th>المعادل (د.أ)</th>
@@ -189,19 +213,21 @@ function fmtDate(d: string | null) {
             <th>الإيصال</th>
             <th>الحالة</th>
             <th>التاريخ</th>
+            <th>آخر إجراء</th>
             <th class="text-end">إجراءات</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="p in (data?.items ?? [])" :key="p.id">
             <td>{{ p.id }}</td>
+            <td dir="ltr">{{ p.transaction_number ?? '—' }}</td>
             <td>{{ p.contractor ?? '—' }}</td>
             <td dir="ltr">{{ p.amount }} {{ currencySymbol[p.currency] ?? p.currency }}</td>
             <td dir="ltr">
               {{ p.amount_jod ?? '—' }}
               <span v-if="p.exchange_rate" class="text-disabled text-caption">({{ p.exchange_rate }})</span>
             </td>
-            <td>{{ ({ membership_fee: 'رسوم عضوية', dues_payment: 'سداد ذمم', penalty: 'غرامة' } as Record<string, string>)[p.type] ?? p.type }}</td>
+            <td>{{ ({ membership_fee: 'رسوم عضوية', renewal_fee: 'رسوم تجديد', dues_payment: 'سداد ذمم', penalty: 'غرامة', equipment_subscription: 'اشتراك سوق الآليات' } as Record<string, string>)[p.type] ?? p.type }}</td>
             <td>
               <a v-if="p.receipt_image_url" :href="p.receipt_image_url" target="_blank" rel="noopener">
                 <VIcon icon="tabler-photo" size="20" />
@@ -214,19 +240,18 @@ function fmtDate(d: string | null) {
               </VChip>
             </td>
             <td>{{ fmtDate(p.submitted_at ?? p.created_at) }}</td>
+            <td class="text-caption text-medium-emphasis">{{ p.status !== 'pending' ? fmtDateTime(p.confirmed_at) : '—' }}</td>
             <td class="text-end text-no-wrap">
-              <template v-if="p.status === 'pending'">
-                <VBtn size="small" color="success" variant="tonal" class="me-1" @click="openConfirm(p)">
-                  تأكيد
-                </VBtn>
-                <VBtn size="small" color="error" variant="tonal" @click="openReject(p)">
-                  رفض
-                </VBtn>
-              </template>
+              <VBtn size="small" color="success" variant="tonal" class="me-1" @click="openConfirm(p)">
+                تأكيد
+              </VBtn>
+              <VBtn size="small" color="error" variant="tonal" @click="openReject(p)">
+                رفض
+              </VBtn>
             </td>
           </tr>
           <tr v-if="!isLoading && !(data?.items ?? []).length">
-            <td colspan="9" class="text-center text-medium-emphasis py-8">
+            <td colspan="11" class="text-center text-medium-emphasis py-8">
               لا توجد معاملات
             </td>
           </tr>
@@ -265,6 +290,24 @@ function fmtDate(d: string | null) {
               لا يوجد سعر صرف معتمد — أدخل السعر يدوياً.
             </VAlert>
           </template>
+
+          <a v-if="confirming?.receipt_image_url" :href="confirming.receipt_image_url" target="_blank" rel="noopener" class="d-block mb-2 mt-3 text-body-2">
+            عرض صورة الإشعار الحالية
+          </a>
+          <VFileInput
+            v-model="confirmReceiptFile"
+            label="صورة إثبات الدفع (اختياري — لاستبدال/إضافة الصورة عند التأكيد)"
+            accept="image/png,image/jpeg,image/webp,application/pdf"
+            prepend-icon="tabler-photo"
+            show-size
+            class="mt-3"
+          />
+          <VImg
+            v-if="confirmReceiptPreview"
+            :src="confirmReceiptPreview"
+            max-height="220"
+            class="mt-2 rounded border"
+          />
         </VCardText>
         <VCardActions class="justify-end pb-4 px-6">
           <VBtn variant="tonal" color="secondary" @click="confirmDialog = false">إلغاء</VBtn>

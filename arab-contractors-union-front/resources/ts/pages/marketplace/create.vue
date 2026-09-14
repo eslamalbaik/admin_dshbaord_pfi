@@ -52,7 +52,7 @@ const imageErrors = ref('')
 // ─── Load reference data + edit data ─────────────────────────────────────────
 const fetchRef = async () => {
   const [typesRes, contractorsRes] = await Promise.all([
-    api.get('/api/v1/equipment-types'),
+    api.get('/api/v1/equipment-types', { params: { active_only: 1 } }),
     api.get('/api/v1/contractors?per_page=200'),
   ])
   types.value       = typesRes.data
@@ -105,6 +105,8 @@ const onFilesSelected = (e: Event) => {
       return
     }
   }
+  if (files.length > 8)
+    imageErrors.value = `الحد الأقصى 8 صور — تم اختيار أول 8 من أصل ${files.length}.`
   newImages.value = files.slice(0, 8)
 }
 
@@ -163,7 +165,7 @@ const statusOptions = [
 const conditionOptions = [
   { title: 'ممتازة', value: 'excellent' },
   { title: 'جيدة', value: 'good' },
-  { title: 'مقبولة', value: 'fair' },
+  { title: 'بحاجة صيانة', value: 'needs_maintenance' },
 ]
 
 const contractTypeOptions = [
@@ -260,6 +262,8 @@ const contractTypeOptions = [
               variant="outlined"
               density="compact"
               rows="3"
+              maxlength="2000"
+              counter
               style="font-family:Cairo,sans-serif"
             />
           </VCol>

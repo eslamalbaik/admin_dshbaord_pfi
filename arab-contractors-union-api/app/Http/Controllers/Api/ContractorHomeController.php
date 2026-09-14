@@ -28,6 +28,11 @@ class ContractorHomeController extends Controller
 {
     use ApiResponseTrait;
 
+    public function __construct(
+        private \App\Services\ContractorFinancialService $financialService,
+        private \App\Services\MembershipStatusService $membershipStatusService
+    ) {}
+
     private const NEW_TENDERS_WINDOW_DAYS = 7;
     private const NEW_BADGE_HOURS         = 24;
     private const FEED_POOL_LIMIT         = 30; // عدد السجلات المجلوبة من كل مصدر قبل الدمج والترتيب
@@ -98,22 +103,14 @@ class ContractorHomeController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
     private function membershipStatus(Contractor $contractor): array
     {
-        $membership = $contractor->activeMembership;
-        $isPaidActive = $membership && $membership->expires_at && $membership->expires_at->isFuture();
-
-        // badge أخضر فقط لو فيه عضوية مدفوعة وسارية فعلياً — لا يكفي أن يكون status الإداري "active"
-        $badge = match (true) {
-            $isPaidActive                                                     => 'active',
-            $membership && $membership->expires_at && $membership->expires_at->isPast() => 'expired',
-            default                                                            => $contractor->status,
-        };
+        $status = $this->membershipStatusService->getSubscriptionStatus($contractor);
 
         return [
             'status'         => $contractor->status,
-            'badge'          => $badge,
-            'expires_at'     => $membership?->expires_at?->toDateString(),
-            'expiring_soon'  => (bool) $membership?->expiring_soon,
-            'days_remaining' => $membership?->expires_at ? max(0, (int) now()->diffInDays($membership->expires_at, false)) : null,
+            'badge'          => $status['badge'],
+            'expires_at'     => $status['expires_at'],
+            'expiring_soon'  => $status['expiring_soon'],
+            'days_remaining' => $status['days_remaining'],
         ];
     }
 
@@ -122,7 +119,7 @@ class ContractorHomeController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
     private function financialSummary(Contractor $contractor): array
     {
-        $balance = $contractor->totalObligations();
+        $balance = $this->financialService->totalObligations($contractor);
 
         $hasOverdue = $contractor->dues()
             ->outstanding()
@@ -172,7 +169,7 @@ class ContractorHomeController extends Controller
         return [
             'show'               => true,
             'has_pending_dues'   => count($issues) > 0,
-            'outstanding_amount' => $contractor->totalObligations(),
+            'outstanding_amount' => $this->financialService->totalObligations($contractor),
         ];
     }
 

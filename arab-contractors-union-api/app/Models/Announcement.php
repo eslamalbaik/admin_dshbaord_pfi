@@ -19,11 +19,22 @@ class Announcement extends Model
         'published_at' => 'datetime',
     ];
 
+    protected $appends = ['effective_status'];
+
     public function scopePublished($query)
     {
         return $query->where('is_published', true)
                      ->whereNotNull('published_at')
                      ->where('published_at', '<=', now());
+    }
+
+    /** draft (لم يُنشر) | scheduled (مجدول لتاريخ مستقبلي) | published (منشور فعلاً الآن) */
+    public function getEffectiveStatusAttribute(): string
+    {
+        if (! $this->is_published || ! $this->published_at)
+            return 'draft';
+
+        return $this->published_at->isFuture() ? 'scheduled' : 'published';
     }
 
     public function author()

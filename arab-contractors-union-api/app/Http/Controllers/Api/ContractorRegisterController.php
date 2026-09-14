@@ -2,25 +2,21 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exceptions\OtpCooldownException;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\Contractor;
-use App\Services\Sms\SmsSenderInterface;
+use App\Services\OtpService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Validation\ValidationException;
 
 class ContractorRegisterController extends Controller
 {
     use ApiResponseTrait;
 
-    /**
-     * الرمز يُرجَع بالرد فقط بوضع log (SMS_DRIVER=log) للتسهيل على الفحص محلياً —
-     * يختفي تلقائياً بمجرد ضبط مزوّد فعلي (SMS_DRIVER=hotsms).
-     */
-    private function otpPreview(int $otp): array
+    public function __construct(private OtpService $otpService)
     {
-        return config('services.sms.driver', 'log') === 'log' ? ['otp_preview' => $otp] : [];
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -52,19 +48,22 @@ class ContractorRegisterController extends Controller
             return $this->error('حسابك مفعّل ومسجّل مسبقاً. يمكنك تسجيل الدخول.', 422, null, 'already_registered');
         }
 
-        $cooldownKey = 'register_otp_cooldown_' . $contractor->id;
-        if (Cache::has($cooldownKey)) {
-            $expiresIn = max(0, Cache::get($cooldownKey) - time());
-            return $this->error("يرجى الانتظار {$expiresIn} ثانية قبل طلب رمز جديد.", 429, ['expires_in' => $expiresIn], 'otp_cooldown');
-        }
-
         if (is_null($contractor->terms_accepted_at)) {
             $contractor->update(['terms_accepted_at' => now()]);
         }
 
-        $otp = $this->generateOtp($contractor);
+        try {
+            $result = $this->otpService->sendOtp(
+                'register',
+                $contractor->id,
+                $contractor->phone,
+                'رمز التحقق الخاص بك في اتحاد المقاولين الفلسطينيين: {otp}. صالح لمدة 10 دقائق.',
+            );
+        } catch (OtpCooldownException $e) {
+            return $this->error($e->getMessage(), 429, ['expires_in' => $e->expiresIn], 'otp_cooldown');
+        }
 
-        return $this->success([
+        $data = [
             'id'                  => $contractor->id,
             'name'                => $contractor->name,
             'authorized_person'   => $contractor->authorized_person,
@@ -73,9 +72,14 @@ class ContractorRegisterController extends Controller
             'membership_number'   => $contractor->membership_number,
             'has_password'        => !empty($contractor->password),
             'otp_required'        => true,
-            'expires_in'          => 35,
-            ...$this->otpPreview($otp),
-        ], 'تم التحقق من رقم الجوال، تم إرسال رمز التحقق إليه.');
+            'expires_in'          => $result['expires_in'],
+        ];
+
+        if ($result['is_preview']) {
+            $data['otp_preview'] = $result['otp'];
+        }
+
+        return $this->success($data, 'تم التحقق من رقم الجوال، تم إرسال رمز التحقق إليه.');
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -99,14 +103,13 @@ class ContractorRegisterController extends Controller
             return $this->error('حسابك موقوف. تواصل مع الاتحاد لمزيد من المعلومات.', 403, null, 'account_inactive');
         }
 
-        $cachedOtp = Cache::get('register_otp_' . $contractor->id);
-
-        if (! $cachedOtp || (string) $cachedOtp !== (string) $request->otp) {
+        try {
+            $this->otpService->verifyOtp('register', $contractor->id, $request->otp);
+        } catch (ValidationException) {
             return $this->error('رمز التحقق غير صحيح أو انتهت صلاحيته.', 422, null, 'invalid_otp');
         }
 
         $contractor->update(['phone_verified_at' => now()]);
-        Cache::forget('register_otp_' . $contractor->id);
 
         return $this->success([
             'id'                  => $contractor->id,
@@ -145,20 +148,28 @@ class ContractorRegisterController extends Controller
             return $this->error('رقم جوالك مفعّل مسبقاً.', 422, null, 'already_verified');
         }
 
-        $cooldownKey = 'register_otp_cooldown_' . $contractor->id;
-        if (Cache::has($cooldownKey)) {
-            $expiresIn = max(0, Cache::get($cooldownKey) - time());
-            return $this->error("يرجى الانتظار {$expiresIn} ثانية قبل طلب رمز جديد.", 429, ['expires_in' => $expiresIn], 'otp_cooldown');
+        try {
+            $result = $this->otpService->sendOtp(
+                'register',
+                $contractor->id,
+                $contractor->phone,
+                'رمز التحقق الخاص بك في اتحاد المقاولين الفلسطينيين: {otp}. صالح لمدة 10 دقائق.',
+            );
+        } catch (OtpCooldownException $e) {
+            return $this->error($e->getMessage(), 429, ['expires_in' => $e->expiresIn], 'otp_cooldown');
         }
 
-        $otp = $this->generateOtp($contractor);
-
-        return $this->success([
+        $data = [
             'phone'        => $contractor->phone,
             'otp_required' => true,
-            'expires_in'   => 35,
-            ...$this->otpPreview($otp),
-        ], 'تم إرسال رمز تحقق جديد إلى رقم جوالك.');
+            'expires_in'   => $result['expires_in'],
+        ];
+
+        if ($result['is_preview']) {
+            $data['otp_preview'] = $result['otp'];
+        }
+
+        return $this->success($data, 'تم إرسال رمز تحقق جديد إلى رقم جوالك.');
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -231,24 +242,6 @@ class ContractorRegisterController extends Controller
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  توليد رمز تحقق التسجيل وإرساله عبر مزوّد SMS المفعَّل (SMS_DRIVER)
-    // ─────────────────────────────────────────────────────────────────────────
-    private function generateOtp(Contractor $contractor): int
-    {
-        $otp = 123456;
-
-        Cache::put('register_otp_' . $contractor->id, $otp, now()->addMinutes(10));
-        Cache::put('register_otp_cooldown_' . $contractor->id, time() + 35, now()->addSeconds(35));
-
-        app(SmsSenderInterface::class)->send(
-            $contractor->phone,
-            "رمز التحقق الخاص بك في اتحاد المقاولين الفلسطينيين: {$otp}. صالح لمدة 10 دقائق."
-        );
-
-        return $otp;
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
     //  POST /api/v1/contractor/auth/forgot-password/send-otp
     // ─────────────────────────────────────────────────────────────────────────
     public function forgotPasswordSendOtp(Request $request)
@@ -272,31 +265,29 @@ class ContractorRegisterController extends Controller
             return $this->error('لا يمكن استعادة كلمة المرور — لا توجد لديك عضوية فعّالة في الاتحاد. يرجى التواصل مع الاتحاد.', 403, null, 'membership_inactive');
         }
 
-        $cooldownKey = 'forgot_otp_cooldown_' . $contractor->id;
-        if (Cache::has($cooldownKey)) {
-            $expiresIn = max(0, Cache::get($cooldownKey) - time());
-            return $this->error("يرجى الانتظار {$expiresIn} ثانية قبل طلب رمز جديد.", 429, ['expires_in' => $expiresIn], 'otp_cooldown');
+        try {
+            $result = $this->otpService->sendOtp(
+                'forgot',
+                $contractor->id,
+                $contractor->phone,
+                'رمز استعادة كلمة المرور في اتحاد المقاولين الفلسطينيين: {otp}. صالح لمدة 10 دقائق.',
+            );
+        } catch (OtpCooldownException $e) {
+            return $this->error($e->getMessage(), 429, ['expires_in' => $e->expiresIn], 'otp_cooldown');
         }
 
-        // رمز تحقق ثابت 123456 للاختبار
-        $otp = 123456;
-
-        // تخزينه في الـ Cache لمدة 10 دقائق
-        Cache::put('otp_' . $contractor->id, $otp, now()->addMinutes(10));
-        Cache::put($cooldownKey, time() + 35, now()->addSeconds(35));
-
-        app(SmsSenderInterface::class)->send(
-            $contractor->phone,
-            "رمز استعادة كلمة المرور في اتحاد المقاولين الفلسطينيين: {$otp}. صالح لمدة 10 دقائق."
-        );
-
-        return $this->success([
+        $data = [
             'id'                  => $contractor->id,
             'membership_number'   => $contractor->membership_number,
             'phone'               => $contractor->phone,
-            'expires_in'          => 35,
-            ...$this->otpPreview($otp),
-        ], 'تم إرسال رمز التحقق إلى رقم الجوال المسجل بنجاح.');
+            'expires_in'          => $result['expires_in'],
+        ];
+
+        if ($result['is_preview']) {
+            $data['otp_preview'] = $result['otp'];
+        }
+
+        return $this->success($data, 'تم إرسال رمز التحقق إلى رقم الجوال المسجل بنجاح.');
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -325,9 +316,9 @@ class ContractorRegisterController extends Controller
             return $this->error('لا يمكن استعادة كلمة المرور — لا توجد لديك عضوية فعّالة في الاتحاد. يرجى التواصل مع الاتحاد.', 403, null, 'membership_inactive');
         }
 
-        $cachedOtp = Cache::get('otp_' . $contractor->id);
-
-        if (!$cachedOtp || (string)$cachedOtp !== (string)$request->otp) {
+        try {
+            $this->otpService->verifyOtp('forgot', $contractor->id, $request->otp);
+        } catch (ValidationException) {
             return $this->error('رمز التحقق غير صحيح أو انتهت صلاحيته.', 422, null, 'invalid_otp');
         }
 
@@ -336,9 +327,6 @@ class ContractorRegisterController extends Controller
             'password'          => Hash::make($request->password),
             'phone_verified_at' => $contractor->phone_verified_at ?? now(),
         ]);
-
-        // مسح رمز التحقق من الكاش
-        Cache::forget('otp_' . $contractor->id);
 
         // مسح الجلسات القديمة وتوليد جلسة جديدة للمستخدم للدخول الفوري
         $contractor->tokens()->delete();

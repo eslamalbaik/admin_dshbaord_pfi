@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
 class PasswordResetController extends Controller
 {
     /**
-     * Send a password reset link to the student's email.
+     * Send a password reset link to the email.
      */
     public function sendResetLink(Request $request)
     {
@@ -37,9 +37,8 @@ class PasswordResetController extends Controller
             ]
         );
 
-        // Reset link goes to the student landing page
-        $landingUrl = rtrim(config('app.landing_url', 'http://localhost:3000'), '/');
-        $resetUrl = $landingUrl . '/reset-password?token=' . $token . '&email=' . urlencode($email);
+        // Reset link goes to the dashboard
+        $resetUrl = rtrim(config('app.frontend_url', 'http://localhost:3000'), '/') . '/reset-password?token=' . $token . '&email=' . urlencode($email);
 
         // Queue the reset password email to keep responses fast and non-blocking
         Mail::to($email)->queue(new ResetPasswordMail($resetUrl));

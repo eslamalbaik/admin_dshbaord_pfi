@@ -13,8 +13,18 @@ class Tender extends Model
     public const CATEGORIES = ['مباني', 'طرق', 'بنية تحتية', 'قطاع صحي', 'قطاع تعليمي', 'عام'];
 
     /** نافذة بادج "جديد" — بالساعات؛ "ينتهي قريباً" — عدد الأيام قبل الموعد النهائي */
-    private const NEW_WINDOW_HOURS   = 48;
-    private const CLOSING_SOON_DAYS  = 4;
+    private const NEW_WINDOW_HOURS  = 48;
+    public const CLOSING_SOON_DAYS  = 4;
+
+    /** القيم الأربع المعروضة للمستخدم — عمود display_status حقيقي، وليس بادج محسوب لحظياً فقط */
+    public const DISPLAY_STATUSES = ['new', 'updated', 'closing_soon', 'closed'];
+
+    public const DISPLAY_STATUS_LABELS = [
+        'new'          => 'جديد',
+        'updated'      => 'محدث',
+        'closing_soon' => 'ينتهي قريباً',
+        'closed'       => 'مغلق',
+    ];
 
     protected $fillable = [
         'title', 'issuing_entity', 'reference_number', 'description', 'union_notes',
@@ -32,14 +42,58 @@ class Tender extends Model
         'submission_types' => 'array',
     ];
 
-    protected $appends = ['is_active', 'is_new', 'is_updated', 'closing_soon'];
+    protected $appends = ['is_active', 'is_new', 'is_updated', 'closing_soon', 'display_status_label'];
 
     protected static function booted(): void
     {
         // تاريخ النشر تلقائي دائماً — لا حقل يدوي بالفورم، يُضبط لحظة الإنشاء بغض النظر عن نقطة الدخول
         static::creating(function (Tender $tender) {
             $tender->published_at ??= now();
+            $tender->syncDisplayStatus(false);
         });
+
+        static::updating(function (Tender $tender) {
+            // استبعاد التحديثات الداخلية البحتة (توليد الرقم المرجعي عقب الإنشاء مباشرة) من احتساب "محدَّث"
+            $isContentUpdate = (bool) array_diff(array_keys($tender->getDirty()), ['reference_number', 'display_status']);
+            $tender->syncDisplayStatus($isContentUpdate);
+        });
+    }
+
+    /**
+     * يحدّث display_status وفق: مغلق/ملغى إدارياً > قرب الموعد النهائي > تحديث محتوى فعلي.
+     * تقدّم أحادي الاتجاه لحالتي new→updated فقط؛ closed/closing_soon يعكسان الواقع دائماً (غير أحاديي الاتجاه)
+     * حتى تنعكس إعادة الفتح أو تمديد الموعد النهائي بشكل صحيح.
+     */
+    public function syncDisplayStatus(bool $isContentUpdate = false): void
+    {
+        if (in_array($this->status, ['closed', 'cancelled'], true)) {
+            $this->display_status = 'closed';
+
+            return;
+        }
+
+        if ($this->deadline && $this->deadline->isFuture()
+            && now()->diffInDays($this->deadline, false) <= self::CLOSING_SOON_DAYS) {
+            $this->display_status = 'closing_soon';
+
+            return;
+        }
+
+        $current = $this->display_status;
+
+        if ($current === null) {
+            $this->display_status = 'new';
+        } elseif ($current === 'closed') {
+            // إعادة فتح عطاء كان مغلقاً — تُعتبر تحديثاً فعلياً بغض النظر عن باقي الحقول
+            $this->display_status = 'updated';
+        } elseif ($isContentUpdate && $current === 'new') {
+            $this->display_status = 'updated';
+        }
+    }
+
+    public function getDisplayStatusLabelAttribute(): string
+    {
+        return self::DISPLAY_STATUS_LABELS[$this->display_status] ?? $this->display_status;
     }
 
     public function creator()

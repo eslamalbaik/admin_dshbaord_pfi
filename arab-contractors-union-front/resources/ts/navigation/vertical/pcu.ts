@@ -122,7 +122,10 @@ if (!isAccountant) {
   menuItems.push({
     title: 'التعميمات',
     icon: { icon: 'tabler-speakerphone' },
-    to: 'announcements',
+    children: [
+      { title: 'جميع التعميمات', to: 'announcements' },
+      { title: 'تصنيفات التعميمات', to: 'announcements-categories' },
+    ],
   })
 }
 

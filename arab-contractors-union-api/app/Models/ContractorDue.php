@@ -57,7 +57,7 @@ class ContractorDue extends Model
 
     public function getStatusLabelAttribute(): string
     {
-        return self::STATUS_LABELS[$this->status] ?? $this->status;
+        return self::STATUS_LABELS[$this->status] ?? $this->status ?? self::STATUS_LABELS['unpaid'];
     }
 
     /** رقم مرجعي بصيغة INV-<سنة الإنشاء>-<رقم الذمة بـ3 خانات> — يُولَّد مرة واحدة عند الإنشاء */
@@ -125,6 +125,12 @@ class ContractorDue extends Model
     {
         $original = (float) ($this->original_amount_jod ?? $this->amount_jod);
 
+        // خصم إضافي من نفس النوع (نسبة/مبلغ) يتراكم مع الخصم السابق بدل ما يستبدله —
+        // مثلاً 30% ثم 30% تانية = 60% إجمالاً، مش 30% ثابتة
+        if ($this->discount_type === $type) {
+            $value += (float) $this->discount_value;
+        }
+
         $newAmount = $type === 'percent'
             ? $original * (1 - $value / 100)
             : $original - $value;
@@ -135,6 +141,11 @@ class ContractorDue extends Model
             throw new \InvalidArgumentException('الخصم يُنزل المبلغ تحت ما تم سداده فعلياً على هذه الذمة.');
         }
 
+        // تحديث لاحقة "(بعد خصم ...)" بنص البيان لتعكس نسبة/مبلغ الخصم المتراكم الفعلي —
+        // بدونه يضل النص القديم (مثلاً 50%) ظاهر حتى بعد ما يصير الخصم الحقيقي 70%.
+        $suffix = $type === 'percent' ? "(بعد خصم {$value}%)" : "(بعد خصم {$value} د.أ)";
+        $baseDescription = trim(preg_replace('/\s*\(بعد خصم[^)]*\)\s*$/u', '', (string) $this->description));
+
         $this->update([
             'original_amount_jod' => $original,
             'discount_type'       => $type,
@@ -143,6 +154,7 @@ class ContractorDue extends Model
             'discount_reason'     => $reason,
             'discount_by'         => $byUserId,
             'amount_jod'          => $newAmount,
+            'description'         => "{$baseDescription} {$suffix}",
         ]);
 
         $this->applyPayment(0);

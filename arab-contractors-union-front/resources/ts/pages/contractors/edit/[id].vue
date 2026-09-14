@@ -80,10 +80,19 @@ const addSpecialty = () => {
   form.value.specialties.push({ field_lk_type: null, specialization_lk_type: null, classification: '' })
 }
 
-const removeSpecialty = (index: number) => {
-  if (form.value.specialties.length > 1) {
-    form.value.specialties.splice(index, 1)
-  }
+const removeSpecialtyDialog = ref(false)
+const removingSpecialtyIndex = ref<number | null>(null)
+
+const confirmRemoveSpecialty = (index: number) => {
+  removingSpecialtyIndex.value = index
+  removeSpecialtyDialog.value = true
+}
+
+const removeSpecialty = () => {
+  if (removingSpecialtyIndex.value !== null)
+    form.value.specialties.splice(removingSpecialtyIndex.value, 1)
+  removeSpecialtyDialog.value = false
+  removingSpecialtyIndex.value = null
 }
 
 const fieldOptions = [
@@ -133,6 +142,15 @@ const gradeOptions = [
 const gradeOptionsFor = (fieldLkType: number | null) =>
   TOP_TIER_FIELDS.includes(fieldLkType as number) ? gradeOptions : gradeOptions.filter(g => g.value !== 'اولى أ')
 
+// روابط الملفات المرفوعة مسبقاً — تُعرض للمعاينة/التحميل جنب كل حقل رفع، بدل ما يظهر الحقل فاضي
+const documentKeys = [
+  'lease_or_ownership_contract', 'company_approval_letter', 'municipal_license', 'company_register',
+  'cr_file', 'articles_of_association', 'internal_bylaws', 'bank_dealing_letter',
+  'secretary_contract', 'full_time_engineer_certificate', 'partners_ids', 'authorization_letter',
+] as const
+
+const existingFiles = ref<Record<string, string | null>>({})
+
 const fetchContractor = async () => {
   try {
     const { data } = await api.get(`/api/v1/contractors/${route.params.id}`)
@@ -145,9 +163,13 @@ const fetchContractor = async () => {
       'phone', 'fax', 'email', 'city', 'address', 'trade', 'established_date', 'license_number', 'notes'
     ]
     
+    const dateFields = ['established_date']
+
     textFields.forEach(field => {
       if (contractor[field] !== null && contractor[field] !== undefined) {
-        (form.value as any)[field] = contractor[field]
+        (form.value as any)[field] = dateFields.includes(field)
+          ? String(contractor[field]).substring(0, 10)
+          : contractor[field]
       }
     })
 
@@ -174,6 +196,10 @@ const fetchContractor = async () => {
     } else {
       form.value.partners = []
     }
+
+    documentKeys.forEach(key => {
+      existingFiles.value[key] = contractor[`${key}_url`] ?? contractor[key] ?? null
+    })
   } catch (err) {
     errorMsg.value = 'فشل جلب بيانات المقاول.'
   } finally {
@@ -188,14 +214,17 @@ onMounted(() => {
 const nextStep = () => { if (step.value < 4) step.value++ }
 const prevStep = () => { if (step.value > 1) step.value-- }
 
+const uploadProgress = ref(0)
+
 const submit = async () => {
   loading.value = true
+  uploadProgress.value = 0
   errorMsg.value = ''
   validationErrors.value = {}
   try {
     const fd = new FormData()
     fd.append('_method', 'PUT') // Laravel uses PUT for file updates via POST request
-    
+
     Object.entries(form.value).forEach(([k, v]) => {
       if (v !== null) {
         if (k === 'partners' && Array.isArray(v)) {
@@ -207,7 +236,12 @@ const submit = async () => {
         }
       }
     })
-    await api.post(`/api/v1/contractors/${route.params.id}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+    await api.post(`/api/v1/contractors/${route.params.id}`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: e => {
+        uploadProgress.value = e.total ? Math.round((e.loaded / e.total) * 100) : 0
+      },
+    })
     router.push({ name: 'contractors' })
   }
   catch (err: any) {
@@ -426,15 +460,18 @@ const submit = async () => {
                   icon
                   variant="text"
                   color="error"
-                  :disabled="form.specialties.length <= 1"
-                  @click="removeSpecialty(index)"
+                  @click="confirmRemoveSpecialty(index)"
                   title="حذف هذا المجال"
                 >
                   <VIcon icon="tabler-trash" />
                 </VBtn>
               </VCol>
             </VRow>
-            
+
+            <p v-if="!form.specialties.length" class="text-body-2 text-medium-emphasis mb-3" style="font-family:Cairo,sans-serif">
+              لا يوجد مجال/تصنيف مضاف.
+            </p>
+
             <VBtn
               prepend-icon="tabler-plus"
               variant="tonal"
@@ -474,6 +511,12 @@ const submit = async () => {
         <p class="text-body-2 text-medium-emphasis mb-4">يرجى رفع المستندات الجديدة فقط في حال أردت تحديث المستندات القديمة (يتحول الحقل للون الأخضر عند اختيار ملف جديد):</p>
         <VRow>
           <VCol cols="12" md="6">
+            <div v-if="existingFiles.cr_file && !form.cr_file" class="d-flex align-center gap-2 mb-1">
+              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+              <a :href="existingFiles.cr_file!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+              </a>
+            </div>
             <VFileInput
               v-model="form.cr_file"
               label="السجل التجاري (للتحديث)"
@@ -487,6 +530,12 @@ const submit = async () => {
             />
           </VCol>
           <VCol cols="12" md="6">
+            <div v-if="existingFiles.company_register && !form.company_register" class="d-flex align-center gap-2 mb-1">
+              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+              <a :href="existingFiles.company_register!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+              </a>
+            </div>
             <VFileInput
               v-model="form.company_register"
               label="مستخرج عن سجل الشركة (للتحديث)"
@@ -500,6 +549,12 @@ const submit = async () => {
             />
           </VCol>
           <VCol cols="12" md="6">
+            <div v-if="existingFiles.municipal_license && !form.municipal_license" class="d-flex align-center gap-2 mb-1">
+              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+              <a :href="existingFiles.municipal_license!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+              </a>
+            </div>
             <VFileInput
               v-model="form.municipal_license"
               label="رخصة المهن سارية المفعول (للتحديث)"
@@ -513,6 +568,12 @@ const submit = async () => {
             />
           </VCol>
           <VCol cols="12" md="6">
+            <div v-if="existingFiles.bank_dealing_letter && !form.bank_dealing_letter" class="d-flex align-center gap-2 mb-1">
+              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+              <a :href="existingFiles.bank_dealing_letter!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+              </a>
+            </div>
             <VFileInput
               v-model="form.bank_dealing_letter"
               label="شهادة تعامل للشركة مع بنك (للتحديث)"
@@ -526,6 +587,12 @@ const submit = async () => {
             />
           </VCol>
           <VCol cols="12" md="6">
+            <div v-if="existingFiles.articles_of_association && !form.articles_of_association" class="d-flex align-center gap-2 mb-1">
+              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+              <a :href="existingFiles.articles_of_association!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+              </a>
+            </div>
             <VFileInput
               v-model="form.articles_of_association"
               label="عقد تأسيس الشركة (للتحديث)"
@@ -539,6 +606,12 @@ const submit = async () => {
             />
           </VCol>
           <VCol cols="12" md="6">
+            <div v-if="existingFiles.internal_bylaws && !form.internal_bylaws" class="d-flex align-center gap-2 mb-1">
+              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+              <a :href="existingFiles.internal_bylaws!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+              </a>
+            </div>
             <VFileInput
               v-model="form.internal_bylaws"
               label="النظام الداخلي (للتحديث)"
@@ -552,6 +625,12 @@ const submit = async () => {
             />
           </VCol>
           <VCol cols="12" md="6">
+            <div v-if="existingFiles.lease_or_ownership_contract && !form.lease_or_ownership_contract" class="d-flex align-center gap-2 mb-1">
+              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+              <a :href="existingFiles.lease_or_ownership_contract!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+              </a>
+            </div>
             <VFileInput
               v-model="form.lease_or_ownership_contract"
               label="عقد الإيجار أو الملكية لمقر الشركة (للتحديث)"
@@ -565,6 +644,12 @@ const submit = async () => {
             />
           </VCol>
           <VCol cols="12" md="6">
+            <div v-if="existingFiles.partners_ids && !form.partners_ids" class="d-flex align-center gap-2 mb-1">
+              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+              <a :href="existingFiles.partners_ids!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+              </a>
+            </div>
             <VFileInput
               v-model="form.partners_ids"
               label="صور هويات الشركاء (للتحديث)"
@@ -578,6 +663,12 @@ const submit = async () => {
             />
           </VCol>
           <VCol cols="12" md="6">
+            <div v-if="existingFiles.authorization_letter && !form.authorization_letter" class="d-flex align-center gap-2 mb-1">
+              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+              <a :href="existingFiles.authorization_letter!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+              </a>
+            </div>
             <VFileInput
               v-model="form.authorization_letter"
               label="كتاب تفويض المعتمد بالتوقيع (للتحديث)"
@@ -591,6 +682,12 @@ const submit = async () => {
             />
           </VCol>
           <VCol cols="12" md="6">
+            <div v-if="existingFiles.company_approval_letter && !form.company_approval_letter" class="d-flex align-center gap-2 mb-1">
+              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+              <a :href="existingFiles.company_approval_letter!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+              </a>
+            </div>
             <VFileInput
               v-model="form.company_approval_letter"
               label="كتاب موافقة على الانتساب (للتحديث)"
@@ -604,6 +701,12 @@ const submit = async () => {
             />
           </VCol>
           <VCol cols="12" md="6">
+            <div v-if="existingFiles.full_time_engineer_certificate && !form.full_time_engineer_certificate" class="d-flex align-center gap-2 mb-1">
+              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+              <a :href="existingFiles.full_time_engineer_certificate!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+              </a>
+            </div>
             <VFileInput
               v-model="form.full_time_engineer_certificate"
               label="شهادة مهندس متفرغ (للتحديث)"
@@ -617,6 +720,12 @@ const submit = async () => {
             />
           </VCol>
           <VCol cols="12" md="6">
+            <div v-if="existingFiles.secretary_contract && !form.secretary_contract" class="d-flex align-center gap-2 mb-1">
+              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+              <a :href="existingFiles.secretary_contract!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+              </a>
+            </div>
             <VFileInput
               v-model="form.secretary_contract"
               label="عقد سكرتير (للتحديث)"
@@ -634,6 +743,13 @@ const submit = async () => {
           </VCol>
         </VRow>
       </VCardText>
+      <VCardText v-if="loading" class="pt-0">
+        <VProgressLinear :model-value="uploadProgress" color="success" height="8" rounded striped>
+          <template #default>
+            <span class="text-caption font-weight-medium">{{ uploadProgress }}%</span>
+          </template>
+        </VProgressLinear>
+      </VCardText>
       <VCardActions class="pa-4">
         <VBtn variant="tonal" @click="prevStep" prepend-icon="tabler-arrow-right">السابق</VBtn>
         <VSpacer />
@@ -642,6 +758,24 @@ const submit = async () => {
         </VBtn>
       </VCardActions>
     </VCard>
+
+    <!-- Confirm remove specialty dialog -->
+    <VDialog v-model="removeSpecialtyDialog" max-width="400">
+      <VCard>
+        <VCardTitle class="d-flex align-center gap-2" style="font-family:Cairo,sans-serif">
+          <VIcon icon="tabler-alert-triangle" color="error" />
+          تأكيد الحذف
+        </VCardTitle>
+        <VCardText style="font-family:Cairo,sans-serif">
+          هل أنت متأكد من حذف هذا المجال والتصنيف؟ لا يمكن التراجع عن هذا الإجراء.
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" @click="removeSpecialtyDialog = false">إلغاء</VBtn>
+          <VBtn color="error" @click="removeSpecialty">حذف</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
   </div>
   <div v-else class="d-flex justify-center align-center h-100 mt-10">
     <VProgressCircular indeterminate color="primary" />

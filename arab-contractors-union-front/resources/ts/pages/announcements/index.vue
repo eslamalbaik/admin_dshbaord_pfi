@@ -10,6 +10,14 @@ const page = ref(1)
 const total = ref(0)
 const categoryOptions = ref<string[]>([])
 
+// التصنيفات المُدارة (بند 10ج) — بديل الحقل الحر، فقط الظاهرة منها تُعرض بفورم الإنشاء/التعديل
+const managedCategories = ref<{ id: number; name: string }[]>([])
+const fetchManagedCategories = async () => {
+  const { data } = await api.get('/api/v1/announcement-categories', { params: { active_only: 1 } })
+  managedCategories.value = data
+}
+onMounted(fetchManagedCategories)
+
 // ── Snackbar ──────────────────────────────────────
 const snackbar = ref(false)
 const snackbarText = ref('')
@@ -24,6 +32,9 @@ const search = ref('')
 const categoryFilter = ref('')
 const pinnedFilter = ref('')
 const publishedFilter = ref('')
+
+const statusColor: Record<string, string> = { draft: 'secondary', scheduled: 'warning', published: 'success' }
+const statusLabel: Record<string, string> = { draft: 'مسودة', scheduled: 'مجدول', published: 'منشور' }
 
 const headers = [
   { title: 'التعميم', key: 'title' },
@@ -64,7 +75,7 @@ const emptyForm = () => ({
   id: null as number | null,
   title: '',
   number: '',
-  category: '',
+  category_id: null as number | null,
   body: '',
   is_published: false,
   is_pinned: false,
@@ -92,7 +103,7 @@ const openEdit = (item: any) => {
     id: item.id,
     title: item.title,
     number: item.number ?? '',
-    category: item.category ?? '',
+    category_id: item.category_id ?? null,
     body: item.body ?? '',
     is_published: !!item.is_published,
     is_pinned: !!item.is_pinned,
@@ -103,6 +114,15 @@ const openEdit = (item: any) => {
   attachmentFile.value = null
   isEditing.value = true
   formDialog.value = true
+}
+
+// ── View details (read-only) ───────────────────────
+const viewDialog = ref(false)
+const viewingItem = ref<any>(null)
+
+const openView = (item: any) => {
+  viewingItem.value = item
+  viewDialog.value = true
 }
 
 const saveAnnouncement = async () => {
@@ -117,8 +137,9 @@ const saveAnnouncement = async () => {
     fd.append('body', form.value.body)
     fd.append('is_published', form.value.is_published ? '1' : '0')
     fd.append('is_pinned', form.value.is_pinned ? '1' : '0')
-    if (form.value.number) fd.append('number', form.value.number)
-    if (form.value.category) fd.append('category', form.value.category)
+    // رقم التعميم: يُترك فارغاً بالإنشاء لتوليده تلقائياً بالباك اند؛ التعديل يسمح بتصحيحه يدوياً
+    if (isEditing.value && form.value.number) fd.append('number', form.value.number)
+    if (form.value.category_id) fd.append('category_id', String(form.value.category_id))
     if (form.value.published_at) fd.append('published_at', form.value.published_at)
     const image = firstFile(imageFile.value)
     const attachment = firstFile(attachmentFile.value)
@@ -263,13 +284,22 @@ const deleteAnnouncement = async () => {
         </template>
 
         <template #item.is_published="{ item }">
-          <VChip :color="item.is_published ? 'success' : 'secondary'" size="small" label style="font-family:Cairo,sans-serif">
-            {{ item.is_published ? 'منشور' : 'مسودة' }}
+          <VChip
+            :color="statusColor[item.effective_status] ?? 'secondary'"
+            size="small"
+            label
+            style="font-family:Cairo,sans-serif"
+          >
+            {{ statusLabel[item.effective_status] ?? 'مسودة' }}
           </VChip>
         </template>
 
         <template #item.actions="{ item }">
           <div class="d-flex align-center gap-1">
+            <VBtn icon size="small" variant="text" color="info" @click="openView(item)">
+              <VIcon icon="tabler-eye" />
+              <VTooltip activator="parent">عرض التفاصيل</VTooltip>
+            </VBtn>
             <VBtn icon size="small" variant="text" color="primary" @click="openEdit(item)">
               <VIcon icon="tabler-pencil" />
               <VTooltip activator="parent">تعديل</VTooltip>
@@ -297,13 +327,22 @@ const deleteAnnouncement = async () => {
               <VTextField v-model="form.title" label="عنوان التعميم" style="font-family:Cairo,sans-serif" />
             </VCol>
             <VCol cols="12" md="4">
-              <VTextField v-model="form.number" label="رقم التعميم (مثال: 2026/108)" dir="ltr" style="font-family:Cairo,sans-serif" />
+              <VTextField
+                v-model="form.number"
+                :label="isEditing ? 'رقم التعميم' : 'رقم التعميم (يُولَّد تلقائياً)'"
+                :readonly="!isEditing"
+                :placeholder="isEditing ? '' : 'سيُحدَّد تلقائياً عند الحفظ'"
+                dir="ltr"
+                style="font-family:Cairo,sans-serif"
+              />
             </VCol>
             <VCol cols="12" md="6">
-              <VCombobox
-                v-model="form.category"
-                :items="categoryOptions"
-                label="التصنيف (مثال: تعميمات الشؤون الفنية والتصنيف)"
+              <VSelect
+                v-model="form.category_id"
+                :items="managedCategories"
+                item-title="name"
+                item-value="id"
+                label="التصنيف"
                 clearable
                 style="font-family:Cairo,sans-serif"
               />
@@ -348,6 +387,63 @@ const deleteAnnouncement = async () => {
           <VSpacer />
           <VBtn variant="tonal" @click="formDialog = false">إلغاء</VBtn>
           <VBtn color="primary" :loading="formLoading" @click="saveAnnouncement">{{ isEditing ? 'حفظ التعديلات' : 'نشر' }}</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- View Details Dialog -->
+    <VDialog v-model="viewDialog" max-width="680" scrollable>
+      <VCard v-if="viewingItem">
+        <VCardTitle class="d-flex align-center justify-space-between flex-wrap gap-2" style="font-family:Cairo,sans-serif">
+          <div class="d-flex align-center gap-2">
+            <span>{{ viewingItem.title }}</span>
+            <VChip v-if="viewingItem.is_pinned" color="error" size="x-small" label>عاجل وهام</VChip>
+          </div>
+          <VChip
+            :color="statusColor[viewingItem.effective_status] ?? 'secondary'"
+            size="small"
+            label
+          >
+            {{ statusLabel[viewingItem.effective_status] ?? 'مسودة' }}
+          </VChip>
+        </VCardTitle>
+        <VCardText>
+          <VImg v-if="viewingItem.image" :src="viewingItem.image" max-height="280" class="mb-4 rounded" cover />
+
+          <VRow dense class="mb-3">
+            <VCol cols="6" md="4">
+              <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">رقم التعميم</span>
+              <span dir="ltr">{{ viewingItem.number || '—' }}</span>
+            </VCol>
+            <VCol cols="6" md="4">
+              <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">التصنيف</span>
+              <span style="font-family:Cairo,sans-serif">{{ viewingItem.category || '—' }}</span>
+            </VCol>
+            <VCol cols="6" md="4">
+              <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">تاريخ النشر</span>
+              <span style="font-family:Cairo,sans-serif">{{ viewingItem.published_at ? new Date(viewingItem.published_at).toLocaleDateString('ar-PS') : '—' }}</span>
+            </VCol>
+          </VRow>
+
+          <VDivider class="mb-4" />
+
+          <div class="text-body-2 mb-4" style="font-family:Cairo,sans-serif" v-html="viewingItem.body" />
+
+          <VBtn
+            v-if="viewingItem.attachment"
+            :href="viewingItem.attachment"
+            target="_blank"
+            variant="tonal"
+            prepend-icon="tabler-paperclip"
+            style="font-family:Cairo,sans-serif"
+          >
+            تحميل المرفق
+          </VBtn>
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" color="primary" @click="viewDialog = false; openEdit(viewingItem)">تعديل</VBtn>
+          <VBtn variant="tonal" @click="viewDialog = false">إغلاق</VBtn>
         </VCardActions>
       </VCard>
     </VDialog>

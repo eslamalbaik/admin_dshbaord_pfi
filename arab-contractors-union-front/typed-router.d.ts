@@ -23,6 +23,7 @@ declare module 'vue-router/auto-routes' {
     'admin-login': RouteRecordInfo<'admin-login', '/admin/login', Record<never, never>, Record<never, never>>,
     'analytics': RouteRecordInfo<'analytics', '/analytics', Record<never, never>, Record<never, never>>,
     'announcements': RouteRecordInfo<'announcements', '/announcements', Record<never, never>, Record<never, never>>,
+    'announcements-categories': RouteRecordInfo<'announcements-categories', '/announcements/categories', Record<never, never>, Record<never, never>>,
     'certificate-requests': RouteRecordInfo<'certificate-requests', '/certificate-requests', Record<never, never>, Record<never, never>>,
     'certificates-verify-token': RouteRecordInfo<'certificates-verify-token', '/certificates/verify/:token', { token: ParamValue<true> }, { token: ParamValue<false> }>,
     'contractor-certificate-request': RouteRecordInfo<'contractor-certificate-request', '/contractor/certificate-request', Record<never, never>, Record<never, never>>,

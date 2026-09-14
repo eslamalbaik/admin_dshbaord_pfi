@@ -11,7 +11,54 @@ const search = ref('')
 
 const addDialog = ref(false)
 const addLoading = ref(false)
-const newPenalty = ref({ contractor_id: '', reason: '', amount: '', notes: '' })
+const newPenalty = ref({ contractor_id: null as number | null, reason: '', amount: '', notes: '' })
+
+// ── Snackbar ──────────────────────────────────────
+const snackbar = ref(false)
+const snackbarText = ref('')
+const snackbarColor = ref<'success' | 'error'>('success')
+const notify = (text: string, color: 'success' | 'error' = 'success') => {
+  snackbarText.value = text
+  snackbarColor.value = color
+  snackbar.value = true
+}
+
+// ── Contractor picker (search-as-you-type, like the dues page) ──
+const contractorSearch = ref('')
+const contractorOptions = ref<{ id: number; name: string; membership_number: string }[]>([])
+let contractorTimer: ReturnType<typeof setTimeout> | null = null
+const justSelectedContractor = ref(false)
+
+watch(() => newPenalty.value.contractor_id, () => {
+  justSelectedContractor.value = true
+})
+
+watch(contractorSearch, q => {
+  if (justSelectedContractor.value) {
+    justSelectedContractor.value = false
+    return
+  }
+  if (contractorTimer) clearTimeout(contractorTimer)
+  contractorTimer = setTimeout(async () => {
+    if (!q || q.length < 2) return
+    try {
+      const r = await api.get('/api/v1/contractors', { params: { search: q, per_page: 10 } })
+      contractorOptions.value = (r.data.data ?? r.data.items ?? []).map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        membership_number: c.membership_number,
+      }))
+    }
+    catch {}
+  }, 350)
+})
+
+function openAddDialog() {
+  newPenalty.value = { contractor_id: null, reason: '', amount: '', notes: '' }
+  contractorSearch.value = ''
+  contractorOptions.value = []
+  addDialog.value = true
+}
 
 const headers = [
   { title: 'المقاول', key: 'contractor_name' },
@@ -43,11 +90,12 @@ const addPenalty = async () => {
   try {
     await api.post('/api/v1/penalties', newPenalty.value)
     addDialog.value = false
-    newPenalty.value = { contractor_id: '', reason: '', amount: '', notes: '' }
+    notify('تمت إضافة الغرامة بنجاح.')
     fetchPenalties()
   }
-  catch (err) {
+  catch (err: any) {
     console.error(err)
+    notify(err?.response?.data?.message || 'فشل حفظ الغرامة. تحقق من البيانات المدخلة.', 'error')
   }
   finally {
     addLoading.value = false
@@ -64,7 +112,7 @@ onMounted(fetchPenalties)
         <h1 class="text-h4 font-weight-bold" style="font-family:Cairo,sans-serif">الغرامات والمخالفات</h1>
         <p class="text-body-2 text-medium-emphasis mb-0" style="font-family:Cairo,sans-serif">إدارة غرامات المقاولين والمخالفات المسجّلة</p>
       </div>
-      <VBtn color="primary" prepend-icon="tabler-plus" @click="addDialog = true">
+      <VBtn color="primary" prepend-icon="tabler-plus" @click="openAddDialog">
         إضافة غرامة
       </VBtn>
     </div>
@@ -124,7 +172,16 @@ onMounted(fetchPenalties)
         <VCardText>
           <VRow>
             <VCol cols="12">
-              <VTextField v-model="newPenalty.contractor_id" label="رقم هوية المقاول (ID)" />
+              <VAutocomplete
+                v-model="newPenalty.contractor_id"
+                v-model:search="contractorSearch"
+                :items="contractorOptions"
+                :item-title="(c: any) => `${c.name} (${c.membership_number})`"
+                item-value="id"
+                label="المقاول"
+                placeholder="ابحث بالاسم أو رقم العضوية..."
+                no-data-text="اكتب حرفين على الأقل للبحث"
+              />
             </VCol>
             <VCol cols="12">
               <VTextField v-model="newPenalty.reason" label="سبب الغرامة" />
@@ -140,9 +197,24 @@ onMounted(fetchPenalties)
         <VCardActions>
           <VSpacer />
           <VBtn variant="tonal" @click="addDialog = false">إلغاء</VBtn>
-          <VBtn color="primary" :loading="addLoading" @click="addPenalty">حفظ</VBtn>
+          <VBtn
+            color="primary"
+            :loading="addLoading"
+            :disabled="addLoading || !newPenalty.contractor_id || !newPenalty.reason || !newPenalty.amount"
+            @click="addPenalty"
+          >
+            حفظ
+          </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
+
+    <!-- Feedback Snackbar -->
+    <VSnackbar v-model="snackbar" :timeout="3500" :color="snackbarColor" location="bottom end" variant="elevated">
+      <span style="font-family:Cairo,sans-serif">{{ snackbarText }}</span>
+      <template #actions>
+        <VBtn variant="text" size="small" @click="snackbar = false">إغلاق</VBtn>
+      </template>
+    </VSnackbar>
   </div>
 </template>

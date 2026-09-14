@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\Announcement;
 use App\Models\AnnouncementAcknowledgement;
+use App\Models\AnnouncementCategory;
 use App\Models\Contractor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class AnnouncementController extends Controller
 {
@@ -146,6 +148,19 @@ class AnnouncementController extends Controller
         ]);
     }
 
+    /** رقم تعميم تلقائي تسلسلي بصيغة {السنة}/{الرقم} — يُستخدم فقط لو الأدمن ما أدخل رقماً يدوياً */
+    private function nextAnnouncementNumber(): string
+    {
+        $year = now()->year;
+
+        $lastSeq = Announcement::where('number', 'like', "{$year}/%")
+            ->get(['number'])
+            ->map(fn ($a) => (int) Str::afterLast($a->number, '/'))
+            ->max() ?? 0;
+
+        return "{$year}/" . ($lastSeq + 1);
+    }
+
     // POST /api/v1/admin/announcements
     public function store(Request $request)
     {
@@ -153,6 +168,7 @@ class AnnouncementController extends Controller
             'title'        => 'required|string|max:255',
             'number'       => 'nullable|string|max:100',
             'category'     => 'nullable|string|max:150',
+            'category_id'  => 'nullable|exists:announcement_categories,id',
             'body'         => 'required|string',
             'image'        => 'nullable',
             'attachment'   => 'nullable|file|mimes:pdf,doc,docx|max:10240',
@@ -160,6 +176,15 @@ class AnnouncementController extends Controller
             'is_pinned'    => 'boolean',
             'published_at' => 'nullable|date',
         ]);
+
+        if (empty($validated['number'])) {
+            $validated['number'] = $this->nextAnnouncementNumber();
+        }
+
+        // نُبقي عمود category النصي القديم متزامناً مع التصنيف المُدار — تصفية/تجميع index() الحالية تعتمد عليه
+        if (! empty($validated['category_id'])) {
+            $validated['category'] = AnnouncementCategory::find($validated['category_id'])->name;
+        }
 
         if ($request->hasFile('image')) {
             $validated['image'] = Storage::disk('public')->url($request->file('image')->store('announcements', 'public'));
@@ -196,6 +221,7 @@ class AnnouncementController extends Controller
             'title'        => 'sometimes|string|max:255',
             'number'       => 'nullable|string|max:100',
             'category'     => 'nullable|string|max:150',
+            'category_id'  => 'nullable|exists:announcement_categories,id',
             'body'         => 'sometimes|string',
             'image'        => 'nullable',
             'attachment'   => 'nullable|file|mimes:pdf,doc,docx|max:10240',
@@ -203,6 +229,10 @@ class AnnouncementController extends Controller
             'is_pinned'    => 'boolean',
             'published_at' => 'nullable|date',
         ]);
+
+        if (array_key_exists('category_id', $validated) && $validated['category_id']) {
+            $validated['category'] = AnnouncementCategory::find($validated['category_id'])->name;
+        }
 
         if ($request->hasFile('image')) {
             $validated['image'] = Storage::disk('public')->url($request->file('image')->store('announcements', 'public'));

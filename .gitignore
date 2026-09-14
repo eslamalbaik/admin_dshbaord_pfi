@@ -8,3 +8,9 @@ arab-contractors-union-front/stats.html
 # ─── ملفات مؤقتة على مستوى المستودع ───
 *.tar.gz
 *.sql
+
+# ─── ملفات عمل محلية لا تخصّ الكود ───
+/*.apk
+/*.docx
+/postman_paths.txt
+/error_log*

@@ -24,7 +24,24 @@ class ArchiveExpiredTenders extends Command
 
         $archivedCount = $expiredBase()->whereNull('archived_at')->update(['archived_at' => now()]);
 
-        Log::channel('reminders')->info('tenders.archived', ['archived' => $archivedCount, 'closed' => $closedCount]);
+        // مزامنة display_status مع status بعد الإغلاق التلقائي أعلاه (وأي إغلاق/إلغاء يدوي لم يُطابَق بعد)
+        $displayClosedCount = Tender::whereIn('status', ['closed', 'cancelled'])
+            ->where('display_status', '!=', 'closed')
+            ->update(['display_status' => 'closed']);
+
+        // دخول نافذة "ينتهي قريباً" — تحوّل زمني بحت، دون أي تغيير على status الإداري
+        $displayClosingSoonCount = Tender::whereNotIn('status', ['closed', 'cancelled'])
+            ->whereNotNull('deadline')
+            ->whereBetween('deadline', [now()->toDateString(), now()->addDays(Tender::CLOSING_SOON_DAYS)->toDateString()])
+            ->whereNotIn('display_status', ['closing_soon', 'closed'])
+            ->update(['display_status' => 'closing_soon']);
+
+        Log::channel('reminders')->info('tenders.archived', [
+            'archived' => $archivedCount,
+            'closed' => $closedCount,
+            'display_closed' => $displayClosedCount,
+            'display_closing_soon' => $displayClosingSoonCount,
+        ]);
         $this->info("تمت أرشفة {$archivedCount} عطاء، وإغلاق {$closedCount} منها تلقائياً.");
 
         return self::SUCCESS;

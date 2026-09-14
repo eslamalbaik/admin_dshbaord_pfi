@@ -9,6 +9,8 @@ use App\Models\Contractor;
 use App\Models\Event;
 use App\Models\EventRegistration;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 class EventController extends Controller
 {
@@ -184,32 +186,74 @@ class EventController extends Controller
         return $this->paginated($query->paginate(15));
     }
 
-    // POST /api/v1/admin/events
-    public function store(Request $request)
+    // القواعد المشتركة بين store/update لحقول الفعالية (باستثناء title/body اللي تختلف required/sometimes)
+    private function eventRules(): array
     {
-        $validated = $request->validate([
-            'title'          => 'required|string|max:255',
-            'excerpt'        => 'nullable|string|max:500',
-            'body'           => 'required|string',
+        return [
             'image'          => 'nullable',
             'video_url'      => 'nullable|url|max:500',
             'external_url'   => 'nullable|url|max:500',
-            'gallery'        => 'nullable|array',
             'is_published'   => 'boolean',
             'published_at'   => 'nullable|date',
             'event_date'     => 'nullable|date',
-            'event_location' => 'nullable|string|max:255',
+            // مكان الفعالية إلزامي فقط لو نوع الحضور "وجاهي" (بند 9ج)
+            'event_location' => 'required_if:event_format,onsite|nullable|string|max:255',
             'event_format'      => 'nullable|in:onsite,online,hybrid',
-            'is_international'  => 'boolean',
+            'event_type'        => ['nullable', Rule::in(Event::EVENT_TYPES)],
             'stream_url'        => 'nullable|url|max:500',
-            'speakers'          => 'nullable|array',
-            'speakers.*.name'   => 'required_with:speakers|string|max:255',
-            'speakers.*.title'  => 'nullable|string|max:255',
-            'speakers.*.photo'  => 'nullable|url|max:500',
-            'speakers.*.is_keynote' => 'boolean',
-        ]);
+            'speakers'                  => 'nullable|array',
+            'speakers.*.name'           => 'required_with:speakers|string|max:255',
+            'speakers.*.title'          => 'nullable|string|max:255',
+            // رابط الصورة الحالي (يبقى كما هو لو ما رُفعت صورة جديدة له عبر speaker_photos[])
+            'speakers.*.photo'          => 'nullable|string|max:500',
+            'speakers.*.is_keynote'     => 'boolean',
+            'speaker_photos.*'          => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
+        ];
+    }
+
+    // يرفع صور المتحدثين المُرسَلة عبر speaker_photos[index] ويدمجها بمصفوفة speakers بنفس الفهرس،
+    // ثم يضمن وجود متحدث رئيسي واحد كحد أقصى (بند 9و) — آخر true بالترتيب يفوز لو أُرسل أكثر من واحد
+    private function mergeSpeakerPhotosAndEnforceSingleKeynote(Request $request, array &$validated): void
+    {
+        if ($request->hasFile('speaker_photos')) {
+            foreach ($request->file('speaker_photos') as $index => $file) {
+                if (! $file || ! isset($validated['speakers'][$index]))
+                    continue;
+
+                $path = $file->store('events/speakers', 'public');
+                $validated['speakers'][$index]['photo'] = Storage::disk('public')->url($path);
+            }
+        }
+
+        if (! empty($validated['speakers'])) {
+            $keynoteIndex = null;
+            foreach ($validated['speakers'] as $i => $sp) {
+                if (! empty($sp['is_keynote']))
+                    $keynoteIndex = $i;
+            }
+            foreach ($validated['speakers'] as $i => &$sp) {
+                $sp['is_keynote'] = $keynoteIndex !== null && $i === $keynoteIndex;
+            }
+            unset($sp);
+        }
+    }
+
+    // POST /api/v1/admin/events
+    public function store(Request $request)
+    {
+        $validated = $request->validate(array_merge([
+            'title' => 'required|string|max:255',
+            'excerpt' => 'nullable|string|max:500',
+            'body' => 'required|string',
+            'is_international' => 'boolean',
+        ], $this->eventRules()));
 
         $this->handleMediaUploads($request, $validated, null, 'events', 'events/gallery');
+        // فعاليات: صورة رئيسية واحدة فقط، لا معرض صور (بند 9د) — handleMediaUploads يقرأ الملفات من
+        // الـrequest مباشرة بغض النظر عن قواعد validate، فلازم نُسقط أي gallery بعد المعالجة صراحةً
+        unset($validated['gallery']);
+
+        $this->mergeSpeakerPhotosAndEnforceSingleKeynote($request, $validated);
 
         $validated['slug']       = Event::generateSlug($validated['title']);
         $validated['created_by'] = $request->user()->id;
@@ -234,31 +278,17 @@ class EventController extends Controller
     // PUT /api/v1/admin/events/{id}
     public function update(Request $request, Event $event)
     {
-        $validated = $request->validate([
-            'title'          => 'sometimes|string|max:255',
-            'excerpt'        => 'nullable|string|max:500',
-            'body'           => 'sometimes|string',
-            'image'          => 'nullable',
-            'video_url'      => 'nullable|url|max:500',
-            'external_url'   => 'nullable|url|max:500',
-            'gallery'        => 'nullable|array',
-            'remove_gallery'   => 'nullable|array',
-            'remove_gallery.*' => 'string',
-            'is_published'   => 'boolean',
-            'published_at'   => 'nullable|date',
-            'event_date'     => 'nullable|date',
-            'event_location' => 'nullable|string|max:255',
-            'event_format'      => 'nullable|in:onsite,online,hybrid',
-            'is_international'  => 'boolean',
-            'stream_url'        => 'nullable|url|max:500',
-            'speakers'          => 'nullable|array',
-            'speakers.*.name'   => 'required_with:speakers|string|max:255',
-            'speakers.*.title'  => 'nullable|string|max:255',
-            'speakers.*.photo'  => 'nullable|url|max:500',
-            'speakers.*.is_keynote' => 'boolean',
-        ]);
+        $validated = $request->validate(array_merge([
+            'title' => 'sometimes|string|max:255',
+            'excerpt' => 'nullable|string|max:500',
+            'body' => 'sometimes|string',
+            'is_international' => 'boolean',
+        ], $this->eventRules()));
 
         $this->handleMediaUploads($request, $validated, $event, 'events', 'events/gallery');
+        unset($validated['gallery']);
+
+        $this->mergeSpeakerPhotosAndEnforceSingleKeynote($request, $validated);
 
         if (isset($validated['title']))
             $validated['slug'] = Event::generateSlug($validated['title']);

@@ -1,0 +1,6082 @@
+{
+	"info": {
+		"name": "Admin Dashboard API",
+		"_postman_id": "arab-contractors-union-contractor-app-2026-admin",
+		"description": "# Arab Contractors Union API v1\n\n## نموذج الاستجابة الموحد (Unified Response)\nكل الاستجابات — نجاح أو خطأ بما فيها 401/404/422/429/500 — تعود بالهيكل:\n```json\n{\n  \"status\": true,          // false عند أي خطأ\n  \"message\": \"رسالة واضحة بالعربية\",\n  \"status_code\": 200,\n  \"items\": { },            // البيانات (عند النجاح فقط)\n  \"errors\": { }            // تفاصيل أخطاء الحقول (عند 422 فقط)\n}\n```\n\n## هيكلية رقم العضوية المعتمدة\n- **الأعضاء القدامى:** رقم فقط من `1` إلى `927`\n- **الأعضاء الجدد:** رقم يليه `_g` بدءاً من `928_g` (مثال: `930_g`)\n- أي صيغة أخرى مرفوضة.\n\n## إرسال البيانات\nكل طلبات POST تستقبل **Form-Data** (وليس Raw JSON).\n\n## رسائل أخطاء تسجيل الدخول\n| الحالة | الكود | الرسالة |\n|---|---|---|\n| رقم عضوية غير موجود | 404 | لا توجد لديك عضوية في الاتحاد |\n| كلمة مرور خاطئة | 401 | بيانات الاعتماد غير صحيحة |\n| حساب مجمد/معلق | 403 | رسالة مخصصة |\n| جوال غير مفعّل | 403 | لم يتم تفعيل رقم جوالك بعد... |",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "https://api.pcu.org.ps/api/v1",
+			"type": "string"
+		},
+		{
+			"key": "contractor_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "equipment_id",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "tender_id",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "membership_number",
+			"value": "928_g",
+			"type": "string",
+			"description": "رقم عضوية اليوزر الاختباري (هيكلية جديدة)"
+		},
+		{
+			"key": "password",
+			"value": "Test@12345",
+			"type": "string",
+			"description": "كلمة مرور اليوزر الاختباري"
+		},
+		{
+			"key": "bank_account_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "ticket_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "news_slug",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "phone",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "page_slug",
+			"value": "about-us"
+		},
+		{
+			"key": "admin_token",
+			"value": "",
+			"type": "string",
+			"description": "Bearer token لمستخدم أدمن — يُجلب من POST /api/v1/auth/login (email/password)"
+		},
+		{
+			"key": "announcement_id",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "legal_file_id",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "term_id",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "contractor_id",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "due_id",
+			"value": "1"
+		},
+		{
+			"key": "membership_record_id",
+			"value": "1"
+		},
+		{
+			"key": "event_id",
+			"value": "1"
+		},
+		{
+			"key": "event_slug",
+			"value": ""
+		},
+		{
+			"key": "equipment_type_id",
+			"value": "1"
+		},
+		{
+			"key": "equipment_package_id",
+			"value": "1"
+		},
+		{
+			"key": "equipment_report_id",
+			"value": "1"
+		},
+		{
+			"key": "payment_id",
+			"value": "1"
+		},
+		{
+			"key": "news_id",
+			"value": "1"
+		},
+		{
+			"key": "page_id",
+			"value": "1"
+		},
+		{
+			"key": "certificate_request_id",
+			"value": "1"
+		},
+		{
+			"key": "name_change_request_id",
+			"value": "1"
+		},
+		{
+			"key": "profile_update_request_id",
+			"value": "1"
+		},
+		{
+			"key": "penalty_id",
+			"value": "1"
+		},
+		{
+			"key": "document_id",
+			"value": "1"
+		},
+		{
+			"key": "notification_id",
+			"value": "1"
+		},
+		{
+			"key": "blocked_date_id",
+			"value": "1"
+		},
+		{
+			"key": "equipment_image_id",
+			"value": "1"
+		},
+		{
+			"key": "grade_fee_id",
+			"value": "1"
+		},
+		{
+			"key": "attachment_id",
+			"value": "1"
+		},
+		{
+			"key": "certificate_token",
+			"value": ""
+		}
+	],
+	"item": [
+		{
+			"name": "🔑 Admin Dashboard",
+			"description": "راوتات لوحة تحكم الأدمن (auth:sanctum) — استخدم {{admin_token}} كـ Bearer، يُجلب من POST {{base_url}}/auth/login بحساب أدمن (email/password).",
+			"item": [
+				{
+					"name": "Announcements",
+					"item": [
+						{
+							"name": "List Announcements (Admin)",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/announcements?search=&category=&is_pinned=&is_published=",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"admin",
+										"announcements"
+									],
+									"query": [
+										{
+											"key": "search",
+											"value": "",
+											"type": "text",
+											"description": "بحث بالعنوان أو رقم التعميم"
+										},
+										{
+											"key": "category",
+											"value": "",
+											"type": "text",
+											"description": "فلترة بتصنيف محدد"
+										},
+										{
+											"key": "is_pinned",
+											"value": "",
+											"type": "text",
+											"description": "1 = عاجل وهام فقط"
+										},
+										{
+											"key": "is_published",
+											"value": "",
+											"type": "text",
+											"description": "1 = منشور | 0 = مسودة"
+										}
+									]
+								},
+								"description": "**GET** `/api/v1/admin/announcements` — *أدمن (auth:sanctum)*\n\nقائمة كل التعميمات (منشورة ومسودات)، مُرقّمة (15/صفحة).\n\n**النجاح 200:** `items` + `meta.categories` (قائمة كل التصنيفات المستخدمة حالياً، لبناء select بلوحة التحكم)."
+							}
+						},
+						{
+							"name": "Create Announcement",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/announcements",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"admin",
+										"announcements"
+									]
+								},
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "title",
+											"value": "تحديث اشتراطات السلامة المهنية",
+											"type": "text"
+										},
+										{
+											"key": "number",
+											"value": "2026/108",
+											"type": "text"
+										},
+										{
+											"key": "category",
+											"value": "تعميمات الشؤون الفنية والتصنيف",
+											"type": "text"
+										},
+										{
+											"key": "body",
+											"value": "نص التعميم الكامل...",
+											"type": "text"
+										},
+										{
+											"key": "is_published",
+											"value": "1",
+											"type": "text"
+										},
+										{
+											"key": "is_pinned",
+											"value": "1",
+											"type": "text",
+											"description": "1 = عاجل وهام — يظهر Pop-up لمرة واحدة بتطبيق المقاول"
+										},
+										{
+											"key": "published_at",
+											"value": "",
+											"type": "text",
+											"description": "اختياري — الآن افتراضياً",
+											"disabled": true
+										},
+										{
+											"key": "image",
+											"value": "",
+											"type": "file",
+											"disabled": true
+										},
+										{
+											"key": "attachment",
+											"value": "",
+											"type": "file",
+											"description": "PDF/DOC/DOCX — حتى 10MB",
+											"disabled": true
+										}
+									]
+								},
+								"description": "**POST** `/api/v1/admin/announcements` — *أدمن*\n\n`multipart/form-data`. عند `is_published=1` يُبعث Push Notification لكل المقاولين."
+							}
+						},
+						{
+							"name": "Update Announcement",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/announcements/{{announcement_id}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"admin",
+										"announcements",
+										"{{announcement_id}}"
+									]
+								},
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "_method",
+											"value": "PUT",
+											"type": "text"
+										},
+										{
+											"key": "title",
+											"value": "عنوان محدَّث",
+											"type": "text"
+										},
+										{
+											"key": "number",
+											"value": "2026/108",
+											"type": "text"
+										},
+										{
+											"key": "category",
+											"value": "تعميمات الشؤون الفنية والتصنيف",
+											"type": "text"
+										},
+										{
+											"key": "body",
+											"value": "نص محدَّث",
+											"type": "text"
+										},
+										{
+											"key": "is_published",
+											"value": "1",
+											"type": "text"
+										},
+										{
+											"key": "is_pinned",
+											"value": "0",
+											"type": "text"
+										},
+										{
+											"key": "image",
+											"value": "",
+											"type": "file",
+											"disabled": true
+										},
+										{
+											"key": "attachment",
+											"value": "",
+											"type": "file",
+											"disabled": true
+										}
+									]
+								},
+								"description": "**PUT** `/api/v1/admin/announcements/{id}` (مُرسلة كـ POST + `_method=PUT` لدعم رفع ملفات) — *أدمن*"
+							}
+						},
+						{
+							"name": "Delete Announcement",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/announcements/{{announcement_id}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"admin",
+										"announcements",
+										"{{announcement_id}}"
+									]
+								},
+								"description": "**DELETE** `/api/v1/admin/announcements/{id}` — *أدمن* (Soft delete)"
+							}
+						}
+					]
+				},
+				{
+					"name": "Legal Library",
+					"item": [
+						{
+							"name": "List Legal Files (Admin)",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/legal-files?category=&search=",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"legal-files"
+									],
+									"query": [
+										{
+											"key": "category",
+											"value": "",
+											"type": "text",
+											"description": "legislation | mou | other"
+										},
+										{
+											"key": "search",
+											"value": "",
+											"type": "text",
+											"description": "بحث بالعنوان"
+										}
+									]
+								},
+								"description": "**GET** `/api/v1/dashboard/legal-files` — *أدمن*\n\nقائمة مُرقّمة (20/صفحة) — كل ملف فيها `is_featured` (الأكثر طلباً)."
+							}
+						},
+						{
+							"name": "Upload Legal File",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/legal-files",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"legal-files"
+									]
+								},
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "title",
+											"value": "الشروط العامة لعقد المقاولة",
+											"type": "text"
+										},
+										{
+											"key": "title_en",
+											"value": "",
+											"type": "text",
+											"disabled": true
+										},
+										{
+											"key": "description",
+											"value": "",
+											"type": "text",
+											"disabled": true
+										},
+										{
+											"key": "description_en",
+											"value": "",
+											"type": "text",
+											"disabled": true
+										},
+										{
+											"key": "category",
+											"value": "legislation",
+											"type": "text",
+											"description": "legislation | mou | other"
+										},
+										{
+											"key": "sort",
+											"value": "0",
+											"type": "text"
+										},
+										{
+											"key": "is_active",
+											"value": "1",
+											"type": "text"
+										},
+										{
+											"key": "is_featured",
+											"value": "0",
+											"type": "text",
+											"description": "1 = يظهر بقسم \"الأكثر طلباً\""
+										},
+										{
+											"key": "file",
+											"value": "",
+											"type": "file",
+											"description": "PDF/DOC/DOCX/XLS/XLSX/PPT/PPTX — حتى 50MB"
+										}
+									]
+								},
+								"description": "**POST** `/api/v1/dashboard/legal-files` — *أدمن*"
+							}
+						},
+						{
+							"name": "Update Legal File",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/legal-files/{{legal_file_id}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"legal-files",
+										"{{legal_file_id}}"
+									]
+								},
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "_method",
+											"value": "PUT",
+											"type": "text"
+										},
+										{
+											"key": "title",
+											"value": "عنوان محدَّث",
+											"type": "text"
+										},
+										{
+											"key": "category",
+											"value": "legislation",
+											"type": "text"
+										},
+										{
+											"key": "sort",
+											"value": "0",
+											"type": "text"
+										},
+										{
+											"key": "is_active",
+											"value": "1",
+											"type": "text"
+										},
+										{
+											"key": "is_featured",
+											"value": "1",
+											"type": "text"
+										},
+										{
+											"key": "file",
+											"value": "",
+											"type": "file",
+											"description": "اختياري — استبدال الملف الحالي",
+											"disabled": true
+										}
+									]
+								},
+								"description": "**PUT** `/api/v1/dashboard/legal-files/{id}` (POST + `_method=PUT`) — *أدمن*"
+							}
+						},
+						{
+							"name": "Delete Legal File",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/legal-files/{{legal_file_id}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"legal-files",
+										"{{legal_file_id}}"
+									]
+								},
+								"description": "**DELETE** `/api/v1/dashboard/legal-files/{id}` — *أدمن* (يحذف الملف من التخزين أيضاً)"
+							}
+						}
+					]
+				},
+				{
+					"name": "Terms & Privacy Policy",
+					"item": [
+						{
+							"name": "List (all types)",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/terms",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"terms"
+									]
+								},
+								"description": "**GET** `/api/v1/dashboard/terms` — *أدمن*\n\nكل الفقرات (terms + privacy) بدون فلترة."
+							}
+						},
+						{
+							"name": "List (filter by type)",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/terms?type=privacy",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"terms"
+									],
+									"query": [
+										{
+											"key": "type",
+											"value": "privacy",
+											"type": "text",
+											"description": "terms | privacy"
+										}
+									]
+								},
+								"description": "**GET** `/api/v1/dashboard/terms?type=privacy` — *أدمن*"
+							}
+						},
+						{
+							"name": "Create Term",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/terms",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"terms"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"type\": \"terms\",\n  \"title\": \"بند جديد\",\n  \"title_en\": \"New clause\",\n  \"body\": \"نص البند بالعربي\",\n  \"body_en\": \"Clause body in English\",\n  \"sort\": 0,\n  \"is_active\": true\n}"
+								},
+								"description": "**POST** `/api/v1/dashboard/terms` — *أدمن*\n\n`type` اختياري (افتراضي `terms`) — مرّر `\"privacy\"` لإضافة فقرة سياسة خصوصية."
+							}
+						},
+						{
+							"name": "Update Term",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/terms/{{term_id}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"terms",
+										"{{term_id}}"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"type\": \"privacy\",\n  \"title\": \"عنوان محدَّث\",\n  \"body\": \"نص محدَّث\",\n  \"sort\": 1,\n  \"is_active\": true\n}"
+								},
+								"description": "**PUT** `/api/v1/dashboard/terms/{id}` — *أدمن*\n\nيقدر يحوّل الفقرة بين `terms` و`privacy` بتغيير `type`."
+							}
+						},
+						{
+							"name": "Delete Term",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/terms/{{term_id}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"terms",
+										"{{term_id}}"
+									]
+								},
+								"description": "**DELETE** `/api/v1/dashboard/terms/{id}` — *أدمن*"
+							}
+						}
+					]
+				},
+				{
+					"name": "Contractors",
+					"item": [
+						{
+							"name": "List Contractors",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/contractors?search=&status=&page=1&per_page=10",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"contractors"
+									],
+									"query": [
+										{
+											"key": "search",
+											"value": "",
+											"type": "text",
+											"description": "بحث بالاسم/رقم الرخصة/البريد/رقم العضوية/السجل التجاري"
+										},
+										{
+											"key": "status",
+											"value": "",
+											"type": "text",
+											"description": "active | pending | expired | suspended"
+										},
+										{
+											"key": "page",
+											"value": "1",
+											"type": "text"
+										},
+										{
+											"key": "per_page",
+											"value": "10",
+											"type": "text"
+										}
+									]
+								},
+								"description": "**GET** `/api/v1/contractors` — *أدمن/محاسب* — قائمة مُرقّمة."
+							}
+						},
+						{
+							"name": "Next Membership Number",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/contractors/next-membership-number",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"contractors",
+										"next-membership-number"
+									]
+								},
+								"description": "**GET** `/api/v1/contractors/next-membership-number` — *أدمن* — رقم العضوية التالي (تسلسل جديد `{n}_g` بدءًا من 928).\n\n**ملاحظة:** المسار الثابت هذا مُعرَّف قبل `apiResource('contractors', ...)` بالكود حتى لا يُلتقط `next-membership-number` كمعرّف `{contractor}`."
+							}
+						},
+						{
+							"name": "Create Contractor (multipart)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/contractors",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"contractors"
+									]
+								},
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "name",
+											"value": "شركة اختبار للمقاولات",
+											"type": "text"
+										},
+										{
+											"key": "membership_number",
+											"value": "930_g",
+											"type": "text"
+										},
+										{
+											"key": "commercial_register",
+											"value": "123456789",
+											"type": "text"
+										},
+										{
+											"key": "license_number",
+											"value": "12345",
+											"type": "text"
+										},
+										{
+											"key": "phone",
+											"value": "0599123456",
+											"type": "text"
+										},
+										{
+											"key": "email",
+											"value": "test-contractor@example.com",
+											"type": "text"
+										},
+										{
+											"key": "address",
+											"value": "غزة - الرمال",
+											"type": "text"
+										},
+										{
+											"key": "owner_name",
+											"value": "أحمد محمد",
+											"type": "text"
+										},
+										{
+											"key": "authorized_person",
+											"value": "أحمد محمد",
+											"type": "text"
+										},
+										{
+											"key": "established_date",
+											"value": "2020-01-01",
+											"type": "text"
+										},
+										{
+											"key": "specialties",
+											"value": "[{\"field_lk_type\":20,\"specialization_lk_type\":20,\"classification\":\"ثالثة\"}]",
+											"type": "text"
+										},
+										{
+											"key": "cr_file",
+											"type": "file",
+											"src": [],
+											"disabled": true
+										}
+									]
+								},
+								"description": "**POST** `/api/v1/contractors` — *أدمن* — تسجيل مقاول جديد من لوحة التحكم.\n\n`membership_number`/`commercial_register`/`license_number`/`email`/`phone` فريدة — الحذف soft-delete يُحرّرها تلقائيًا (يُلحق بها `_deleted_{id}` عند الحذف)."
+							}
+						},
+						{
+							"name": "Get Contractor",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/contractors/{{contractor_id}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"contractors",
+										"{{contractor_id}}"
+									]
+								},
+								"description": "**GET** `/api/v1/contractors/{id}` — *أدمن*"
+							}
+						},
+						{
+							"name": "Update Contractor (multipart)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/contractors/{{contractor_id}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"contractors",
+										"{{contractor_id}}"
+									]
+								},
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "_method",
+											"value": "PUT",
+											"type": "text",
+											"description": "Laravel method-spoofing — الفورم multipart لدعم رفع الملفات"
+										},
+										{
+											"key": "name",
+											"value": "شركة اختبار للمقاولات",
+											"type": "text"
+										},
+										{
+											"key": "membership_number",
+											"value": "930_g",
+											"type": "text"
+										},
+										{
+											"key": "commercial_register",
+											"value": "123456789",
+											"type": "text"
+										},
+										{
+											"key": "owner_name",
+											"value": "أحمد محمد",
+											"type": "text"
+										},
+										{
+											"key": "authorized_person",
+											"value": "أحمد محمد",
+											"type": "text"
+										}
+									]
+								},
+								"description": "**POST** `/api/v1/contractors/{id}` مع `_method=PUT` — *أدمن* — نفس أسلوب لوحة التحكم (POST + method-spoofing لدعم multipart) بدل PUT مباشر."
+							}
+						},
+						{
+							"name": "Change Status",
+							"request": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/contractors/{{contractor_id}}/status",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"contractors",
+										"{{contractor_id}}",
+										"status"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"status\": \"active\"\n}"
+								},
+								"description": "**PATCH** `/api/v1/contractors/{id}/status` — *أدمن* — `status`: active | pending | expired | suspended."
+							}
+						},
+						{
+							"name": "Generate QR",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/contractors/{{contractor_id}}/qr",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"contractors",
+										"{{contractor_id}}",
+										"qr"
+									]
+								},
+								"description": "**POST** `/api/v1/contractors/{id}/qr` — *أدمن* — يولّد QR صالح 24 ساعة."
+							}
+						},
+						{
+							"name": "Delete Contractor",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/contractors/{{contractor_id}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"contractors",
+										"{{contractor_id}}"
+									]
+								},
+								"description": "**DELETE** `/api/v1/contractors/{id}` — *أدمن* — حذف ناعم (soft-delete). الحقول الفريدة (phone/email/license_number/commercial_register/membership_number) تُلحَق بلاحقة `_deleted_{id}` تلقائيًا حتى تتحرر لإعادة الاستخدام."
+							}
+						}
+					]
+				},
+				{
+					"name": "App Settings",
+					"item": [
+						{
+							"name": "Get Settings",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/settings",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"settings"
+									]
+								},
+								"description": "**GET** `/api/v1/dashboard/settings` — *أدمن* — كل الإعدادات key/value (union_name, union_logo, social_*, ...)."
+							}
+						},
+						{
+							"name": "Update Settings",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/settings",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"settings"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"settings\": [\n    { \"key\": \"union_name\", \"value\": \"اتحاد المقاولين الفلسطينيين - غزة\", \"group\": \"about\" },\n    { \"key\": \"support_whatsapp\", \"value\": \"+970599123456\", \"group\": \"contact\" }\n  ]\n}"
+								},
+								"description": "**PUT** `/api/v1/dashboard/settings` — *أدمن* — تحديث مجموعة إعدادات دفعة واحدة. لا يشمل `union_logo`/`union_cover_image` — لهم مسار رفع منفصل."
+							}
+						},
+						{
+							"name": "Upload Logo",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/settings/logo",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"settings",
+										"logo"
+									]
+								},
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "logo",
+											"type": "file",
+											"src": [],
+											"description": "png/jpg/jpeg/svg/webp — حتى 2 ميجا"
+										}
+									]
+								},
+								"description": "**POST** `/api/v1/dashboard/settings/logo` — *أدمن* — يستبدل الشعار الحالي (يحذف القديم من التخزين)."
+							}
+						},
+						{
+							"name": "Upload Cover Image",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/settings/cover-image",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"settings",
+										"cover-image"
+									]
+								},
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "cover_image",
+											"type": "file",
+											"src": [],
+											"description": "png/jpg/jpeg/webp — حتى 4 ميجا"
+										}
+									]
+								},
+								"description": "**POST** `/api/v1/dashboard/settings/cover-image` — *أدمن* — صورة غلاف شاشة \"عن الاتحاد\" بالتطبيق."
+							}
+						}
+					]
+				},
+				{
+					"name": "Support Tickets (Admin)",
+					"item": [
+						{
+							"name": "List Support Tickets (Admin)",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/support-tickets?status=&category=&search=",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"support-tickets"
+									],
+									"query": [
+										{
+											"key": "status",
+											"value": "",
+											"type": "text",
+											"description": "open | in_progress | answered | closed"
+										},
+										{
+											"key": "category",
+											"value": "",
+											"type": "text",
+											"description": "technical | complaint | inquiry | suggestion | other"
+										},
+										{
+											"key": "search",
+											"value": "",
+											"type": "text",
+											"description": "بحث بالعنوان أو اسم المقاول"
+										}
+									]
+								},
+								"description": "**GET** `/api/v1/dashboard/support-tickets` — *أدمن* — قائمة مُرقّمة (15/صفحة)."
+							}
+						},
+						{
+							"name": "Get Support Ticket (Admin)",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/support-tickets/{{ticket_id}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"support-tickets",
+										"{{ticket_id}}"
+									]
+								},
+								"description": "**GET** `/api/v1/dashboard/support-tickets/{id}` — *أدمن*"
+							}
+						},
+						{
+							"name": "Reply to Support Ticket (Admin)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/support-tickets/{{ticket_id}}/reply",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"support-tickets",
+										"{{ticket_id}}",
+										"reply"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"reply\": \"تم حل المشكلة، الرجاء إعادة تسجيل الدخول.\"\n}"
+								},
+								"description": "**POST** `/api/v1/dashboard/support-tickets/{id}/reply` — *أدمن* — يرسل بريد + إشعار داخل التطبيق للمقاول."
+							}
+						},
+						{
+							"name": "Update Ticket Status (Admin)",
+							"request": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/support-tickets/{{ticket_id}}/status",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"support-tickets",
+										"{{ticket_id}}",
+										"status"
+									]
+								},
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"status\": \"in_progress\"\n}"
+								},
+								"description": "**PATCH** `/api/v1/dashboard/support-tickets/{id}/status` — *أدمن* — status: open | in_progress | answered | closed."
+							}
+						},
+						{
+							"name": "Delete Support Ticket (Admin)",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{admin_token}}"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/dashboard/support-tickets/{{ticket_id}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"dashboard",
+										"support-tickets",
+										"{{ticket_id}}"
+									]
+								},
+								"description": "**DELETE** `/api/v1/dashboard/support-tickets/{id}` — *أدمن*"
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "🔑 Admin Auth",
+			"item": [
+				{
+					"name": "Admin Login",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/auth/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
+						},
+						"description": "Admin/staff login",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"Test@12345\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Admin Register",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/auth/register",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"register"
+							]
+						},
+						"description": "Admin/staff register",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Admin\",\n  \"email\": \"admin@example.com\",\n  \"password\": \"Test@12345\",\n  \"password_confirmation\": \"Test@12345\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Google Redirect",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/auth/google/redirect",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"google",
+								"redirect"
+							]
+						},
+						"description": "Redirect to Google OAuth"
+					},
+					"response": []
+				},
+				{
+					"name": "Google Exchange",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/auth/google/exchange",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"google",
+								"exchange"
+							]
+						},
+						"description": "Exchange google code for token",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Admin Logout",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/auth/logout",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"logout"
+							]
+						},
+						"description": "Admin logout"
+					},
+					"response": []
+				},
+				{
+					"name": "Admin Me",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/auth/me",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"me"
+							]
+						},
+						"description": "Get authenticated admin"
+					},
+					"response": []
+				},
+				{
+					"name": "Current User",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/user",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"user"
+							]
+						},
+						"description": "Get current authenticated user"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "🔐 Contractor Auth (Extra)",
+			"item": [
+				{
+					"name": "Update Profile (PATCH)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/auth/profile",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"auth",
+								"profile"
+							]
+						},
+						"description": "Partial profile update",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"address\": \"New Address\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Logo",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/auth/logo",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"auth",
+								"logo"
+							]
+						},
+						"description": "Upload contractor logo",
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "logo",
+									"type": "file",
+									"src": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Name Change Request - Get",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/auth/name-change-request",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"auth",
+								"name-change-request"
+							]
+						},
+						"description": "Get current name change request"
+					},
+					"response": []
+				},
+				{
+					"name": "Name Change Request - Submit",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/auth/name-change-request",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"auth",
+								"name-change-request"
+							]
+						},
+						"description": "Submit a name change request",
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "new_name",
+									"value": "New Company Name",
+									"type": "text"
+								},
+								{
+									"key": "document",
+									"type": "file",
+									"src": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Notifications - List",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/auth/notifications",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"auth",
+								"notifications"
+							]
+						},
+						"description": "List contractor notifications"
+					},
+					"response": []
+				},
+				{
+					"name": "Notifications - Unread Count",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/auth/notifications/unread-count",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"auth",
+								"notifications",
+								"unread-count"
+							]
+						},
+						"description": "Get unread notifications count"
+					},
+					"response": []
+				},
+				{
+					"name": "Notifications - Mark All Read",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/auth/notifications/read",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"auth",
+								"notifications",
+								"read"
+							]
+						},
+						"description": "Mark all notifications as read"
+					},
+					"response": []
+				},
+				{
+					"name": "Notifications - Mark One Read",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/auth/notifications/{{notification_id}}/mark-as-read",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"auth",
+								"notifications",
+								"{{notification_id}}",
+								"mark-as-read"
+							]
+						},
+						"description": "Mark a single notification as read"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📰 Admin News",
+			"item": [
+				{
+					"name": "List News (Admin)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/admin/news",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"admin",
+								"news"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Create News",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/admin/news",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"admin",
+								"news"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "title",
+									"value": "News title",
+									"type": "text"
+								},
+								{
+									"key": "body",
+									"value": "News body",
+									"type": "text"
+								},
+								{
+									"key": "image",
+									"type": "file",
+									"src": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update News",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/admin/news/{{news_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"admin",
+								"news",
+								"{{news_id}}"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Updated title\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete News",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/admin/news/{{news_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"admin",
+								"news",
+								"{{news_id}}"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📅 Admin Events",
+			"item": [
+				{
+					"name": "List Events (Admin)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/admin/events",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"admin",
+								"events"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Create Event",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/admin/events",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"admin",
+								"events"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "title",
+									"value": "Event title",
+									"type": "text"
+								},
+								{
+									"key": "date",
+									"value": "2026-01-01",
+									"type": "text"
+								},
+								{
+									"key": "image",
+									"type": "file",
+									"src": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Event",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/admin/events/{{event_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"admin",
+								"events",
+								"{{event_id}}"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Updated event\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Event",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/admin/events/{{event_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"admin",
+								"events",
+								"{{event_id}}"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Event Attendees",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/admin/events/{{event_id}}/attendees",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"admin",
+								"events",
+								"{{event_id}}",
+								"attendees"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📢 Admin Announcements (Extra)",
+			"item": [
+				{
+					"name": "Create Announcement (JSON)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/admin/announcements",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"admin",
+								"announcements"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Announcement\",\n  \"body\": \"...\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Announcement (PUT)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/admin/announcements/{{announcement_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"admin",
+								"announcements",
+								"{{announcement_id}}"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Updated\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "👥 Contractors (Admin Extra)",
+			"item": [
+				{
+					"name": "Update Contractor (PUT)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractors/{{contractor_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractors",
+								"{{contractor_id}}"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Updated Name\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Contractor Contact",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractors/{{contractor_id}}/contact",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractors",
+								"{{contractor_id}}",
+								"contact"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phone\": \"0590000000\",\n  \"email\": \"c@example.com\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Toggle Equipment Ban",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractors/{{contractor_id}}/equipment-ban",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractors",
+								"{{contractor_id}}",
+								"equipment-ban"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"banned\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "🧾 Memberships (Admin)",
+			"item": [
+				{
+					"name": "Pending Memberships",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/memberships/pending",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"memberships",
+								"pending"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "List Memberships",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/memberships",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"memberships"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Create Membership",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/memberships",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"memberships"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"contractor_id\": 1\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Approve Membership",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/memberships/{{membership_record_id}}/approve",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"memberships",
+								"{{membership_record_id}}",
+								"approve"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Reject Membership",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/memberships/{{membership_record_id}}/reject",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"memberships",
+								"{{membership_record_id}}",
+								"reject"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"reason\": \"...\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "💰 Payments (Admin)",
+			"item": [
+				{
+					"name": "List Payment Transactions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/payments/transactions",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"payments",
+								"transactions"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Create Payment Transaction",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/payments/transactions",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"payments",
+								"transactions"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"contractor_id\": 1,\n  \"amount\": 100\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Confirm Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/payments/transactions/{{payment_id}}/confirm",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"payments",
+								"transactions",
+								"{{payment_id}}",
+								"confirm"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Reject Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/payments/transactions/{{payment_id}}/reject",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"payments",
+								"transactions",
+								"{{payment_id}}",
+								"reject"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"reason\": \"...\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "🏦 Bank Accounts (Admin)",
+			"item": [
+				{
+					"name": "List Bank Accounts",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/bank-accounts",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"bank-accounts"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Create Bank Account",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/bank-accounts",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"bank-accounts"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"bank_name\": \"Bank\",\n  \"account_number\": \"12345\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Bank Account",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/bank-accounts/{{bank_account_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"bank-accounts",
+								"{{bank_account_id}}"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"bank_name\": \"Updated\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Bank Account",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/bank-accounts/{{bank_account_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"bank-accounts",
+								"{{bank_account_id}}"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📃 Dynamic Pages (Admin)",
+			"item": [
+				{
+					"name": "List Pages",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/pages",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"pages"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Create Page",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/pages",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"pages"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"slug\": \"about-us\",\n  \"title\": \"About\",\n  \"content\": \"...\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Page",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/pages/{{page_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"pages",
+								"{{page_id}}"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Updated\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Page",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/pages/{{page_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"pages",
+								"{{page_id}}"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "🎓 Certificate Requests (Admin)",
+			"item": [
+				{
+					"name": "List Certificate Requests",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/certificate-requests",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"certificate-requests"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Issue Membership Certificate",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/certificate-requests/issue-membership",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"certificate-requests",
+								"issue-membership"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"contractor_id\": 1\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Delete Certificate Requests",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/certificate-requests/bulk-delete",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"certificate-requests",
+								"bulk-delete"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"ids\": [\n    1,\n    2\n  ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Certificate Request",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/certificate-requests/{{certificate_request_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"certificate-requests",
+								"{{certificate_request_id}}"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Approve Certificate Request",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/certificate-requests/{{certificate_request_id}}/approve",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"certificate-requests",
+								"{{certificate_request_id}}",
+								"approve"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Reject Certificate Request",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/certificate-requests/{{certificate_request_id}}/reject",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"certificate-requests",
+								"{{certificate_request_id}}",
+								"reject"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"reason\": \"...\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Issue Certificate Request",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/certificate-requests/{{certificate_request_id}}/issue",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"certificate-requests",
+								"{{certificate_request_id}}",
+								"issue"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Regenerate Certificate Request",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/certificate-requests/{{certificate_request_id}}/regenerate",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"certificate-requests",
+								"{{certificate_request_id}}",
+								"regenerate"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Certificate Request",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/certificate-requests/{{certificate_request_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"certificate-requests",
+								"{{certificate_request_id}}"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "✏️ Name/Profile Change Requests (Admin)",
+			"item": [
+				{
+					"name": "List Name Change Requests",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/name-change-requests",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"name-change-requests"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Approve Name Change Request",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/name-change-requests/{{name_change_request_id}}/approve",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"name-change-requests",
+								"{{name_change_request_id}}",
+								"approve"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Reject Name Change Request",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/name-change-requests/{{name_change_request_id}}/reject",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"name-change-requests",
+								"{{name_change_request_id}}",
+								"reject"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"reason\": \"...\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Profile Update Requests",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/profile-update-requests",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"profile-update-requests"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Approve Profile Update Request",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/profile-update-requests/{{profile_update_request_id}}/approve",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"profile-update-requests",
+								"{{profile_update_request_id}}",
+								"approve"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Reject Profile Update Request",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/profile-update-requests/{{profile_update_request_id}}/reject",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"profile-update-requests",
+								"{{profile_update_request_id}}",
+								"reject"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"reason\": \"...\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "💵 Contractor Dues (Admin)",
+			"item": [
+				{
+					"name": "List Dues",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/dues",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"dues"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Dues Summary",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/dues/summary",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"dues",
+								"summary"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Dues By Contractor",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/dues/by-contractor",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"dues",
+								"by-contractor"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Import Dues",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/dues/import",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"dues",
+								"import"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Pay For Contractor",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/contractors/{{contractor_id}}/dues/pay",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"contractors",
+								"{{contractor_id}}",
+								"dues",
+								"pay"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"amount\": 100\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Due",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/dues",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"dues"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"contractor_id\": 1,\n  \"amount\": 100\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Due",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/dues/{{due_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"dues",
+								"{{due_id}}"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"amount\": 150\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Settle Due",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/dues/{{due_id}}/settle",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"dues",
+								"{{due_id}}",
+								"settle"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"amount\": 100\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Due",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/dues/{{due_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"dues",
+								"{{due_id}}"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "List Exchange Rates",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/exchange-rates",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"exchange-rates"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Create Exchange Rate",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/exchange-rates",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"exchange-rates"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"currency\": \"USD\",\n  \"rate\": 3.6\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Grade Fees",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/grade-fees",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"grade-fees"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Calculate Fee",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/contractors/{{contractor_id}}/dues/calculate-fee",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"contractors",
+								"{{contractor_id}}",
+								"dues",
+								"calculate-fee"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Generate Fee",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/contractors/{{contractor_id}}/dues/generate-fee",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"contractors",
+								"{{contractor_id}}",
+								"dues",
+								"generate-fee"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Generate Fee (Bulk)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/dues/generate-fee/bulk",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"dues",
+								"generate-fee",
+								"bulk"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"contractor_ids\": [\n    1,\n    2\n  ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Apply Discount",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/dues/{{due_id}}/discount",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"dues",
+								"{{due_id}}",
+								"discount"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"amount\": 10\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Grade Fee",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/grade-fees/{{grade_fee_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"grade-fees",
+								"{{grade_fee_id}}"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"amount\": 100\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Apply Discount (Bulk)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/dues/discount/bulk",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"dues",
+								"discount",
+								"bulk"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"ids\": [\n    1,\n    2\n  ],\n  \"amount\": 10\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "⚠️ Penalties",
+			"item": [
+				{
+					"name": "List Penalties",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/penalties",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"penalties"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Create Penalty",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/penalties",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"penalties"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"contractor_id\": 1,\n  \"amount\": 50,\n  \"reason\": \"...\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Pay Penalty",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/penalties/{{penalty_id}}/pay",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"penalties",
+								"{{penalty_id}}",
+								"pay"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📋 Tenders (Admin)",
+			"item": [
+				{
+					"name": "List Tenders (Admin)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/tenders",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"tenders"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Create Tender",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/tenders",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"tenders"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Tender\",\n  \"description\": \"...\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Tender",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/tenders/{{tender_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"tenders",
+								"{{tender_id}}"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Update Tender",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/tenders/{{tender_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"tenders",
+								"{{tender_id}}"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Updated\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Tender",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/tenders/{{tender_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"tenders",
+								"{{tender_id}}"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Add Tender Attachment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/tenders/{{tender_id}}/attachments",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"tenders",
+								"{{tender_id}}",
+								"attachments"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Tender Attachment",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/tenders/{{tender_id}}/attachments/{{attachment_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"tenders",
+								"{{tender_id}}",
+								"attachments",
+								"{{attachment_id}}"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📁 Documents",
+			"item": [
+				{
+					"name": "List Documents",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/documents",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"documents"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Document",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/documents",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"documents"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Document",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/documents/{{document_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"documents",
+								"{{document_id}}"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "🔔 Notifications (Admin)",
+			"item": [
+				{
+					"name": "List Notifications",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/notifications",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"notifications"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Mark All Read",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/notifications/read",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"notifications",
+								"read"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Mark One Read",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/notifications/{{notification_id}}/mark-as-read",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"notifications",
+								"{{notification_id}}",
+								"mark-as-read"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Broadcast Notification",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/notifications/broadcast",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"notifications",
+								"broadcast"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"...\",\n  \"body\": \"...\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "🚜 Equipment Marketplace (Admin)",
+			"item": [
+				{
+					"name": "List Equipment Types",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/equipment-types",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"equipment-types"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Create Equipment Type",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/equipment-types",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"equipment-types"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Excavator\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Equipment Type",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/equipment-types/{{equipment_type_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"equipment-types",
+								"{{equipment_type_id}}"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Updated\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Equipment Type",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/equipment-types/{{equipment_type_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"equipment-types",
+								"{{equipment_type_id}}"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Equipment Stats",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/equipment/stats",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"equipment",
+								"stats"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "List Equipment (Admin)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/equipment",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"equipment"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Create Equipment (Admin)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/equipment",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"equipment"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Equipment\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Equipment (Admin)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/equipment/{{equipment_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"equipment",
+								"{{equipment_id}}"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Update Equipment (Admin)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/equipment/{{equipment_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"equipment",
+								"{{equipment_id}}"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Updated\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Equipment (Admin)",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/equipment/{{equipment_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"equipment",
+								"{{equipment_id}}"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Equipment Images",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/equipment/{{equipment_id}}/images",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"equipment",
+								"{{equipment_id}}",
+								"images"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "images[]",
+									"type": "file",
+									"src": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Equipment Image",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/equipment/{{equipment_id}}/images/{{equipment_image_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"equipment",
+								"{{equipment_id}}",
+								"images",
+								"{{equipment_image_id}}"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Set Primary Equipment Image",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/equipment/{{equipment_id}}/images/{{equipment_image_id}}/primary",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"equipment",
+								"{{equipment_id}}",
+								"images",
+								"{{equipment_image_id}}",
+								"primary"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "List Equipment Blocked Dates",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/equipment/{{equipment_id}}/blocked-dates",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"equipment",
+								"{{equipment_id}}",
+								"blocked-dates"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Create Equipment Blocked Date",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/equipment/{{equipment_id}}/blocked-dates",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"equipment",
+								"{{equipment_id}}",
+								"blocked-dates"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"date\": \"2026-01-01\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Equipment Blocked Date",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/equipment/{{equipment_id}}/blocked-dates/{{blocked_date_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"equipment",
+								"{{equipment_id}}",
+								"blocked-dates",
+								"{{blocked_date_id}}"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "List Equipment Reports",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/equipment-reports",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"equipment-reports"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Update Equipment Report",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/equipment-reports/{{equipment_report_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"equipment-reports",
+								"{{equipment_report_id}}"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"resolved\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Equipment Packages (Admin)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/equipment-packages",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"equipment-packages"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Create Equipment Package",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/equipment-packages",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"equipment-packages"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Package\",\n  \"price\": 100\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Equipment Package",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/equipment-packages/{{equipment_package_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"equipment-packages",
+								"{{equipment_package_id}}"
+							]
+						},
+						"description": "",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"price\": 150\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Equipment Package",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/equipment-packages/{{equipment_package_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"equipment-packages",
+								"{{equipment_package_id}}"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📊 Reports",
+			"item": [
+				{
+					"name": "Reports Summary",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/reports/summary",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"reports",
+								"summary"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Export Reports PDF",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/reports/export/pdf",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"reports",
+								"export",
+								"pdf"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Export Reports Excel",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/reports/export/excel",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"reports",
+								"export",
+								"excel"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Dashboard Stats",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/stats",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"dashboard",
+								"stats"
+							]
+						},
+						"description": ""
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}

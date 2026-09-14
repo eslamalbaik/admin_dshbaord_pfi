@@ -4,6 +4,16 @@ import api from '@/plugins/axios'
 definePage({ meta: { requiresAdmin: true,
     adminOnly: true } })
 
+// ─── Snackbar ──────────────────────────────────────
+const snackbar = ref(false)
+const snackbarText = ref('')
+const snackbarColor = ref<'success' | 'error' | 'warning'>('success')
+const notify = (text: string, color: 'success' | 'error' | 'warning' = 'success') => {
+  snackbarText.value = text
+  snackbarColor.value = color
+  snackbar.value = true
+}
+
 // ─── State ──────────────────────────────────────────────────────────────────
 const equipment   = ref<any[]>([])
 const types       = ref<any[]>([])
@@ -29,6 +39,7 @@ const saving        = ref(false)
 const deleting      = ref(false)
 
 const editForm = ref({
+  equipment_type_id: null as number | null,
   name: '', brand: '', description: '', manufacture_year: null as number | null,
   power: '', condition: 'good', contract_type: 'daily', governorate: '', city: '',
   daily_price: 0, owner_phone: '', status: 'visible', is_featured: false, needs_maintenance: false, admin_notes: '',
@@ -56,7 +67,7 @@ const statusOptions = [
 const conditionOptions = [
   { title: 'ممتازة', value: 'excellent' },
   { title: 'جيدة', value: 'good' },
-  { title: 'مقبولة', value: 'fair' },
+  { title: 'بحاجة صيانة', value: 'needs_maintenance' },
 ]
 
 const statusMeta: Record<string, { color: string; label: string }> = {
@@ -66,9 +77,9 @@ const statusMeta: Record<string, { color: string; label: string }> = {
 }
 
 const conditionMeta: Record<string, { color: string; label: string }> = {
-  excellent: { color: 'success', label: 'ممتازة' },
-  good:      { color: 'primary', label: 'جيدة' },
-  fair:      { color: 'warning', label: 'مقبولة' },
+  excellent:         { color: 'success', label: 'ممتازة' },
+  good:              { color: 'primary', label: 'جيدة' },
+  needs_maintenance: { color: 'warning', label: 'بحاجة صيانة' },
 }
 
 const contractTypeOptions = [
@@ -114,9 +125,23 @@ const fetchStats = async () => {
 }
 
 const fetchTypes = async () => {
+  // فلتر القائمة بالأعلى يحتاج كل الأنواع (بما فيها المخفية) عشان يقدر يفلتر آليات قديمة مربوطة بنوع مخفي
   const { data } = await api.get('/api/v1/equipment-types')
   types.value = data
 }
+
+// خيارات منتقي التعديل: الأنواع الظاهرة فقط (نوع مخفي ما يظهرش كخيار قابل للاختيار من جديد) —
+// مع استثناء: لو الآلية الحالية مربوطة بنوع مخفي بالفعل، يبقى ظاهراً بالقائمة عشان ما يختفيش من الفورم
+const editTypeOptions = computed(() => {
+  const active = types.value.filter((t: any) => t.is_active)
+  const currentId = editForm.value.equipment_type_id
+  if (currentId && !active.some((t: any) => t.id === currentId)) {
+    const current = types.value.find((t: any) => t.id === currentId)
+    if (current) return [...active, current]
+  }
+
+  return active
+})
 
 onMounted(() => {
   fetchTypes()
@@ -136,6 +161,7 @@ watch(page, fetchEquipment)
 const openEdit = (item: any) => {
   selectedItem.value = item
   editForm.value = {
+    equipment_type_id: item.equipment_type_id ?? item.type?.id ?? null,
     name:             item.name,
     brand:            item.brand ?? '',
     description:      item.description ?? '',
@@ -212,7 +238,12 @@ const openImages = async (item: any) => {
 
 const onImageFiles = (e: Event) => {
   const input = e.target as HTMLInputElement
-  imageFiles.value = input.files ? Array.from(input.files) : []
+  const files = input.files ? Array.from(input.files) : []
+  const remaining = 8 - equipImages.value.length
+  if (files.length > remaining) {
+    notify(`الحد الأقصى 8 صور لكل آلية — لديها ${equipImages.value.length} حالياً، تم اختيار أول ${Math.max(remaining, 0)} فقط من ${files.length} صورة.`, 'warning')
+  }
+  imageFiles.value = files.slice(0, Math.max(remaining, 0))
 }
 
 const uploadImages = async () => {
@@ -226,6 +257,8 @@ const uploadImages = async () => {
     })
     equipImages.value.push(...data)
     imageFiles.value = []
+  } catch (err: any) {
+    notify(err?.response?.data?.message || 'تعذّر رفع الصور', 'error')
   }
   finally {
     imageUploading.value = false
@@ -473,7 +506,7 @@ const reasonLabel: Record<string, string> = {
                 </VBtn>
                 <VBtn icon size="x-small" variant="tonal" color="secondary" @click="openCalendar(item)">
                   <VIcon icon="tabler-calendar" size="16" />
-                  <VTooltip activator="parent">جدول الحجوزات</VTooltip>
+                  <VTooltip activator="parent">تواريخ عدم التوفر (حجز/صيانة)</VTooltip>
                 </VBtn>
                 <VBtn icon size="x-small" variant="tonal" color="error" @click="openDelete(item)">
                   <VIcon icon="tabler-trash" size="16" />
@@ -507,6 +540,18 @@ const reasonLabel: Record<string, string> = {
           <VRow class="mt-1">
             <VCol cols="12" md="6">
               <VTextField v-model="editForm.name" label="اسم الآلية" variant="outlined" density="compact" style="font-family:Cairo,sans-serif" />
+            </VCol>
+            <VCol cols="12" md="6">
+              <VSelect
+                v-model="editForm.equipment_type_id"
+                :items="editTypeOptions"
+                item-title="name_ar"
+                item-value="id"
+                label="نوع الآلية"
+                variant="outlined"
+                density="compact"
+                style="font-family:Cairo,sans-serif"
+              />
             </VCol>
             <VCol cols="12" md="6">
               <VTextField v-model="editForm.brand" label="الماركة" variant="outlined" density="compact" style="font-family:Cairo,sans-serif" />
@@ -570,7 +615,7 @@ const reasonLabel: Record<string, string> = {
               <VSwitch v-model="editForm.needs_maintenance" label="بحاجة صيانة (تختفي من السوق مؤقتاً)" color="error" style="font-family:Cairo,sans-serif" />
             </VCol>
             <VCol cols="12">
-              <VTextarea v-model="editForm.description" label="الوصف" variant="outlined" density="compact" rows="2" style="font-family:Cairo,sans-serif" />
+              <VTextarea v-model="editForm.description" label="الوصف" variant="outlined" density="compact" rows="2" maxlength="2000" counter style="font-family:Cairo,sans-serif" />
             </VCol>
             <VCol cols="12">
               <VTextarea v-model="editForm.admin_notes" label="ملاحظات داخلية" variant="outlined" density="compact" rows="2" style="font-family:Cairo,sans-serif" />
@@ -667,7 +712,7 @@ const reasonLabel: Record<string, string> = {
       <VCard :loading="calLoading">
         <VCardTitle style="font-family:Cairo,sans-serif;font-size:18px;padding:20px 24px 0">
           <VIcon icon="tabler-calendar" size="20" class="me-2" />
-          جدول الحجوزات: {{ selectedItem?.name }}
+          تواريخ عدم التوفر: {{ selectedItem?.name }}
         </VCardTitle>
         <VCardText>
           <!-- Blocked dates list -->
@@ -749,5 +794,13 @@ const reasonLabel: Record<string, string> = {
         </VCardActions>
       </VCard>
     </VDialog>
+
+    <!-- Feedback Snackbar -->
+    <VSnackbar v-model="snackbar" :timeout="3500" :color="snackbarColor" location="bottom end" variant="elevated">
+      <span style="font-family:Cairo,sans-serif">{{ snackbarText }}</span>
+      <template #actions>
+        <VBtn variant="text" size="small" @click="snackbar = false">إغلاق</VBtn>
+      </template>
+    </VSnackbar>
   </div>
 </template>

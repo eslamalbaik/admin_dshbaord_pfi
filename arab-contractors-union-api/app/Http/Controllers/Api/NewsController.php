@@ -82,7 +82,8 @@ class NewsController extends Controller
             'external_url' => 'nullable|url|max:500',
             'gallery'      => 'nullable|array',
             'gallery.*'    => 'image|mimes:jpg,jpeg,png,webp|max:5120',
-            'category'     => 'required|in:news,announcement,tender',
+            // Announcements/Tenders/Events أصبحوا كيانات مستقلة بجداولهم الخاصة — لا داعي لتصنيف الأخبار كأحدها
+            'category'     => 'required|in:news',
             'is_published' => 'boolean',
             'published_at' => 'nullable|date',
         ]);
@@ -114,7 +115,7 @@ class NewsController extends Controller
             'gallery.*'        => 'image|mimes:jpg,jpeg,png,webp|max:5120',
             'remove_gallery'   => 'nullable|array',
             'remove_gallery.*' => 'string',
-            'category'         => 'sometimes|in:news,announcement,tender',
+            'category'         => 'sometimes|in:news',
             'is_published'     => 'boolean',
             'published_at'     => 'nullable|date',
         ]);
@@ -139,5 +140,24 @@ class NewsController extends Controller
         $news->delete();
 
         return $this->success(message: 'تم حذف الخبر بنجاح.');
+    }
+
+    // DELETE /api/v1/admin/news/{news}/gallery-image — حذف فوري لصورة واحدة من المعرض (بديل نمط "علّم ثم احفظ")
+    public function destroyGalleryImage(Request $request, News $news)
+    {
+        $data = $request->validate(['url' => 'required|string']);
+
+        $gallery = $news->getRawOriginal('gallery');
+        $gallery = $gallery ? (json_decode($gallery, true) ?? []) : [];
+
+        $path = $this->urlToRelativePath($data['url']);
+
+        if (! in_array($path, $gallery, true))
+            return $this->error('الصورة غير موجودة في معرض هذا الخبر.', 404);
+
+        $this->deletePublicFile($path);
+        $news->update(['gallery' => array_values(array_diff($gallery, [$path]))]);
+
+        return $this->success(message: 'تم حذف الصورة.');
     }
 }

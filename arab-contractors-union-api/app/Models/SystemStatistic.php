@@ -10,9 +10,12 @@ class SystemStatistic extends Model
     use HasFactory;
 
     protected $fillable = [
-        'total_students',
-        'active_courses',
-        'total_enrollments',
         'total_revenue',
+        'active_contractors_count',
+        'pending_memberships_count',
+        'published_tenders_count',
+        'active_equipment_count',
+        'total_tenders_value',
+        'total_penalties_value',
     ];
 }

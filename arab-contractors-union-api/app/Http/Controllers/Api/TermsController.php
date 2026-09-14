@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Term;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class TermsController extends Controller
 {
@@ -60,15 +61,50 @@ class TermsController extends Controller
         $data = $request->validate($this->rules);
         $data['type'] = $data['type'] ?? 'terms';
 
-        return response()->json(Term::create($data), 201);
+        return DB::transaction(function () use ($data) {
+            // لو رقم الترتيب المطلوب محجوز مسبقاً، نزحزح كل من بعده للأسفل ليُفسح مكاناً (بدل تكرار الرقم)
+            if (isset($data['sort'])) {
+                Term::where('type', $data['type'])
+                    ->where('sort', '>=', $data['sort'])
+                    ->increment('sort');
+            }
+
+            return response()->json(Term::create($data), 201);
+        });
     }
 
     /** PUT /api/v1/dashboard/terms/{term} */
     public function update(Request $request, Term $term)
     {
-        $term->update($request->validate($this->rules));
+        $data = $request->validate($this->rules);
 
-        return response()->json($term);
+        $oldSort = $term->sort;
+        $newSort = $data['sort'] ?? null;
+        $type    = $data['type'] ?? $term->type;
+
+        if ($newSort !== null && $newSort !== $oldSort) {
+            DB::transaction(function () use ($term, $data, $oldSort, $newSort, $type) {
+                if ($newSort > $oldSort) {
+                    // تحرّك للأسفل بالترتيب: كل من كان بين الموضع القديم والجديد يتقدّم رقماً واحداً للأعلى
+                    Term::where('type', $type)
+                        ->where('id', '!=', $term->id)
+                        ->whereBetween('sort', [$oldSort + 1, $newSort])
+                        ->decrement('sort');
+                } else {
+                    // تحرّك للأعلى بالترتيب: كل من كان بين الموضعين يتأخر رقماً واحداً للأسفل
+                    Term::where('type', $type)
+                        ->where('id', '!=', $term->id)
+                        ->whereBetween('sort', [$newSort, $oldSort - 1])
+                        ->increment('sort');
+                }
+
+                $term->update($data);
+            });
+        } else {
+            $term->update($data);
+        }
+
+        return response()->json($term->fresh());
     }
 
     /** DELETE /api/v1/dashboard/terms/{term} */

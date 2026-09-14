@@ -20,25 +20,14 @@ const notify = (text: string, color: 'success' | 'error' = 'success') => {
 }
 
 const search = ref('')
-const categoryFilter = ref('')
 const publishedFilter = ref('')
-
-const categoryOptions = [
-  { title: 'خبر', value: 'news' },
-  { title: 'إعلان', value: 'announcement' },
-  { title: 'عطاء', value: 'tender' },
-]
 
 const headers = [
   { title: 'العنوان', key: 'title' },
-  { title: 'التصنيف', key: 'category' },
   { title: 'تاريخ النشر', key: 'published_at' },
   { title: 'الحالة', key: 'is_published' },
   { title: 'إجراءات', key: 'actions', sortable: false },
 ]
-
-const getCategoryLabel = (c: string) => categoryOptions.find(o => o.value === c)?.title ?? c
-const getCategoryColor = (c: string) => ({ news: 'primary', announcement: 'info', tender: 'warning' }[c] || 'secondary')
 
 const fetchNews = async () => {
   loading.value = true
@@ -46,7 +35,6 @@ const fetchNews = async () => {
     const { data } = await api.get('/api/v1/admin/news', {
       params: {
         search: search.value || undefined,
-        category: categoryFilter.value || undefined,
         is_published: publishedFilter.value !== '' ? publishedFilter.value : undefined,
         page: page.value,
       },
@@ -73,17 +61,36 @@ const emptyForm = () => ({
   imagePreview: '' as string,
   gallery: [] as File[],
   existingGallery: [] as string[],
-  removeGallery: [] as string[],
   video_url: '',
   external_url: '',
   is_published: false,
   published_at: '',
 })
 
-const toggleRemoveGalleryImage = (url: string) => {
-  const idx = form.value.removeGallery.indexOf(url)
-  if (idx === -1) form.value.removeGallery.push(url)
-  else form.value.removeGallery.splice(idx, 1)
+// حذف فوري بتأكيد — بدل نمط "علّم ثم احفظ" اللي كان يربك الأدمن (الصورة تفضل ظاهرة بعتامة لحد ما يحفظ الفورم كله)
+const removeGalleryImageDialog = ref(false)
+const removingGalleryImageUrl = ref<string | null>(null)
+
+const confirmRemoveGalleryImage = (url: string) => {
+  removingGalleryImageUrl.value = url
+  removeGalleryImageDialog.value = true
+}
+
+const removeGalleryImageConfirmed = async () => {
+  if (!removingGalleryImageUrl.value || !form.value.id) return
+  try {
+    await api.delete(`/api/v1/admin/news/${form.value.id}/gallery-image`, {
+      data: { url: removingGalleryImageUrl.value },
+    })
+    form.value.existingGallery = form.value.existingGallery.filter(u => u !== removingGalleryImageUrl.value)
+    notify('تم حذف الصورة.')
+  } catch (err: any) {
+    console.error(err)
+    notify(err?.response?.data?.message || 'تعذّر حذف الصورة', 'error')
+  } finally {
+    removeGalleryImageDialog.value = false
+    removingGalleryImageUrl.value = null
+  }
 }
 
 const formDialog = ref(false)
@@ -110,11 +117,10 @@ const openEdit = (item: any) => {
     title: item.title,
     excerpt: item.excerpt ?? '',
     body: item.body ?? '',
-    category: item.category,
+    category: 'news',
     imagePreview: item.image ?? '',
     gallery: [],
     existingGallery: item.gallery ?? [],
-    removeGallery: [],
     video_url: item.video_url ?? '',
     external_url: item.external_url ?? '',
     is_published: !!item.is_published,
@@ -123,6 +129,15 @@ const openEdit = (item: any) => {
   mainImageFile.value = null
   isEditing.value = true
   formDialog.value = true
+}
+
+// ── View details (read-only) ───────────────────────
+const viewDialog = ref(false)
+const viewingItem = ref<any>(null)
+
+const openView = (item: any) => {
+  viewingItem.value = item
+  viewDialog.value = true
 }
 
 const saveNews = async () => {
@@ -144,7 +159,6 @@ const saveNews = async () => {
     const mainImage = firstFile(mainImageFile.value)
     if (mainImage) fd.append('image', mainImage)
     form.value.gallery.forEach(f => fd.append('gallery[]', f))
-    form.value.removeGallery.forEach(url => fd.append('remove_gallery[]', url))
 
     if (isEditing.value) {
       fd.append('_method', 'PUT')
@@ -210,15 +224,6 @@ const deleteNews = async () => {
           @update:model-value="page = 1"
         />
         <VSelect
-          v-model="categoryFilter"
-          :items="[{ title: 'كل التصنيفات', value: '' }, ...categoryOptions]"
-          label="التصنيف"
-          density="compact"
-          clearable
-          style="max-width:180px"
-          @update:model-value="page = 1"
-        />
-        <VSelect
           v-model="publishedFilter"
           :items="[{ title: 'الكل', value: '' }, { title: 'منشور', value: '1' }, { title: 'مسودة', value: '0' }]"
           label="الحالة"
@@ -246,12 +251,6 @@ const deleteNews = async () => {
           </div>
         </template>
 
-        <template #item.category="{ item }">
-          <VChip :color="getCategoryColor(item.category)" size="small" label style="font-family:Cairo,sans-serif">
-            {{ getCategoryLabel(item.category) }}
-          </VChip>
-        </template>
-
         <template #item.published_at="{ item }">
           {{ item.published_at ? new Date(item.published_at).toLocaleDateString('ar-PS') : '—' }}
         </template>
@@ -264,6 +263,10 @@ const deleteNews = async () => {
 
         <template #item.actions="{ item }">
           <div class="d-flex align-center gap-1">
+            <VBtn icon size="small" variant="text" color="info" @click="openView(item)">
+              <VIcon icon="tabler-eye" />
+              <VTooltip activator="parent">عرض التفاصيل</VTooltip>
+            </VBtn>
             <VBtn icon size="small" variant="text" color="primary" @click="openEdit(item)">
               <VIcon icon="tabler-pencil" />
               <VTooltip activator="parent">تعديل</VTooltip>
@@ -287,16 +290,8 @@ const deleteNews = async () => {
         <VCardTitle style="font-family:Cairo,sans-serif">{{ isEditing ? 'تعديل الخبر' : 'خبر جديد' }}</VCardTitle>
         <VCardText>
           <VRow>
-            <VCol cols="12" md="8">
+            <VCol cols="12">
               <VTextField v-model="form.title" label="العنوان" style="font-family:Cairo,sans-serif" />
-            </VCol>
-            <VCol cols="12" md="4">
-              <VSelect
-                v-model="form.category"
-                :items="categoryOptions"
-                label="التصنيف"
-                style="font-family:Cairo,sans-serif"
-              />
             </VCol>
             <VCol cols="12">
               <VTextarea v-model="form.excerpt" label="مقتطف مختصر (يظهر في القائمة)" rows="2" style="font-family:Cairo,sans-serif" />
@@ -307,6 +302,10 @@ const deleteNews = async () => {
             </VCol>
 
             <VCol cols="12" md="6">
+              <div v-if="form.imagePreview && !mainImageFile" class="d-flex align-center gap-2 mb-2">
+                <VImg :src="form.imagePreview" width="48" height="48" cover rounded />
+                <span class="text-caption text-medium-emphasis" style="font-family:Cairo,sans-serif">الصورة الحالية — اختر صورة جديدة لاستبدالها</span>
+              </div>
               <VFileInput
                 label="الصورة الرئيسية"
                 prepend-inner-icon="tabler-photo"
@@ -331,36 +330,26 @@ const deleteNews = async () => {
 
             <VCol v-if="form.existingGallery.length" cols="12">
               <label class="text-body-2 font-weight-medium mb-2 d-block" style="font-family:Cairo,sans-serif">
-                صور المعرض الحالية (اضغط لحذف صورة)
+                صور المعرض الحالية (اضغط أيقونة الحذف لإزالة صورة فوراً)
               </label>
               <div class="d-flex flex-wrap gap-3">
                 <div
                   v-for="url in form.existingGallery"
                   :key="url"
                   class="position-relative"
-                  style="width:80px;height:80px;cursor:pointer"
-                  @click="toggleRemoveGalleryImage(url)"
+                  style="width:80px;height:80px"
                 >
-                  <VImg
-                    :src="url"
-                    width="80"
-                    height="80"
-                    cover
-                    rounded
-                    :style="form.removeGallery.includes(url) ? 'opacity:0.35' : ''"
-                  />
+                  <VImg :src="url" width="80" height="80" cover rounded />
                   <VIcon
-                    :icon="form.removeGallery.includes(url) ? 'tabler-rotate' : 'tabler-trash'"
-                    :color="form.removeGallery.includes(url) ? 'success' : 'error'"
+                    icon="tabler-trash"
+                    color="error"
                     size="18"
                     class="position-absolute"
-                    style="top:2px;left:2px;background:white;border-radius:50%;padding:2px"
+                    style="top:2px;left:2px;background:white;border-radius:50%;padding:2px;cursor:pointer"
+                    @click="confirmRemoveGalleryImage(url)"
                   />
                 </div>
               </div>
-              <p v-if="form.removeGallery.length" class="text-caption text-error mt-1" style="font-family:Cairo,sans-serif">
-                {{ form.removeGallery.length }} صورة ستُحذف عند الحفظ
-              </p>
             </VCol>
 
             <VCol cols="12" md="6">
@@ -386,6 +375,64 @@ const deleteNews = async () => {
       </VCard>
     </VDialog>
 
+    <!-- View Details Dialog -->
+    <VDialog v-model="viewDialog" max-width="680" scrollable>
+      <VCard v-if="viewingItem">
+        <VCardTitle class="d-flex align-center justify-space-between" style="font-family:Cairo,sans-serif">
+          <span>{{ viewingItem.title }}</span>
+          <VChip :color="viewingItem.is_published ? 'success' : 'secondary'" size="small" label>
+            {{ viewingItem.is_published ? 'منشور' : 'مسودة' }}
+          </VChip>
+        </VCardTitle>
+        <VCardText>
+          <VImg v-if="viewingItem.image" :src="viewingItem.image" max-height="280" class="mb-4 rounded" cover />
+
+          <p v-if="viewingItem.excerpt" class="text-body-1 font-weight-medium mb-4" style="font-family:Cairo,sans-serif">
+            {{ viewingItem.excerpt }}
+          </p>
+
+          <div class="text-body-2 mb-4" style="font-family:Cairo,sans-serif" v-html="viewingItem.body" />
+
+          <div v-if="viewingItem.gallery?.length" class="mb-4">
+            <label class="text-body-2 font-weight-medium mb-2 d-block" style="font-family:Cairo,sans-serif">صور المعرض</label>
+            <div class="d-flex flex-wrap gap-3">
+              <VImg
+                v-for="url in (viewingItem.gallery ?? [])"
+                :key="url"
+                :src="url"
+                width="90"
+                height="90"
+                cover
+                rounded
+              />
+            </div>
+          </div>
+
+          <VDivider class="mb-4" />
+
+          <VRow dense>
+            <VCol v-if="viewingItem.video_url" cols="12" md="6">
+              <span class="text-caption text-medium-emphasis d-block">رابط فيديو يوتيوب</span>
+              <a :href="viewingItem.video_url" target="_blank" dir="ltr">{{ viewingItem.video_url }}</a>
+            </VCol>
+            <VCol v-if="viewingItem.external_url" cols="12" md="6">
+              <span class="text-caption text-medium-emphasis d-block">رابط خارجي</span>
+              <a :href="viewingItem.external_url" target="_blank" dir="ltr">{{ viewingItem.external_url }}</a>
+            </VCol>
+            <VCol cols="12" md="6">
+              <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">تاريخ النشر</span>
+              <span style="font-family:Cairo,sans-serif">{{ viewingItem.published_at ? new Date(viewingItem.published_at).toLocaleDateString('ar-PS') : '—' }}</span>
+            </VCol>
+          </VRow>
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" color="primary" @click="viewDialog = false; openEdit(viewingItem)">تعديل</VBtn>
+          <VBtn variant="tonal" @click="viewDialog = false">إغلاق</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
     <!-- Delete Confirm Dialog -->
     <VDialog v-model="deleteDialog" max-width="400">
       <VCard>
@@ -400,6 +447,24 @@ const deleteNews = async () => {
           <VSpacer />
           <VBtn variant="tonal" @click="deleteDialog = false">إلغاء</VBtn>
           <VBtn color="error" :loading="deleteLoading" @click="deleteNews">حذف</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- Gallery Image Delete Confirm Dialog -->
+    <VDialog v-model="removeGalleryImageDialog" max-width="400">
+      <VCard>
+        <VCardTitle class="d-flex align-center gap-2" style="font-family:Cairo,sans-serif">
+          <VIcon icon="tabler-alert-triangle" color="error" />
+          تأكيد حذف الصورة
+        </VCardTitle>
+        <VCardText style="font-family:Cairo,sans-serif">
+          هل أنت متأكد من حذف هذه الصورة من المعرض؟ لا يمكن التراجع عن هذا الإجراء.
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" @click="removeGalleryImageDialog = false">إلغاء</VBtn>
+          <VBtn color="error" @click="removeGalleryImageConfirmed">حذف</VBtn>
         </VCardActions>
       </VCard>
     </VDialog>

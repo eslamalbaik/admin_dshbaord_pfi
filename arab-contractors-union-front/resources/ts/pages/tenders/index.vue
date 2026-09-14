@@ -130,6 +130,23 @@ const saveTender = async () => {
   finally { editLoading.value = false }
 }
 
+// ── View details (read-only) ───────────────────────
+const viewDialog = ref(false)
+const viewingItem = ref<any>(null)
+const viewAttachments = ref<any[]>([])
+
+const openView = async (item: any) => {
+  viewingItem.value = item
+  viewAttachments.value = Array.isArray(item.attachments) ? item.attachments : []
+  viewDialog.value = true
+  try {
+    const { data } = await api.get(`/api/v1/tenders/${item.id}`)
+    viewAttachments.value = data.items?.attachments ?? []
+  } catch (err) {
+    console.error(err)
+  }
+}
+
 // ── Status ────────────────────────────────────────
 const statusLoading = ref<number | null>(null)
 
@@ -176,6 +193,9 @@ const newTender = ref({
   external_url:     '',
 })
 
+// مرفقات إضافية (متعددة) تُرفع تلقائياً فور إنشاء العطاء — دون الحاجة لإعادة فتح التعديل يدوياً
+const newAttachmentStaged = ref<File[]>([])
+
 const editTenderTyped = editTender as any
 
 // toggle طريقة تقديم في نموذج الإنشاء
@@ -216,9 +236,17 @@ const headers = [
   { title: 'ملاحظات الاتحاد', key: 'union_notes' },
   { title: 'تاريخ النشر', key: 'published_at' },
   { title: 'آخر موعد', key: 'deadline' },
+  { title: 'المستجدات', key: 'display_status' },
   { title: 'الحالة', key: 'status' },
   { title: 'إجراءات', key: 'actions', sortable: false },
 ]
+
+const displayStatusColor: Record<string, string> = {
+  new: 'info',
+  updated: 'primary',
+  closing_soon: 'warning',
+  closed: 'secondary',
+}
 
 const statusOptions = [
   { title: 'الكل', value: '' },
@@ -328,12 +356,30 @@ const createTender = async () => {
       formData.append('submission_file', newTender.value.submission_file)
 
     const { data } = await api.post('/api/v1/tenders', formData)
+    const created = data.items
+
+    // رفع المرفقات الإضافية المُختارة أثناء الإنشاء تلقائياً — قبل عرض العطاء كـ"تم إنشاؤه"،
+    // دون أي إجراء يدوي إضافي من المستخدم (بند 5ب)
+    if (newAttachmentStaged.value.length) {
+      for (const file of newAttachmentStaged.value) {
+        const fd = new FormData()
+        fd.append('file', file)
+        fd.append('label', file.name)
+        try {
+          await api.post(`/api/v1/tenders/${created.id}/attachments`, fd)
+        } catch (attachErr) {
+          console.error(attachErr)
+        }
+      }
+    }
+
     createDialog.value = false
     newTender.value = { title: '', issuing_entity: '', description: '', union_notes: '', category: '', deadline: '', status: 'open', submission_types: [], submission_email: '', submission_phone: '', submission_file: null, external_url: '' }
-    notify('تم نشر العطاء بنجاح — أضف مرفقات العطاء الآن لو حابب')
+    newAttachmentStaged.value = []
+    notify('تم نشر العطاء بنجاح، وملف طريقة التقديم ومرفقاته محفوظة. يمكنك إضافة مزيد من المرفقات أدناه.')
     fetchTenders()
-    // فتح نافذة التعديل مباشرة على العطاء الجديد — عشان إضافة المرفقات (بتحتاج id العطاء، مش متاحة وقت الإنشاء)
-    openEdit(data.items)
+    // فتح نافذة التعديل مباشرة على العطاء الجديد — للمراجعة أو إضافة مزيد من المرفقات
+    openEdit(created)
   }
   catch (err) {
     console.error(err)
@@ -358,7 +404,7 @@ watchEffect(() => fetchTenders())
         <VBtn variant="tonal" prepend-icon="tabler-file-spreadsheet" @click="exportDialog = true">
           تصدير Excel
         </VBtn>
-        <VBtn color="primary" prepend-icon="tabler-plus" @click="createDialog = true">
+        <VBtn color="primary" prepend-icon="tabler-plus" @click="newAttachmentStaged = []; createDialog = true">
           عطاء جديد
         </VBtn>
       </div>
@@ -447,12 +493,13 @@ watchEffect(() => fetchTenders())
         </template>
 
         <template #item.deadline="{ item }">
-          <div class="d-flex align-center gap-2">
-            <span>{{ item.deadline ? new Date(item.deadline).toLocaleDateString('ar-PS') : '—' }}</span>
-            <VChip v-if="item.closing_soon" color="warning" size="x-small" label style="font-family:Cairo,sans-serif">
-              ينتهي قريباً
-            </VChip>
-          </div>
+          <span>{{ item.deadline ? new Date(item.deadline).toLocaleDateString('ar-PS') : '—' }}</span>
+        </template>
+
+        <template #item.display_status="{ item }">
+          <VChip :color="displayStatusColor[item.display_status] ?? 'info'" size="small" label style="font-family:Cairo,sans-serif">
+            {{ item.display_status_label }}
+          </VChip>
         </template>
 
         <template #item.status="{ item }">
@@ -485,6 +532,12 @@ watchEffect(() => fetchTenders())
                 </VListItem>
               </VList>
             </VMenu>
+
+            <!-- عرض التفاصيل -->
+            <VBtn icon size="small" variant="text" color="info" @click="openView(item)">
+              <VIcon icon="tabler-eye" />
+              <VTooltip activator="parent">عرض التفاصيل</VTooltip>
+            </VBtn>
 
             <!-- تعديل -->
             <VBtn icon size="small" variant="text" color="primary" @click="openEdit(item)">
@@ -640,6 +693,20 @@ watchEffect(() => fetchTenders())
                 type="url"
                 dir="ltr"
                 placeholder="https://example.com/tender/123"
+              />
+            </VCol>
+
+            <!-- مرفقات إضافية (متعددة) — تُرفع تلقائياً فور نشر العطاء -->
+            <VCol cols="12">
+              <VFileInput
+                label="مرفقات إضافية (اختياري — يمكن اختيار أكثر من ملف)"
+                prepend-inner-icon="tabler-paperclip"
+                prepend-icon=""
+                multiple
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+                style="font-family:Cairo,sans-serif"
+                :model-value="newAttachmentStaged"
+                @update:model-value="newAttachmentStaged = ($event as File[] | null) ?? []"
               />
             </VCol>
           </VRow>
@@ -830,6 +897,103 @@ watchEffect(() => fetchTenders())
           <VSpacer />
           <VBtn variant="tonal" @click="editDialog = false">إلغاء</VBtn>
           <VBtn color="primary" :loading="editLoading" @click="saveTender">حفظ التعديلات</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- View Details Dialog -->
+    <VDialog v-model="viewDialog" max-width="680" scrollable>
+      <VCard v-if="viewingItem">
+        <VCardTitle class="d-flex align-center justify-space-between flex-wrap gap-2" style="font-family:Cairo,sans-serif">
+          <span>{{ viewingItem.title }}</span>
+          <div class="d-flex gap-2">
+            <VChip v-if="viewingItem.display_status_label" :color="displayStatusColor[viewingItem.display_status] ?? 'info'" size="small" label>
+              {{ viewingItem.display_status_label }}
+            </VChip>
+            <VChip :color="getStatusColor(viewingItem.status)" size="small" label>
+              {{ getStatusLabel(viewingItem.status) }}
+            </VChip>
+          </div>
+        </VCardTitle>
+        <VCardText>
+          <VRow dense class="mb-3">
+            <VCol cols="6" md="4">
+              <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">الرقم المرجعي</span>
+              <span dir="ltr">{{ viewingItem.reference_number || '—' }}</span>
+            </VCol>
+            <VCol cols="6" md="4">
+              <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">الجهة المعلنة</span>
+              <span style="font-family:Cairo,sans-serif">{{ viewingItem.issuing_entity || '—' }}</span>
+            </VCol>
+            <VCol cols="6" md="4">
+              <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">التصنيف</span>
+              <span style="font-family:Cairo,sans-serif">{{ viewingItem.category || '—' }}</span>
+            </VCol>
+            <VCol cols="6" md="4">
+              <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">الميزانية</span>
+              <span style="font-family:Cairo,sans-serif">{{ viewingItem.budget ?? '—' }}</span>
+            </VCol>
+            <VCol cols="6" md="4">
+              <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">آخر موعد</span>
+              <span style="font-family:Cairo,sans-serif">{{ viewingItem.deadline ? new Date(viewingItem.deadline).toLocaleDateString('ar-PS') : '—' }}</span>
+            </VCol>
+            <VCol cols="6" md="4">
+              <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">تاريخ النشر</span>
+              <span style="font-family:Cairo,sans-serif">{{ viewingItem.published_at ? new Date(viewingItem.published_at).toLocaleDateString('ar-PS') : '—' }}</span>
+            </VCol>
+          </VRow>
+
+          <VDivider class="mb-4" />
+
+          <div v-if="viewingItem.description" class="mb-4">
+            <label class="text-body-2 font-weight-medium mb-1 d-block" style="font-family:Cairo,sans-serif">الوصف</label>
+            <p class="text-body-2" style="font-family:Cairo,sans-serif">{{ viewingItem.description }}</p>
+          </div>
+          <div v-if="viewingItem.union_notes" class="mb-4">
+            <label class="text-body-2 font-weight-medium mb-1 d-block" style="font-family:Cairo,sans-serif">ملاحظات الاتحاد</label>
+            <p class="text-body-2" style="font-family:Cairo,sans-serif">{{ viewingItem.union_notes }}</p>
+          </div>
+
+          <div class="mb-4">
+            <label class="text-body-2 font-weight-medium mb-1 d-block" style="font-family:Cairo,sans-serif">طريقة التقديم</label>
+            <div class="d-flex flex-wrap gap-2">
+              <VChip v-if="(viewingItem.submission_types ?? []).includes('email')" size="small" prepend-icon="tabler-mail">
+                {{ viewingItem.submission_email || 'بريد إلكتروني' }}
+              </VChip>
+              <VChip v-if="(viewingItem.submission_types ?? []).includes('phone')" size="small" prepend-icon="tabler-phone">
+                {{ viewingItem.submission_phone || 'هاتف' }}
+              </VChip>
+              <VChip v-if="(viewingItem.submission_types ?? []).includes('file') && viewingItem.submission_file" size="small" prepend-icon="tabler-file-upload">
+                <a :href="viewingItem.submission_file" target="_blank">ملف التقديم</a>
+              </VChip>
+              <span v-if="!(viewingItem.submission_types ?? []).length" class="text-medium-emphasis text-body-2">—</span>
+            </div>
+          </div>
+
+          <div v-if="viewAttachments.length" class="mb-2">
+            <label class="text-body-2 font-weight-medium mb-2 d-block" style="font-family:Cairo,sans-serif">المرفقات</label>
+            <div class="d-flex flex-wrap gap-3">
+              <a
+                v-for="att in viewAttachments"
+                :key="att.id"
+                :href="att.url"
+                target="_blank"
+                class="d-flex align-center gap-2 pa-2"
+                style="border:1px solid rgba(0,0,0,0.12);border-radius:8px"
+              >
+                <VAvatar v-if="att.is_image" :image="att.url" size="32" rounded />
+                <VAvatar v-else size="32" rounded color="secondary" variant="tonal">
+                  <VIcon icon="tabler-file" size="16" />
+                </VAvatar>
+                <span class="text-caption" style="font-family:Cairo,sans-serif">{{ att.label || 'مرفق' }}</span>
+              </a>
+            </div>
+          </div>
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" color="primary" @click="viewDialog = false; openEdit(viewingItem)">تعديل</VBtn>
+          <VBtn variant="tonal" @click="viewDialog = false">إغلاق</VBtn>
         </VCardActions>
       </VCard>
     </VDialog>

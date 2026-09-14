@@ -72,7 +72,10 @@ public/mockServiceWorker.js
 /storage/app/lo-profile-*/
 /storage/app/public/certificates/
 /storage/app/public/receipts/
-/storage/app/public/contractors/profile-update/
+/storage/app/public/contractors/
+/storage/app/public/announcements/
+/storage/app/public/events/
+/storage/app/public/news/
 
 # سكربتات فحص/بناء قالب الشهادة المحلية — أدوات تشخيص لمرة واحدة لا جزء من التطبيق
 /build_and_verify.php
@@ -84,9 +87,11 @@ public/mockServiceWorker.js
 /test_issue.php
 /xml_dump.txt
 
-# خطوط جُرِّبت للشهادة ثم استُبعدت (Amiri و Noto Naskh) — mPDF يرفض جدول GPOS
-# فيها، والخط المعتمد xbriyaz مشحون داخل vendor. لا داعي لشحن 1.4 م.ب بلا استعمال.
-/resources/certificate-assets/fonts/
+# خطوط الشهادة تُشحن الآن مع المستودع لأن سيرفر Linux لا يحويها وبدونها
+# يرمي mPDF‏ FontException ويفشل التوليد كلياً — تفاصيل في certificate-assets/README.md.
+# Amiri و Noto Naskh وحدهما يبقيان مستثنيَين: mPDF يرفض جدول GPOS فيهما فهما بلا استعمال.
+/resources/certificate-assets/fonts/Amiri-*.ttf
+/resources/certificate-assets/fonts/NotoNaskhArabic-*.ttf
 
 # نسخ احتياطية من قالب الشهادة تُنشأ يدوياً أثناء التعديل
 /resources/templates/*.bak

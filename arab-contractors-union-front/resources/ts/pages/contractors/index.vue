@@ -241,6 +241,12 @@ const downloadFile = (url: string | null, title: string) => {
   a.click()
 }
 
+// عرض الملف داخل المتصفح (تبويب جديد) بدل إجباره على التحميل مباشرة
+const viewFile = (url: string | null) => {
+  if (!url) return
+  window.open(url, '_blank')
+}
+
 const getFieldTitle = (val: number) => {
   const options = [
     { title: 'غير محدد', value: 10 },
@@ -298,6 +304,61 @@ const getSpecialtiesList = (contractor: any) => {
   return []
 }
 
+// ── بيانات بطاقات "تفاصيل المقاول" — مصفوفات label/value تُغذّي الكروت بدل تكرار <p> يدوياً ──
+const membershipRows = computed(() => {
+  const t = detailsTarget.value
+  if (!t) return []
+  return [
+    { label: 'رقم العضوية', value: t.membership_number || '—', icon: 'tabler-id-badge-2' },
+    { label: 'رقم السجل التجاري', value: t.commercial_register || '—', icon: 'tabler-file-certificate' },
+    { label: 'رأس المال', value: t.capital || '—', icon: 'tabler-currency-dollar' },
+    { label: 'تاريخ التسجيل', value: t.registration_date || '—', icon: 'tabler-calendar-event' },
+    { label: 'تاريخ التأسيس', value: t.established_date ? String(t.established_date).substring(0, 10) : '—', icon: 'tabler-calendar-star' },
+    { label: 'الشكل القانوني', value: t.legal_form || '—', icon: 'tabler-gavel' },
+    { label: 'غايات الشركة', value: t.company_purposes || '—', icon: 'tabler-target-arrow' },
+    ...(t.trade ? [{ label: 'التخصص', value: t.trade, icon: 'tabler-briefcase' }] : []),
+  ]
+})
+
+const managementRows = computed(() => {
+  const t = detailsTarget.value
+  if (!t) return []
+  return [
+    { label: 'صاحب المنشأة', value: t.owner_name || '—', icon: 'tabler-user' },
+    { label: 'أسماء الشركاء', value: t.partners || '—', icon: 'tabler-users' },
+    { label: 'المفوض بالتوقيع', value: t.authorized_person || '—', icon: 'tabler-signature' },
+  ]
+})
+
+const contactRows = computed(() => {
+  const t = detailsTarget.value
+  if (!t) return []
+  return [
+    { label: 'الجوال', value: t.phone || '—', dir: 'ltr', icon: 'tabler-device-mobile' },
+    { label: 'الهاتف/الفاكس', value: t.fax || '—', dir: 'ltr', icon: 'tabler-phone' },
+    { label: 'البريد الإلكتروني', value: t.email || '—', icon: 'tabler-mail' },
+    { label: 'المدينة', value: t.city || '—', icon: 'tabler-map-pin' },
+    { label: 'العنوان التفصيلي', value: t.address || '—', icon: 'tabler-map-2' },
+    { label: 'رقم الرخصة', value: t.license_number || '—', icon: 'tabler-license' },
+  ]
+})
+
+const documentFields = [
+  { key: 'cr_file', label: 'السجل التجاري', icon: 'tabler-file-certificate' },
+  { key: 'company_register', label: 'سجل الشركة', icon: 'tabler-building' },
+  { key: 'municipal_license', label: 'رخصة البلدية', icon: 'tabler-stamp' },
+  { key: 'company_approval_letter', label: 'موافقة الانتساب', icon: 'tabler-checkbox' },
+  { key: 'lease_or_ownership_contract', label: 'عقد المقر', icon: 'tabler-home' },
+  { key: 'articles_of_association', label: 'عقد التأسيس', icon: 'tabler-file-text' },
+  { key: 'internal_bylaws', label: 'النظام الداخلي', icon: 'tabler-book' },
+  { key: 'bank_dealing_letter', label: 'تعامل البنك', icon: 'tabler-building-bank' },
+  { key: 'secretary_contract', label: 'عقد سكرتير', icon: 'tabler-briefcase' },
+  { key: 'full_time_engineer_certificate', label: 'شهادة مهندس متفرغ', icon: 'tabler-certificate' },
+  { key: 'partners_ids', label: 'هويات الشركاء', icon: 'tabler-id-badge-2' },
+  { key: 'authorization_letter', label: 'تفويض توقيع', icon: 'tabler-signature' },
+]
+
+const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? detailsTarget.value?.[key] ?? null
 </script>
 
 <template>
@@ -408,83 +469,211 @@ const getSpecialtiesList = (contractor: any) => {
     </VCard>
 
     <!-- Details Dialog -->
-    <VDialog v-model="detailsDialog" max-width="900">
-      <VCard v-if="detailsTarget">
-        <VCardTitle class="d-flex justify-space-between align-center" style="font-family:Cairo,sans-serif">
-          <span>تفاصيل المقاول: {{ detailsTarget.name }}</span>
-          <VBtn icon="tabler-x" variant="text" size="small" @click="detailsDialog = false" />
-        </VCardTitle>
-        <VDivider />
-        <VCardText style="font-family:Cairo,sans-serif; max-height: 70vh; overflow-y: auto;">
+    <VDialog v-model="detailsDialog" max-width="960">
+      <VCard v-if="detailsTarget" class="contractor-details-card" style="border-radius: 20px; overflow: hidden;">
+        <!-- ─── Header banner ─── -->
+        <div
+          class="d-flex align-center gap-4 pa-6"
+          style="background: linear-gradient(135deg, rgb(var(--v-theme-primary)) 0%, rgba(var(--v-theme-primary), 0.75) 100%);"
+        >
+          <VAvatar size="68" color="white" variant="flat" style="box-shadow: 0 4px 14px rgba(0,0,0,.18);">
+            <span class="text-h5 font-weight-bold text-primary">{{ detailsTarget.name?.substring(0, 2) }}</span>
+          </VAvatar>
+          <div class="flex-grow-1" style="min-width:0">
+            <h2 class="text-h5 font-weight-bold text-white text-truncate" style="font-family:Cairo,sans-serif">
+              {{ detailsTarget.name }}
+            </h2>
+            <div class="d-flex align-center gap-2 flex-wrap mt-2">
+              <VChip size="small" variant="tonal" label style="font-family:Cairo,sans-serif; background: rgba(255,255,255,0.18); color: #fff;">
+                <VIcon icon="tabler-id-badge-2" size="14" start />
+                عضوية {{ detailsTarget.membership_number }}
+              </VChip>
+              <VChip :color="getStatusColor(detailsTarget.status)" size="small" label style="font-family:Cairo,sans-serif">
+                {{ getStatusLabel(detailsTarget.status) }}
+              </VChip>
+              <VChip :color="detailsTarget.has_app_account ? 'success' : 'secondary'" variant="flat" size="small" label style="font-family:Cairo,sans-serif">
+                <VIcon :icon="detailsTarget.has_app_account ? 'tabler-device-mobile-check' : 'tabler-device-mobile-off'" size="14" start />
+                {{ detailsTarget.has_app_account ? 'فاتح حساب' : 'لم يفتح حساب' }}
+              </VChip>
+            </div>
+          </div>
+          <VBtn icon="tabler-x" variant="tonal" color="white" size="small" @click="detailsDialog = false" />
+        </div>
+
+        <VCardText style="font-family:Cairo,sans-serif; max-height: 72vh; overflow-y: auto;" class="pa-5" >
           <VRow>
+            <!-- معلومات العضوية والتأسيس -->
             <VCol cols="12" md="6">
-              <h3 class="text-h6 mb-3 text-primary">معلومات العضوية والتأسيس</h3>
-              <p><strong>رقم العضوية:</strong> {{ detailsTarget.membership_number }}</p>
-              <p><strong>رقم السجل التجاري:</strong> {{ detailsTarget.commercial_register }}</p>
-              <p><strong>رأس المال:</strong> {{ detailsTarget.capital || '—' }}</p>
-              <p><strong>تاريخ التسجيل:</strong> {{ detailsTarget.registration_date || '—' }}</p>
-              <p><strong>الشكل القانوني:</strong> {{ detailsTarget.legal_form || '—' }}</p>
-              <p><strong>غايات الشركة:</strong> {{ detailsTarget.company_purposes || '—' }}</p>
-              <div v-if="getSpecialtiesList(detailsTarget).length > 0">
-                <p class="mb-1"><strong>المجالات والتصنيفات:</strong></p>
-                <div class="d-flex flex-column gap-1 mb-3">
-                  <div v-for="(spec, idx) in getSpecialtiesList(detailsTarget)" :key="idx" class="d-flex align-center gap-1 flex-wrap">
-                    <VChip size="small" color="primary" label>{{ getFieldTitle(spec.field_lk_type) }}</VChip>
-                    <VChip size="small" color="info" label>{{ getSpecializationTitle(spec.specialization_lk_type) }}</VChip>
-                    <VChip size="small" color="success" label>تصنيف: {{ spec.classification }}</VChip>
+              <VCard variant="outlined" class="h-100 details-section-card">
+                <VCardItem>
+                  <template #prepend>
+                    <VAvatar color="primary" variant="tonal" size="38" rounded="lg">
+                      <VIcon icon="tabler-building-bank" size="20" />
+                    </VAvatar>
+                  </template>
+                  <VCardTitle class="text-subtitle-1 font-weight-bold">معلومات العضوية والتأسيس</VCardTitle>
+                </VCardItem>
+                <VCardText class="pt-0">
+                  <div v-for="row in membershipRows" :key="row.label" class="details-row">
+                    <span class="d-flex align-center gap-2 text-body-2 details-row-label">
+                      <VIcon :icon="row.icon" size="16" color="primary" />
+                      {{ row.label }}
+                    </span>
+                    <span class="text-body-2 font-weight-medium text-end details-row-value">{{ row.value }}</span>
                   </div>
-                </div>
-              </div>
-              <div v-else>
-                <p><strong>التخصص:</strong> {{ detailsTarget.trade || '—' }}</p>
-                <p><strong>التصنيف:</strong> {{ detailsTarget.classification || '—' }}</p>
-              </div>
+                </VCardText>
+              </VCard>
             </VCol>
+
+            <!-- الإدارة والشركاء -->
             <VCol cols="12" md="6">
-              <div class="d-flex align-center justify-space-between mb-3">
-                <h3 class="text-h6 text-primary mb-0">الإدارة والشركاء</h3>
-                <VBtn size="small" variant="text" prepend-icon="tabler-edit" @click="openContactEdit">
-                  تعديل المفوض والجوال
-                </VBtn>
-              </div>
-              <p><strong>صاحب المنشأة:</strong> {{ detailsTarget.owner_name || '—' }}</p>
-              <p><strong>أسماء الشركاء:</strong> {{ detailsTarget.partners || '—' }}</p>
-              <p><strong>المفوض بالتوقيع:</strong> {{ detailsTarget.authorized_person || '—' }}</p>
+              <VCard variant="outlined" class="h-100 details-section-card">
+                <VCardItem>
+                  <template #prepend>
+                    <VAvatar color="info" variant="tonal" size="38" rounded="lg">
+                      <VIcon icon="tabler-users-group" size="20" />
+                    </VAvatar>
+                  </template>
+                  <VCardTitle class="text-subtitle-1 font-weight-bold">الإدارة والشركاء</VCardTitle>
+                  <template #append>
+                    <VBtn size="small" variant="text" color="primary" prepend-icon="tabler-edit" @click="openContactEdit">
+                      تعديل
+                    </VBtn>
+                  </template>
+                </VCardItem>
+                <VCardText class="pt-0">
+                  <div v-for="row in managementRows" :key="row.label" class="details-row">
+                    <span class="d-flex align-center gap-2 text-body-2 details-row-label">
+                      <VIcon :icon="row.icon" size="16" color="info" />
+                      {{ row.label }}
+                    </span>
+                    <span class="text-body-2 font-weight-medium text-end details-row-value">{{ row.value }}</span>
+                  </div>
+                </VCardText>
+              </VCard>
             </VCol>
-            
+
+            <!-- العنوان والاتصال -->
+            <VCol cols="12" md="6">
+              <VCard variant="outlined" class="h-100 details-section-card">
+                <VCardItem>
+                  <template #prepend>
+                    <VAvatar color="success" variant="tonal" size="38" rounded="lg">
+                      <VIcon icon="tabler-map-pin" size="20" />
+                    </VAvatar>
+                  </template>
+                  <VCardTitle class="text-subtitle-1 font-weight-bold">العنوان والاتصال</VCardTitle>
+                </VCardItem>
+                <VCardText class="pt-0">
+                  <div v-for="row in contactRows" :key="row.label" class="details-row">
+                    <span class="d-flex align-center gap-2 text-body-2 details-row-label">
+                      <VIcon :icon="row.icon" size="16" color="success" />
+                      {{ row.label }}
+                    </span>
+                    <span class="text-body-2 font-weight-medium text-end details-row-value" :dir="row.dir">{{ row.value }}</span>
+                  </div>
+                </VCardText>
+              </VCard>
+            </VCol>
+
+            <!-- المجالات والتصنيفات -->
+            <VCol cols="12" md="6">
+              <VCard variant="outlined" class="h-100 details-section-card">
+                <VCardItem>
+                  <template #prepend>
+                    <VAvatar color="warning" variant="tonal" size="38" rounded="lg">
+                      <VIcon icon="tabler-category" size="20" />
+                    </VAvatar>
+                  </template>
+                  <VCardTitle class="text-subtitle-1 font-weight-bold">المجالات والتصنيفات</VCardTitle>
+                </VCardItem>
+                <VCardText class="pt-0">
+                  <div v-if="getSpecialtiesList(detailsTarget).length > 0" class="d-flex flex-column gap-2">
+                    <div
+                      v-for="(spec, idx) in getSpecialtiesList(detailsTarget)"
+                      :key="idx"
+                      class="d-flex align-center gap-1 flex-wrap pa-2 rounded-lg"
+                      style="background: rgba(var(--v-theme-on-surface), 0.03);"
+                    >
+                      <VChip size="small" color="primary" variant="tonal" label>{{ getFieldTitle(spec.field_lk_type) }}</VChip>
+                      <VChip size="small" color="info" variant="tonal" label>{{ getSpecializationTitle(spec.specialization_lk_type) }}</VChip>
+                      <VChip size="small" color="success" variant="tonal" label>{{ spec.classification }}</VChip>
+                    </div>
+                  </div>
+                  <div v-else class="details-row">
+                    <span class="text-body-2 text-medium-emphasis">التصنيف</span>
+                    <span class="text-body-2 font-weight-medium">{{ detailsTarget.classification || '—' }}</span>
+                  </div>
+                </VCardText>
+              </VCard>
+            </VCol>
+
+            <!-- المستندات المرفقة -->
             <VCol cols="12">
-                <VDivider class="my-4" />
+              <VCard variant="outlined" class="details-section-card">
+                <VCardItem>
+                  <template #prepend>
+                    <VAvatar color="secondary" variant="tonal" size="38" rounded="lg">
+                      <VIcon icon="tabler-folder" size="20" />
+                    </VAvatar>
+                  </template>
+                  <VCardTitle class="text-subtitle-1 font-weight-bold">المستندات المرفقة</VCardTitle>
+                </VCardItem>
+                <VCardText class="pt-0">
+                  <VRow dense>
+                    <VCol v-for="doc in documentFields" :key="doc.key" cols="12" sm="6" md="4">
+                      <div
+                        class="d-flex align-center gap-2 pa-2 rounded-lg"
+                        :style="`background: rgba(var(--v-theme-on-surface), ${documentUrl(doc.key) ? 0.03 : 0.015});`"
+                      >
+                        <VAvatar :color="documentUrl(doc.key) ? 'primary' : 'secondary'" variant="tonal" size="32" rounded="lg">
+                          <VIcon :icon="doc.icon" size="16" />
+                        </VAvatar>
+                        <span
+                          class="text-body-2 text-truncate flex-grow-1"
+                          :class="documentUrl(doc.key) ? 'font-weight-medium' : 'text-medium-emphasis'"
+                          style="font-family:Cairo,sans-serif"
+                        >
+                          {{ doc.label }}
+                        </span>
+                        <template v-if="documentUrl(doc.key)">
+                          <VBtn icon size="x-small" variant="text" color="primary" @click="viewFile(documentUrl(doc.key))">
+                            <VIcon icon="tabler-eye" size="16" />
+                            <VTooltip activator="parent">عرض</VTooltip>
+                          </VBtn>
+                          <VBtn icon size="x-small" variant="text" color="primary" @click="downloadFile(documentUrl(doc.key), doc.label)">
+                            <VIcon icon="tabler-download" size="16" />
+                            <VTooltip activator="parent">تحميل</VTooltip>
+                          </VBtn>
+                        </template>
+                        <VIcon v-else icon="tabler-file-off" size="16" color="secondary" />
+                      </div>
+                    </VCol>
+                  </VRow>
+                </VCardText>
+              </VCard>
             </VCol>
 
-            <VCol cols="12" md="6">
-              <h3 class="text-h6 mb-3 text-primary">العنوان والاتصال</h3>
-              <p><strong>الجوال:</strong> <span dir="ltr">{{ detailsTarget.phone || '—' }}</span></p>
-              <p><strong>الهاتف/الفاكس:</strong> <span dir="ltr">{{ detailsTarget.fax || '—' }}</span></p>
-              <p><strong>البريد الإلكتروني:</strong> {{ detailsTarget.email || '—' }}</p>
-              <p><strong>المدينة:</strong> {{ detailsTarget.city || '—' }}</p>
-              <p><strong>العنوان التفصيلي:</strong> {{ detailsTarget.address || '—' }}</p>
-            </VCol>
-
-            <VCol cols="12" md="6">
-              <h3 class="text-h6 mb-3 text-primary">المستندات المرفقة</h3>
-              <div class="d-flex flex-column gap-2">
-                <VBtn size="small" variant="tonal" prepend-icon="tabler-download" @click="downloadFile(detailsTarget.cr_file_url ?? detailsTarget.cr_file, 'السجل التجاري')" :disabled="!detailsTarget.cr_file">السجل التجاري</VBtn>
-                <VBtn size="small" variant="tonal" prepend-icon="tabler-download" @click="downloadFile(detailsTarget.company_register_url ?? detailsTarget.company_register, 'سجل الشركة')" :disabled="!detailsTarget.company_register">سجل الشركة</VBtn>
-                <VBtn size="small" variant="tonal" prepend-icon="tabler-download" @click="downloadFile(detailsTarget.municipal_license_url ?? detailsTarget.municipal_license, 'رخصة البلدية')" :disabled="!detailsTarget.municipal_license">رخصة البلدية</VBtn>
-                <VBtn size="small" variant="tonal" prepend-icon="tabler-download" @click="downloadFile(detailsTarget.company_approval_letter_url ?? detailsTarget.company_approval_letter, 'موافقة الانتساب')" :disabled="!detailsTarget.company_approval_letter">موافقة الانتساب</VBtn>
-                <VBtn size="small" variant="tonal" prepend-icon="tabler-download" @click="downloadFile(detailsTarget.lease_or_ownership_contract_url ?? detailsTarget.lease_or_ownership_contract, 'عقد المقر')" :disabled="!detailsTarget.lease_or_ownership_contract">عقد المقر (إيجار/تمليك)</VBtn>
-                <VBtn size="small" variant="tonal" prepend-icon="tabler-download" @click="downloadFile(detailsTarget.articles_of_association_url ?? detailsTarget.articles_of_association, 'عقد التأسيس')" :disabled="!detailsTarget.articles_of_association">عقد التأسيس</VBtn>
-                <VBtn size="small" variant="tonal" prepend-icon="tabler-download" @click="downloadFile(detailsTarget.internal_bylaws_url ?? detailsTarget.internal_bylaws, 'النظام الداخلي')" :disabled="!detailsTarget.internal_bylaws">النظام الداخلي</VBtn>
-                <VBtn size="small" variant="tonal" prepend-icon="tabler-download" @click="downloadFile(detailsTarget.bank_dealing_letter_url ?? detailsTarget.bank_dealing_letter, 'تعامل البنك')" :disabled="!detailsTarget.bank_dealing_letter">كتاب تعامل البنك</VBtn>
-                <VBtn size="small" variant="tonal" prepend-icon="tabler-download" @click="downloadFile(detailsTarget.secretary_contract_url ?? detailsTarget.secretary_contract, 'عقد سكرتير')" :disabled="!detailsTarget.secretary_contract">عقد سكرتير</VBtn>
-                <VBtn size="small" variant="tonal" prepend-icon="tabler-download" @click="downloadFile(detailsTarget.full_time_engineer_certificate_url ?? detailsTarget.full_time_engineer_certificate, 'شهادة مهندس')" :disabled="!detailsTarget.full_time_engineer_certificate">شهادة مهندس متفرغ</VBtn>
-                <VBtn size="small" variant="tonal" prepend-icon="tabler-download" @click="downloadFile(detailsTarget.partners_ids_url ?? detailsTarget.partners_ids, 'هويات الشركاء')" :disabled="!detailsTarget.partners_ids">هويات الشركاء</VBtn>
-                <VBtn size="small" variant="tonal" prepend-icon="tabler-download" @click="downloadFile(detailsTarget.authorization_letter_url ?? detailsTarget.authorization_letter, 'تفويض توقيع')" :disabled="!detailsTarget.authorization_letter">تفويض المفوض</VBtn>
-              </div>
+            <!-- ملاحظات إضافية -->
+            <VCol v-if="detailsTarget.notes" cols="12">
+              <VCard variant="outlined" class="details-section-card" color="warning">
+                <VCardItem>
+                  <template #prepend>
+                    <VAvatar color="warning" variant="tonal" size="38" rounded="lg">
+                      <VIcon icon="tabler-notes" size="20" />
+                    </VAvatar>
+                  </template>
+                  <VCardTitle class="text-subtitle-1 font-weight-bold">ملاحظات إضافية</VCardTitle>
+                </VCardItem>
+                <VCardText class="pt-0">
+                  <p class="text-body-2 mb-0">{{ detailsTarget.notes }}</p>
+                </VCardText>
+              </VCard>
             </VCol>
           </VRow>
         </VCardText>
-        <VCardActions>
+        <VDivider />
+        <VCardActions class="pa-4">
           <VSpacer />
           <VBtn variant="tonal" @click="detailsDialog = false">إغلاق</VBtn>
         </VCardActions>
@@ -549,3 +738,31 @@ const getSpecialtiesList = (contractor: any) => {
     </VSnackbar>
   </div>
 </template>
+<style scoped>
+.details-section-card {
+  border-radius: 14px !important;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.details-section-card:hover {
+  box-shadow: 0 4px 16px rgba(var(--v-theme-on-surface), 0.08);
+}
+.details-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block: 8px;
+  border-bottom: 1px dashed rgba(var(--v-theme-on-surface), 0.1);
+}
+.details-row:last-child {
+  border-bottom: none;
+}
+.details-row-label {
+  color: rgba(var(--v-theme-on-surface), var(--v-high-emphasis-opacity));
+  font-weight: 500;
+  white-space: nowrap;
+}
+.details-row-value {
+  color: rgba(var(--v-theme-on-surface), var(--v-high-emphasis-opacity));
+}
+</style>

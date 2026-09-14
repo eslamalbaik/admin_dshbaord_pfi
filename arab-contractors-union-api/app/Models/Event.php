@@ -11,11 +11,13 @@ class Event extends Model
 {
     use SoftDeletes, GeneratesSlug, HasPublicMediaUrls;
 
+    public const EVENT_TYPES = ['international', 'institutional', 'local'];
+
     protected $fillable = [
         'title', 'slug', 'excerpt', 'body',
         'image', 'video_url', 'external_url', 'gallery',
         'is_published',
-        'event_date', 'event_location', 'event_format', 'is_international', 'stream_url', 'speakers',
+        'event_date', 'event_location', 'event_format', 'is_international', 'event_type', 'stream_url', 'speakers',
         'published_at', 'created_by',
     ];
 
@@ -27,6 +29,15 @@ class Event extends Model
         'is_international' => 'boolean',
         'speakers'         => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        // is_international بديل محسوب مؤقت (deprecated) لضمان توافق أي مستهلك قديم للـAPI لم يُحدَّث بعد
+        static::saving(function (Event $event) {
+            if ($event->isDirty('event_type'))
+                $event->is_international = $event->event_type === 'international';
+        });
+    }
 
     // ─── Scopes ──────────────────────────────────────────────────────────────
 

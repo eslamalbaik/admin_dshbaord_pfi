@@ -188,7 +188,22 @@ const contractorSearch = ref('')
 const contractorOptions = ref<{ id: number; name: string; membership_number: string }[]>([])
 let contractorTimer: ReturnType<typeof setTimeout> | null = null
 
+// When a contractor is selected, Vuetify's VAutocomplete rewrites `contractorSearch`
+// to the selected item's display label (e.g. "اسم (12345)"). Without this guard that
+// rewrite re-triggers the debounced search below, which refetches contractorOptions
+// with that label as the query, drops the selected id from the results, and makes the
+// autocomplete render blank/"غير معرف" even though dueForm.contractor_id is still set.
+const justSelectedContractor = ref(false)
+
+watch(() => dueForm.value.contractor_id, () => {
+  justSelectedContractor.value = true
+})
+
 watch(contractorSearch, q => {
+  if (justSelectedContractor.value) {
+    justSelectedContractor.value = false
+    return
+  }
   if (contractorTimer) clearTimeout(contractorTimer)
   contractorTimer = setTimeout(async () => {
     if (!q || q.length < 2) return
@@ -263,6 +278,21 @@ const deleteDueMutation = useMutation({
     refreshAll()
   },
 })
+
+const deleteDueDialog = ref(false)
+const deletingDueId = ref<number | null>(null)
+
+function confirmDeleteDue(id: number) {
+  deletingDueId.value = id
+  deleteDueDialog.value = true
+}
+
+function deleteDueConfirmed() {
+  if (deletingDueId.value !== null)
+    deleteDueMutation.mutate(deletingDueId.value)
+  deleteDueDialog.value = false
+  deletingDueId.value = null
+}
 
 const statusColor: Record<string, string> = {
   unpaid: 'error',
@@ -704,7 +734,7 @@ const criteriaDiscountMutation = useMutation({
                           size="x-small"
                           variant="text"
                           color="error"
-                          @click="deleteDueMutation.mutate(d.id)"
+                          @click="confirmDeleteDue(d.id)"
                         />
                       </td>
                     </tr>
@@ -959,7 +989,7 @@ const criteriaDiscountMutation = useMutation({
           <VBtn
             color="primary"
             :loading="saveDueMutation.isPending.value"
-            :disabled="!editingDue && !dueForm.contractor_id"
+            :disabled="saveDueMutation.isPending.value || (!editingDue && !dueForm.contractor_id)"
             @click="saveDueMutation.mutate()"
           >
             حفظ
@@ -1165,6 +1195,23 @@ const criteriaDiscountMutation = useMutation({
           >
             تطبيق الخصم
           </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- ─── Dialog تأكيد حذف الذمة ─── -->
+    <VDialog v-model="deleteDueDialog" max-width="400">
+      <VCard>
+        <VCardTitle class="d-flex align-center gap-2">
+          <VIcon icon="tabler-alert-triangle" color="error" />
+          تأكيد الحذف
+        </VCardTitle>
+        <VCardText>
+          هل أنت متأكد من حذف هذه الذمة؟ لا يمكن التراجع عن هذا الإجراء.
+        </VCardText>
+        <VCardActions class="justify-end pb-4 px-6">
+          <VBtn variant="tonal" color="secondary" @click="deleteDueDialog = false">إلغاء</VBtn>
+          <VBtn color="error" :loading="deleteDueMutation.isPending.value" @click="deleteDueConfirmed">حذف</VBtn>
         </VCardActions>
       </VCard>
     </VDialog>

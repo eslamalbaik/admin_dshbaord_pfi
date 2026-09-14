@@ -39,6 +39,17 @@ class Payment extends Model
         return self::STATUS_LABELS[$this->status] ?? $this->status;
     }
 
+    protected static function booted(): void
+    {
+        // كل دفعة لازم يكون إلها رقم مرجعي، بغض النظر عن مصدر الإنشاء (مقاول أو إدخال يدوي من الداشبورد)
+        static::created(function (self $payment) {
+            if (! $payment->transaction_number) {
+                $payment->transaction_number = self::generateTransactionNumber($payment);
+                $payment->saveQuietly();
+            }
+        });
+    }
+
     /** رابط صورة إشعار التحويل الكامل */
     public function getReceiptImageUrlAttribute(): ?string
     {

@@ -9,9 +9,16 @@ use Illuminate\Http\Request;
 class EquipmentTypeController extends Controller
 {
     // GET /api/equipment-types
-    public function index()
+    public function index(Request $request)
     {
-        return response()->json(EquipmentType::orderBy('name_ar')->get());
+        $query = EquipmentType::orderBy('name_ar');
+
+        // منتقيات إنشاء/تعديل الآلية تطلب فقط الأنواع الظاهرة؛ شاشة إدارة الأنواع تحتاج الكل (بما فيها المخفي)
+        if ($request->boolean('active_only')) {
+            $query->where('is_active', true);
+        }
+
+        return response()->json($query->get());
     }
 
     // POST /api/equipment-types

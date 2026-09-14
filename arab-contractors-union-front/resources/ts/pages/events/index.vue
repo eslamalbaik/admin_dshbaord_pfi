@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import api from '@/plugins/axios'
-import { firstFile, toFileArray, type SingleFileModel } from '@/utils/files'
+import { firstFile, type SingleFileModel } from '@/utils/files'
 
 definePage({ meta: { requiresAdmin: true, adminOnly: true } })
 
@@ -26,6 +26,12 @@ const eventFormatOptions = [
   { title: 'وجاهي', value: 'onsite' },
   { title: 'أونلاين', value: 'online' },
   { title: 'وجاهي + أونلاين', value: 'hybrid' },
+]
+
+const eventTypeOptions = [
+  { title: 'فعالية دولية', value: 'international' },
+  { title: 'فعالية مؤسسات', value: 'institutional' },
+  { title: 'فعالية محلية للاتحاد', value: 'local' },
 ]
 
 const headers = [
@@ -60,7 +66,7 @@ const fetchEvents = async () => {
 watchEffect(() => fetchEvents())
 
 // ── Create/Edit form ──────────────────────────────
-interface SpeakerForm { name: string; title: string; photo: string; is_keynote: boolean }
+interface SpeakerForm { name: string; title: string; photo: string; is_keynote: boolean; photoFile: File | null }
 
 const emptyForm = () => ({
   id: null as number | null,
@@ -68,28 +74,38 @@ const emptyForm = () => ({
   excerpt: '',
   body: '',
   imagePreview: '' as string,
-  gallery: [] as File[],
-  existingGallery: [] as string[],
-  removeGallery: [] as string[],
   video_url: '',
   external_url: '',
   event_date: '',
   event_location: '',
   event_format: '' as string,
-  is_international: false,
+  event_type: 'local' as string,
   stream_url: '',
   speakers: [] as SpeakerForm[],
   is_published: false,
   published_at: '',
 })
 
-const addSpeaker = () => form.value.speakers.push({ name: '', title: '', photo: '', is_keynote: false })
-const removeSpeaker = (i: number) => form.value.speakers.splice(i, 1)
+const addSpeaker = () => form.value.speakers.push({ name: '', title: '', photo: '', is_keynote: false, photoFile: null })
 
-const toggleRemoveGalleryImage = (url: string) => {
-  const idx = form.value.removeGallery.indexOf(url)
-  if (idx === -1) form.value.removeGallery.push(url)
-  else form.value.removeGallery.splice(idx, 1)
+// متحدث رئيسي واحد بحد أقصى — تفعيل متحدث يُلغي تلقائياً أي متحدث رئيسي آخر (بند 9و)
+const onKeynoteToggle = (index: number, value: boolean) => {
+  if (value)
+    form.value.speakers.forEach((sp, i) => { sp.is_keynote = i === index })
+  else
+    form.value.speakers[index].is_keynote = false
+}
+
+const speakerDeleteDialog = ref(false)
+const speakerDeleteIndex = ref<number | null>(null)
+
+const confirmRemoveSpeaker = (i: number) => { speakerDeleteIndex.value = i; speakerDeleteDialog.value = true }
+
+const removeSpeaker = () => {
+  if (speakerDeleteIndex.value !== null)
+    form.value.speakers.splice(speakerDeleteIndex.value, 1)
+  speakerDeleteDialog.value = false
+  speakerDeleteIndex.value = null
 }
 
 const formDialog = ref(false)
@@ -116,18 +132,15 @@ const openEdit = (item: any) => {
     excerpt: item.excerpt ?? '',
     body: item.body ?? '',
     imagePreview: item.image ?? '',
-    gallery: [],
-    existingGallery: item.gallery ?? [],
-    removeGallery: [],
     video_url: item.video_url ?? '',
     external_url: item.external_url ?? '',
     event_date: item.event_date ? item.event_date.substring(0, 16) : '',
     event_location: item.event_location ?? '',
     event_format: item.event_format ?? '',
-    is_international: !!item.is_international,
+    event_type: item.event_type ?? 'local',
     stream_url: item.stream_url ?? '',
     speakers: Array.isArray(item.speakers) ? item.speakers.map((s: any) => ({
-      name: s.name ?? '', title: s.title ?? '', photo: s.photo ?? '', is_keynote: !!s.is_keynote,
+      name: s.name ?? '', title: s.title ?? '', photo: s.photo ?? '', is_keynote: !!s.is_keynote, photoFile: null,
     })) : [],
     is_published: !!item.is_published,
     published_at: item.published_at ? item.published_at.substring(0, 10) : '',
@@ -137,9 +150,25 @@ const openEdit = (item: any) => {
   formDialog.value = true
 }
 
+// ── View details (read-only) ───────────────────────
+const viewDialog = ref(false)
+const viewingItem = ref<any>(null)
+
+const openView = (item: any) => {
+  viewingItem.value = item
+  viewDialog.value = true
+}
+
+const eventTypeLabel = (t: string) => eventTypeOptions.find(o => o.value === t)?.title ?? t
+const eventFormatLabel = (f: string) => eventFormatOptions.find(o => o.value === f)?.title ?? f
+
 const saveEvent = async () => {
   if (!form.value.title || !form.value.body) {
     notify('العنوان والمحتوى مطلوبان', 'error')
+    return
+  }
+  if (form.value.event_format === 'onsite' && !form.value.event_location) {
+    notify('مكان الفعالية مطلوب لأن نوع الحضور وجاهي', 'error')
     return
   }
   formLoading.value = true
@@ -155,18 +184,17 @@ const saveEvent = async () => {
     if (form.value.event_date) fd.append('event_date', form.value.event_date)
     if (form.value.event_location) fd.append('event_location', form.value.event_location)
     if (form.value.event_format) fd.append('event_format', form.value.event_format)
-    fd.append('is_international', form.value.is_international ? '1' : '0')
+    fd.append('event_type', form.value.event_type)
     if (form.value.stream_url) fd.append('stream_url', form.value.stream_url)
     form.value.speakers.forEach((s, i) => {
       fd.append(`speakers[${i}][name]`, s.name)
       if (s.title) fd.append(`speakers[${i}][title]`, s.title)
       if (s.photo) fd.append(`speakers[${i}][photo]`, s.photo)
       fd.append(`speakers[${i}][is_keynote]`, s.is_keynote ? '1' : '0')
+      if (s.photoFile) fd.append(`speaker_photos[${i}]`, s.photoFile)
     })
     const mainImage = firstFile(mainImageFile.value)
     if (mainImage) fd.append('image', mainImage)
-    form.value.gallery.forEach(f => fd.append('gallery[]', f))
-    form.value.removeGallery.forEach(url => fd.append('remove_gallery[]', url))
 
     if (isEditing.value) {
       fd.append('_method', 'PUT')
@@ -352,6 +380,10 @@ const deleteEvent = async () => {
               <VIcon icon="tabler-users" />
               <VTooltip activator="parent">المهتمون بالانضمام</VTooltip>
             </VBtn>
+            <VBtn icon size="small" variant="text" color="info" @click="openView(item)">
+              <VIcon icon="tabler-eye" />
+              <VTooltip activator="parent">عرض التفاصيل</VTooltip>
+            </VBtn>
             <VBtn icon size="small" variant="text" color="primary" @click="openEdit(item)">
               <VIcon icon="tabler-pencil" />
               <VTooltip activator="parent">تعديل</VTooltip>
@@ -387,6 +419,10 @@ const deleteEvent = async () => {
             </VCol>
 
             <VCol cols="12" md="6">
+              <div v-if="form.imagePreview && !mainImageFile" class="d-flex align-center gap-2 mb-2">
+                <VImg :src="form.imagePreview" width="48" height="48" cover rounded />
+                <span class="text-caption text-medium-emphasis" style="font-family:Cairo,sans-serif">الصورة الحالية — اختر صورة جديدة لاستبدالها</span>
+              </div>
               <VFileInput
                 label="الصورة الرئيسية"
                 prepend-inner-icon="tabler-photo"
@@ -395,66 +431,28 @@ const deleteEvent = async () => {
                 style="font-family:Cairo,sans-serif"
                 v-model="mainImageFile"
               />
-            </VCol>
-            <VCol cols="12" md="6">
-              <VFileInput
-                label="إضافة صور للمعرض"
-                prepend-inner-icon="tabler-photo-plus"
-                prepend-icon=""
-                accept="image/*"
-                multiple
-                style="font-family:Cairo,sans-serif"
-                :model-value="form.gallery"
-                @update:model-value="form.gallery = toFileArray($event)"
-              />
-            </VCol>
-
-            <VCol v-if="form.existingGallery.length" cols="12">
-              <label class="text-body-2 font-weight-medium mb-2 d-block" style="font-family:Cairo,sans-serif">
-                صور المعرض الحالية (اضغط لحذف صورة)
-              </label>
-              <div class="d-flex flex-wrap gap-3">
-                <div
-                  v-for="url in form.existingGallery"
-                  :key="url"
-                  class="position-relative"
-                  style="width:80px;height:80px;cursor:pointer"
-                  @click="toggleRemoveGalleryImage(url)"
-                >
-                  <VImg
-                    :src="url"
-                    width="80"
-                    height="80"
-                    cover
-                    rounded
-                    :style="form.removeGallery.includes(url) ? 'opacity:0.35' : ''"
-                  />
-                  <VIcon
-                    :icon="form.removeGallery.includes(url) ? 'tabler-rotate' : 'tabler-trash'"
-                    :color="form.removeGallery.includes(url) ? 'success' : 'error'"
-                    size="18"
-                    class="position-absolute"
-                    style="top:2px;left:2px;background:white;border-radius:50%;padding:2px"
-                  />
-                </div>
-              </div>
-              <p v-if="form.removeGallery.length" class="text-caption text-error mt-1" style="font-family:Cairo,sans-serif">
-                {{ form.removeGallery.length }} صورة ستُحذف عند الحفظ
+              <p class="text-caption text-medium-emphasis mt-1" style="font-family:Cairo,sans-serif">
+                صورة رئيسية واحدة فقط — لا يوجد معرض صور للفعاليات
               </p>
             </VCol>
-
             <VCol cols="12" md="6">
               <VTextField v-model="form.video_url" label="رابط فيديو يوتيوب (اختياري)" prepend-inner-icon="tabler-brand-youtube" dir="ltr" />
             </VCol>
+
             <VCol cols="12" md="6">
               <VTextField v-model="form.external_url" label="رابط خارجي (اختياري)" prepend-inner-icon="tabler-external-link" dir="ltr" />
             </VCol>
-
             <VCol cols="12" md="6">
               <VTextField v-model="form.event_date" label="موعد الفعالية" type="datetime-local" style="font-family:Cairo,sans-serif" />
             </VCol>
-            <VCol cols="12" md="6">
-              <VTextField v-model="form.event_location" label="مكان الفعالية" prepend-inner-icon="tabler-map-pin" style="font-family:Cairo,sans-serif" />
+
+            <VCol cols="12" md="4">
+              <VSelect
+                v-model="form.event_type"
+                :items="eventTypeOptions"
+                label="نوع الفعالية *"
+                style="font-family:Cairo,sans-serif"
+              />
             </VCol>
             <VCol cols="12" md="4">
               <VSelect
@@ -465,10 +463,17 @@ const deleteEvent = async () => {
                 style="font-family:Cairo,sans-serif"
               />
             </VCol>
-            <VCol cols="12" md="4" class="d-flex align-center">
-              <VSwitch v-model="form.is_international" label="فعالية دولية" color="info" style="font-family:Cairo,sans-serif" />
+            <VCol v-if="form.event_format === 'onsite'" cols="12" md="4">
+              <VTextField
+                v-model="form.event_location"
+                label="مكان الفعالية *"
+                prepend-inner-icon="tabler-map-pin"
+                :rules="[v => !!v || 'مطلوب لأن نوع الحضور وجاهي']"
+                style="font-family:Cairo,sans-serif"
+              />
             </VCol>
-            <VCol cols="12" md="4">
+
+            <VCol cols="12" md="6">
               <VTextField
                 v-model="form.stream_url"
                 label="رابط البث المباشر (Zoom)"
@@ -494,13 +499,30 @@ const deleteEvent = async () => {
                   <VTextField v-model="sp.title" label="المسمى/الصفة" density="compact" style="font-family:Cairo,sans-serif" />
                 </VCol>
                 <VCol cols="12" md="3">
-                  <VTextField v-model="sp.photo" label="رابط الصورة (اختياري)" density="compact" dir="ltr" />
+                  <div v-if="sp.photo && !sp.photoFile" class="d-flex align-center gap-1 mb-1">
+                    <VImg :src="sp.photo" width="28" height="28" cover rounded />
+                    <span class="text-caption text-medium-emphasis" style="font-family:Cairo,sans-serif">صورة حالية</span>
+                  </div>
+                  <VFileInput
+                    v-model="sp.photoFile"
+                    label="صورة المتحدث"
+                    density="compact"
+                    accept="image/*"
+                    prepend-icon=""
+                    style="font-family:Cairo,sans-serif"
+                  />
                 </VCol>
                 <VCol cols="12" md="2">
-                  <VSwitch v-model="sp.is_keynote" label="متحدث رئيسي" density="compact" style="font-family:Cairo,sans-serif" />
+                  <VSwitch
+                    :model-value="sp.is_keynote"
+                    label="متحدث رئيسي"
+                    density="compact"
+                    style="font-family:Cairo,sans-serif"
+                    @update:model-value="onKeynoteToggle(i, $event as boolean)"
+                  />
                 </VCol>
                 <VCol cols="12" md="1" class="text-center">
-                  <VBtn icon="tabler-trash" size="small" variant="text" color="error" @click="removeSpeaker(i)" />
+                  <VBtn icon="tabler-trash" size="small" variant="text" color="error" @click="confirmRemoveSpeaker(i)" />
                 </VCol>
               </VRow>
               <p v-if="!form.speakers.length" class="text-body-2 text-medium-emphasis" style="font-family:Cairo,sans-serif">
@@ -520,6 +542,94 @@ const deleteEvent = async () => {
           <VSpacer />
           <VBtn variant="tonal" @click="formDialog = false">إلغاء</VBtn>
           <VBtn color="primary" :loading="formLoading" @click="saveEvent">{{ isEditing ? 'حفظ التعديلات' : 'نشر' }}</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- View Details Dialog -->
+    <VDialog v-model="viewDialog" max-width="680" scrollable>
+      <VCard v-if="viewingItem">
+        <VCardTitle class="d-flex align-center justify-space-between" style="font-family:Cairo,sans-serif">
+          <span>{{ viewingItem.title }}</span>
+          <VChip :color="viewingItem.is_published ? 'success' : 'secondary'" size="small" label>
+            {{ viewingItem.is_published ? 'منشور' : 'مسودة' }}
+          </VChip>
+        </VCardTitle>
+        <VCardText>
+          <VImg v-if="viewingItem.image" :src="viewingItem.image" max-height="280" class="mb-4 rounded" cover />
+
+          <p v-if="viewingItem.excerpt" class="text-body-1 font-weight-medium mb-4" style="font-family:Cairo,sans-serif">
+            {{ viewingItem.excerpt }}
+          </p>
+
+          <VRow dense class="mb-3">
+            <VCol cols="6" md="4">
+              <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">موعد الفعالية</span>
+              <span style="font-family:Cairo,sans-serif">{{ viewingItem.event_date ? new Date(viewingItem.event_date).toLocaleString('ar-PS', { dateStyle: 'medium', timeStyle: 'short' }) : '—' }}</span>
+            </VCol>
+            <VCol cols="6" md="4">
+              <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">المكان</span>
+              <span style="font-family:Cairo,sans-serif">{{ viewingItem.event_location || '—' }}</span>
+            </VCol>
+            <VCol cols="6" md="4">
+              <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">نوع الحضور</span>
+              <span style="font-family:Cairo,sans-serif">{{ viewingItem.event_format ? eventFormatLabel(viewingItem.event_format) : '—' }}</span>
+            </VCol>
+            <VCol cols="6" md="4">
+              <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">نوع الفعالية</span>
+              <span style="font-family:Cairo,sans-serif">{{ viewingItem.event_type ? eventTypeLabel(viewingItem.event_type) : '—' }}</span>
+            </VCol>
+            <VCol v-if="viewingItem.stream_url" cols="6" md="4">
+              <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">رابط البث</span>
+              <a :href="viewingItem.stream_url" target="_blank" dir="ltr">{{ viewingItem.stream_url }}</a>
+            </VCol>
+          </VRow>
+
+          <VDivider class="mb-4" />
+
+          <div class="text-body-2 mb-4" style="font-family:Cairo,sans-serif" v-html="viewingItem.body" />
+
+          <div v-if="viewingItem.speakers?.length" class="mb-2">
+            <label class="text-body-2 font-weight-medium mb-2 d-block" style="font-family:Cairo,sans-serif">المتحدثون</label>
+            <div class="d-flex flex-wrap gap-3">
+              <div v-for="(sp, i) in viewingItem.speakers" :key="i" class="d-flex align-center gap-2">
+                <VAvatar v-if="sp.photo" :image="sp.photo" size="36" />
+                <VAvatar v-else size="36" color="secondary" variant="tonal">
+                  <VIcon icon="tabler-user" size="18" />
+                </VAvatar>
+                <div>
+                  <div class="d-flex align-center gap-1">
+                    <span class="text-body-2 font-weight-medium" style="font-family:Cairo,sans-serif">{{ sp.name }}</span>
+                    <VChip v-if="sp.is_keynote" size="x-small" color="primary" label>رئيسي</VChip>
+                  </div>
+                  <span v-if="sp.title" class="text-caption text-medium-emphasis" style="font-family:Cairo,sans-serif">{{ sp.title }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" color="primary" @click="viewDialog = false; openEdit(viewingItem)">تعديل</VBtn>
+          <VBtn variant="tonal" @click="viewDialog = false">إغلاق</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- Speaker Delete Confirm Dialog -->
+    <VDialog v-model="speakerDeleteDialog" max-width="400">
+      <VCard>
+        <VCardTitle class="d-flex align-center gap-2" style="font-family:Cairo,sans-serif">
+          <VIcon icon="tabler-alert-triangle" color="error" />
+          تأكيد حذف المتحدث
+        </VCardTitle>
+        <VCardText style="font-family:Cairo,sans-serif">
+          هل أنت متأكد من حذف هذا المتحدث؟ لا يمكن التراجع عن هذا الإجراء.
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" @click="speakerDeleteDialog = false">إلغاء</VBtn>
+          <VBtn color="error" @click="removeSpeaker">حذف</VBtn>
         </VCardActions>
       </VCard>
     </VDialog>

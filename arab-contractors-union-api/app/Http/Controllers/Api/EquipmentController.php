@@ -71,7 +71,7 @@ class EquipmentController extends Controller
             'description'       => 'nullable|string',
             'manufacture_year'  => 'nullable|integer|min:1970|max:' . date('Y'),
             'power'             => 'nullable|string|max:50',
-            'condition'         => 'nullable|in:excellent,good,fair',
+            'condition'         => 'nullable|in:excellent,good,needs_maintenance',
             'contract_type'     => 'nullable|in:daily,weekly,monthly',
             'governorate'       => 'nullable|string|max:100',
             'city'              => 'nullable|string|max:100',
@@ -122,11 +122,11 @@ class EquipmentController extends Controller
             'description'       => 'nullable|string',
             'manufacture_year'  => 'nullable|integer|min:1970|max:' . date('Y'),
             'power'             => 'nullable|string|max:50',
-            'condition'         => 'nullable|in:excellent,good,fair',
+            'condition'         => 'nullable|in:excellent,good,needs_maintenance',
             'contract_type'     => 'nullable|in:daily,weekly,monthly',
             'governorate'       => 'nullable|string|max:100',
             'city'              => 'nullable|string|max:100',
-            'daily_price'       => 'sometimes|numeric|min:0',
+            'daily_price'       => 'required|numeric|min:0',
             'owner_phone'       => 'nullable|string|max:20',
             'status'            => 'nullable|in:visible,hidden,suspended',
             'is_featured'       => 'nullable|boolean',
@@ -156,9 +156,20 @@ class EquipmentController extends Controller
     public function uploadImages(Request $request, Equipment $equipment)
     {
         $request->validate([
-            'images'   => 'required|array|min:1|max:8',
+            'images'   => 'required|array|min:1',
             'images.*' => 'image|mimes:jpg,jpeg,png,webp|max:3072',
         ]);
+
+        // الحد 8 صور إجمالي (موجودة + جديدة)، لا الدفعة المرفوعة فقط — كانت الدفعة تُفحص لوحدها
+        // مما سمح بتجاوز الحد الفعلي عبر رفعات متتالية
+        $existingCount = $equipment->images()->count();
+        $newCount      = count($request->file('images'));
+
+        if ($existingCount + $newCount > 8) {
+            return response()->json([
+                'message' => "الحد الأقصى 8 صور لكل آلية. لديها حالياً {$existingCount} صورة، ولا يمكن إضافة {$newCount} أخرى.",
+            ], 422);
+        }
 
         $lastOrder = $equipment->images()->max('sort_order') ?? -1;
         $hasPrimary = $equipment->images()->where('is_primary', true)->exists();

@@ -15,6 +15,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // API-only app — never redirect unauthenticated requests, always return 401 JSON
         $middleware->redirectGuestsTo(fn() => null);
 
+        // Security headers for all responses
+        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+
         $middleware->validateCsrfTokens(except: [
             'login',
             'register',

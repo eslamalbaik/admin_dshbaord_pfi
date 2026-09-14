@@ -37,7 +37,6 @@ class AuthController extends Controller
 
             $redirectUrl = match($user->role) {
                 'admin', 'accountant' => $frontendUrl . '/dashboards',
-                'student'             => $landingUrl . '/student/dashboard',
                 default               => $landingUrl . '/',
             };
 
@@ -45,7 +44,7 @@ class AuthController extends Controller
                 'id'          => $user->id,
                 'name'        => $user->name,
                 'fullName'    => $user->name,
-                'role'        => $user->role ?? 'student',
+                'role'        => $user->role ?? 'admin',
                 'email'       => $user->email,
                 'redirect_url'=> $redirectUrl,
             ], 'تم تسجيل الدخول بنجاح.', 200, 'user');
@@ -70,7 +69,7 @@ class AuthController extends Controller
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => bcrypt($validated['password']),
-            'role' => 'student',
+            'role' => 'admin',
         ]);
 
         $plainToken = $user->createToken('auth_token')->plainTextToken;
@@ -83,7 +82,7 @@ class AuthController extends Controller
             'fullName'     => $user->name,
             'role'         => $user->role,
             'email'        => $user->email,
-            'redirect_url' => $landingUrl . '/student/dashboard',
+            'redirect_url' => rtrim(config('app.frontend_url'), '/') . '/dashboards',
         ], 'تم إنشاء الحساب بنجاح.', 201, 'user');
     }
 
@@ -150,7 +149,7 @@ class AuthController extends Controller
 
         $email = strtolower(trim($googleUser->getEmail()));
 
-        // Find existing user or create a new student account
+        // Find existing user or create a new admin account
         $user = \App\Models\User::withTrashed()->where('email', $email)->first();
 
         if ($user && $user->trashed()) {
@@ -162,22 +161,22 @@ class AuthController extends Controller
                 'name'     => $googleUser->getName() ?: $email,
                 'email'    => $email,
                 'password' => bcrypt(\Illuminate\Support\Str::random(32)), // random unusable password
-                'role'     => 'student',
+                'role'     => 'admin',
             ]);
-            Log::info("New Google student registered: {$email}");
+            Log::info("New Google admin registered: {$email}");
         }
 
         $plainToken = $user->createToken('google_oauth')->plainTextToken;
 
         $redirectUrl = in_array($user->role, ['admin', 'accountant'])
             ? rtrim(config('app.frontend_url'), '/') . '/dashboards'
-            : $landingUrl . '/student/dashboard';
+            : $landingUrl . '/';
 
         return $this->successWithToken($plainToken, [
             'id'           => $user->id,
             'name'         => $user->name,
             'fullName'     => $user->name,
-            'role'         => $user->role ?? 'student',
+            'role'         => $user->role ?? 'admin',
             'email'        => $user->email,
             'redirect_url' => $redirectUrl,
         ], 'تم تسجيل الدخول عبر Google بنجاح.', 200, 'user');

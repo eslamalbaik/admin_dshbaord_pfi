@@ -36,11 +36,11 @@ Route::prefix('v1')->group(function () {
     //  Contractor Mobile App — Auth (Public)
     // --------------------------------------------------------
     Route::prefix('contractor/auth')->group(function () {
-        // throttle: 5 محاولات كل دقيقة لمنع brute force
-        Route::middleware('throttle:5,1')->post('login', [ContractorAuthController::class, 'login']);
+        // throttle:auth (5 محاولات كل دقيقة) لمنع brute force
+        Route::middleware('throttle:auth')->post('login', [ContractorAuthController::class, 'login']);
 
         // تسجيل العضو (خطوتان): التحقق من الهوية ثم تعيين كلمة المرور
-        Route::middleware('throttle:10,1')->group(function () {
+        Route::middleware('throttle:auth')->group(function () {
             Route::post('verify-identity', [ContractorRegisterController::class, 'verifyIdentity']);
             Route::post('set-password',    [ContractorRegisterController::class, 'setPassword']);
             Route::post('verify-otp',      [ContractorRegisterController::class, 'verifyOtp']);
@@ -304,6 +304,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/',         [NewsController::class, 'store']);
             Route::put('{news}',     [NewsController::class, 'update']);
             Route::delete('{news}',  [NewsController::class, 'destroy']);
+            Route::delete('{news}/gallery-image', [NewsController::class, 'destroyGalleryImage']);
         });
 
         // --------------------------------------------------------
@@ -326,6 +327,11 @@ Route::prefix('v1')->group(function () {
             Route::put('{announcement}',     [\App\Http\Controllers\Api\AnnouncementController::class, 'update']);
             Route::delete('{announcement}',  [\App\Http\Controllers\Api\AnnouncementController::class, 'destroy']);
         });
+
+        Route::get('announcement-categories',    [\App\Http\Controllers\Api\AnnouncementCategoryController::class, 'index']);
+        Route::post('announcement-categories',   [\App\Http\Controllers\Api\AnnouncementCategoryController::class, 'store']);
+        Route::patch('announcement-categories/{announcementCategory}',  [\App\Http\Controllers\Api\AnnouncementCategoryController::class, 'update']);
+        Route::delete('announcement-categories/{announcementCategory}', [\App\Http\Controllers\Api\AnnouncementCategoryController::class, 'destroy']);
 
         // --------------------------------------------------------
         //  Terms & Conditions — Admin CRUD
@@ -369,6 +375,7 @@ Route::prefix('v1')->group(function () {
         Route::post('payments/transactions', [PaymentController::class, 'store']);
         Route::post('payments/transactions/{payment}/confirm', [PaymentController::class, 'confirm']);
         Route::post('payments/transactions/{payment}/reject',  [PaymentController::class, 'reject']);
+        Route::post('payments/transactions/{payment}/receipt-image', [PaymentController::class, 'uploadReceiptImage']);
 
         // --------------------------------------------------------
         //  Bank Accounts — Admin CRUD (شاشة الدفع)

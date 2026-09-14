@@ -249,6 +249,8 @@ class ContractorController extends Controller
     // GET /api/contractors/{id}
     public function show(Contractor $contractor)
     {
+        $contractor->withFileUrls = true;
+
         return $this->success($contractor->load('activeMembership')->toArray());
     }
 
@@ -264,6 +266,7 @@ class ContractorController extends Controller
         }
         
         $contractor->update($validated);
+        $contractor->withFileUrls = true;
 
         return $this->success($contractor->toArray(), 'تم تحديث بيانات المقاول بنجاح.');
     }

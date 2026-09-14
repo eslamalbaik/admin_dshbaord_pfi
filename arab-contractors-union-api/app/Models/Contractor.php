@@ -50,7 +50,48 @@ class Contractor extends Authenticatable
         'remember_token',
     ];
 
+    /** أسماء أعمدة الملفات المخزّنة على القرص — تُستخدم لبناء رابط `<field>_url` كامل تلقائيًا. */
+    public const FILE_FIELDS = [
+        'cr_file', 'id_file', 'authorized_signature', 'logo',
+        'lease_or_ownership_contract', 'company_approval_letter', 'municipal_license',
+        'company_register', 'articles_of_association', 'internal_bylaws',
+        'bank_dealing_letter', 'secretary_contract', 'full_time_engineer_certificate',
+        'partners_ids', 'authorization_letter',
+    ];
+
     protected $appends = ['has_app_account'];
+
+    /** يبني تلقائيًا `<field>_url` (رابط كامل عبر Storage::url) لأي حقل ملف عند الوصول له كمفتاح ديناميكي. */
+    public function getAttribute($key)
+    {
+        if (str_ends_with($key, '_url')) {
+            $field = substr($key, 0, -4);
+            if (in_array($field, self::FILE_FIELDS, true)) {
+                $path = $this->getAttributeFromArray($field);
+
+                return $path ? url(\Illuminate\Support\Facades\Storage::url($path)) : null;
+            }
+        }
+
+        return parent::getAttribute($key);
+    }
+
+    /** يُفعَّل بصفحة show/update فقط — تفاديًا لحساب 15 رابط لكل صف بقوائم/pagination. */
+    public bool $withFileUrls = false;
+
+    /** append() لا يصلح مع getAttribute() الديناميكي لأن Eloquent يطلب method get{Field}Attribute() فعلي — فبنحقن الروابط يدويًا بعد toArray(). */
+    public function toArray()
+    {
+        $array = parent::toArray();
+
+        if ($this->withFileUrls) {
+            foreach (self::FILE_FIELDS as $field) {
+                $array["{$field}_url"] = $this->getAttribute("{$field}_url");
+            }
+        }
+
+        return $array;
+    }
 
     protected $casts = [
         'established_year'       => 'integer',
@@ -96,40 +137,6 @@ class Contractor extends Authenticatable
             ->latestOfMany();
     }
 
-    /**
-     * كائن موحّد لحالة اشتراك المقاول — نداء واحد يجمع تفاصيل العضوية النشطة،
-     * الـ badge (active/expired/status الإداري)، أهلية التجديد وموانعه.
-     * مصدر واحد يُستخدم من أكثر من نقطة نهاية بدل تكرار نفس الحسبة.
-     */
-    public function subscriptionStatus(): array
-    {
-        $membership   = $this->activeMembership;
-        $isPaidActive = $membership && $membership->expires_at && $membership->expires_at->isFuture();
-
-        $badge = match (true) {
-            $isPaidActive                                                                  => 'active',
-            $membership && $membership->expires_at && $membership->expires_at->isPast()    => 'expired',
-            default                                                                         => $this->status,
-        };
-
-        $blockers = \App\Support\ContractorRequirements::renewalBlockers($this);
-
-        return [
-            'id'                    => $membership?->id,
-            'type'                  => $membership?->type,
-            'membership_status'     => $membership?->status,
-            'badge'                 => $badge,
-            'starts_at'             => $membership?->starts_at?->toDateString(),
-            'expires_at'            => $membership?->expires_at?->toDateString(),
-            'amount'                => $membership?->amount,
-            'expiring_soon'         => (bool) $membership?->expiring_soon,
-            'days_remaining'        => $membership?->expires_at ? max(0, (int) now()->diffInDays($membership->expires_at, false)) : null,
-            'can_renew'             => count($blockers) === 0,
-            'renewal_blockers'      => $blockers,
-            'outstanding_total_jod' => $this->outstandingDuesTotal(),
-        ];
-    }
-
     public function payments()
     {
         return $this->hasMany(Payment::class);
@@ -158,118 +165,6 @@ class Contractor extends Authenticatable
     public function dues()
     {
         return $this->hasMany(ContractorDue::class);
-    }
-
-    /** إجمالي الذمم المتبقية بالدينار الأردني */
-    public function outstandingDuesTotal(): float
-    {
-        return round((float) $this->dues()
-            ->outstanding()
-            ->selectRaw('COALESCE(SUM(amount_jod - paid_jod), 0) as total')
-            ->value('total'), 2);
-    }
-
-    /** إجمالي "ما عليه" — دفعات معلّقة + غرامات غير مسدَّدة + ذمم سابقة */
-    public function totalObligations(): float
-    {
-        $pendingPayments = (float) $this->payments()->where('status', 'pending')->sum('amount');
-        $unpaidPenalties = (float) $this->penalties()->where('status', '!=', 'paid')->sum('amount');
-
-        return round($pendingPayments + $unpaidPenalties + $this->outstandingDuesTotal(), 2);
-    }
-
-    /** الحد الأدنى لنسبة سداد الذمم لإصدار شهادة العضوية (REQ-02) — للعرض فقط الآن */
-    public const MEMBERSHIP_CERT_MIN_PAID_PERCENT = 95.0;
-
-    /** سقف هامش السماح المطلق بالدينار — أيهما أقل يُعتمَد: 5% من الإجمالي أو 50 دينار */
-    public const MEMBERSHIP_CERT_MAX_MARGIN_JOD = 50.0;
-
-    /** نسبة ما سُدِّد من إجمالي الذمم (amount_jod مقابل paid_jod) — 100% إن لم توجد ذمم مسجّلة */
-    public function duesPaidPercentage(): float
-    {
-        $totals = $this->duesTotals();
-        $total  = $totals['total'];
-
-        if ($total <= 0) {
-            return 100.0;
-        }
-
-        return round(($totals['paid'] / $total) * 100, 2);
-    }
-
-    /** @return array{total: float, paid: float, outstanding: float} */
-    public function duesTotalsSummary(): array
-    {
-        return $this->duesTotals();
-    }
-
-    /** @return array{total: float, paid: float, outstanding: float} */
-    private function duesTotals(): array
-    {
-        $totals = $this->dues()
-            ->selectRaw('COALESCE(SUM(amount_jod), 0) as total, COALESCE(SUM(paid_jod), 0) as paid')
-            ->first();
-
-        $total = (float) $totals->total;
-        $paid  = (float) $totals->paid;
-
-        return ['total' => $total, 'paid' => $paid, 'outstanding' => round($total - $paid, 2)];
-    }
-
-    /** @return array{total: float, paid: float, outstanding: float} ذمم السنة الحالية فقط (year = هذه السنة) */
-    public function currentYearDuesTotals(): array
-    {
-        $totals = $this->dues()
-            ->where('year', now()->year)
-            ->selectRaw('COALESCE(SUM(amount_jod), 0) as total, COALESCE(SUM(paid_jod), 0) as paid')
-            ->first();
-
-        $total = (float) $totals->total;
-        $paid  = (float) $totals->paid;
-
-        return ['total' => $total, 'paid' => $paid, 'outstanding' => round($total - $paid, 2)];
-    }
-
-    /** نسبة سداد ذمم السنة الحالية — 100% إن لم توجد ذمم مسجّلة لهذه السنة بعد */
-    public function currentYearDuesPaidPercentage(): float
-    {
-        $totals = $this->currentYearDuesTotals();
-
-        if ($totals['total'] <= 0) {
-            return 100.0;
-        }
-
-        return round(($totals['paid'] / $totals['total']) * 100, 2);
-    }
-
-    /** المبلغ بالدينار اللازم سداده لبلوغ نسبة 95% من ذمم السنة الحالية — 0 إن لم توجد ذمم لهذه السنة */
-    public function remainingToReach95PercentJod(): float
-    {
-        $totals = $this->currentYearDuesTotals();
-
-        if ($totals['total'] <= 0) {
-            return 0.0;
-        }
-
-        return max(0.0, round($totals['total'] * self::MEMBERSHIP_CERT_MIN_PAID_PERCENT / 100 - $totals['paid'], 2));
-    }
-
-    /**
-     * هامش السماح المسموح بالدينار لإصدار شهادة العضوية — أيهما أقل: 5% من إجمالي
-     * الذمم أو سقف {@see MEMBERSHIP_CERT_MAX_MARGIN_JOD} — لمنع حسابات الذمم الكبيرة
-     * من الاستفادة من هامش نسبي كبير (إطار الحوكمة، اجتماع مجلس الإدارة).
-     */
-    public function membershipCertAllowedMarginJod(): float
-    {
-        $total = $this->duesTotals()['total'];
-
-        return min($total * (100 - self::MEMBERSHIP_CERT_MIN_PAID_PERCENT) / 100, self::MEMBERSHIP_CERT_MAX_MARGIN_JOD);
-    }
-
-    /** هل نسبة سداد ذمم السنة الحالية تبلغ 95% فأكثر؟ (REQ-02 — محرك الاحتساب الآلي) */
-    public function isEligibleForMembershipCertificate(): bool
-    {
-        return $this->currentYearDuesPaidPercentage() >= self::MEMBERSHIP_CERT_MIN_PAID_PERCENT;
     }
 
     public function documents()
@@ -405,6 +300,44 @@ class Contractor extends Authenticatable
             });
 
         return ($maxNum + 1) . $suffix;
+    }
+
+    /**
+     * هل المقاول مؤهل لتسجيل الدخول؟
+     * مصدر واحد لشروط الحظر — أي تغيير مستقبلي يحصل هنا فقط.
+     *
+     * @return array{eligible: bool, reason: ?string, error_key: ?string, http_code: ?int}
+     */
+    public function loginEligibility(): array
+    {
+        if ($this->is_frozen) {
+            return [
+                'eligible'  => false,
+                'reason'    => \App\Support\ApiMessages::ACCOUNT_FROZEN,
+                'error_key' => 'account_frozen',
+                'http_code' => 403,
+            ];
+        }
+
+        if ($this->status === 'suspended') {
+            return [
+                'eligible'  => false,
+                'reason'    => \App\Support\ApiMessages::ACCOUNT_SUSPENDED,
+                'error_key' => 'account_suspended',
+                'http_code' => 403,
+            ];
+        }
+
+        if (! $this->phone_verified_at) {
+            return [
+                'eligible'  => false,
+                'reason'    => \App\Support\ApiMessages::PHONE_NOT_VERIFIED,
+                'error_key' => 'phone_not_verified',
+                'http_code' => 403,
+            ];
+        }
+
+        return ['eligible' => true, 'reason' => null, 'error_key' => null, 'http_code' => null];
     }
 
     /**

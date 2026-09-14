@@ -302,6 +302,8 @@ class TenderController extends Controller
             'deadline'            => $t->deadline?->toDateString(),
             'published_at'        => $t->published_at?->toDateString(),
             'status'              => $t->status,
+            'display_status'      => $t->display_status,
+            'display_status_label' => $t->display_status_label,
             'is_active'           => $t->is_active,
             'is_new'              => $t->is_new,
             'is_updated'          => $t->is_updated,
