@@ -824,6 +824,24 @@
 									"disabled": true
 								},
 								{
+									"key": "authorized_person_id_number",
+									"value": "",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "authorized_person_phone",
+									"value": "",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "authorized_person_whatsapp",
+									"value": "",
+									"type": "text",
+									"disabled": true
+								},
+								{
 									"key": "cr_file",
 									"type": "file",
 									"src": "",
@@ -834,6 +852,13 @@
 									"type": "file",
 									"src": "",
 									"disabled": true
+								},
+								{
+									"key": "accountant_certificate_or_contract",
+									"type": "file",
+									"src": "",
+									"disabled": true,
+									"description": "شهادة تفرغ محاسب من نقابة المحاسبين / أو عقد مع مكتب محاسبين معتمد"
 								},
 								{
 									"key": "classification",
