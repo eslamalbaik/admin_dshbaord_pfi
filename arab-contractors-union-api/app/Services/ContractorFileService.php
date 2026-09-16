@@ -31,6 +31,7 @@ class ContractorFileService
         'bank_dealing_letter'            => 'contractors/bank_letters',
         'secretary_contract'             => 'contractors/secretary_contracts',
         'full_time_engineer_certificate' => 'contractors/engineer_certs',
+        'accountant_certificate_or_contract' => 'contractors/accountant_certs',
         'partners_ids'                   => 'contractors/partners_ids',
         'authorization_letter'           => 'contractors/authorization_letters',
         'authorized_signature'           => 'contractors/signatures',

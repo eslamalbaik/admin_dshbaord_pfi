@@ -891,10 +891,10 @@
 								"request-otp"
 							]
 						},
-						"description": "**POST** `/api/v1/contractor/auth/profile/phone/request-otp`\n\nيرسل رمز تحقق (OTP) لرقم الجوال الجديد قبل حفظه بالبروفايل — يرفض لو نفس الرقم الحالي أو مستخدَم بحساب آخر. cooldown 35 ثانية بين الطلبات. الاستجابة تتضمّن `otp_preview` بس بالبيئة المحلية (driver=log).",
+						"description": "**POST** `/api/v1/contractor/auth/profile/phone/request-otp` — **Form-Data**\n\nيرسل رمز تحقق (OTP) لرقم الجوال الجديد قبل حفظه بالبروفايل — يرفض لو نفس الرقم الحالي أو مستخدَم بحساب آخر. cooldown 35 ثانية بين الطلبات. الاستجابة تتضمّن `otp_preview` بس بالبيئة المحلية (driver=log).",
 						"body": {
-							"mode": "urlencoded",
-							"urlencoded": [
+							"mode": "formdata",
+							"formdata": [
 								{
 									"key": "phone",
 									"value": "0599123456",
@@ -911,10 +911,6 @@
 						"header": [
 							{
 								"key": "Accept",
-								"value": "application/json"
-							},
-							{
-								"key": "Content-Type",
 								"value": "application/json"
 							},
 							{
@@ -935,10 +931,16 @@
 								"verify-otp"
 							]
 						},
-						"description": "**POST** `/api/v1/contractor/auth/profile/phone/verify-otp`\n\nيتحقق من الرمز، ويُتيح إرسال نفس رقم الجوال بطلب `profile/update` بعدها لمدة 15 دقيقة. بدون هالخطوة، `profile/update` يرفض أي تغيير برقم الجوال (`phone_verification_required`).",
+						"description": "**POST** `/api/v1/contractor/auth/profile/phone/verify-otp` — **Form-Data**\n\nيتحقق من الرمز، ويُتيح إرسال نفس رقم الجوال بطلب `profile/update` بعدها لمدة 15 دقيقة. بدون هالخطوة، `profile/update` يرفض أي تغيير برقم الجوال (`phone_verification_required`).",
 						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"otp\": \"123456\"\n}"
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "otp",
+									"value": "123456",
+									"type": "text"
+								}
+							]
 						}
 					}
 				},
@@ -1360,6 +1362,83 @@
 							]
 						},
 						"description": "GET /api/v1/contractor/documents"
+					}
+				},
+				{
+					"name": "Upload Document (Tender)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "title",
+									"value": "وثيقة عطاء مشروع كذا",
+									"type": "text"
+								},
+								{
+									"key": "file",
+									"type": "file",
+									"src": "",
+									"disabled": true
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/contractor/documents",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"documents"
+							]
+						},
+						"description": "POST /api/v1/contractor/documents — المقاول يرفع وثيقة عطاء لملفه الخاص فقط؛ النوع مقفول على tender (REQ-Tender-Docs)."
+					}
+				},
+				{
+					"name": "Delete Document",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/documents/:document",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"documents",
+								":document"
+							],
+							"variable": [
+								{
+									"key": "document",
+									"value": "1"
+								}
+							]
+						},
+						"description": "DELETE /api/v1/contractor/documents/{document} — يحذف فقط إن كانت الوثيقة مملوكة للمقاول الحالي (403 غير ذلك)."
 					}
 				},
 				{

@@ -59,8 +59,8 @@ class ContractorLookups
 
     /** مسمّيات درجات التخصص (خاصة بـ specialties[].classification) — منفصلة عن Contractor::CLASSIFICATION_LABELS */
     public const SPECIALTY_GRADE_LABELS = [
-        'اولى أ' => 'الدرجة الأولى (1)',
-        'اولى ب' => 'الدرجة الأولى',
+        'اولى أ' => 'الدرجة الأولى (أ)',
+        'اولى ب' => 'الدرجة الأولى (ب)',
         'ثانية'  => 'الدرجة الثانية',
         'ثالثة'  => 'الدرجة الثالثة',
         'رابعة'  => 'الدرجة الرابعة',

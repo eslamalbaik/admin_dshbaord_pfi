@@ -40,6 +40,9 @@ class UpdateFullProfileRequest extends FormRequest
             'legal_form'                    => 'nullable|string|max:100',
             'company_purposes'              => 'nullable|string',
             'authorized_person'             => 'nullable|string|max:255',
+            'authorized_person_id_number'   => 'nullable|string|max:50',
+            'authorized_person_phone'       => 'nullable|string|max:20',
+            'authorized_person_whatsapp'    => 'nullable|string|max:20',
 
             // Files
             'cr_file'                       => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
@@ -53,6 +56,7 @@ class UpdateFullProfileRequest extends FormRequest
             'bank_dealing_letter'           => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
             'secretary_contract'            => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
             'full_time_engineer_certificate'=> 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
+            'accountant_certificate_or_contract' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
             'partners_ids'                  => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
             'authorization_letter'          => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
             'authorized_signature'          => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',

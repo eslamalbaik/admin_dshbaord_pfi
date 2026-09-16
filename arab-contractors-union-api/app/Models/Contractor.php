@@ -25,7 +25,9 @@ class Contractor extends Authenticatable
     ];
 
     protected $fillable = [
-        'membership_number', 'name', 'authorized_person', 'authorized_person_title', 'commercial_register',
+        'membership_number', 'name', 'authorized_person', 'authorized_person_title',
+        'authorized_person_id_number', 'authorized_person_phone', 'authorized_person_whatsapp',
+        'commercial_register',
         'license_number', 'trade', 'classification', 'established_year', 'owner_name',
         'email', 'phone', 'phone_verified_at', 'city', 'governorate_id', 'city_id', 'address',
         'classification_decision_number', 'classification_decision_date',
@@ -39,7 +41,7 @@ class Contractor extends Authenticatable
         'authorized_signature', 'logo', 'lease_or_ownership_contract', 'company_approval_letter',
         'municipal_license', 'company_register', 'articles_of_association',
         'internal_bylaws', 'bank_dealing_letter', 'secretary_contract',
-        'full_time_engineer_certificate', 'partners_ids', 'authorization_letter',
+        'full_time_engineer_certificate', 'accountant_certificate_or_contract', 'partners_ids', 'authorization_letter',
         // Auto-fields and specialized types
         'field_lk_type', 'specialization_lk_type', 'established_date', 'specialties', 'terms_accepted_at',
         'equipment_disclaimer_accepted_at', 'equipment_banned_at',
@@ -56,7 +58,7 @@ class Contractor extends Authenticatable
         'lease_or_ownership_contract', 'company_approval_letter', 'municipal_license',
         'company_register', 'articles_of_association', 'internal_bylaws',
         'bank_dealing_letter', 'secretary_contract', 'full_time_engineer_certificate',
-        'partners_ids', 'authorization_letter',
+        'accountant_certificate_or_contract', 'partners_ids', 'authorization_letter',
     ];
 
     protected $appends = ['has_app_account'];
@@ -243,6 +245,7 @@ class Contractor extends Authenticatable
         'authorization_letter'          => 'كتاب تفويض المفوّض',
         'company_approval_letter'       => 'كتاب موافقة الشركة',
         'full_time_engineer_certificate'=> 'شهادة مهندس متفرغ',
+        'accountant_certificate_or_contract' => 'شهادة تفرغ محاسب من نقابة المحاسبين / أو عقد مع مكتب محاسبين معتمد',
         'secretary_contract'            => 'عقد سكرتير',
     ];
 

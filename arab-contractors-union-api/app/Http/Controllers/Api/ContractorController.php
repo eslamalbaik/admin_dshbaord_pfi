@@ -106,6 +106,9 @@ class ContractorController extends Controller
             'legal_form'                    => 'nullable|string|max:100',
             'company_purposes'              => 'nullable|string',
             'authorized_person'             => 'nullable|string|max:255',
+            'authorized_person_id_number'   => 'nullable|string|max:50',
+            'authorized_person_phone'       => 'nullable|string|max:20',
+            'authorized_person_whatsapp'    => 'nullable|string|max:20',
 
             // Files
             'cr_file'                       => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
@@ -119,6 +122,7 @@ class ContractorController extends Controller
             'bank_dealing_letter'           => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
             'secretary_contract'            => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
             'full_time_engineer_certificate'=> 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
+            'accountant_certificate_or_contract' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
             'partners_ids'                  => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
             'authorization_letter'          => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
         ];
@@ -138,6 +142,7 @@ class ContractorController extends Controller
             'bank_dealing_letter'           => 'contractors/bank_letters',
             'secretary_contract'            => 'contractors/secretary_contracts',
             'full_time_engineer_certificate'=> 'contractors/engineer_certs',
+            'accountant_certificate_or_contract' => 'contractors/accountant_certs',
             'partners_ids'                  => 'contractors/partners_ids',
             'authorization_letter'          => 'contractors/authorization_letters',
         ];
@@ -201,6 +206,9 @@ class ContractorController extends Controller
             'legal_form'                    => 'الشكل القانوني',
             'company_purposes'              => 'غايات الشركة',
             'authorized_person'             => 'المفوض بالتوقيع',
+            'authorized_person_id_number'   => 'رقم هوية المفوض',
+            'authorized_person_phone'       => 'رقم جوال المفوض',
+            'authorized_person_whatsapp'    => 'رقم واتساب المفوض',
             'cr_file'                       => 'ملف السجل التجاري',
             'id_file'                       => 'ملف الهوية',
             'authorized_signature'          => 'نموذج التوقيع',
@@ -213,6 +221,7 @@ class ContractorController extends Controller
             'bank_dealing_letter'           => 'كتاب البنك',
             'secretary_contract'            => 'عقد السكرتير',
             'full_time_engineer_certificate'=> 'شهادة المهندس المتفرغ',
+            'accountant_certificate_or_contract' => 'شهادة تفرغ المحاسب / عقد المكتب المحاسبي',
             'partners_ids'                  => 'هويات الشركاء',
             'authorization_letter'          => 'كتاب التفويض',
         ];
@@ -306,6 +315,9 @@ class ContractorController extends Controller
     {
         $validated = $request->validate([
             'authorized_person' => 'nullable|string|max:255',
+            'authorized_person_id_number' => 'nullable|string|max:50',
+            'authorized_person_phone'     => 'nullable|string|max:20',
+            'authorized_person_whatsapp'  => 'nullable|string|max:20',
             'phone'              => [
                 'nullable', 'string', 'max:20',
                 $this->uniqueIgnoringSoftDeleted('phone', true, $contractor->id),

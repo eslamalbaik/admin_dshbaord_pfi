@@ -287,6 +287,20 @@ const getSpecializationTitle = (val: number) => {
   return options.find(o => o.value === Number(val))?.title || val
 }
 
+// درجات التصنيف الموحَّدة (المادة 37) — "اولى أ" الدرجة الخاصة المقصورة على مجالي
+// طرق(20) وابنية(30)، و"اولى ب" الدرجة الأولى العادية المتاحة لبقية المجالات.
+const getGradeTitle = (val: string | null) => {
+  const labels: Record<string, string> = {
+    'اولى أ': 'الدرجة الأولى (أ)',
+    'اولى ب': 'الدرجة الأولى (ب)',
+    'ثانية':  'الدرجة الثانية',
+    'ثالثة':  'الدرجة الثالثة',
+    'رابعة':  'الدرجة الرابعة',
+    'خامسة':  'الدرجة الخامسة',
+  }
+  return val ? (labels[val] || val) : '—'
+}
+
 const getSpecialtiesList = (contractor: any) => {
   if (!contractor) return []
   if (contractor.specialties) {
@@ -354,6 +368,7 @@ const documentFields = [
   { key: 'bank_dealing_letter', label: 'تعامل البنك', icon: 'tabler-building-bank' },
   { key: 'secretary_contract', label: 'عقد سكرتير', icon: 'tabler-briefcase' },
   { key: 'full_time_engineer_certificate', label: 'شهادة مهندس متفرغ', icon: 'tabler-certificate' },
+  { key: 'accountant_certificate_or_contract', label: 'شهادة تفرغ محاسب / عقد مكتب محاسبين', icon: 'tabler-report-money' },
   { key: 'partners_ids', label: 'هويات الشركاء', icon: 'tabler-id-badge-2' },
   { key: 'authorization_letter', label: 'تفويض توقيع', icon: 'tabler-signature' },
 ]
@@ -597,7 +612,7 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
                     >
                       <VChip size="small" color="primary" variant="tonal" label>{{ getFieldTitle(spec.field_lk_type) }}</VChip>
                       <VChip size="small" color="info" variant="tonal" label>{{ getSpecializationTitle(spec.specialization_lk_type) }}</VChip>
-                      <VChip size="small" color="success" variant="tonal" label>{{ spec.classification }}</VChip>
+                      <VChip size="small" color="success" variant="tonal" label>{{ getGradeTitle(spec.classification) }}</VChip>
                     </div>
                   </div>
                   <div v-else class="details-row">

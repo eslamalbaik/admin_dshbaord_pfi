@@ -37,6 +37,9 @@ class ContractorProfileService
             'name'                 => $contractor->name,
             'logo_url'             => $contractor->logo ? Storage::disk('public')->url($contractor->logo) : null,
             'authorized_person'    => $contractor->authorized_person,
+            'authorized_person_id_number' => $contractor->authorized_person_id_number,
+            'authorized_person_phone'     => $contractor->authorized_person_phone,
+            'authorized_person_whatsapp'  => $contractor->authorized_person_whatsapp,
             'trade'                => $contractor->trade,
             'classification_label' => $contractor->classification_label,
             'email'                => $contractor->email,
@@ -172,7 +175,7 @@ class ContractorProfileService
     //  التحقق من توافق المحافظة والمدينة ومزامنة العمود النصي القديم
     // ─────────────────────────────────────────────────────────────────────────
 
-    public function applyLocation(array &$validated): void
+    public function applyLocation(array &$validated, Contractor $contractor): void
     {
         if (! array_key_exists('city_id', $validated) && ! array_key_exists('governorate_id', $validated)) {
             return;
@@ -181,8 +184,17 @@ class ContractorProfileService
         $city = ! empty($validated['city_id']) ? City::find($validated['city_id']) : null;
 
         if ($city) {
-            // المدينة يجب أن تتبع المحافظة المُرسلة (إن أُرسلت)
+            // المدينة يجب أن تتبع المحافظة المُرسلة (إن أُرسلت فعليًا كتعديل جديد)
             if (! empty($validated['governorate_id']) && (int) $validated['governorate_id'] !== (int) $city->governorate_id) {
+                // المدينة المرسلة نفسها المحفوظة أصلاً (لم يغيّرها المستخدم) — يقصد تغيير
+                // المحافظة فقط، فنُفرّغ المدينة القديمة غير المتوافقة بدل رفض الطلب بالكامل.
+                if ((int) $validated['city_id'] === (int) $contractor->city_id) {
+                    $validated['city_id'] = null;
+                    $validated['city'] = null;
+
+                    return;
+                }
+
                 throw ValidationException::withMessages([
                     'city_id' => ['المدينة المختارة لا تتبع المحافظة المختارة.'],
                 ]);

@@ -27,6 +27,9 @@ const form = ref({
   owner_name: '',
   partners: [] as string[],
   authorized_person: '',
+  authorized_person_id_number: '',
+  authorized_person_phone: '',
+  authorized_person_whatsapp: '',
 
   // Step 3: العنوان وبيانات الاتصال
   phone: '',
@@ -52,6 +55,7 @@ const form = ref({
   bank_dealing_letter: null as File | null,
   secretary_contract: null as File | null,
   full_time_engineer_certificate: null as File | null,
+  accountant_certificate_or_contract: null as File | null,
   partners_ids: null as File | null,
   authorization_letter: null as File | null,
   notes: '',
@@ -132,8 +136,8 @@ const specializationOptions = [
 // درجات التصنيف الموحَّدة (المادة 37) — "اولى أ" لا تصحّ إلا لمجالي طرق(20) وابنية(30)
 const TOP_TIER_FIELDS = [20, 30]
 const gradeOptions = [
-  { title: 'الدرجة الأولى (1)', value: 'اولى أ' },
-  { title: 'الدرجة الأولى', value: 'اولى ب' },
+  { title: 'الدرجة الأولى (أ)', value: 'اولى أ' },
+  { title: 'الدرجة الأولى (ب)', value: 'اولى ب' },
   { title: 'الدرجة الثانية', value: 'ثانية' },
   { title: 'الدرجة الثالثة', value: 'ثالثة' },
   { title: 'الدرجة الرابعة', value: 'رابعة' },
@@ -146,7 +150,8 @@ const gradeOptionsFor = (fieldLkType: number | null) =>
 const documentKeys = [
   'lease_or_ownership_contract', 'company_approval_letter', 'municipal_license', 'company_register',
   'cr_file', 'articles_of_association', 'internal_bylaws', 'bank_dealing_letter',
-  'secretary_contract', 'full_time_engineer_certificate', 'partners_ids', 'authorization_letter',
+  'secretary_contract', 'full_time_engineer_certificate', 'accountant_certificate_or_contract',
+  'partners_ids', 'authorization_letter',
 ] as const
 
 const existingFiles = ref<Record<string, string | null>>({})
@@ -160,6 +165,7 @@ const fetchContractor = async () => {
     const textFields = [
       'membership_number', 'commercial_register', 'name', 'capital', 'registration_date',
       'legal_form', 'company_purposes', 'owner_name', 'authorized_person',
+      'authorized_person_id_number', 'authorized_person_phone', 'authorized_person_whatsapp',
       'phone', 'fax', 'email', 'city', 'address', 'trade', 'established_date', 'license_number', 'notes'
     ]
     
@@ -349,6 +355,15 @@ const submit = async () => {
           </VCol>
           <VCol cols="12" md="6">
             <VTextField v-model="form.authorized_person" label="اسم المفوض بالتوقيع" :error-messages="validationErrors.authorized_person" />
+          </VCol>
+          <VCol cols="12" md="4">
+            <VTextField v-model="form.authorized_person_id_number" label="رقم هوية المفوض" :error-messages="validationErrors.authorized_person_id_number" />
+          </VCol>
+          <VCol cols="12" md="4">
+            <VTextField v-model="form.authorized_person_phone" label="رقم جوال المفوض" :error-messages="validationErrors.authorized_person_phone" />
+          </VCol>
+          <VCol cols="12" md="4">
+            <VTextField v-model="form.authorized_person_whatsapp" label="رقم الواتساب للمفوض" :error-messages="validationErrors.authorized_person_whatsapp" />
           </VCol>
           <VCol cols="12">
             <div class="d-flex align-center gap-2">
@@ -717,6 +732,25 @@ const submit = async () => {
               placeholder="انقر هنا لاختيار الملف أو سحبه"
               :color="form.full_time_engineer_certificate ? 'success' : ''"
               :prepend-icon="form.full_time_engineer_certificate ? 'tabler-circle-check' : 'tabler-cloud-upload'"
+            />
+          </VCol>
+          <VCol cols="12" md="6">
+            <div v-if="existingFiles.accountant_certificate_or_contract && !form.accountant_certificate_or_contract" class="d-flex align-center gap-2 mb-1">
+              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+              <a :href="existingFiles.accountant_certificate_or_contract!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+              </a>
+            </div>
+            <VFileInput
+              v-model="form.accountant_certificate_or_contract"
+              label="شهادة تفرغ محاسب من نقابة المحاسبين / أو عقد مع مكتب محاسبين معتمد (للتحديث)"
+              :error-messages="validationErrors.accountant_certificate_or_contract"
+              accept=".pdf,image/*"
+              class="custom-file-input"
+              persistent-placeholder
+              placeholder="انقر هنا لاختيار الملف أو سحبه"
+              :color="form.accountant_certificate_or_contract ? 'success' : ''"
+              :prepend-icon="form.accountant_certificate_or_contract ? 'tabler-circle-check' : 'tabler-cloud-upload'"
             />
           </VCol>
           <VCol cols="12" md="6">

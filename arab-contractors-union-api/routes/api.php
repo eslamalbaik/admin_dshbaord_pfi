@@ -88,6 +88,8 @@ Route::prefix('v1')->group(function () {
         Route::get('memberships',  [ContractorDashboardController::class, 'memberships']);
         Route::get('payments',     [ContractorDashboardController::class, 'payments']);
         Route::get('documents',    [ContractorDashboardController::class, 'documents']);
+        Route::post('documents',               [DocumentController::class, 'contractorStore']);
+        Route::delete('documents/{document}',  [DocumentController::class, 'contractorDestroy']);
 
         // شاشة الدفع — رفع إشعار التحويل ومتابعته
         Route::post('payments/transfer', [PaymentController::class, 'submitTransfer']);
@@ -489,6 +491,7 @@ Route::prefix('v1')->group(function () {
         //  Documents
         // --------------------------------------------------------
         Route::get('documents',               [DocumentController::class, 'index']);
+        Route::get('documents/export-zip',    [DocumentController::class, 'exportZip']);
         Route::post('documents',              [DocumentController::class, 'store']);
         Route::delete('documents/{document}', [DocumentController::class, 'destroy']);
 
@@ -496,6 +499,7 @@ Route::prefix('v1')->group(function () {
         //  Users & Notifications
         // --------------------------------------------------------
         Route::get('notifications',                    [NotificationController::class, 'index']);
+        Route::get('notifications/unread-count',       [NotificationController::class, 'unreadCount']);
         Route::post('notifications/read',              [NotificationController::class, 'markAllRead']);
         Route::patch('notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead']);
 

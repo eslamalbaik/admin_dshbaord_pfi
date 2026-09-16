@@ -41,13 +41,25 @@ const lastPage = computed(() => data.value?.meta?.last_page ?? 1)
 const isViewOpen = ref(false)
 const selected = ref<any>(null)
 const rejectReason = ref('')
+const rejectReasonError = ref('')
 const actionError = ref('')
 
 const openRequest = (r: any) => {
   selected.value = r
   rejectReason.value = ''
+  rejectReasonError.value = ''
   actionError.value = ''
   isViewOpen.value = true
+}
+
+// السبب إلزامي في الـ backend (min:5) — نتحقق هنا أيضاً حتى لا يرتدّ 422 للمستخدم.
+const onReject = () => {
+  if (rejectReason.value.trim().length < 5) {
+    rejectReasonError.value = 'سبب الرفض إلزامي (5 أحرف على الأقل) لإبلاغ المقاول به.'
+
+    return
+  }
+  rejectMutation.mutate()
 }
 
 const refresh = () => {
@@ -207,9 +219,11 @@ function fmtDate(d: string | null) {
             </VBtn>
             <VTextarea
               v-model="rejectReason"
-              label="سبب الرفض (اختياري)"
+              label="سبب الرفض *"
               rows="2"
               dir="rtl"
+              :error-messages="rejectReasonError"
+              @update:model-value="rejectReasonError = ''"
             />
             <VBtn
               color="error"
@@ -217,7 +231,7 @@ function fmtDate(d: string | null) {
               prepend-icon="tabler-x"
               class="mt-2"
               :loading="rejectMutation.isPending.value"
-              @click="rejectMutation.mutate()"
+              @click="onReject"
             >
               رفض الطلب
             </VBtn>

@@ -37,6 +37,7 @@ onUnmounted(() => window.removeEventListener('contractor-logged-out', logout))
 interface Contractor {
   id: number; name: string; membership_number: string
   commercial_register: string; authorized_person: string
+  authorized_person_id_number: string; authorized_person_phone: string; authorized_person_whatsapp: string
   trade: string; classification: string
   email: string; phone: string; city: string; address: string
   status: string; is_frozen: boolean
@@ -201,6 +202,7 @@ const docFields = [
   { key: 'authorization_letter',            label: 'كتاب تفويض المفوّض' },
   { key: 'company_approval_letter',         label: 'كتاب موافقة الشركة' },
   { key: 'full_time_engineer_certificate',  label: 'شهادة مهندس متفرغ' },
+  { key: 'accountant_certificate_or_contract', label: 'شهادة تفرغ محاسب من نقابة المحاسبين / أو عقد مع مكتب محاسبين معتمد' },
   { key: 'secretary_contract',              label: 'عقد سكرتير' },
 ] as const
 
@@ -219,7 +221,8 @@ const editMode = ref(false)
 const isSaving = ref(false)
 const saveError = ref('')
 const editForm = ref({
-  authorized_person: '', owner_name: '', email: '', phone: '', fax: '',
+  authorized_person: '', authorized_person_id_number: '', authorized_person_phone: '',
+  authorized_person_whatsapp: '', owner_name: '', email: '', phone: '', fax: '',
   capital: '', legal_form: '', registration_date: '', company_purposes: '',
   address: '', notes: '', governorate_id: null as number | null, city_id: null as number | null,
 })
@@ -293,6 +296,9 @@ function startEdit() {
   if (!contractor.value || !profileExtra.value) return
   editForm.value = {
     authorized_person: contractor.value.authorized_person ?? '',
+    authorized_person_id_number: contractor.value.authorized_person_id_number ?? '',
+    authorized_person_phone: contractor.value.authorized_person_phone ?? '',
+    authorized_person_whatsapp: contractor.value.authorized_person_whatsapp ?? '',
     owner_name: profileExtra.value.owner_name ?? '',
     email: contractor.value.email ?? '',
     phone: contractor.value.phone ?? '',
@@ -359,6 +365,9 @@ function applyProfileResponse(items: any) {
   if (contractor.value) {
     contractor.value.name = items.name
     contractor.value.authorized_person = items.authorized_person
+    contractor.value.authorized_person_id_number = items.authorized_person_id_number
+    contractor.value.authorized_person_phone = items.authorized_person_phone
+    contractor.value.authorized_person_whatsapp = items.authorized_person_whatsapp
     contractor.value.email = items.email
     contractor.value.phone = items.phone
     contractor.value.address = items.address
@@ -614,6 +623,52 @@ function downloadDoc(url: string, title: string) {
   a.href = url; a.download = title; a.target = '_blank'
   a.click()
 }
+
+// ─── وثائق العطاء الإضافية (REQ-Tender-Docs) — رفع/حذف يخص المقاول نفسه فقط ───
+const newDocTitle = ref('')
+const newDocFile = ref<File | null>(null)
+const uploadingDoc = ref(false)
+const uploadDocError = ref('')
+const deletingDocId = ref<number | null>(null)
+
+function onNewDocFileChange(e: Event) {
+  newDocFile.value = (e.target as HTMLInputElement).files?.[0] ?? null
+}
+
+async function uploadTenderDocument() {
+  if (!newDocFile.value || !newDocTitle.value.trim()) {
+    uploadDocError.value = 'الرجاء إدخال عنوان الوثيقة واختيار الملف.'
+    return
+  }
+
+  uploadingDoc.value = true
+  uploadDocError.value = ''
+  try {
+    const fd = new FormData()
+    fd.append('title', newDocTitle.value.trim())
+    fd.append('file', newDocFile.value)
+    const r = await axios.post(`${BASE}/api/v1/contractor/documents`, fd, { headers: apiHeaders() })
+    documents.value = [r.data.items, ...documents.value]
+    newDocTitle.value = ''
+    newDocFile.value = null
+  } catch (err: any) {
+    uploadDocError.value = err?.response?.data?.message || 'تعذّر رفع الوثيقة، حاول مرة أخرى.'
+  } finally {
+    uploadingDoc.value = false
+  }
+}
+
+async function deleteTenderDocument(id: number) {
+  deletingDocId.value = id
+  try {
+    await axios.delete(`${BASE}/api/v1/contractor/documents/${id}`, { headers: apiHeaders() })
+    documents.value = documents.value.filter(d => d.id !== id)
+  } catch {
+    uploadDocError.value = 'تعذّر حذف الوثيقة، حاول مرة أخرى.'
+  } finally {
+    deletingDocId.value = null
+  }
+}
 </script>
 
 <template>
@@ -830,6 +885,18 @@ function downloadDoc(url: string, title: string) {
                 <div class="md-input-read">{{ contractor.authorized_person || '—' }}</div>
               </div>
               <div class="md-input-group">
+                <label>رقم هوية المفوض</label>
+                <div class="md-input-read">{{ contractor.authorized_person_id_number || '—' }}</div>
+              </div>
+              <div class="md-input-group">
+                <label>رقم جوال المفوض</label>
+                <div class="md-input-read">{{ contractor.authorized_person_phone || '—' }}</div>
+              </div>
+              <div class="md-input-group">
+                <label>رقم الواتساب للمفوض</label>
+                <div class="md-input-read">{{ contractor.authorized_person_whatsapp || '—' }}</div>
+              </div>
+              <div class="md-input-group">
                 <label>رقم العضوية</label>
                 <div class="md-input-read">{{ contractor.membership_number }}</div>
               </div>
@@ -895,6 +962,18 @@ function downloadDoc(url: string, title: string) {
                 <div class="md-input-group">
                   <label>الاسم الأول (المفوض)</label>
                   <input v-model="editForm.authorized_person" type="text" class="md-fi" />
+                </div>
+                <div class="md-input-group">
+                  <label>رقم هوية المفوض</label>
+                  <input v-model="editForm.authorized_person_id_number" type="text" class="md-fi" />
+                </div>
+                <div class="md-input-group">
+                  <label>رقم جوال المفوض</label>
+                  <input v-model="editForm.authorized_person_phone" type="tel" class="md-fi" dir="ltr" />
+                </div>
+                <div class="md-input-group">
+                  <label>رقم الواتساب للمفوض</label>
+                  <input v-model="editForm.authorized_person_whatsapp" type="tel" class="md-fi" dir="ltr" />
                 </div>
                 <div class="md-input-group">
                   <label>صاحب المنشأة</label>
@@ -1229,6 +1308,21 @@ function downloadDoc(url: string, title: string) {
             <div class="page-title-area docs-title">
               <h2>ملفات ومرفقات إضافية</h2>
             </div>
+            <p class="docs-hint">وثائق العطاء وأي مرفقات إضافية تخص شركتك — ترفعها هنا وتبقى تحت تصرّف الإدارة عند مراجعة طلباتك.</p>
+
+            <div class="doc-upload-row">
+              <input v-model="newDocTitle" type="text" class="md-fi" placeholder="عنوان الوثيقة (مثال: وثيقة عطاء مشروع كذا)" />
+              <label class="md-doc-upload">
+                <UploadCloud :size="15" />
+                {{ newDocFile ? newDocFile.name : 'اختر ملفاً' }}
+                <input type="file" accept=".pdf,image/*" hidden @change="onNewDocFileChange" />
+              </label>
+              <button type="button" class="md-action-btn" :disabled="uploadingDoc" @click="uploadTenderDocument">
+                <UploadCloud :size="16" /> {{ uploadingDoc ? 'جاري الرفع...' : 'رفع' }}
+              </button>
+            </div>
+            <p v-if="uploadDocError" class="md-doc-row-err">{{ uploadDocError }}</p>
+
             <div class="doc-modern-grid">
               <div v-for="d in documents" :key="d.id" class="doc-modern-card">
                 <component :is="docIcon(d.mime_type)" :size="32" class="dmc-icon" />
@@ -1237,6 +1331,13 @@ function downloadDoc(url: string, title: string) {
                   <p>{{ d.formatted_size }} • {{ fmtDate(d.created_at) }}</p>
                 </div>
                 <button class="dmc-dl" @click="downloadDoc(d.url, d.title)"><Download :size="18"/></button>
+                <button
+                  class="dmc-dl dmc-del"
+                  :disabled="deletingDocId === d.id"
+                  @click="deleteTenderDocument(d.id)"
+                >
+                  <X :size="16"/>
+                </button>
               </div>
               <p v-if="!documents.length" class="docs-hint">لا توجد مرفقات إضافية بعد.</p>
             </div>
@@ -1662,6 +1763,12 @@ textarea.md-fi { resize: vertical; }
 .dmc-info p { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; }
 .dmc-dl { background: #f1f5f9; border: none; width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--primary); transition: background 0.2s; }
 .dmc-dl:hover { background: #e2e8f0; }
+.dmc-del { color: #dc2626; }
+.dmc-del:hover { background: #fee2e2; }
+.dmc-del:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.doc-upload-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+.doc-upload-row .md-fi { flex: 1; min-width: 220px; }
 
 /* ─── Feeds ─── */
 .feed-list { display: flex; flex-direction: column; gap: 1rem; }

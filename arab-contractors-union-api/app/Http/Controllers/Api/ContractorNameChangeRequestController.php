@@ -139,11 +139,16 @@ class ContractorNameChangeRequestController extends Controller
             return $this->error('تم البتّ بهذا الطلب مسبقاً.', 422);
         }
 
-        $data = $request->validate(['reject_reason' => 'nullable|string|max:500']);
+        // السبب إلزامي: يُعرض للمقاول نصاً في الإشعار والبريد
+        // ("... السبب: {reject_reason}")، فتركه فارغاً يُنتج رسالة مبتورة.
+        $data = $request->validate(
+            ['reject_reason' => 'required|string|min:5|max:500'],
+            ['reject_reason.required' => 'سبب الرفض إلزامي لإبلاغ المقاول به.'],
+        );
 
         $nameChangeRequest->update([
             'status'        => 'rejected',
-            'reject_reason' => $data['reject_reason'] ?? null,
+            'reject_reason' => $data['reject_reason'],
             'reviewed_by'   => Auth::id(),
             'reviewed_at'   => now(),
         ]);
