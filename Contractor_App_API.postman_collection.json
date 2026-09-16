@@ -792,7 +792,9 @@
 								{
 									"key": "name",
 									"value": "شركة اختبار النظام 930_g",
-									"type": "text"
+									"type": "text",
+									"disabled": true,
+									"description": "غير فعّال فعلياً على هذا الطلب — اسم الشركة لا يُعدَّل مباشرة، فقط عبر POST /contractor/auth/name-change-request بموافقة الإدارة"
 								},
 								{
 									"key": "trade",
@@ -800,28 +802,17 @@
 									"type": "text"
 								},
 								{
-									"key": "building",
-									"value": "عمارة 5",
+									"key": "owner_name",
+									"value": "",
 									"type": "text",
 									"disabled": true
 								},
 								{
-									"key": "floor",
-									"value": "الطابق الثالث",
+									"key": "authorized_person",
+									"value": "",
 									"type": "text",
-									"disabled": true
-								},
-								{
-									"key": "capital",
-									"value": "500000",
-									"type": "text",
-									"disabled": true
-								},
-								{
-									"key": "legal_form",
-									"value": "شركة مساهمة",
-									"type": "text",
-									"disabled": true
+									"disabled": true,
+									"description": "اسم المفوض بالتوقيع"
 								},
 								{
 									"key": "authorized_person_id_number",
@@ -842,23 +833,102 @@
 									"disabled": true
 								},
 								{
-									"key": "cr_file",
-									"type": "file",
-									"src": "",
+									"key": "email",
+									"value": "",
+									"type": "text",
 									"disabled": true
 								},
 								{
-									"key": "id_file",
-									"type": "file",
-									"src": "",
-									"disabled": true
-								},
-								{
-									"key": "accountant_certificate_or_contract",
-									"type": "file",
-									"src": "",
+									"key": "phone",
+									"value": "",
+									"type": "text",
 									"disabled": true,
-									"description": "شهادة تفرغ محاسب من نقابة المحاسبين / أو عقد مع مكتب محاسبين معتمد"
+									"description": "تغيير الجوال يتطلب تحقق OTP مسبق عبر profile/phone/request-otp و /verify-otp — يُرفض بدونه"
+								},
+								{
+									"key": "governorate_id",
+									"value": "",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "city_id",
+									"value": "",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "address",
+									"value": "",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "building",
+									"value": "عمارة 5",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "floor",
+									"value": "الطابق الثالث",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "fax",
+									"value": "",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "capital",
+									"value": "500000",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "legal_form",
+									"value": "شركة مساهمة",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "established_year",
+									"value": "",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "established_date",
+									"value": "",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "registration_date",
+									"value": "",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "company_purposes",
+									"value": "",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "partners",
+									"value": "[\"شريك 1\",\"شريك 2\"]",
+									"type": "text",
+									"disabled": true,
+									"description": "مصفوفة JSON بأسماء الشركاء"
+								},
+								{
+									"key": "notes",
+									"value": "",
+									"type": "text",
+									"disabled": true
 								},
 								{
 									"key": "classification",
@@ -871,6 +941,109 @@
 									"value": "[{\"field_lk_type\":20,\"specialization_lk_type\":30,\"classification\":\"أ\"}]",
 									"type": "text",
 									"description": "مصفوفة JSON: [{field_lk_type, specialization_lk_type, classification}]"
+								},
+								{
+									"key": "cr_file",
+									"type": "file",
+									"src": "",
+									"disabled": true
+								},
+								{
+									"key": "id_file",
+									"type": "file",
+									"src": "",
+									"disabled": true
+								},
+								{
+									"key": "authorized_signature",
+									"type": "file",
+									"src": "",
+									"disabled": true,
+									"description": "نموذج توقيع المفوض"
+								},
+								{
+									"key": "lease_or_ownership_contract",
+									"type": "file",
+									"src": "",
+									"disabled": true,
+									"description": "عقد الإيجار أو الملكية"
+								},
+								{
+									"key": "company_approval_letter",
+									"type": "file",
+									"src": "",
+									"disabled": true,
+									"description": "كتاب موافقة الشركة على الانتساب"
+								},
+								{
+									"key": "municipal_license",
+									"type": "file",
+									"src": "",
+									"disabled": true,
+									"description": "رخصة المهن (البلدية)"
+								},
+								{
+									"key": "company_register",
+									"type": "file",
+									"src": "",
+									"disabled": true,
+									"description": "مستخرج سجل الشركة"
+								},
+								{
+									"key": "articles_of_association",
+									"type": "file",
+									"src": "",
+									"disabled": true,
+									"description": "عقد التأسيس"
+								},
+								{
+									"key": "internal_bylaws",
+									"type": "file",
+									"src": "",
+									"disabled": true,
+									"description": "النظام الداخلي"
+								},
+								{
+									"key": "bank_dealing_letter",
+									"type": "file",
+									"src": "",
+									"disabled": true,
+									"description": "شهادة تعامل بنكي"
+								},
+								{
+									"key": "secretary_contract",
+									"type": "file",
+									"src": "",
+									"disabled": true,
+									"description": "عقد سكرتير"
+								},
+								{
+									"key": "full_time_engineer_certificate",
+									"type": "file",
+									"src": "",
+									"disabled": true,
+									"description": "شهادة مهندس متفرغ"
+								},
+								{
+									"key": "accountant_certificate_or_contract",
+									"type": "file",
+									"src": "",
+									"disabled": true,
+									"description": "شهادة تفرغ محاسب من نقابة المحاسبين / أو عقد مع مكتب محاسبين معتمد"
+								},
+								{
+									"key": "partners_ids",
+									"type": "file",
+									"src": "",
+									"disabled": true,
+									"description": "صور هويات الشركاء"
+								},
+								{
+									"key": "authorization_letter",
+									"type": "file",
+									"src": "",
+									"disabled": true,
+									"description": "كتاب تفويض المفوّض"
 								}
 							]
 						},
