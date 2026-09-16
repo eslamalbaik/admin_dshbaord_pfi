@@ -235,7 +235,7 @@ class ContractorHomeController extends Controller
             ->get()
             ->map(fn (News $n) => [
                 'type'         => 'news',
-                'reference_id' => $n->id,
+                'reference_id' => $n->slug,
                 'title'        => $n->title,
                 'subtitle'     => $n->category,
                 'has_attachment' => (bool) $n->image,

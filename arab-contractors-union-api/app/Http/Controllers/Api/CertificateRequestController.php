@@ -70,7 +70,7 @@ class CertificateRequestController extends Controller
     {
         $contractor = $request->user();
         $issues     = $this->eligibilityService->getIssues($contractor);
-        $percent    = $contractor->currentYearDuesPaidPercentage();
+        $percent    = $this->financialService->currentYearDuesPaidPercentage($contractor);
 
         $latestMembershipCert = $contractor->certificateRequests()
             ->where('type', 'membership')

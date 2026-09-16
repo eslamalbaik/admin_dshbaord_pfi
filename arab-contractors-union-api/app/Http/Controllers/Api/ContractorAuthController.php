@@ -152,7 +152,7 @@ class ContractorAuthController extends Controller
         $contractor = $request->user('contractor');
         $validated = $request->validated();
 
-        $this->profileService->applyLocation($validated);
+        $this->profileService->applyLocation($validated, $contractor);
         $contractor->update($validated);
 
         return $this->success($this->profileService->fullResource($contractor), 'تم تحديث الملف الشخصي بنجاح.');
@@ -245,7 +245,7 @@ class ContractorAuthController extends Controller
             $validated['phone_verified_at'] = now();
         }
 
-        $this->profileService->applyLocation($validated);
+        $this->profileService->applyLocation($validated, $contractor);
         $this->fileService->uploadProfileFiles($request, $validated, $contractor);
 
         if (isset($validated['specialties']) && is_string($validated['specialties'])) {

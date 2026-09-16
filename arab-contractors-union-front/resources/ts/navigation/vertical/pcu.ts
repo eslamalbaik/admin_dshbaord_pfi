@@ -40,29 +40,17 @@ if (!isAccountant) {
 }
 
 // 3. الشؤون المالية (مشتركة)
-	menuItems.push({ heading: 'الشؤون المالية' })
-	menuItems.push({
-	  title: 'المدفوعات',
-	  icon: { icon: 'tabler-credit-card' },
-	  children: [
-	    { title: 'سجل المدفوعات', to: 'payments-transactions' },
-	  ],
-	})
-	menuItems.push({
-	  title: 'الذمم المالية',
-	  icon: { icon: 'tabler-receipt' },
-	  to: 'dues',
-	})
-	menuItems.push({
-	  title: 'الغرامات والمخالفات',
-	  icon: { icon: 'tabler-alert-triangle' },
-	  to: 'contractors-penalties',
-	})
-	menuItems.push({
-	  title: 'الحسابات البنكية',
-	  icon: { icon: 'tabler-building-bank' },
-	  to: 'settings-bank-accounts',
-	})
+menuItems.push({ heading: 'الشؤون المالية' })
+menuItems.push({
+  title: 'المدفوعات',
+  icon: { icon: 'tabler-credit-card' },
+  children: [
+    { title: 'سجل المدفوعات', to: 'payments-transactions' },
+    { title: 'الذمم المالية', to: 'dues' },
+    { title: 'الغرامات والمخالفات', to: 'contractors-penalties' },
+    { title: 'الحسابات البنكية', to: 'settings-bank-accounts' },
+  ],
+})
 
 // 4. العطاءات وسوق الآليات والوثائق (للأدمن فقط)
 if (!isAccountant) {
@@ -149,41 +137,6 @@ if (!isAccountant) {
     title: 'الإعدادات',
     icon: { icon: 'tabler-settings' },
     to: 'settings',
-  })
-  menuItems.push({
-    title: 'الشروط والأحكام',
-    icon: { icon: 'tabler-file-text' },
-    to: 'settings-terms',
-  })
-  menuItems.push({
-    title: 'سياسة الخصوصية',
-    icon: { icon: 'tabler-shield-lock' },
-    to: 'settings-privacy-policy',
-  })
-  menuItems.push({
-    title: 'المكتبة القانونية',
-    icon: { icon: 'tabler-library' },
-    to: 'settings-legal-library',
-  })
-  menuItems.push({
-    title: 'إعدادات التطبيق',
-    icon: { icon: 'tabler-adjustments' },
-    to: 'settings-app-settings',
-  })
-  menuItems.push({
-    title: 'أسعار الصرف',
-    icon: { icon: 'tabler-currency-dollar' },
-    to: 'settings-exchange-rates',
-  })
-  menuItems.push({
-    title: 'الصفحات الديناميكية',
-    icon: { icon: 'tabler-file-plus' },
-    to: 'settings-pages',
-  })
-  menuItems.push({
-    title: 'رسوم الدرجات',
-    icon: { icon: 'tabler-cash' },
-    to: 'settings-grade-fees',
   })
 }
 

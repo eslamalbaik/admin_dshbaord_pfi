@@ -74,46 +74,49 @@ const uploadAvatar = async () => {
               @click="currentTab = 'profile'"
             />
             <VListItem
-              value="general"
-              prepend-icon="tabler-settings"
-              :title="$t('General')"
-              :active="currentTab === 'general'"
-              @click="currentTab = 'general'"
-            />
-            <VListItem
               value="branding"
               prepend-icon="tabler-palette"
               :title="$t('Branding')"
               :active="currentTab === 'branding'"
               @click="currentTab = 'branding'"
             />
+
+            <VDivider class="my-2" />
+
             <VListItem
-              value="email"
-              prepend-icon="tabler-mail"
-              :title="$t('Email (SMTP)')"
-              :active="currentTab === 'email'"
-              @click="currentTab = 'email'"
+              prepend-icon="tabler-file-text"
+              title="الشروط والأحكام"
+              :to="{ name: 'settings-terms' }"
             />
             <VListItem
-              value="payments"
-              prepend-icon="tabler-credit-card"
-              :title="$t('Payments')"
-              :active="currentTab === 'payments'"
-              @click="currentTab = 'payments'"
-            />
-            <VListItem
-              value="ai"
-              prepend-icon="tabler-brain"
-              :title="$t('AI (Gemini)')"
-              :active="currentTab === 'ai'"
-              @click="currentTab = 'ai'"
-            />
-            <VListItem
-              value="security"
               prepend-icon="tabler-shield-lock"
-              :title="$t('Security')"
-              :active="currentTab === 'security'"
-              @click="currentTab = 'security'"
+              title="سياسة الخصوصية"
+              :to="{ name: 'settings-privacy-policy' }"
+            />
+            <VListItem
+              prepend-icon="tabler-library"
+              title="المكتبة القانونية"
+              :to="{ name: 'settings-legal-library' }"
+            />
+            <VListItem
+              prepend-icon="tabler-adjustments"
+              title="إعدادات التطبيق"
+              :to="{ name: 'settings-app-settings' }"
+            />
+            <VListItem
+              prepend-icon="tabler-currency-dollar"
+              title="أسعار الصرف"
+              :to="{ name: 'settings-exchange-rates' }"
+            />
+            <VListItem
+              prepend-icon="tabler-file-plus"
+              title="الصفحات الديناميكية"
+              :to="{ name: 'settings-pages' }"
+            />
+            <VListItem
+              prepend-icon="tabler-cash"
+              title="رسوم الدرجات"
+              :to="{ name: 'settings-grade-fees' }"
             />
           </VList>
         </VCard>
@@ -153,64 +156,12 @@ const uploadAvatar = async () => {
             </VBtn>
           </VCardText>
 
-          <!-- General -->
-          <VCardText v-if="currentTab === 'general'">
-            <h5 class="text-h5 mb-4">{{ $t('General Settings') }}</h5>
-            <VTextField :label="$t('Site Name')" placeholder="Pharmacy LMS" class="mb-4" />
-            <VFileInput :label="$t('Logo')" accept="image/*" class="mb-4" />
-            <VFileInput :label="$t('Favicon')" accept="image/*" class="mb-4" />
-            <VBtn color="primary">{{ $t('Save Changes') }}</VBtn>
-          </VCardText>
-
           <!-- Branding -->
           <VCardText v-if="currentTab === 'branding'">
             <h5 class="text-h5 mb-4">Branding</h5>
             <VTextField label="Primary Color" placeholder="#7C3AED" class="mb-4" />
             <VTextField label="Secondary Color" placeholder="#06B6D4" class="mb-4" />
             <VSelect label="Font Family" :items="['Inter', 'Roboto', 'Outfit', 'Cairo']" class="mb-4" />
-            <VBtn color="primary">Save Changes</VBtn>
-          </VCardText>
-
-          <!-- Email -->
-          <VCardText v-if="currentTab === 'email'">
-            <h5 class="text-h5 mb-4">Email Settings (SMTP)</h5>
-            <VTextField label="SMTP Host" placeholder="smtp.gmail.com" class="mb-4" />
-            <VTextField label="SMTP Port" placeholder="587" class="mb-4" />
-            <VTextField label="SMTP Username" class="mb-4" />
-            <VTextField label="SMTP Password" type="password" class="mb-4" />
-            <VTextField label="From Email" placeholder="noreply@pharmacy-lms.com" class="mb-4" />
-            <VTextField label="From Name" placeholder="Pharmacy LMS" class="mb-4" />
-            <VBtn color="primary">Save Changes</VBtn>
-          </VCardText>
-
-          <!-- Payments -->
-          <VCardText v-if="currentTab === 'payments'">
-            <h5 class="text-h5 mb-4">Payment Gateway Settings</h5>
-            <VSelect label="Payment Provider" :items="['Moyasar', 'Tap', 'HyperPay']" class="mb-4" />
-            <VTextField label="API Key" class="mb-4" />
-            <VTextField label="Secret Key" type="password" class="mb-4" />
-            <VSwitch label="Test Mode" class="mb-4" />
-            <VBtn color="primary">Save Changes</VBtn>
-          </VCardText>
-
-          <!-- AI -->
-          <VCardText v-if="currentTab === 'ai'">
-            <h5 class="text-h5 mb-4">AI Settings (Gemini)</h5>
-            <VTextField label="Gemini API Key" type="password" class="mb-4" />
-            <VSwitch label="Enable AI Quiz Generation" class="mb-4" />
-            <VSwitch label="Enable Smart Summaries" class="mb-4" />
-            <VSwitch label="Enable Student Analysis" class="mb-4" />
-            <VBtn color="primary">Save Changes</VBtn>
-          </VCardText>
-
-          <!-- Security -->
-          <VCardText v-if="currentTab === 'security'">
-            <h5 class="text-h5 mb-4">Security Settings</h5>
-            <VTextField label="Max Devices Per Account" type="number" placeholder="2" class="mb-4" />
-            <VSwitch label="Enable Device Fingerprinting" class="mb-4" />
-            <VSwitch label="Enable OTP Login" class="mb-4" />
-            <VSwitch label="Enable Google Login" class="mb-4" />
-            <VSwitch label="Force Email Verification" class="mb-4" />
             <VBtn color="primary">Save Changes</VBtn>
           </VCardText>
         </VCard>
