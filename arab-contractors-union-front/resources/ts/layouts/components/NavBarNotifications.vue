@@ -6,7 +6,7 @@ import { useNotifications } from '@/composables/useNotifications'
 
 // Single source of truth — all fetching/caching/polling handled by Vue Query.
 // This component performs ZERO manual axios calls.
-const { rawNotifications, markRead, markReadMany } = useNotifications()
+const { rawNotifications, unreadCount, markRead, markReadMany } = useNotifications()
 
 const router = useRouter()
 const { t } = useI18n()
@@ -47,6 +47,24 @@ const notifications = computed<Notification[]>(() =>
       subtitle = 'notifications.course_completed_desc'
       color = 'success'
       icon = 'tabler-trophy'
+    }
+    else if (d.type === 'payment_submitted') {
+      title = 'notifications.title'
+      subtitle = d.message || ''
+      color = 'success'
+      icon = 'tabler-cash'
+    }
+    else if (d.type === 'contractor_activated') {
+      title = 'notifications.title'
+      subtitle = d.message || ''
+      color = 'info'
+      icon = 'tabler-user-check'
+    }
+    else if (d.type === 'event_joined') {
+      title = 'notifications.title'
+      subtitle = d.message || ''
+      color = 'warning'
+      icon = 'tabler-calendar-event'
     }
     else {
       title = 'notifications.title'
@@ -95,6 +113,7 @@ const handleNotificationClick = async (notification: Notification) => {
 <template>
   <Notifications
     :notifications="notifications"
+    :unread-count="unreadCount"
     @remove="removeNotification"
     @read="onRead"
     @unread="onUnread"

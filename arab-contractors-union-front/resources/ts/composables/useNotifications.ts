@@ -28,7 +28,7 @@ interface NotificationsResponse {
   unread_count: number
 }
 
-const NOTIFICATIONS_KEY = ['admin-notifications'] as const
+export const NOTIFICATIONS_KEY = ['admin-notifications'] as const
 
 export function useNotifications() {
   const queryClient = useQueryClient()
@@ -38,7 +38,14 @@ export function useNotifications() {
     queryKey: NOTIFICATIONS_KEY,
     queryFn: async (): Promise<NotificationsResponse> => {
       const res = await api.get('/api/v1/notifications')
-      return res.data
+
+      // acu-api wraps every response as { status, message, status_code, items }.
+      // The axios interceptor only mirrors `items` → `data` when `items` is an
+      // ARRAY; here it is an object ({ notifications, unread_count }), so it is
+      // left untouched and the payload stays one level down. Unwrap it here —
+      // reading res.data directly yields undefined and silently degrades to an
+      // empty list with a zero unread count (empty bell + hidden badge).
+      return res.data?.items ?? res.data
     },
     staleTime: 30000, // 30s — treat data as fresh, dedupes rapid mounts
     refetchInterval: 60000, // poll once a minute

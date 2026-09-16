@@ -31,24 +31,33 @@ function mapRawNotification(n: any): NotificationItem {
   const d = n.data || {}
 
   // تحديد العنوان والأيقونة واللون بحسب نوع الإشعار
+  // المفاتيح هنا يجب أن تطابق حرفياً قيمة 'type' في app/Notifications/*.php —
+  // أي مفتاح لا يطابق يسقط إلى 'general' فيضيع العنوان والأيقونة واللون.
   const typeMap: Record<string, { title: string; icon: string; color: string }> = {
+    // طلبات المقاولين
+    name_change_request_submitted:   { title: 'طلب تعديل اسم شركة', icon: 'tabler-signature', color: 'warning' },
+    name_change_request_status:      { title: 'تحديث طلب تعديل الاسم', icon: 'tabler-signature', color: 'info' },
+    profile_update_request_submitted: { title: 'طلب تعديل بيانات', icon: 'tabler-user-edit', color: 'warning' },
+    profile_update_request_status:   { title: 'تحديث طلب تعديل البيانات', icon: 'tabler-user-edit', color: 'info' },
+    certificate_request_submitted:   { title: 'طلب شهادة جديد', icon: 'tabler-certificate', color: 'warning' },
+    certificate_request_status:      { title: 'تحديث طلب شهادة', icon: 'tabler-certificate', color: 'info' },
+    // حركة مالية
+    payment_submitted:   { title: 'إشعار تحويل بانتظار التأكيد', icon: 'tabler-cash', color: 'warning' },
+    payment_confirmed:   { title: 'تم تأكيد الدفعة', icon: 'tabler-circle-check', color: 'success' },
+    payment_rejected:    { title: 'رُفضت الدفعة', icon: 'tabler-credit-card-off', color: 'error' },
     // عضوية
-    membership_approved: { title: 'تمت الموافقة على العضوية', icon: 'tabler-id-badge', color: 'success' },
-    membership_rejected: { title: 'رُفض طلب العضوية',        icon: 'tabler-id-badge-off', color: 'error' },
-    membership_expiring: { title: 'العضوية على وشك الانتهاء', icon: 'tabler-clock-exclamation', color: 'warning' },
-    membership_expired:  { title: 'انتهت صلاحية العضوية',    icon: 'tabler-clock-off', color: 'error' },
-    // مدفوعات
-    payment_received:    { title: 'تم استلام دفعة',           icon: 'tabler-credit-card', color: 'success' },
-    payment_overdue:     { title: 'دفعة متأخرة',              icon: 'tabler-credit-card-off', color: 'error' },
-    // غرامات
-    penalty_issued:      { title: 'غرامة جديدة صادرة',        icon: 'tabler-alert-triangle', color: 'error' },
-    penalty_paid:        { title: 'تم سداد الغرامة',          icon: 'tabler-circle-check', color: 'success' },
-    // عطاءات
-    tender_new:          { title: 'عطاء جديد',                icon: 'tabler-files', color: 'primary' },
-    tender_deadline:     { title: 'اقتراب موعد العطاء',        icon: 'tabler-calendar-exclamation', color: 'warning' },
-    // مقاولون
-    contractor_new:      { title: 'مقاول جديد',               icon: 'tabler-building-factory-2', color: 'info' },
-    contractor_updated:  { title: 'تحديث بيانات مقاول',       icon: 'tabler-building-factory-2', color: 'secondary' },
+    contractor_activated:            { title: 'تفعيل حساب مقاول', icon: 'tabler-user-check', color: 'info' },
+    complete_profile:                { title: 'استكمال الملف الشخصي', icon: 'tabler-user-exclamation', color: 'secondary' },
+    membership_expiry_reminder:      { title: 'العضوية على وشك الانتهاء', icon: 'tabler-clock-exclamation', color: 'warning' },
+    membership_grace_period_reminder: { title: 'مهلة تجديد العضوية', icon: 'tabler-clock-off', color: 'error' },
+    // فعاليات ودعم
+    event_joined:                    { title: 'تسجيل حضور فعالية', icon: 'tabler-calendar-event', color: 'primary' },
+    support_ticket_created:          { title: 'طلب دعم جديد', icon: 'tabler-lifebuoy', color: 'warning' },
+    support_ticket_replied:          { title: 'رد على طلب دعم', icon: 'tabler-message-reply', color: 'info' },
+    support_ticket_contractor_replied: { title: 'رد المقاول على طلب دعم', icon: 'tabler-message-reply', color: 'warning' },
+    // نظام
+    admin_broadcast:                 { title: 'إعلان من الاتحاد', icon: 'tabler-speakerphone', color: 'primary' },
+    pma_rates_fetch_failed:          { title: 'تعذّر جلب أسعار الصرف', icon: 'tabler-alert-triangle', color: 'error' },
     // عام
     general:             { title: 'إشعار',                    icon: 'tabler-bell', color: 'primary' },
   }
@@ -97,10 +106,15 @@ async function fetchNotifications() {
   isLoading.value = true
   isError.value   = false
   try {
-    const res        = await api.get(`/api/v1/notifications?page=${page.value}`)
-    const paginator  = res.data?.notifications || {}
+    const res = await api.get(`/api/v1/notifications?page=${page.value}`)
+
+    // acu-api يغلّف الرد بـ { status, message, status_code, items }، و interceptor
+    // الـ axios يفكّه فقط حين يكون `items` مصفوفة — وهنا كائن، فيبقى مستوى أدنى.
+    // قراءة res.data مباشرة تُرجع undefined فتظهر الصفحة فارغة بلا أي خطأ.
+    const payload    = res.data?.items ?? res.data
+    const paginator  = payload?.notifications || {}
     const raw        = paginator.data || []
-    unreadCount.value = res.data?.unread_count ?? 0
+    unreadCount.value = payload?.unread_count ?? 0
     totalPages.value  = paginator.last_page ?? 1
     notifications.value = raw.map(mapRawNotification)
   }
