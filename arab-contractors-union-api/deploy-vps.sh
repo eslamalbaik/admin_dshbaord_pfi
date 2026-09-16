@@ -66,6 +66,10 @@ php artisan optimize
 echo "==> ربط storage"
 php artisan storage:link || true
 
+echo "==> إعادة تشغيل خدمات الإشعارات الفورية (Reverb + queue worker)"
+# لازم تعريف الوحدتين systemd أول مرة يدوياً — انظر ملاحظات REALTIME_NOTIFICATIONS.md
+sudo systemctl restart pcu-api-queue pcu-api-reverb || echo "⚠ تخطّي: خدمات pcu-api-queue/pcu-api-reverb غير مُعرَّفة بعد"
+
 # ---------------------------------------------------------------
 #  تنظيف النسخ القديمة
 # ---------------------------------------------------------------

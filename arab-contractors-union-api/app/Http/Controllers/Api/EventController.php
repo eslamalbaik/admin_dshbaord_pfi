@@ -8,7 +8,10 @@ use App\Http\Traits\HandlesMediaUploads;
 use App\Models\Contractor;
 use App\Models\Event;
 use App\Models\EventRegistration;
+use App\Models\User;
+use App\Notifications\EventJoinedNotification;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
@@ -52,10 +55,17 @@ class EventController extends Controller
     // POST /api/v1/contractor/events/{event}/join
     public function joinEvent(Request $request, Event $event)
     {
-        EventRegistration::firstOrCreate(
+        $registration = EventRegistration::firstOrCreate(
             ['event_id' => $event->id, 'contractor_id' => $request->user()->id],
             ['registered_at' => now()],
         );
+
+        if ($registration->wasRecentlyCreated) {
+            $admins = User::where('role', 'admin')->get();
+            if ($admins->isNotEmpty()) {
+                Notification::send($admins, new EventJoinedNotification($event, $request->user()));
+            }
+        }
 
         return $this->success(message: 'تم تسجيل انضمامك للفعالية بنجاح.');
     }

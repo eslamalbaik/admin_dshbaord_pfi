@@ -66,6 +66,9 @@ public/mockServiceWorker.js
 .env*
 !.env.example
 
+# مفتاح Firebase Admin SDK الخاص — سرّ حي، لا يُرفع أبدًا
+/storage/app/private/firebase/
+
 # مخرجات وقت التشغيل لتوليد الشهادات — تتولّد على كل سيرفر ولا تُنقل بين البيئات
 /storage/app/mpdf-tmp/
 /storage/app/mpdf-tmp-test/

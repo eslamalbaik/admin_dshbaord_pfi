@@ -11,6 +11,13 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    // Channel auth route lives under /api/broadcasting/auth, guarded the same way as the
+    // rest of the API (auth:sanctum) — the default "web"-middleware route relies on session
+    // auth, which doesn't apply here since the frontend authenticates with a bearer token.
+    ->withBroadcasting(
+        channels: __DIR__.'/../routes/channels.php',
+        attributes: ['prefix' => 'api', 'middleware' => ['api', 'auth:sanctum']],
+    )
     ->withMiddleware(function (Middleware $middleware): void {
         // API-only app — never redirect unauthenticated requests, always return 401 JSON
         $middleware->redirectGuestsTo(fn() => null);

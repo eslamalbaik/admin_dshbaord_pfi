@@ -10,7 +10,9 @@ declare global {
   const COOKIE_MAX_AGE_1_YEAR: typeof import('./resources/ts/utils/constants')['COOKIE_MAX_AGE_1_YEAR']
   const CreateUrl: typeof import('./src/@core/composable/CreateUrl')['CreateUrl']
   const EffectScope: typeof import('vue')['EffectScope']
+  const NOTIFICATIONS_KEY: typeof import('./resources/ts/composables/useNotifications')['NOTIFICATIONS_KEY']
   const acceptHMRUpdate: typeof import('pinia')['acceptHMRUpdate']
+  const adminToasts: typeof import('./resources/ts/composables/useRealtimeAdminNotifications')['adminToasts']
   const alphaDashValidator: typeof import('./resources/ts/@core/utils/validators')['alphaDashValidator']
   const alphaValidator: typeof import('./resources/ts/@core/utils/validators')['alphaValidator']
   const asyncComputed: typeof import('@vueuse/core')['asyncComputed']
@@ -291,6 +293,7 @@ declare global {
   const usePrevious: typeof import('@vueuse/core')['usePrevious']
   const useProjection: typeof import('@vueuse/math')['useProjection']
   const useRafFn: typeof import('@vueuse/core')['useRafFn']
+  const useRealtimeAdminNotifications: typeof import('./resources/ts/composables/useRealtimeAdminNotifications')['useRealtimeAdminNotifications']
   const useRefHistory: typeof import('@vueuse/core')['useRefHistory']
   const useResizeObserver: typeof import('@vueuse/core')['useResizeObserver']
   const useResponsiveLeftSidebar: typeof import('./resources/ts/@core/composable/useResponsiveSidebar')['useResponsiveLeftSidebar']
@@ -383,7 +386,9 @@ declare module 'vue' {
     readonly $api: UnwrapRef<typeof import('./resources/ts/utils/api')['$api']>
     readonly COOKIE_MAX_AGE_1_YEAR: UnwrapRef<typeof import('./resources/ts/utils/constants')['COOKIE_MAX_AGE_1_YEAR']>
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
+    readonly NOTIFICATIONS_KEY: UnwrapRef<typeof import('./resources/ts/composables/useNotifications')['NOTIFICATIONS_KEY']>
     readonly acceptHMRUpdate: UnwrapRef<typeof import('pinia')['acceptHMRUpdate']>
+    readonly adminToasts: UnwrapRef<typeof import('./resources/ts/composables/useRealtimeAdminNotifications')['adminToasts']>
     readonly alphaDashValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['alphaDashValidator']>
     readonly alphaValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['alphaValidator']>
     readonly asyncComputed: UnwrapRef<typeof import('@vueuse/core')['asyncComputed']>
@@ -658,6 +663,7 @@ declare module 'vue' {
     readonly usePrevious: UnwrapRef<typeof import('@vueuse/core')['usePrevious']>
     readonly useProjection: UnwrapRef<typeof import('@vueuse/math')['useProjection']>
     readonly useRafFn: UnwrapRef<typeof import('@vueuse/core')['useRafFn']>
+    readonly useRealtimeAdminNotifications: UnwrapRef<typeof import('./resources/ts/composables/useRealtimeAdminNotifications')['useRealtimeAdminNotifications']>
     readonly useRefHistory: UnwrapRef<typeof import('@vueuse/core')['useRefHistory']>
     readonly useResizeObserver: UnwrapRef<typeof import('@vueuse/core')['useResizeObserver']>
     readonly useResponsiveLeftSidebar: UnwrapRef<typeof import('./resources/ts/@core/composable/useResponsiveSidebar')['useResponsiveLeftSidebar']>

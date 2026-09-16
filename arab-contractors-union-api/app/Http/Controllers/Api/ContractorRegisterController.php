@@ -6,9 +6,12 @@ use App\Exceptions\OtpCooldownException;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\Contractor;
+use App\Models\User;
+use App\Notifications\ContractorActivatedNotification;
 use App\Services\OtpService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 
 class ContractorRegisterController extends Controller
@@ -217,6 +220,11 @@ class ContractorRegisterController extends Controller
             // 'expired' تبقى كما هي لأنها تخص انتهاء العضوية لا اكتمال التسجيل.
             ...($contractor->status === 'pending' ? ['status' => 'active'] : []),
         ]);
+
+        $admins = User::where('role', 'admin')->get();
+        if ($admins->isNotEmpty()) {
+            Notification::send($admins, new ContractorActivatedNotification($contractor));
+        }
 
         // حذف التوكنات القديمة
         $contractor->tokens()->delete();

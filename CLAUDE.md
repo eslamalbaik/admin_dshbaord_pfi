@@ -70,6 +70,52 @@ Both `deploy-vps.sh` scripts back up before touching anything and roll back on f
 
 `VITE_API_BASE_URL` in `.env.production` is **baked in at build time** and cannot be changed afterwards — verify it before building.
 
+### Real-time admin notifications (Reverb + queue worker)
+
+Admin-facing notifications (contractor activation, event RSVP, payment submission — see [PaymentSubmittedNotification.php](arab-contractors-union-api/app/Notifications/PaymentSubmittedNotification.php) and friends) broadcast live over Laravel Reverb, on top of the existing DB-backed `notifications` table. This needs **two long-running processes** on the API server, separate from PHP-FPM — `deploy-vps.sh` restarts them (`sudo systemctl restart pcu-api-queue pcu-api-reverb`) but does not create them; set up once per server:
+
+```ini
+# /etc/systemd/system/pcu-api-reverb.service
+[Unit]
+Description=PCU API — Laravel Reverb (real-time notifications)
+After=network.target
+[Service]
+WorkingDirectory=/var/www/pcuorg/api
+ExecStart=/usr/bin/php artisan reverb:start --host=127.0.0.1 --port=8080
+Restart=always
+User=www-data
+[Install]
+WantedBy=multi-user.target
+```
+
+```ini
+# /etc/systemd/system/pcu-api-queue.service
+[Unit]
+Description=PCU API — queue worker (broadcasting notifications)
+After=network.target
+[Service]
+WorkingDirectory=/var/www/pcuorg/api
+ExecStart=/usr/bin/php artisan queue:work --tries=3 --backoff=3
+Restart=always
+User=www-data
+[Install]
+WantedBy=multi-user.target
+```
+
+`sudo systemctl daemon-reload && sudo systemctl enable --now pcu-api-reverb pcu-api-queue`. The API server's `.env` needs `BROADCAST_CONNECTION=reverb`, `REVERB_APP_ID`/`REVERB_APP_KEY`/`REVERB_APP_SECRET` (generate with `php -r "echo bin2hex(random_bytes(16));"`), `REVERB_HOST=api.pcuorg.cloud`, `REVERB_PORT=443`, `REVERB_SCHEME=https`. The frontend's `.env.production` `VITE_REVERB_APP_KEY` **must match** `REVERB_APP_KEY` exactly.
+
+Reverb binds to `127.0.0.1:8080` only — Nginx fronts it on the same HTTPS domain/cert so the browser connects over `wss://api.pcuorg.cloud/app` with no new firewall port:
+
+```nginx
+location /app/ {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+}
+```
+
 ### Uploads under `storage/app/public/`
 
 `.gitignore` excludes `contractors/`, `certificates/`, `receipts/`, `announcements/`, `events/`, `news/`. These once held committed dev placeholders; production has real uploads at the same paths. If a `git pull` ever aborts with *"local changes would be overwritten"* there, back up (`tar -czf ~/backup.tar.gz storage/app/public`) before discarding anything — a bare `git checkout -- storage/` restores placeholders over real files and the pull then deletes them.
