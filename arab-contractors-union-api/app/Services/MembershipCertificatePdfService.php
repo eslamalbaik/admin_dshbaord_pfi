@@ -242,7 +242,11 @@ HTML;
             ? "certificates/preview/{$serial}.pdf"
             : "certificates/membership/{$serial}.pdf";
 
-        Storage::disk('public')->put($path, $mpdf->Output('', 'S'));
+        // القرص العام مُعدّ بـ throw=false (config/filesystems.php)، فأي فشل كتابة
+        // (صلاحيات، مساحة ممتلئة) كان سيمرّ صامتاً ويُرجع مساراً لملف غير موجود فعلياً.
+        if (! Storage::disk('public')->put($path, $mpdf->Output('', 'S'))) {
+            throw new \RuntimeException("تعذّرت كتابة ملف الشهادة على القرص: {$path}");
+        }
 
         return $path;
     }

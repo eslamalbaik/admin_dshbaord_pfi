@@ -308,11 +308,20 @@ class CertificateRequestController extends Controller
         $data = $request->validated();
         $oldPath = $certificateRequest->certificate_path;
 
-        $path = $this->pdfService->generate($certificateRequest, [
-            'address'         => $data['address'] ?? null,
-            'decision_number' => $data['decision_number'] ?? null,
-            'decision_date'   => $data['decision_date'] ?? null,
-        ]);
+        try {
+            $path = $this->pdfService->generate($certificateRequest, [
+                'address'         => $data['address'] ?? null,
+                'decision_number' => $data['decision_number'] ?? null,
+                'decision_date'   => $data['decision_date'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Membership certificate regeneration failed', [
+                'certificate_request_id' => $certificateRequest->id,
+                'contractor_id'          => $certificateRequest->contractor_id,
+                'exception'              => $e,
+            ]);
+            throw $e;
+        }
 
         if ($oldPath && $oldPath !== $path) {
             Storage::disk('public')->delete($oldPath);
@@ -355,6 +364,11 @@ class CertificateRequestController extends Controller
                 'decision_date'   => $data['decision_date'] ?? null,
             ]);
         } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Membership certificate admin issuance failed', [
+                'certificate_request_id' => $certRequest->id,
+                'contractor_id'          => $contractor->id,
+                'exception'              => $e,
+            ]);
             $certRequest->delete();
             throw $e;
         }
