@@ -61,6 +61,7 @@ rsync -a --delete \
   --exclude='.env' \
   --exclude='storage/app/public' \
   --exclude='vendor' \
+  --exclude='node_modules' \
   --exclude='.git' \
   "$MONOREPO_DIR/arab-contractors-union-api/" "$APP_DIR/"
 
