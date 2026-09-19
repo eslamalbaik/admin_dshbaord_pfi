@@ -9,7 +9,8 @@
 set -euo pipefail
 
 APP_DIR="/var/www/pcuorg/front"
-BRANCH="deploy-new"
+MONOREPO_DIR="/var/www/pcuorg/monorepo"
+MONOREPO_BRANCH="feature/arab-contractors-union"
 BACKUP_DIR="$HOME/pcu-backups"
 KEEP_DAYS=30
 STAMP="$(date +%F-%H%M)"
@@ -45,8 +46,18 @@ rollback() {
 # ---------------------------------------------------------------
 #  السحب والبناء
 # ---------------------------------------------------------------
-echo "==> سحب آخر التعديلات ($BRANCH)"
-git pull origin "$BRANCH"
+echo "==> سحب آخر التعديلات من المونوريبو ($MONOREPO_BRANCH)"
+git -C "$MONOREPO_DIR" fetch origin "$MONOREPO_BRANCH"
+git -C "$MONOREPO_DIR" reset --hard "origin/$MONOREPO_BRANCH"
+
+echo "==> مزامنة arab-contractors-union-front/ إلى $APP_DIR"
+rsync -a --delete \
+  --exclude='.env' \
+  --exclude='.env.production' \
+  --exclude='node_modules' \
+  --exclude='dist' \
+  --exclude='.git' \
+  "$MONOREPO_DIR/arab-contractors-union-front/" "$APP_DIR/"
 
 echo "==> مزامنة المكتبات"
 npm install --no-audit --no-fund

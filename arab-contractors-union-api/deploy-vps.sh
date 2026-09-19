@@ -8,7 +8,8 @@
 set -euo pipefail
 
 APP_DIR="/var/www/pcuorg/api"
-BRANCH="deploy-new"
+MONOREPO_DIR="/var/www/pcuorg/monorepo"
+MONOREPO_BRANCH="feature/arab-contractors-union"
 BACKUP_DIR="$HOME/pcu-backups"
 KEEP_DAYS=30
 STAMP="$(date +%F-%H%M)"
@@ -51,8 +52,17 @@ php artisan down || true
 # أعِد الموقع للعمل مهما حدث — نجاحاً أو فشلاً
 trap 'php artisan up || true' EXIT
 
-echo "==> سحب آخر التعديلات ($BRANCH)"
-git pull origin "$BRANCH"
+echo "==> سحب آخر التعديلات من المونوريبو ($MONOREPO_BRANCH)"
+git -C "$MONOREPO_DIR" fetch origin "$MONOREPO_BRANCH"
+git -C "$MONOREPO_DIR" reset --hard "origin/$MONOREPO_BRANCH"
+
+echo "==> مزامنة arab-contractors-union-api/ إلى $APP_DIR"
+rsync -a --delete \
+  --exclude='.env' \
+  --exclude='storage/app/public' \
+  --exclude='vendor' \
+  --exclude='.git' \
+  "$MONOREPO_DIR/arab-contractors-union-api/" "$APP_DIR/"
 
 echo "==> تثبيت حزم Composer (بدون dev)"
 composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs

@@ -1,0 +1,30 @@
+name: Deploy to production
+
+# Pushes to the working branch are deployed straight from this monorepo:
+# the server pulls admin_dshbaord_pfi itself (via a read-only deploy key set
+# up once on the VPS) and each deploy-vps.sh rsyncs its own subdirectory into
+# place before running its normal build/migrate steps. No intermediate
+# mirror repo or token is involved in this pipeline.
+on:
+  push:
+    branches: [feature/arab-contractors-union]
+    paths:
+      - arab-contractors-union-api/**
+      - arab-contractors-union-front/**
+
+jobs:
+  deploy:
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            cd /var/www/pcuorg/api && ./deploy-vps.sh
+            cd /var/www/pcuorg/front && ./deploy-vps.sh
