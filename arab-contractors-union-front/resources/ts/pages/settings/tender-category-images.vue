@@ -12,7 +12,7 @@ const queryClient = useQueryClient()
 
 const { data, isLoading } = useQuery({
   queryKey: ['tender-category-images'],
-  queryFn: async () => (await api.get('/api/v1/dashboard/tenders/category-images')).data,
+  queryFn: async () => (await api.get('/api/v1/tenders/category-images')).data,
 })
 
 const imageFor = (category: string): string | null => (data.value?.items ?? {})[category] ?? null
@@ -28,7 +28,7 @@ const uploadMutation = useMutation({
     fd.append('category', category)
     fd.append('image', file)
 
-    return (await api.post('/api/v1/dashboard/tenders/category-images', fd)).data
+    return (await api.post('/api/v1/tenders/category-images', fd)).data
   },
   onSuccess: () => {
     successMsg.value = 'تم حفظ الصورة بنجاح.'
@@ -50,7 +50,7 @@ const onFilePicked = (category: string, file: File | File[] | null) => {
 }
 
 const deleteMutation = useMutation({
-  mutationFn: async (category: string) => api.delete(`/api/v1/dashboard/tenders/category-images/${encodeURIComponent(category)}`),
+  mutationFn: async (category: string) => api.delete(`/api/v1/tenders/category-images/${encodeURIComponent(category)}`),
   onSuccess: () => {
     successMsg.value = 'تمت إزالة الصورة.'
     errorMsg.value = ''
