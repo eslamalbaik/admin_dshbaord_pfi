@@ -1,0 +1,49 @@
+name: Mirror sync
+
+# Keeps the standalone PcuGaza/PCU-Manager-Backend and PCU-Manager-Frontend
+# repos in sync with this monorepo's feature/arab-contractors-union branch.
+# See CLAUDE.md "Mirror repos" section for the full convention this follows.
+on:
+  push:
+    branches: [feature/arab-contractors-union]
+    paths:
+      - arab-contractors-union-api/**
+      - arab-contractors-union-front/**
+
+permissions:
+  contents: write
+
+jobs:
+  mirror-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Add pcu-back remote
+        run: |
+          git remote add pcu-back "https://x-access-token:${{ secrets.MIRROR_PUSH_TOKEN }}@github.com/PcuGaza/PCU-Manager-Backend.git"
+      - name: Sync backend mirror
+        run: bash .github/scripts/mirror-sync.sh arab-contractors-union-api pcu-back mirror-api-deploy-new
+
+  mirror-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Add pcu-front remote
+        run: |
+          git remote add pcu-front "https://x-access-token:${{ secrets.MIRROR_PUSH_TOKEN }}@github.com/PcuGaza/PCU-Manager-Frontend.git"
+      - name: Sync frontend mirror
+        run: bash .github/scripts/mirror-sync.sh arab-contractors-union-front pcu-front mirror-front-deploy-new
