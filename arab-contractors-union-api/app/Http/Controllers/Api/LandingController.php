@@ -72,7 +72,7 @@ class LandingController extends Controller
                         'slug'         => $n->slug,
                         'excerpt'      => $n->excerpt,
                         'category'     => $n->category,
-                        'image_url'    => $n->image ? Storage::disk('public')->url($n->image) : null,
+                        'image_url'    => $n->image,
                         'published_at' => $n->published_at,
                     ])
                     ->values(),
