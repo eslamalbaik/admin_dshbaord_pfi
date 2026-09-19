@@ -212,7 +212,6 @@ class UnionSeeder extends Seeder
                         'condition'         => $conditions[$i % 3],
                         'governorate'       => $gov,
                         'city'              => $gov,
-                        'daily_price'       => $eq['price'],
                         'owner_phone'       => $contractor->phone ?? '0599-' . str_pad($i + 1, 6, '0', STR_PAD_LEFT),
                         'status'            => $statuses[$i % count($statuses)],
                     ]

@@ -9,6 +9,7 @@ use App\Models\ContractorDue;
 use App\Models\ContractorNameChangeRequest;
 use App\Models\Equipment;
 use App\Models\EquipmentType;
+use App\Models\Event;
 use App\Models\Membership;
 use App\Models\News;
 use App\Models\Payment;
@@ -41,15 +42,15 @@ class ContractorHomeTest extends TestCase
         $this->getJson('/api/v1/contractor/home')->assertStatus(401);
     }
 
-    public function test_suspended_contractor_is_blocked_with_force_logout(): void
+    public function test_suspended_contractor_can_still_access_home(): void
     {
+        // status=suspended يمنع تجديد العضوية فقط (راجع ContractorRequirements::renewalBlockers
+        // و test_submit_transfer_blocked_when_contractor_suspended)، ولا يقفل الدخول للتطبيق —
+        // is_frozen وحده يفعل ذلك (راجع test_frozen_contractor_is_blocked أدناه).
         $contractor = $this->createContractor(['status' => 'suspended']);
         Sanctum::actingAs($contractor, ['*']);
 
-        $response = $this->getJson('/api/v1/contractor/home');
-
-        $response->assertStatus(403)
-            ->assertJson(['status' => false, 'force_logout' => true, 'error' => 'account_suspended']);
+        $this->getJson('/api/v1/contractor/home')->assertStatus(200);
     }
 
     public function test_frozen_contractor_is_blocked(): void
@@ -113,21 +114,25 @@ class ContractorHomeTest extends TestCase
 
     public function test_home_events_count_only_counts_upcoming_published_events(): void
     {
+        // كان هذا التيست يُنشئ صفوف News بـ category='event' وevent_date — بقايا مرحلة
+        // قبل فصل الفعاليات لجدول/موديل Event مستقل؛ event_date أصلاً لم يكن fillable
+        // على News فكان يُسقَط بصمت، والكونترولر الفعلي يعتمد على Event حصراً — صُحِّح
+        // ليستخدم الموديل الصحيح (REQ-10 #1: حذف category من News كشف هذا التيست الميت).
         $contractor = $this->createContractor();
 
-        News::create([
+        Event::create([
             'title' => 'فعالية قادمة', 'slug' => 'upcoming-event', 'body' => 'x',
-            'category' => 'event', 'is_published' => true, 'published_at' => now(),
+            'is_published' => true, 'published_at' => now(),
             'event_date' => now()->addDays(5),
         ]);
-        News::create([
+        Event::create([
             'title' => 'فعالية سابقة', 'slug' => 'past-event', 'body' => 'x',
-            'category' => 'event', 'is_published' => true, 'published_at' => now()->subDays(30),
+            'is_published' => true, 'published_at' => now()->subDays(30),
             'event_date' => now()->subDays(10),
         ]);
         News::create([
             'title' => 'خبر عادي', 'slug' => 'plain-news-2', 'body' => 'x',
-            'category' => 'news', 'is_published' => true, 'published_at' => now(),
+            'is_published' => true, 'published_at' => now(),
         ]);
 
         Sanctum::actingAs($contractor, ['*']);
@@ -304,7 +309,7 @@ class ContractorHomeTest extends TestCase
         ]);
         News::create([
             'title' => 'خبر عادي', 'slug' => 'plain-news', 'body' => 'x',
-            'category' => 'news', 'is_published' => true, 'published_at' => now(),
+            'is_published' => true, 'published_at' => now(),
         ]);
 
         Sanctum::actingAs($contractor, ['*']);

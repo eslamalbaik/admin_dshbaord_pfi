@@ -5,6 +5,13 @@ import { toFileArray } from '@/utils/files'
 definePage({ meta: { requiresAdmin: true,
     adminOnly: true } })
 
+// deadline صار تاريخ+وقت (REQ-07 #2) — يحوّل أي ISO string لصيغة <input type="datetime-local">
+const toDatetimeLocal = (value: string | null | undefined) => value ? value.slice(0, 16) : ''
+
+// أقل قيمة مسموحة لحقل الموعد النهائي عند الإنشاء — يمنع اختيار وقت ماضٍ من الواجهة
+// نفسها، بالإضافة لتحقق after:now بالباك اند
+const minDeadline = () => new Date().toISOString().slice(0, 16)
+
 const loading = ref(false)
 const tenders = ref<any[]>([])
 
@@ -44,7 +51,7 @@ const openEdit = async (item: any) => {
     description:      item.description    || '',
     union_notes:      item.union_notes    || '',
     category:         item.category       || '',
-    deadline:         item.deadline ? item.deadline.substring(0, 10) : '',
+    deadline:         toDatetimeLocal(item.deadline),
     status:           item.status,
     submission_types: Array.isArray(item.submission_types) ? [...item.submission_types] : [],
     submission_email: item.submission_email || '',
@@ -97,11 +104,24 @@ const uploadAttachments = async () => {
   }
 }
 
-const removeAttachment = async (attachmentId: number) => {
+// تأكيد قبل حذف مرفق (REQ-07 #4) — كان يُحذف فوراً بلا تأكيد
+const deleteAttachmentDialog = ref(false)
+const deletingAttachment = ref<any>(null)
+
+const confirmRemoveAttachment = (att: any) => {
+  deletingAttachment.value = att
+  deleteAttachmentDialog.value = true
+}
+
+const removeAttachment = async () => {
+  const attachmentId = deletingAttachment.value?.id
+  if (!attachmentId)
+    return
   attachmentDeletingId.value = attachmentId
   try {
     await api.delete(`/api/v1/tenders/${editTender.value.id}/attachments/${attachmentId}`)
     attachments.value = attachments.value.filter(a => a.id !== attachmentId)
+    deleteAttachmentDialog.value = false
   } catch (err) {
     console.error(err)
     notify('تعذّر حذف المرفق', 'error')
@@ -309,7 +329,7 @@ const runExport = async () => {
         t.issuing_entity ?? '',
         t.category ?? '',
         t.published_at ? new Date(t.published_at).toLocaleDateString('ar-EG') : '',
-        t.deadline ? new Date(t.deadline).toLocaleDateString('ar-EG') : '',
+        t.deadline ? new Date(t.deadline).toLocaleString('ar-EG') : '',
         getStatusLabel(t.status),
       ]),
     ]
@@ -493,7 +513,7 @@ watchEffect(() => fetchTenders())
         </template>
 
         <template #item.deadline="{ item }">
-          <span>{{ item.deadline ? new Date(item.deadline).toLocaleDateString('ar-PS') : '—' }}</span>
+          <span>{{ item.deadline ? new Date(item.deadline).toLocaleString('ar-PS') : '—' }}</span>
         </template>
 
         <template #item.display_status="{ item }">
@@ -614,7 +634,13 @@ watchEffect(() => fetchTenders())
               />
             </VCol>
             <VCol cols="12">
-              <VTextField v-model="newTender.deadline" label="آخر موعد للتقديم" type="date" style="font-family:Cairo,sans-serif" />
+              <VTextField
+                v-model="newTender.deadline"
+                label="آخر موعد للتقديم (تاريخ ووقت)"
+                type="datetime-local"
+                :min="minDeadline()"
+                style="font-family:Cairo,sans-serif"
+              />
             </VCol>
 
             <!-- طريقة التقديم — متعددة الاختيار -->
@@ -754,7 +780,12 @@ watchEffect(() => fetchTenders())
               />
             </VCol>
             <VCol cols="12" md="6">
-              <VTextField v-model="editTender.deadline" label="آخر موعد للتقديم" type="date" style="font-family:Cairo,sans-serif" />
+              <VTextField
+                v-model="editTender.deadline"
+                label="آخر موعد للتقديم (تاريخ ووقت)"
+                type="datetime-local"
+                style="font-family:Cairo,sans-serif"
+              />
             </VCol>
             <VCol cols="12" md="6">
               <VSelect
@@ -861,7 +892,7 @@ watchEffect(() => fetchTenders())
                     variant="text"
                     color="error"
                     :loading="attachmentDeletingId === att.id"
-                    @click="removeAttachment(att.id)"
+                    @click="confirmRemoveAttachment(att)"
                   >
                     <VIcon icon="tabler-x" size="14" />
                   </VBtn>
@@ -935,7 +966,7 @@ watchEffect(() => fetchTenders())
             </VCol>
             <VCol cols="6" md="4">
               <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">آخر موعد</span>
-              <span style="font-family:Cairo,sans-serif">{{ viewingItem.deadline ? new Date(viewingItem.deadline).toLocaleDateString('ar-PS') : '—' }}</span>
+              <span style="font-family:Cairo,sans-serif">{{ viewingItem.deadline ? new Date(viewingItem.deadline).toLocaleString('ar-PS') : '—' }}</span>
             </VCol>
             <VCol cols="6" md="4">
               <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">تاريخ النشر</span>
@@ -1014,6 +1045,26 @@ watchEffect(() => fetchTenders())
           <VSpacer />
           <VBtn variant="tonal" @click="deleteDialog = false">إلغاء</VBtn>
           <VBtn color="error" :loading="deleteLoading" @click="deleteTender">حذف</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- Delete Attachment Confirm Dialog -->
+    <VDialog v-model="deleteAttachmentDialog" max-width="400">
+      <VCard>
+        <VCardTitle class="d-flex align-center gap-2" style="font-family:Cairo,sans-serif">
+          <VIcon icon="tabler-alert-triangle" color="error" />
+          تأكيد حذف المرفق
+        </VCardTitle>
+        <VCardText style="font-family:Cairo,sans-serif">
+          هل أنت متأكد من حذف المرفق
+          <strong>{{ deletingAttachment?.label || 'هذا الملف' }}</strong>؟
+          لا يمكن التراجع عن هذا الإجراء.
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" @click="deleteAttachmentDialog = false">إلغاء</VBtn>
+          <VBtn color="error" :loading="attachmentDeletingId === deletingAttachment?.id" @click="removeAttachment">حذف</VBtn>
         </VCardActions>
       </VCard>
     </VDialog>

@@ -57,7 +57,6 @@ const emptyForm = () => ({
   title: '',
   excerpt: '',
   body: '',
-  category: 'news',
   imagePreview: '' as string,
   gallery: [] as File[],
   existingGallery: [] as string[],
@@ -117,7 +116,6 @@ const openEdit = (item: any) => {
     title: item.title,
     excerpt: item.excerpt ?? '',
     body: item.body ?? '',
-    category: 'news',
     imagePreview: item.image ?? '',
     gallery: [],
     existingGallery: item.gallery ?? [],
@@ -151,7 +149,6 @@ const saveNews = async () => {
     fd.append('title', form.value.title)
     fd.append('excerpt', form.value.excerpt)
     fd.append('body', form.value.body)
-    fd.append('category', form.value.category)
     fd.append('is_published', form.value.is_published ? '1' : '0')
     if (form.value.video_url) fd.append('video_url', form.value.video_url)
     if (form.value.external_url) fd.append('external_url', form.value.external_url)

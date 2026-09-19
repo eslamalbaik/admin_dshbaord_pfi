@@ -10,9 +10,12 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * فحص المستخدم النشط عند كل طلب محمي:
- * إذا جُمّدت عضوية المقاول أو عُلّق حسابه من لوحة التحكم بعد تسجيل دخوله،
- * تُحذف كل توكناته فوراً (تسجيل خروج إجباري) ويُرجَع 403 مع force_logout=true
- * حتى يمسح التطبيق الجلسة المحلية ويعيده لشاشة الدخول.
+ * إذا جُمّد حساب المقاول من لوحة التحكم بعد تسجيل دخوله، تُحذف كل توكناته
+ * فوراً (تسجيل خروج إجباري) ويُرجَع 403 مع force_logout=true حتى يمسح
+ * التطبيق الجلسة المحلية ويعيده لشاشة الدخول.
+ *
+ * status=suspended لا يقفل الحساب — فقط يمنع تجديد العضوية
+ * (راجع ContractorRequirements::renewalBlockers). is_frozen وحده يقفل الدخول.
  */
 class EnsureContractorIsActive
 {
@@ -20,14 +23,8 @@ class EnsureContractorIsActive
     {
         $user = $request->user();
 
-        if ($user instanceof Contractor) {
-            if ($user->is_frozen) {
-                return $this->forceLogout($user, ApiMessages::ACCOUNT_FROZEN, 'account_frozen');
-            }
-
-            if ($user->status === 'suspended') {
-                return $this->forceLogout($user, ApiMessages::ACCOUNT_SUSPENDED, 'account_suspended');
-            }
+        if ($user instanceof Contractor && $user->is_frozen) {
+            return $this->forceLogout($user, ApiMessages::ACCOUNT_FROZEN, 'account_frozen');
         }
 
         return $next($request);

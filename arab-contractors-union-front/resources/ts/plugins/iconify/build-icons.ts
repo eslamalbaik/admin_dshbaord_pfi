@@ -284,6 +284,8 @@ const sources: BundleScriptConfig = {
         'shopping-bag',
         'shopping-cart',
         'shovel',
+        'snowflake',
+        'snowflake-off',
         'sort-ascending',
         'stack-2',
         'star',

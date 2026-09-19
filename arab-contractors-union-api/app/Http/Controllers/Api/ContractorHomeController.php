@@ -235,9 +235,11 @@ class ContractorHomeController extends Controller
             ->get()
             ->map(fn (News $n) => [
                 'type'         => 'news',
-                'reference_id' => $n->slug,
+                'reference_id' => $n->id,
                 'title'        => $n->title,
-                'subtitle'     => $n->category,
+                // category صار محذوفاً من الأخبار (REQ-10 #1) — كانت قيمته 'news' دائماً
+                // بلا فائدة أصلاً؛ المقتطف أكثر فائدة كعنوان فرعي بعنصر التغذية
+                'subtitle'     => $n->excerpt,
                 'has_attachment' => (bool) $n->image,
                 'is_new'       => $n->published_at->gt(now()->subHours(self::NEW_BADGE_HOURS)),
                 'priority'     => 'normal',

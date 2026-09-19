@@ -76,6 +76,28 @@ const confirmDelete = (t: any) => {
   if (confirm('هل تريد حذف هذا البند؟'))
     deleteMutation.mutate(t.id)
 }
+
+// إعادة الترتيب عبر تبديل مع الجار المباشر بالقائمة (REQ-13) — بدل إدخال رقم ترتيب يدوي
+// عرضة لثغرات/تداخل، دايماً موضع مجاور موجود فعلاً فتبقى القائمة متسلسلة بلا فجوات
+const reorderMutation = useMutation({
+  mutationFn: async ({ item, newSort }: { item: any, newSort: number }) =>
+    (await api.put(`/api/v1/dashboard/terms/${item.id}`, { ...item, sort: newSort })).data,
+  onSuccess: () => invalidate(),
+})
+
+const moveUp = (index: number) => {
+  if (index === 0 || reorderMutation.isPending.value) return
+  const current = terms.value[index]
+  const prev = terms.value[index - 1]
+  reorderMutation.mutate({ item: current, newSort: prev.sort })
+}
+
+const moveDown = (index: number) => {
+  if (index === terms.value.length - 1 || reorderMutation.isPending.value) return
+  const current = terms.value[index]
+  const next = terms.value[index + 1]
+  reorderMutation.mutate({ item: current, newSort: next.sort })
+}
 </script>
 
 <template>
@@ -107,10 +129,30 @@ const confirmDelete = (t: any) => {
 
     <!-- Terms List -->
     <VExpansionPanels v-else>
-      <VExpansionPanel v-for="t in terms" :key="t.id">
+      <VExpansionPanel v-for="(t, index) in terms" :key="t.id">
         <VExpansionPanelTitle>
           <div class="d-flex align-center justify-space-between w-100 pe-3">
             <div class="d-flex align-center gap-3">
+              <div class="d-flex flex-column" @click.stop>
+                <VBtn
+                  icon="tabler-chevron-up"
+                  size="x-small"
+                  variant="text"
+                  density="compact"
+                  :disabled="index === 0"
+                  :loading="reorderMutation.isPending.value"
+                  @click="moveUp(index)"
+                />
+                <VBtn
+                  icon="tabler-chevron-down"
+                  size="x-small"
+                  variant="text"
+                  density="compact"
+                  :disabled="index === terms.length - 1"
+                  :loading="reorderMutation.isPending.value"
+                  @click="moveDown(index)"
+                />
+              </div>
               <VChip size="x-small" color="secondary" variant="tonal">
                 {{ t.sort }}
               </VChip>

@@ -1412,7 +1412,7 @@
 								"home"
 							]
 						},
-						"description": "GET /api/v1/contractor/home - home screen, one aggregated call (membership+dues+stats+latest updates)."
+						"description": "GET /api/v1/contractor/home - home screen, one aggregated call (membership+dues+stats+latest updates).\n\n**`items.latest_updates[]`** — كل عنصر: `type` (tender|news|announcement|due|member|...), `reference_id`, `title`, `subtitle`, `badges[]`, `priority`, `created_at`.\n\n**`reference_id` دائماً رقم (id) بغض النظر عن `type`** — بما فيها `news` (كانت سابقاً ترسل `slug` نصياً لعناصر الأخبار فقط، وحُوِّلت لـ id ليتّسق مع باقي الأنواع). لعرض تفاصيل الخبر ما زال يلزم الـ `slug` (وليس هذا الـ id) عبر `GET /news/{slug}` — اجلبه من قائمة الأخبار (`GET /news` أو `GET /news/latest`) وليس من هذا الحقل."
 					}
 				},
 				{
@@ -1446,7 +1446,7 @@
 								}
 							]
 						},
-						"description": "GET /api/v1/contractor/home/updates - full updates feed, paginated."
+						"description": "GET /api/v1/contractor/home/updates - full updates feed, paginated.\n\nنفس شكل عناصر `items.latest_updates` بشاشة `/contractor/home` (راجع وصفها) — بما فيها أن `reference_id` رقم دائماً، وأن أخبار الأنواع `news` يلزم جلب `slug` تفاصيلها من `GET /news` وليس من `reference_id`."
 					}
 				}
 			]
@@ -2735,7 +2735,7 @@
 								}
 							]
 						},
-						"description": "**GET** `/api/v1/news` — *عام*\n\nأخبار ومناسبات الاتحاد (المنشورة فقط) مع `title, excerpt, image, video_url, external_url, category`. مُرقّمة.\n\n**تصفية:** `?category=news|announcement|event|tender` و `?search=`."
+						"description": "**GET** `/api/v1/news` — *عام*\n\nأخبار الاتحاد (المنشورة فقط) مع `title, excerpt, image, video_url, external_url`. مُرقّمة.\n\n**تصفية:** `?search=` فقط — حقل `category` حُذف نهائياً من الأخبار (كان دائماً 'news'، الإعلانات/الفعاليات/العطاءات كيانات مستقلة بجداولها الخاصة)."
 					}
 				},
 				{

@@ -36,7 +36,7 @@ const suggestionGroups: SuggestionGroup[] = [
     content: [
       { icon: 'tabler-building-factory-2', title: 'المقاولون',        url: { name: 'contractors' } },
       { icon: 'tabler-files',              title: 'العطاءات',        url: { name: 'tenders' } },
-      { icon: 'tabler-credit-card',        title: 'المدفوعات',        url: { name: 'payments-transactions' } },
+      // "المدفوعات" (payments-transactions) مخفي عمداً — الميزة معطّلة منتجياً (TASK-04)
       { icon: 'tabler-alert-triangle',     title: 'الغرامات',         url: { name: 'contractors-penalties' } },
     ],
   },

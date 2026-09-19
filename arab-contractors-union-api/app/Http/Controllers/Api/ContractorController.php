@@ -91,16 +91,19 @@ class ContractorController extends Controller
                 $this->uniqueIgnoringSoftDeleted('phone', $isUpdate, $contractorId),
             ],
             'city'                          => 'nullable|string|max:100',
-            'governorate_id'                => 'nullable|integer|exists:governorates,id',
-            'city_id'                       => 'nullable|integer|exists:cities,id',
+            // إلزامية عند الإنشاء فقط (REQ-01 #5) — تبقى nullable عند التعديل حتى لا يُحظر
+            // حفظ أي تعديل آخر على مقاولين قدامى لا تملك سجلاتهم هذه الحقول أصلاً بعد.
+            'governorate_id'                => ($isUpdate ? 'nullable' : 'required') . '|integer|exists:governorates,id',
+            'city_id'                       => ($isUpdate ? 'nullable' : 'required') . '|integer|exists:cities,id',
+            'district'                      => ($isUpdate ? 'nullable' : 'required') . '|string|max:100',
             'address'                       => 'nullable|string',
             'notes'                         => 'nullable|string',
 
             // Text fields
             'partners'                      => 'nullable|string',
             'fax'                           => 'nullable|string|max:50',
-            'building'                      => 'nullable|string|max:100',
-            'floor'                         => 'nullable|string|max:50',
+            'building'                      => ($isUpdate ? 'nullable' : 'required') . '|string|max:100',
+            'floor'                         => ($isUpdate ? 'nullable' : 'required') . '|string|max:50',
             'capital'                       => 'nullable|string|max:100',
             'registration_date'             => 'nullable|date',
             'legal_form'                    => 'nullable|string|max:100',
@@ -111,20 +114,20 @@ class ContractorController extends Controller
             'authorized_person_whatsapp'    => 'nullable|string|max:20',
 
             // Files
-            'cr_file'                       => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
-            'id_file'                       => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
-            'lease_or_ownership_contract'   => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
-            'company_approval_letter'       => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
-            'municipal_license'             => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
-            'company_register'              => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
-            'articles_of_association'       => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
-            'internal_bylaws'               => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
-            'bank_dealing_letter'           => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
-            'secretary_contract'            => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
-            'full_time_engineer_certificate'=> 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
-            'accountant_certificate_or_contract' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
-            'partners_ids'                  => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
-            'authorization_letter'          => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
+            'cr_file'                       => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
+            'id_file'                       => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
+            'lease_or_ownership_contract'   => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
+            'company_approval_letter'       => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
+            'municipal_license'             => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
+            'company_register'              => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
+            'articles_of_association'       => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
+            'internal_bylaws'               => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
+            'bank_dealing_letter'           => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
+            'secretary_contract'            => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
+            'full_time_engineer_certificate'=> 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
+            'accountant_certificate_or_contract' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
+            'partners_ids'                  => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
+            'authorization_letter'          => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
         ];
     }
 
@@ -196,6 +199,9 @@ class ContractorController extends Controller
             'email'                         => 'البريد الإلكتروني',
             'phone'                         => 'الجوال',
             'city'                          => 'المدينة',
+            'governorate_id'                => 'المحافظة',
+            'city_id'                       => 'المدينة',
+            'district'                      => 'الحي',
             'address'                       => 'العنوان',
             'partners'                      => 'الشركاء',
             'fax'                           => 'الفاكس',
@@ -307,6 +313,37 @@ class ContractorController extends Controller
         $contractor->update($validated);
 
         return $this->success($contractor->fresh()->toArray(), 'تم تحديث حالة المقاول بنجاح.');
+    }
+
+    /**
+     * PATCH /api/contractors/{id}/freeze — تجميد/رفع تجميد الحساب.
+     * منفصل عن status (نشط/معلّق/موقوف/منتهي): التجميد يقفل الدخول للتطبيق
+     * بالكامل، بينما status=suspended يمنع تجديد العضوية فقط ولا يقفل الدخول
+     * (راجع Contractor::loginEligibility و ContractorRequirements::renewalBlockers).
+     */
+    public function freeze(Request $request, Contractor $contractor)
+    {
+        $data = $request->validate(['frozen' => 'required|boolean']);
+
+        $contractor->update(['is_frozen' => $data['frozen']]);
+
+        // تجميد فوري: نُبطل كل التوكنات الآن بدل الانتظار لأول طلب تالٍ يمر
+        // عبر EnsureContractorIsActive — بدون هذا يقدر يستمر يستخدم التطبيق
+        // بالتوكن الحالي لحد ما يعمل طلب جديد.
+        if ($data['frozen']) {
+            $contractor->tokens()->delete();
+        }
+
+        \App\Services\AuditLogService::record(
+            $request->user(),
+            $data['frozen'] ? 'contractor.frozen' : 'contractor.unfrozen',
+            $contractor,
+        );
+
+        return $this->success(
+            ['is_frozen' => $contractor->is_frozen],
+            $data['frozen'] ? 'تم تجميد حساب المقاول.' : 'تم رفع التجميد عن حساب المقاول.',
+        );
     }
 
     // PATCH /api/contractors/{id}/contact — تعديل سريع لاسم المفوض ورقم التواصل من شاشة

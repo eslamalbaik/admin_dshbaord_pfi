@@ -29,7 +29,7 @@ class Contractor extends Authenticatable
         'authorized_person_id_number', 'authorized_person_phone', 'authorized_person_whatsapp',
         'commercial_register',
         'license_number', 'trade', 'classification', 'established_year', 'owner_name',
-        'email', 'phone', 'phone_verified_at', 'city', 'governorate_id', 'city_id', 'address',
+        'email', 'phone', 'phone_verified_at', 'city', 'governorate_id', 'city_id', 'district', 'address',
         'classification_decision_number', 'classification_decision_date',
         'status', 'is_frozen', 'profile_completed', 'profile_approved_by',
         'cr_file', 'id_file', 'notes',
@@ -184,6 +184,12 @@ class Contractor extends Authenticatable
         return $this->hasMany(ContractorEquipmentSubscription::class);
     }
 
+    /** حجوزات الآليات التي طلبها هذا المقاول كمستأجر (لا آلياته الخاصة كمالك) */
+    public function equipmentReservations()
+    {
+        return $this->hasMany(EquipmentReservation::class);
+    }
+
     public function activeEquipmentSubscription()
     {
         return $this->hasOne(ContractorEquipmentSubscription::class)
@@ -318,15 +324,6 @@ class Contractor extends Authenticatable
                 'eligible'  => false,
                 'reason'    => \App\Support\ApiMessages::ACCOUNT_FROZEN,
                 'error_key' => 'account_frozen',
-                'http_code' => 403,
-            ];
-        }
-
-        if ($this->status === 'suspended') {
-            return [
-                'eligible'  => false,
-                'reason'    => \App\Support\ApiMessages::ACCOUNT_SUSPENDED,
-                'error_key' => 'account_suspended',
                 'http_code' => 403,
             ];
         }

@@ -43,8 +43,8 @@ class ContractorRegisterController extends Controller
             return $this->error('لا يوجد رقم عضوية مرتبط بحسابك. تواصل مع الاتحاد.', 422, null, 'no_membership_number');
         }
 
-        if ($contractor->is_frozen || $contractor->status === 'suspended') {
-            return $this->error('حسابك موقوف. تواصل مع الاتحاد لمزيد من المعلومات.', 403, null, 'account_inactive');
+        if ($contractor->is_frozen) {
+            return $this->error('حسابك مجمّد. تواصل مع الاتحاد لمزيد من المعلومات.', 403, null, 'account_inactive');
         }
 
         if ($contractor->password && $contractor->phone_verified_at) {
@@ -102,8 +102,8 @@ class ContractorRegisterController extends Controller
             return $this->error('لا يوجد حساب مرتبط برقم الجوال المُدخل.', 404, null, 'contractor_not_found');
         }
 
-        if ($contractor->is_frozen || $contractor->status === 'suspended') {
-            return $this->error('حسابك موقوف. تواصل مع الاتحاد لمزيد من المعلومات.', 403, null, 'account_inactive');
+        if ($contractor->is_frozen) {
+            return $this->error('حسابك مجمّد. تواصل مع الاتحاد لمزيد من المعلومات.', 403, null, 'account_inactive');
         }
 
         try {
@@ -143,8 +143,8 @@ class ContractorRegisterController extends Controller
             return $this->error('لا يوجد حساب مرتبط برقم الجوال المُدخل.', 404, null, 'contractor_not_found');
         }
 
-        if ($contractor->is_frozen || $contractor->status === 'suspended') {
-            return $this->error('حسابك موقوف. تواصل مع الاتحاد لمزيد من المعلومات.', 403, null, 'account_inactive');
+        if ($contractor->is_frozen) {
+            return $this->error('حسابك مجمّد. تواصل مع الاتحاد لمزيد من المعلومات.', 403, null, 'account_inactive');
         }
 
         if ($contractor->phone_verified_at) {
@@ -197,8 +197,8 @@ class ContractorRegisterController extends Controller
             return $this->error('لا يوجد رقم عضوية مرتبط بحسابك. تواصل مع الاتحاد.', 422, null, 'no_membership_number');
         }
 
-        if ($contractor->is_frozen || $contractor->status === 'suspended') {
-            return $this->error('حسابك موقوف. تواصل مع الاتحاد لمزيد من المعلومات.', 403, null, 'account_inactive');
+        if ($contractor->is_frozen) {
+            return $this->error('حسابك مجمّد. تواصل مع الاتحاد لمزيد من المعلومات.', 403, null, 'account_inactive');
         }
 
         if (! $contractor->phone_verified_at) {
@@ -264,8 +264,8 @@ class ContractorRegisterController extends Controller
             return $this->error('لا يوجد حساب مرتبط برقم الجوال المُدخل.', 404, null, 'contractor_not_found');
         }
 
-        if ($contractor->is_frozen || $contractor->status === 'suspended') {
-            return $this->error('حسابك موقوف. تواصل مع الاتحاد لمزيد من المعلومات.', 403, null, 'account_inactive');
+        if ($contractor->is_frozen) {
+            return $this->error('حسابك مجمّد. تواصل مع الاتحاد لمزيد من المعلومات.', 403, null, 'account_inactive');
         }
 
         // استعادة كلمة المرور متاحة فقط لمقاول عضويته فعّالة
@@ -315,8 +315,8 @@ class ContractorRegisterController extends Controller
             return $this->error('لا يوجد حساب مرتبط برقم الجوال المُدخل.', 404, null, 'contractor_not_found');
         }
 
-        if ($contractor->is_frozen || $contractor->status === 'suspended') {
-            return $this->error('حسابك موقوف. تواصل مع الاتحاد لمزيد من المعلومات.', 403, null, 'account_inactive');
+        if ($contractor->is_frozen) {
+            return $this->error('حسابك مجمّد. تواصل مع الاتحاد لمزيد من المعلومات.', 403, null, 'account_inactive');
         }
 
         // استعادة كلمة المرور متاحة فقط لمقاول عضويته فعّالة

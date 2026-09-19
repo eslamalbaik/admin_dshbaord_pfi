@@ -185,6 +185,38 @@ const changeStatus = async (contractor: any, status: string) => {
   }
 }
 
+// ── تجميد الحساب — منفصل عن status: يقفل دخول المقاول للتطبيق فوراً (يُبطل
+// كل توكناته)، بينما status=suspended يمنع التجديد فقط ولا يقفل الدخول.
+const freezeUpdating = ref<number | null>(null)
+const freezeConfirmTarget = ref<any>(null)
+
+const setFrozen = async (contractor: any, frozen: boolean) => {
+  freezeUpdating.value = contractor.id
+  try {
+    await api.patch(`/api/v1/contractors/${contractor.id}/freeze`, { frozen })
+    contractor.is_frozen = frozen
+    notify(frozen ? 'تم تجميد حساب المقاول — لن يقدر يدخل التطبيق حتى تُرفع.' : 'تم رفع التجميد عن الحساب.')
+  }
+  catch (err: any) {
+    console.error(err)
+    notify(err?.response?.data?.message ?? 'تعذّر تحديث حالة التجميد.', 'error')
+  }
+  finally {
+    freezeUpdating.value = null
+    freezeConfirmTarget.value = null
+  }
+}
+
+// التجميد يطرد المقاول فوراً من كل أجهزته — تأكيد قبل التنفيذ. رفع التجميد
+// إجراء آمن رجعي فلا يحتاج تأكيداً.
+const toggleFreeze = (contractor: any) => {
+  if (contractor.is_frozen) {
+    setFrozen(contractor, false)
+    return
+  }
+  freezeConfirmTarget.value = contractor
+}
+
 const openDetails = async (contractor: any) => {
   // Fetch full details
   try {
@@ -439,19 +471,24 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
         </template>
 
         <template #item.status="{ item }">
-          <VMenu>
-            <template #activator="{ props: menuProps }">
-              <VChip v-bind="menuProps" :color="getStatusColor(item.status)" :loading="statusUpdating === item.id" size="small" label style="cursor:pointer">
-                {{ getStatusLabel(item.status) }}
-                <VIcon icon="tabler-chevron-down" size="14" class="ms-1" />
-              </VChip>
-            </template>
-            <VList density="compact">
-              <VListItem v-for="opt in statusChangeOptions" :key="opt.value" :active="opt.value === item.status" @click="changeStatus(item, opt.value)">
-                <VListItemTitle style="font-family:Cairo,sans-serif">{{ opt.title }}</VListItemTitle>
-              </VListItem>
-            </VList>
-          </VMenu>
+          <div class="d-flex align-center gap-1">
+            <VMenu>
+              <template #activator="{ props: menuProps }">
+                <VChip v-bind="menuProps" :color="getStatusColor(item.status)" :loading="statusUpdating === item.id" size="small" label style="cursor:pointer">
+                  {{ getStatusLabel(item.status) }}
+                  <VIcon icon="tabler-chevron-down" size="14" class="ms-1" />
+                </VChip>
+              </template>
+              <VList density="compact">
+                <VListItem v-for="opt in statusChangeOptions" :key="opt.value" :active="opt.value === item.status" @click="changeStatus(item, opt.value)">
+                  <VListItemTitle style="font-family:Cairo,sans-serif">{{ opt.title }}</VListItemTitle>
+                </VListItem>
+              </VList>
+            </VMenu>
+            <VChip v-if="item.is_frozen" color="info" size="small" label prepend-icon="tabler-snowflake" title="الحساب مجمّد — لا يقدر يدخل التطبيق">
+              مجمّد
+            </VChip>
+          </div>
         </template>
 
         <template #item.has_app_account="{ item }">
@@ -470,6 +507,15 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
           </VBtn>
           <VBtn icon size="small" variant="text" color="primary" :to="{ name: 'contractors-edit-id', params: { id: item.id } }" title="تعديل">
             <VIcon icon="tabler-edit" />
+          </VBtn>
+          <VBtn
+            icon size="small" variant="text"
+            :color="item.is_frozen ? 'info' : 'default'"
+            :loading="freezeUpdating === item.id"
+            @click="toggleFreeze(item)"
+            :title="item.is_frozen ? 'رفع التجميد' : 'تجميد الحساب'"
+          >
+            <VIcon :icon="item.is_frozen ? 'tabler-snowflake-off' : 'tabler-snowflake'" />
           </VBtn>
           <VBtn icon size="small" variant="text" color="error" @click="openDelete(item)" title="حذف">
             <VIcon icon="tabler-trash" />
@@ -734,6 +780,22 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
           <VSpacer />
           <VBtn variant="tonal" @click="deleteDialog = false">إلغاء</VBtn>
           <VBtn color="error" :loading="deleteLoading" @click="confirmDelete">حذف</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- Freeze Confirm Dialog -->
+    <VDialog :model-value="!!freezeConfirmTarget" max-width="420" @update:model-value="freezeConfirmTarget = null">
+      <VCard v-if="freezeConfirmTarget">
+        <VCardTitle style="font-family:Cairo,sans-serif">تأكيد التجميد</VCardTitle>
+        <VCardText style="font-family:Cairo,sans-serif">
+          هل أنت متأكد من تجميد حساب <strong>{{ freezeConfirmTarget.name }}</strong>؟
+          سيتم إخراجه فوراً من التطبيق على كل أجهزته ولن يقدر يدخل مرة تانية لحد ما تُرفع التجميد.
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" @click="freezeConfirmTarget = null">إلغاء</VBtn>
+          <VBtn color="info" :loading="freezeUpdating === freezeConfirmTarget.id" @click="setFrozen(freezeConfirmTarget, true)">تجميد</VBtn>
         </VCardActions>
       </VCard>
     </VDialog>

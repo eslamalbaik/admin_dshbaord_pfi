@@ -47,8 +47,8 @@ class ContractorEquipmentTest extends TestCase
         $another = $this->createContractor(['membership_number' => '911_g']);
         $type    = $this->type();
 
-        Equipment::create(['contractor_id' => $me->id, 'equipment_type_id' => $type->id, 'name' => 'حفارتي', 'daily_price' => 50]);
-        Equipment::create(['contractor_id' => $another->id, 'equipment_type_id' => $type->id, 'name' => 'حفارة غيري', 'daily_price' => 60]);
+        Equipment::create(['contractor_id' => $me->id, 'equipment_type_id' => $type->id, 'name' => 'حفارتي']);
+        Equipment::create(['contractor_id' => $another->id, 'equipment_type_id' => $type->id, 'name' => 'حفارة غيري']);
 
         Sanctum::actingAs($me, ['*']);
 
@@ -57,7 +57,7 @@ class ContractorEquipmentTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonStructure([
                 'status', 'message', 'status_code',
-                'items' => [['id', 'contractor_id', 'name', 'daily_price', 'status', 'is_hidden', 'images']],
+                'items' => [['id', 'contractor_id', 'name', 'status', 'is_hidden', 'images']],
                 'meta'  => ['current_page', 'last_page', 'per_page', 'total'],
             ])
             ->assertJsonCount(1, 'items')
@@ -82,7 +82,6 @@ class ContractorEquipmentTest extends TestCase
         $response = $this->postJson('/api/v1/contractor/equipment', [
             'equipment_type_id' => $type->id,
             'name'              => 'حفارة كبيرة',
-            'daily_price'       => 120.5,
             'condition'         => 'good',
             'accept_disclaimer' => true,
         ]);
@@ -113,7 +112,6 @@ class ContractorEquipmentTest extends TestCase
         $response = $this->postJson('/api/v1/contractor/equipment', [
             'equipment_type_id' => $type->id,
             'name'              => 'حفارة مع صور',
-            'daily_price'       => 80,
             'accept_disclaimer' => true,
             'images'            => [UploadedFile::fake()->image('e1.jpg'), UploadedFile::fake()->image('e2.jpg')],
         ]);
@@ -132,7 +130,7 @@ class ContractorEquipmentTest extends TestCase
         $response = $this->postJson('/api/v1/contractor/equipment', []);
 
         $response->assertStatus(422)
-            ->assertJsonValidationErrors(['equipment_type_id', 'name', 'daily_price']);
+            ->assertJsonValidationErrors(['equipment_type_id', 'name']);
         $this->assertDatabaseCount('equipment', 0);
     }
 
@@ -145,7 +143,6 @@ class ContractorEquipmentTest extends TestCase
         $response = $this->postJson('/api/v1/contractor/equipment', [
             'equipment_type_id' => $type->id,
             'name'              => 'حفارة',
-            'daily_price'       => 10,
             'condition'         => 'brand_new_invalid',
             'accept_disclaimer' => true,
         ]);
@@ -161,7 +158,6 @@ class ContractorEquipmentTest extends TestCase
         $response = $this->postJson('/api/v1/contractor/equipment', [
             'equipment_type_id' => 999999,
             'name'              => 'حفارة',
-            'daily_price'       => 10,
             'accept_disclaimer' => true,
         ]);
 
@@ -177,7 +173,6 @@ class ContractorEquipmentTest extends TestCase
         $response = $this->postJson('/api/v1/contractor/equipment', [
             'equipment_type_id' => $type->id,
             'name'              => 'حفارة',
-            'daily_price'       => 10,
         ]);
 
         $response->assertStatus(403)->assertJsonPath('error', 'disclaimer_required');
@@ -193,7 +188,6 @@ class ContractorEquipmentTest extends TestCase
         $response = $this->postJson('/api/v1/contractor/equipment', [
             'equipment_type_id' => $type->id,
             'name'              => 'حفارة',
-            'daily_price'       => 10,
             'accept_disclaimer' => true,
         ]);
 
@@ -216,7 +210,6 @@ class ContractorEquipmentTest extends TestCase
         $response = $this->postJson('/api/v1/contractor/equipment', [
             'equipment_type_id' => $type->id,
             'name'              => 'حفارة',
-            'daily_price'       => 10,
             'accept_disclaimer' => true,
         ]);
 
@@ -232,12 +225,11 @@ class ContractorEquipmentTest extends TestCase
     {
         $contractor = $this->createContractor();
         $type = $this->type();
-        $equipment = Equipment::create(['contractor_id' => $contractor->id, 'equipment_type_id' => $type->id, 'name' => 'قديم', 'daily_price' => 10]);
+        $equipment = Equipment::create(['contractor_id' => $contractor->id, 'equipment_type_id' => $type->id, 'name' => 'قديم']);
         Sanctum::actingAs($contractor, ['*']);
 
         $response = $this->patchJson("/api/v1/contractor/equipment/{$equipment->id}", [
             'name'        => 'اسم محدَّث',
-            'daily_price' => 99.99,
         ]);
 
         $response->assertStatus(200)->assertJsonPath('items.name', 'اسم محدَّث');
@@ -247,16 +239,121 @@ class ContractorEquipmentTest extends TestCase
         $this->getJson('/api/v1/contractor/equipment')->assertJsonPath('items.0.name', 'اسم محدَّث');
     }
 
-    public function test_update_fails_validation_on_invalid_price(): void
+    public function test_update_persists_equipment_type_change(): void
+    {
+        // REQ-08 #9: equipment_type_id كان غائباً عن قواعد validate() بـ update()، فأي
+        // تعديل لنوع الآلية من التطبيق كان يُرسَل ويُتجاهَل بصمت.
+        $contractor = $this->createContractor();
+        $typeA = $this->type();
+        $typeB = EquipmentType::create(['name_ar' => 'رافعة']);
+        $equipment = Equipment::create(['contractor_id' => $contractor->id, 'equipment_type_id' => $typeA->id, 'name' => 'آلية']);
+        Sanctum::actingAs($contractor, ['*']);
+
+        $response = $this->patchJson("/api/v1/contractor/equipment/{$equipment->id}", ['equipment_type_id' => $typeB->id]);
+
+        $response->assertStatus(200)->assertJsonPath('items.equipment_type_id', $typeB->id);
+        $this->assertDatabaseHas('equipment', ['id' => $equipment->id, 'equipment_type_id' => $typeB->id]);
+    }
+
+    public function test_update_fails_validation_on_nonexistent_equipment_type(): void
     {
         $contractor = $this->createContractor();
         $type = $this->type();
-        $equipment = Equipment::create(['contractor_id' => $contractor->id, 'equipment_type_id' => $type->id, 'name' => 'حفارة', 'daily_price' => 10]);
+        $equipment = Equipment::create(['contractor_id' => $contractor->id, 'equipment_type_id' => $type->id, 'name' => 'حفارة']);
         Sanctum::actingAs($contractor, ['*']);
 
-        $response = $this->patchJson("/api/v1/contractor/equipment/{$equipment->id}", ['daily_price' => -5]);
+        $response = $this->patchJson("/api/v1/contractor/equipment/{$equipment->id}", ['equipment_type_id' => 999999]);
 
-        $response->assertStatus(422)->assertJsonValidationErrors(['daily_price']);
+        $response->assertStatus(422)->assertJsonValidationErrors(['equipment_type_id']);
+    }
+
+    public function test_update_fails_validation_on_description_exceeding_max_length(): void
+    {
+        $contractor = $this->createContractor();
+        $type = $this->type();
+        $equipment = Equipment::create(['contractor_id' => $contractor->id, 'equipment_type_id' => $type->id, 'name' => 'حفارة']);
+        Sanctum::actingAs($contractor, ['*']);
+
+        $response = $this->patchJson("/api/v1/contractor/equipment/{$equipment->id}", ['description' => str_repeat('a', 2001)]);
+
+        $response->assertStatus(422)->assertJsonValidationErrors(['description']);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    //  image management (REQ-08 #2/#3/#5) — لم تكن موجودة أصلاً قبل هذا الإصلاح
+    // ─────────────────────────────────────────────────────────────────────
+
+    public function test_upload_images_adds_to_existing_equipment(): void
+    {
+        $contractor = $this->createContractor();
+        $type = $this->type();
+        $equipment = Equipment::create(['contractor_id' => $contractor->id, 'equipment_type_id' => $type->id, 'name' => 'حفارة']);
+        Sanctum::actingAs($contractor, ['*']);
+
+        $response = $this->postJson("/api/v1/contractor/equipment/{$equipment->id}/images", [
+            'images' => [UploadedFile::fake()->image('a.jpg'), UploadedFile::fake()->image('b.jpg')],
+        ]);
+
+        $response->assertStatus(201);
+        $this->assertDatabaseCount('equipment_images', 2);
+        $this->assertTrue($response->json('items.images.0.is_primary'));
+    }
+
+    public function test_upload_images_rejects_when_exceeding_eight_total(): void
+    {
+        $contractor = $this->createContractor();
+        $type = $this->type();
+        $equipment = Equipment::create(['contractor_id' => $contractor->id, 'equipment_type_id' => $type->id, 'name' => 'حفارة']);
+        Sanctum::actingAs($contractor, ['*']);
+
+        $this->postJson("/api/v1/contractor/equipment/{$equipment->id}/images", [
+            'images' => array_map(fn ($i) => UploadedFile::fake()->image("img{$i}.jpg"), range(1, 6)),
+        ])->assertStatus(201);
+
+        // 6 موجودة + 3 جديدة = 9 > 8
+        $response = $this->postJson("/api/v1/contractor/equipment/{$equipment->id}/images", [
+            'images' => array_map(fn ($i) => UploadedFile::fake()->image("extra{$i}.jpg"), range(1, 3)),
+        ]);
+
+        $response->assertStatus(422);
+        $this->assertDatabaseCount('equipment_images', 6);
+    }
+
+    public function test_contractor_a_cannot_upload_images_to_contractor_b_equipment(): void
+    {
+        $a = $this->createContractor(['membership_number' => '926_g']);
+        $b = $this->createContractor(['membership_number' => '927_g', 'name' => 'مقاول ب']);
+        $type = $this->type();
+        $bEquipment = Equipment::create(['contractor_id' => $b->id, 'equipment_type_id' => $type->id, 'name' => 'ملك ب']);
+
+        Sanctum::actingAs($a, ['*']);
+        $response = $this->postJson("/api/v1/contractor/equipment/{$bEquipment->id}/images", [
+            'images' => [UploadedFile::fake()->image('x.jpg')],
+        ]);
+
+        $response->assertStatus(403);
+        $this->assertDatabaseCount('equipment_images', 0);
+    }
+
+    public function test_delete_image_promotes_next_image_to_primary(): void
+    {
+        $contractor = $this->createContractor();
+        $type = $this->type();
+        $equipment = Equipment::create(['contractor_id' => $contractor->id, 'equipment_type_id' => $type->id, 'name' => 'حفارة']);
+        Sanctum::actingAs($contractor, ['*']);
+
+        $upload = $this->postJson("/api/v1/contractor/equipment/{$equipment->id}/images", [
+            'images' => [UploadedFile::fake()->image('a.jpg'), UploadedFile::fake()->image('b.jpg')],
+        ])->json('items.images');
+
+        $primaryId = collect($upload)->firstWhere('is_primary', true)['id'];
+        $otherId   = collect($upload)->firstWhere('is_primary', false)['id'];
+
+        $response = $this->deleteJson("/api/v1/contractor/equipment/{$equipment->id}/images/{$primaryId}");
+
+        $response->assertStatus(200);
+        $this->assertDatabaseHas('equipment_images', ['id' => $otherId, 'is_primary' => true]);
+        $this->assertDatabaseMissing('equipment_images', ['id' => $primaryId]);
     }
 
     public function test_update_nonexistent_equipment_returns_404(): void
@@ -271,7 +368,7 @@ class ContractorEquipmentTest extends TestCase
     {
         $contractor = $this->createContractor();
         $type = $this->type();
-        $equipment = Equipment::create(['contractor_id' => $contractor->id, 'equipment_type_id' => $type->id, 'name' => 'حفارة', 'daily_price' => 10]);
+        $equipment = Equipment::create(['contractor_id' => $contractor->id, 'equipment_type_id' => $type->id, 'name' => 'حفارة']);
 
         $this->patchJson("/api/v1/contractor/equipment/{$equipment->id}", ['name' => 'x'])->assertStatus(401);
     }
@@ -284,7 +381,7 @@ class ContractorEquipmentTest extends TestCase
     {
         $contractor = $this->createContractor();
         $type = $this->type();
-        $equipment = Equipment::create(['contractor_id' => $contractor->id, 'equipment_type_id' => $type->id, 'name' => 'حفارة', 'daily_price' => 10]);
+        $equipment = Equipment::create(['contractor_id' => $contractor->id, 'equipment_type_id' => $type->id, 'name' => 'حفارة']);
         Sanctum::actingAs($contractor, ['*']);
 
         $this->deleteJson("/api/v1/contractor/equipment/{$equipment->id}")->assertStatus(200);
@@ -310,7 +407,7 @@ class ContractorEquipmentTest extends TestCase
         $owner    = $this->createContractor(['membership_number' => '912_g']);
         $reporter = $this->createContractor(['membership_number' => '913_g', 'name' => 'مبلّغ']);
         $type = $this->type();
-        $equipment = Equipment::create(['contractor_id' => $owner->id, 'equipment_type_id' => $type->id, 'name' => 'حفارة', 'daily_price' => 10]);
+        $equipment = Equipment::create(['contractor_id' => $owner->id, 'equipment_type_id' => $type->id, 'name' => 'حفارة']);
         Sanctum::actingAs($reporter, ['*']);
 
         $response = $this->postJson("/api/v1/contractor/equipment/{$equipment->id}/report", [
@@ -329,7 +426,7 @@ class ContractorEquipmentTest extends TestCase
     {
         $contractor = $this->createContractor();
         $type = $this->type();
-        $equipment = Equipment::create(['contractor_id' => $contractor->id, 'equipment_type_id' => $type->id, 'name' => 'حفارة', 'daily_price' => 10]);
+        $equipment = Equipment::create(['contractor_id' => $contractor->id, 'equipment_type_id' => $type->id, 'name' => 'حفارة']);
         Sanctum::actingAs($contractor, ['*']);
 
         $this->postJson("/api/v1/contractor/equipment/{$equipment->id}/report", [])
@@ -353,7 +450,7 @@ class ContractorEquipmentTest extends TestCase
         $a = $this->createContractor(['membership_number' => '920_g']);
         $b = $this->createContractor(['membership_number' => '921_g', 'name' => 'مقاول ب']);
         $type = $this->type();
-        $bEquipment = Equipment::create(['contractor_id' => $b->id, 'equipment_type_id' => $type->id, 'name' => 'ملك ب', 'daily_price' => 20]);
+        $bEquipment = Equipment::create(['contractor_id' => $b->id, 'equipment_type_id' => $type->id, 'name' => 'ملك ب']);
 
         Sanctum::actingAs($a, ['*']);
         $response = $this->patchJson("/api/v1/contractor/equipment/{$bEquipment->id}", ['name' => 'استولى عليها أ']);
@@ -367,7 +464,7 @@ class ContractorEquipmentTest extends TestCase
         $a = $this->createContractor(['membership_number' => '922_g']);
         $b = $this->createContractor(['membership_number' => '923_g', 'name' => 'مقاول ب']);
         $type = $this->type();
-        $bEquipment = Equipment::create(['contractor_id' => $b->id, 'equipment_type_id' => $type->id, 'name' => 'ملك ب', 'daily_price' => 20]);
+        $bEquipment = Equipment::create(['contractor_id' => $b->id, 'equipment_type_id' => $type->id, 'name' => 'ملك ب']);
 
         Sanctum::actingAs($a, ['*']);
         $response = $this->deleteJson("/api/v1/contractor/equipment/{$bEquipment->id}");
@@ -381,7 +478,7 @@ class ContractorEquipmentTest extends TestCase
         $a = $this->createContractor(['membership_number' => '924_g']);
         $b = $this->createContractor(['membership_number' => '925_g', 'name' => 'مقاول ب']);
         $type = $this->type();
-        Equipment::create(['contractor_id' => $b->id, 'equipment_type_id' => $type->id, 'name' => 'ملك ب', 'daily_price' => 20]);
+        Equipment::create(['contractor_id' => $b->id, 'equipment_type_id' => $type->id, 'name' => 'ملك ب']);
 
         Sanctum::actingAs($a, ['*']);
         $this->getJson('/api/v1/contractor/equipment')->assertJsonCount(0, 'items');

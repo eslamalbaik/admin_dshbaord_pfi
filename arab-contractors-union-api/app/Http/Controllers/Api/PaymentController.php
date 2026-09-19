@@ -50,8 +50,10 @@ class PaymentController extends Controller
         if ($type !== 'dues_payment') {
             $blockers = \App\Support\ContractorRequirements::renewalBlockers($contractor);
             if (count($blockers) > 0) {
+                // الرسالة عامة عمداً: blockers ممكن تكون ذمم/غرامات أو حساب موقوف
+                // إدارياً (account_suspended) — التفاصيل الدقيقة في issues لكل الواجهة.
                 return $this->error(
-                    'لا يمكن إتمام أي عمليات قبل تسوية الذمم المالية المستحقّة.',
+                    'لا يمكن إتمام العملية قبل تسوية المتطلبات المستحقّة.',
                     403,
                     ['issues' => $blockers],
                     'dues_pending',

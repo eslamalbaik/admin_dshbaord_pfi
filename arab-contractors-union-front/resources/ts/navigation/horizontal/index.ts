@@ -17,7 +17,8 @@ export default [
     children: [
       { title: 'قائمة المقاولين', to: 'contractors' },
       { title: 'تسجيل مقاول جديد', to: 'contractors-create' },
-      { title: 'طلبات الانتساب', to: 'contractors-memberships' },
+      // "طلبات الانتساب" (contractors-memberships) مخفية عمداً من القائمة — الميزة معطّلة
+      // منتجياً (TASK-02) بينما تبقى الصفحة والراوت شغّالين لمن يملك الرابط المباشر.
       { title: 'طلبات تعديل اسم الشركة', to: 'contractors-name-change-requests' },
     ],
   },
@@ -25,7 +26,8 @@ export default [
     title: 'الشؤون المالية',
     icon: { icon: 'tabler-credit-card' },
     children: [
-      { title: 'سجل المدفوعات', to: 'payments-transactions' },
+      // "سجل المدفوعات" (payments-transactions) مخفي عمداً من القائمة — الميزة معطّلة
+      // منتجياً (TASK-04) بينما تبقى الصفحة والراوت شغّالين لمن يملك الرابط المباشر.
       { title: 'الذمم المالية', to: 'dues' },
       { title: 'الغرامات والمخالفات', to: 'contractors-penalties' },
     ],

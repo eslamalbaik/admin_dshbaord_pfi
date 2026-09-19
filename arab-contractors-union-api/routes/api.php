@@ -141,11 +141,19 @@ Route::prefix('v1')->group(function () {
         Route::get('equipment/subscription-status',  [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'subscriptionStatus']);
         Route::get('equipment/marketplace',          [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'marketplace']);
         Route::get('equipment/marketplace/{equipment}', [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'show']);
+        Route::get('equipment/marketplace/{equipment}/availability', [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'availability']);
+        Route::post('equipment/{equipment}/reservations', [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'requestReservation']);
+        Route::get('my-equipment-reservations',           [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'myReservations']);
+        Route::delete('equipment-reservations/{equipmentReservation}', [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'cancelReservation']);
         Route::get('equipment',                      [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'index']);
         Route::post('equipment',                     [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'store']);
         Route::patch('equipment/{equipment}',        [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'update']);
         Route::delete('equipment/{equipment}',       [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'destroy']);
         Route::post('equipment/{equipment}/report',  [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'report']);
+        // إدارة صور الإعلان بعد النشر (REQ-08 #2/#3/#5) — لم تكن موجودة أصلاً
+        Route::post('equipment/{equipment}/images',                          [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'uploadImages']);
+        Route::delete('equipment/{equipment}/images/{equipmentImage}',       [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'deleteImage']);
+        Route::post('equipment/{equipment}/images/{equipmentImage}/primary', [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'setPrimaryImage']);
 
         // طلبات تعديل بيانات البروفايل الثانوية (REQ-26)
         Route::get('profile-update-requests/mine',          [\App\Http\Controllers\Api\ProfileUpdateRequestController::class, 'mine']);
@@ -359,6 +367,7 @@ Route::prefix('v1')->group(function () {
              ->only(['index', 'store', 'show', 'update', 'destroy']);
         Route::post('contractors/{contractor}/qr', [ContractorController::class, 'generateQR']);
         Route::patch('contractors/{contractor}/status', [ContractorController::class, 'changeStatus']);
+        Route::patch('contractors/{contractor}/freeze', [ContractorController::class, 'freeze']);
         Route::patch('contractors/{contractor}/contact', [ContractorController::class, 'updateContact']);
 
         // --------------------------------------------------------
@@ -474,15 +483,41 @@ Route::prefix('v1')->group(function () {
         });
 
         // --------------------------------------------------------
+        //  Contractor Lookups — إدارة المجالات/الاختصاصات/الدرجات (REQ-01 #7، صلاحية أدمن فقط:
+        //  هذه الأكواد تغذّي محرّك حساب الرسوم وتوليد الشهادات مباشرة)
+        // --------------------------------------------------------
+        Route::middleware('role:admin')->group(function () {
+            Route::get('dashboard/contractor-fields',          [\App\Http\Controllers\Api\ContractorLookupController::class, 'fieldsIndex']);
+            Route::post('dashboard/contractor-fields',         [\App\Http\Controllers\Api\ContractorLookupController::class, 'fieldsStore']);
+            Route::patch('dashboard/contractor-fields/{contractorField}',  [\App\Http\Controllers\Api\ContractorLookupController::class, 'fieldsUpdate']);
+            Route::delete('dashboard/contractor-fields/{contractorField}', [\App\Http\Controllers\Api\ContractorLookupController::class, 'fieldsDestroy']);
+
+            Route::get('dashboard/contractor-specializations',          [\App\Http\Controllers\Api\ContractorLookupController::class, 'specializationsIndex']);
+            Route::post('dashboard/contractor-specializations',         [\App\Http\Controllers\Api\ContractorLookupController::class, 'specializationsStore']);
+            Route::patch('dashboard/contractor-specializations/{contractorSpecialization}',  [\App\Http\Controllers\Api\ContractorLookupController::class, 'specializationsUpdate']);
+            Route::delete('dashboard/contractor-specializations/{contractorSpecialization}', [\App\Http\Controllers\Api\ContractorLookupController::class, 'specializationsDestroy']);
+
+            Route::get('dashboard/contractor-grades',          [\App\Http\Controllers\Api\ContractorLookupController::class, 'gradesIndex']);
+            Route::post('dashboard/contractor-grades',         [\App\Http\Controllers\Api\ContractorLookupController::class, 'gradesStore']);
+            Route::patch('dashboard/contractor-grades/{contractorGrade}',  [\App\Http\Controllers\Api\ContractorLookupController::class, 'gradesUpdate']);
+            Route::delete('dashboard/contractor-grades/{contractorGrade}', [\App\Http\Controllers\Api\ContractorLookupController::class, 'gradesDestroy']);
+        });
+
+        // --------------------------------------------------------
         //  Penalties
         // --------------------------------------------------------
-        Route::get('penalties',                 [PenaltyController::class, 'index']);
-        Route::post('penalties',                [PenaltyController::class, 'store']);
-        Route::patch('penalties/{penalty}/pay', [PenaltyController::class, 'markPaid']);
+        Route::get('penalties',                    [PenaltyController::class, 'index']);
+        Route::post('penalties',                   [PenaltyController::class, 'store']);
+        Route::patch('penalties/{penalty}/status', [PenaltyController::class, 'updateStatus']);
 
         // --------------------------------------------------------
         //  Tenders
         // --------------------------------------------------------
+        // قبل apiResource عمداً: وإلا {tender} بمسار show/apiResource يحاول يفسّر
+        // "category-images" كـ id عطاء ويرجّع 404 model-not-found بدل الوصول للميثودز هون.
+        Route::get('tenders/category-images',              [TenderController::class, 'categoryImages']);
+        Route::post('tenders/category-images',              [TenderController::class, 'storeCategoryImage']);
+        Route::delete('tenders/category-images/{category}', [TenderController::class, 'destroyCategoryImage']);
         Route::apiResource('tenders', TenderController::class);
         Route::post('tenders/{tender}/attachments', [TenderController::class, 'storeAttachment']);
         Route::delete('tenders/{tender}/attachments/{attachment}', [TenderController::class, 'destroyAttachment']);
@@ -530,6 +565,7 @@ Route::prefix('v1')->group(function () {
         Route::get('equipment/{equipment}/blocked-dates',                  [EquipmentController::class, 'blockedDates']);
         Route::post('equipment/{equipment}/blocked-dates',                 [EquipmentController::class, 'addBlockedDate']);
         Route::delete('equipment/{equipment}/blocked-dates/{blockedDate}', [EquipmentController::class, 'removeBlockedDate']);
+        Route::get('equipment/{equipment}/reservations',                  [EquipmentController::class, 'reservations']);
 
         // بلاغات "الإبلاغ عن مشكلة" بالسوق (اكتُشف بتصميم الموبايل)
         Route::get('equipment-reports',                [\App\Http\Controllers\Api\EquipmentReportController::class, 'index']);

@@ -15,7 +15,9 @@ class ArchiveExpiredTenders extends Command
 
     public function handle(): int
     {
-        $expiredBase = fn () => Tender::whereNotNull('deadline')->where('deadline', '<', now()->toDateString());
+        // deadline صار DATETIME (REQ-07 #2) — المقارنة بلحظة now() الفعلية لا بتاريخ اليوم
+        // فقط، وإلا عطاء موعده اليوم الساعة 9 صباحاً ما كان رح يُغلَق إلا بعد يوم كامل.
+        $expiredBase = fn () => Tender::whereNotNull('deadline')->where('deadline', '<', now());
 
         // الإغلاق التلقائي: عطاء "مفتوح" تجاوز الموعد النهائي يتحول لـ"مغلق" دون تدخل يدوي —
         // بغض النظر عن حالة الأرشفة (عطاء مؤرشف مسبقاً بحالة "مفتوح" لازم ينغلق كمان).
@@ -29,10 +31,12 @@ class ArchiveExpiredTenders extends Command
             ->where('display_status', '!=', 'closed')
             ->update(['display_status' => 'closed']);
 
-        // دخول نافذة "ينتهي قريباً" — تحوّل زمني بحت، دون أي تغيير على status الإداري
+        // دخول نافذة "ينتهي قريباً" — تحوّل زمني بحت، دون أي تغيير على status الإداري.
+        // endOfDay() على الحد الأعلى ضروري الآن (وليس تاريخ اليوم فقط) وإلا عطاء موعده
+        // آخر يوم بالنافذة لكن بعد منتصف الليل كان يسقط خارجها خطأً.
         $displayClosingSoonCount = Tender::whereNotIn('status', ['closed', 'cancelled'])
             ->whereNotNull('deadline')
-            ->whereBetween('deadline', [now()->toDateString(), now()->addDays(Tender::CLOSING_SOON_DAYS)->toDateString()])
+            ->whereBetween('deadline', [now(), now()->addDays(Tender::CLOSING_SOON_DAYS)->endOfDay()])
             ->whereNotIn('display_status', ['closing_soon', 'closed'])
             ->update(['display_status' => 'closing_soon']);
 

@@ -27,6 +27,12 @@ const fetchNextMembership = async () => {
 
 onMounted(() => {
   fetchNextMembership()
+  fetchCatalog()
+  fetchGovernorates()
+})
+
+watch(() => form.value.governorate_id, () => {
+  form.value.city_id = null
 })
 
 watch(isNewMembership, (newVal) => {
@@ -61,14 +67,19 @@ const form = ref({
   phone: '',
   fax: '',
   email: '',
-  city: '',
+  governorate_id: null as number | null,
+  city_id: null as number | null,
+  district: '',
   address: '',
+  building: '',
+  floor: '',
   trade: '',
   specialties: [
     { field_lk_type: null as number | null, specialization_lk_type: null as number | null, classification: '' }
   ] as Array<{ field_lk_type: number | null, specialization_lk_type: number | null, classification: string }>,
   established_date: '',
   license_number: '',
+  classification: '',
 
   // Step 4: الوثائق والمستندات المطلوبة
   lease_or_ownership_contract: null as File | null,
@@ -110,58 +121,70 @@ const addSpecialty = () => {
   form.value.specialties.push({ field_lk_type: null, specialization_lk_type: null, classification: '' })
 }
 
-const removeSpecialty = (index: number) => {
-  if (form.value.specialties.length > 1) {
-    form.value.specialties.splice(index, 1)
+const removeSpecialtyDialog = ref(false)
+const removingSpecialtyIndex = ref<number | null>(null)
+
+const confirmRemoveSpecialty = (index: number) => {
+  removingSpecialtyIndex.value = index
+  removeSpecialtyDialog.value = true
+}
+
+const removeSpecialty = () => {
+  if (removingSpecialtyIndex.value !== null && form.value.specialties.length > 1)
+    form.value.specialties.splice(removingSpecialtyIndex.value, 1)
+  removeSpecialtyDialog.value = false
+  removingSpecialtyIndex.value = null
+}
+
+// المجالات/الاختصاصات/الدرجات وربط المحافظات-المدن تُجلب من الخادم (مصدر واحد REQ-01 #6،
+// بدل تكرار القوائم هنا ثابتة يدوياً كما كان سابقاً).
+const fieldOptions = ref<Array<{ title: string, value: number }>>([])
+const specializationOptions = ref<Array<{ title: string, value: number }>>([])
+const fieldSpecializations = ref<Record<number, number[]>>({})
+const gradeOptions = ref<Array<{ title: string, value: string }>>([])
+const topTierFields = ref<number[]>([])
+// التصنيف العام (contractors.classification) — منفصل عن تصنيف كل مجال/تخصص، ويقدر المقاول
+// يعدّله من التطبيق (dashboard.vue: editClassification) لكن كان غير معروض إطلاقاً بفورم لوحة
+// الأدمن، فيبدو للأدمن أن تعديل المقاول من التطبيق "لم ينعكس" رغم نجاح الحفظ فعلياً (TASK-03).
+const overallGradeOptions = ref<Array<{ title: string, value: string }>>([])
+
+const specializationOptionsFor = (fieldLkType: number | null) => {
+  if (!fieldLkType || !fieldSpecializations.value[fieldLkType])
+    return specializationOptions.value
+  const allowed = fieldSpecializations.value[fieldLkType]
+  return specializationOptions.value.filter(s => allowed.includes(s.value))
+}
+
+const gradeOptionsFor = (fieldLkType: number | null) =>
+  topTierFields.value.includes(fieldLkType as number) ? gradeOptions.value : gradeOptions.value.filter(g => g.value !== 'اولى أ')
+
+const governorates = ref<Array<{ id: number, name: string, cities: Array<{ id: number, name: string }> }>>([])
+const citiesForGovernorate = (governorateId: number | null) =>
+  governorates.value.find(g => g.id === governorateId)?.cities ?? []
+
+const fetchCatalog = async () => {
+  try {
+    const { data } = await api.get('/api/v1/app/specialties-catalog')
+    const items = data.items ?? data
+    fieldOptions.value = (items.fields ?? []).map((f: any) => ({ title: f.name, value: f.id }))
+    specializationOptions.value = (items.specializations ?? []).map((s: any) => ({ title: s.name, value: s.id }))
+    fieldSpecializations.value = items.field_specializations ?? {}
+    gradeOptions.value = (items.grades ?? []).map((g: any) => ({ title: g.label, value: g.value }))
+    topTierFields.value = (items.grades ?? []).find((g: any) => g.eligible_fields)?.eligible_fields ?? []
+    overallGradeOptions.value = (items.overall_grades ?? []).map((g: any) => ({ title: g.label, value: g.value }))
+  } catch (err) {
+    console.error('Failed to fetch specialties catalog', err)
   }
 }
 
-const fieldOptions = [
-  { title: 'غير محدد', value: 10 },
-  { title: 'طرق', value: 20 },
-  { title: 'ابنية', value: 30 },
-  { title: 'كهروميكانيك', value: 40 },
-  { title: 'الميــاه/المجــارى', value: 50 },
-  { title: 'أشغال عامه', value: 60 },
-]
-
-const specializationOptions = [
-  { title: 'غير محدد', value: 10 },
-  { title: 'الطرق', value: 20 },
-  { title: 'خلطات اسفلتيه', value: 30 },
-  { title: 'خرسانه جسور وعبارات', value: 40 },
-  { title: 'اشغال ترابيه', value: 50 },
-  { title: 'الأبنية', value: 60 },
-  { title: 'خرسانه مصنعه', value: 70 },
-  { title: 'منشأت معدنية', value: 80 },
-  { title: 'أبنية جاهزه بريفاف', value: 90 },
-  { title: 'صيانة الابنيه', value: 100 },
-  { title: 'كهروميكانيك', value: 110 },
-  { title: 'صيانة كهروميكانيك', value: 120 },
-  { title: 'ميكانيك', value: 130 },
-  { title: 'كـهرباء', value: 140 },
-  { title: 'الكترونيات', value: 150 },
-  { title: 'المياه والمجاري', value: 160 },
-  { title: 'محطات التنقيه', value: 170 },
-  { title: 'الري والصرف', value: 180 },
-  { title: 'حفريات وتعدين', value: 190 },
-  { title: 'اشغال عامه', value: 200 },
-  { title: 'سكك حديدية', value: 210 },
-  { title: 'حفر آبار', value: 220 },
-]
-
-// درجات التصنيف الموحَّدة (المادة 37) — "اولى أ" لا تصحّ إلا لمجالي طرق(20) وابنية(30)
-const TOP_TIER_FIELDS = [20, 30]
-const gradeOptions = [
-  { title: 'الدرجة الأولى (أ)', value: 'اولى أ' },
-  { title: 'الدرجة الأولى (ب)', value: 'اولى ب' },
-  { title: 'الدرجة الثانية', value: 'ثانية' },
-  { title: 'الدرجة الثالثة', value: 'ثالثة' },
-  { title: 'الدرجة الرابعة', value: 'رابعة' },
-  { title: 'الدرجة الخامسة', value: 'خامسة' },
-]
-const gradeOptionsFor = (fieldLkType: number | null) =>
-  TOP_TIER_FIELDS.includes(fieldLkType as number) ? gradeOptions : gradeOptions.filter(g => g.value !== 'اولى أ')
+const fetchGovernorates = async () => {
+  try {
+    const { data } = await api.get('/api/v1/app/governorates')
+    governorates.value = (data.items ?? data).governorates ?? []
+  } catch (err) {
+    console.error('Failed to fetch governorates', err)
+  }
+}
 
 const nextStep = () => { if (step.value < 4) step.value++ }
 const prevStep = () => { if (step.value > 1) step.value-- }
@@ -173,6 +196,10 @@ const submit = async () => {
   try {
     const fd = new FormData()
     Object.entries(form.value).forEach(([k, v]) => {
+      // VFileInput يُعيد [] (وليس null) عند تفريغ حقل الملف — بدون هذا الفحص كان
+      // يُرسَل مصفوفة فارغة كقيمة للحقل فيرفضها الخادم بخطأ "يجب أن يكون ملفاً" (REQ-01 #4)
+      if (Array.isArray(v) && v.length === 0 && k !== 'partners' && k !== 'specialties')
+        return
       if (v !== null && v !== '') {
         if (k === 'partners' && Array.isArray(v)) {
           if (v.length > 0) fd.append(k, v.join(','))
@@ -197,7 +224,7 @@ const submit = async () => {
             step.value = 1
         } else if (errors.owner_name || errors.partners || errors.authorized_person) {
             step.value = 2
-        } else if (errors.phone || errors.fax || errors.email || errors.city || errors.address || errors.license_number || errors.established_date || errors.specialties) {
+        } else if (errors.phone || errors.fax || errors.email || errors.governorate_id || errors.city_id || errors.district || errors.address || errors.building || errors.floor || errors.license_number || errors.established_date || errors.classification || errors.specialties) {
             step.value = 3
         } else {
             step.value = 4
@@ -368,15 +395,38 @@ const submit = async () => {
           </VCol>
           <VCol cols="12" md="4">
             <VSelect
-              v-model="form.city"
-              :items="['شمال غزة', 'غزة', 'الوسطى', 'خان يونس', 'رفح']"
-              label="المدينة / المحافظة (غزة) *"
-              :error-messages="validationErrors.city"
+              v-model="form.governorate_id"
+              :items="governorates"
+              item-title="name"
+              item-value="id"
+              label="المحافظة *"
+              :error-messages="validationErrors.governorate_id"
               :rules="[v => !!v || 'مطلوب']"
             />
           </VCol>
+          <VCol cols="12" md="4">
+            <VSelect
+              v-model="form.city_id"
+              :items="citiesForGovernorate(form.governorate_id)"
+              item-title="name"
+              item-value="id"
+              label="المدينة *"
+              :disabled="!form.governorate_id"
+              :error-messages="validationErrors.city_id"
+              :rules="[v => !!v || 'مطلوب']"
+            />
+          </VCol>
+          <VCol cols="12" md="4">
+            <VTextField v-model="form.district" label="الحي *" :error-messages="validationErrors.district" :rules="[v => !!v || 'مطلوب']" />
+          </VCol>
           <VCol cols="12" md="8">
-            <VTextField v-model="form.address" label="العنوان التفصيلي (الحي، الشارع، البناية، الطابق) *" :error-messages="validationErrors.address" :rules="[v => !!v || 'مطلوب']" />
+            <VTextField v-model="form.address" label="العنوان التفصيلي (الشارع) *" :error-messages="validationErrors.address" :rules="[v => !!v || 'مطلوب']" />
+          </VCol>
+          <VCol cols="12" md="2">
+            <VTextField v-model="form.building" label="العمارة *" :error-messages="validationErrors.building" :rules="[v => !!v || 'مطلوب']" />
+          </VCol>
+          <VCol cols="12" md="2">
+            <VTextField v-model="form.floor" label="الطابق *" :error-messages="validationErrors.floor" :rules="[v => !!v || 'مطلوب']" />
           </VCol>
           <!-- التخصصات والتصنيفات المتعددة -->
           <VCol cols="12">
@@ -391,12 +441,13 @@ const submit = async () => {
                   item-value="value"
                   label="المجال *"
                   :rules="[v => !!v || 'مطلوب']"
+                  @update:model-value="spec.specialization_lk_type = null"
                 />
               </VCol>
               <VCol cols="12" md="4">
                 <VSelect
                   v-model="spec.specialization_lk_type"
-                  :items="specializationOptions"
+                  :items="specializationOptionsFor(spec.field_lk_type)"
                   item-title="title"
                   item-value="value"
                   label="التخصص *"
@@ -419,7 +470,7 @@ const submit = async () => {
                   variant="text"
                   color="error"
                   :disabled="form.specialties.length <= 1"
-                  @click="removeSpecialty(index)"
+                  @click="confirmRemoveSpecialty(index)"
                   title="حذف هذا المجال"
                 >
                   <VIcon icon="tabler-trash" />
@@ -450,6 +501,17 @@ const submit = async () => {
           <VCol cols="12" md="4">
             <VTextField v-model="form.established_date" label="تاريخ التأسيس *" type="date" :error-messages="validationErrors.established_date" :rules="[v => !!v || 'مطلوب']" />
           </VCol>
+          <VCol cols="12" md="4">
+            <VSelect
+              v-model="form.classification"
+              :items="overallGradeOptions"
+              item-title="title"
+              item-value="value"
+              label="التصنيف العام"
+              clearable
+              :error-messages="validationErrors.classification"
+            />
+          </VCol>
         </VRow>
       </VCardText>
       <VCardActions class="pa-4">
@@ -463,13 +525,13 @@ const submit = async () => {
     <VCard v-if="step === 4">
       <VCardTitle style="font-family:Cairo,sans-serif">الوثائق والمستندات المطلوبة</VCardTitle>
       <VCardText>
-        <p class="text-body-2 text-medium-emphasis mb-4">يرجى رفع المستندات التالية بصيغة PDF أو كصور واضحة (يتحول الحقل للون الأخضر عند نجاح الاختيار):</p>
+        <p class="text-body-2 text-medium-emphasis mb-4">يرجى رفع المستندات التالية بصيغة PDF أو Word أو كصور واضحة (يتحول الحقل للون الأخضر عند نجاح الاختيار):</p>
         <VRow>
           <VCol cols="12" md="6">
             <VFileInput
               v-model="form.cr_file"
               label="السجل التجاري *"
-              accept=".pdf,image/*"
+              accept=".pdf,.doc,.docx,image/*"
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -483,7 +545,7 @@ const submit = async () => {
             <VFileInput
               v-model="form.company_register"
               label="مستخرج عن سجل الشركة *"
-              accept=".pdf,image/*"
+              accept=".pdf,.doc,.docx,image/*"
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -497,7 +559,7 @@ const submit = async () => {
             <VFileInput
               v-model="form.municipal_license"
               label="رخصة المهن (الحرف) سارية المفعول *"
-              accept=".pdf,image/*"
+              accept=".pdf,.doc,.docx,image/*"
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -511,7 +573,7 @@ const submit = async () => {
             <VFileInput
               v-model="form.bank_dealing_letter"
               label="شهادة تعامل للشركة مع بنك *"
-              accept=".pdf,image/*"
+              accept=".pdf,.doc,.docx,image/*"
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -525,7 +587,7 @@ const submit = async () => {
             <VFileInput
               v-model="form.articles_of_association"
               label="عقد تأسيس الشركة *"
-              accept=".pdf,image/*"
+              accept=".pdf,.doc,.docx,image/*"
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -539,7 +601,7 @@ const submit = async () => {
             <VFileInput
               v-model="form.internal_bylaws"
               label="النظام الداخلي *"
-              accept=".pdf,image/*"
+              accept=".pdf,.doc,.docx,image/*"
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -553,7 +615,7 @@ const submit = async () => {
             <VFileInput
               v-model="form.lease_or_ownership_contract"
               label="عقد الإيجار أو الملكية لمقر الشركة *"
-              accept=".pdf,image/*"
+              accept=".pdf,.doc,.docx,image/*"
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -567,7 +629,7 @@ const submit = async () => {
             <VFileInput
               v-model="form.partners_ids"
               label="صور هويات الشركاء *"
-              accept=".pdf,image/*"
+              accept=".pdf,.doc,.docx,image/*"
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -581,7 +643,7 @@ const submit = async () => {
             <VFileInput
               v-model="form.authorization_letter"
               label="كتاب تفويض المعتمد بالتوقيع *"
-              accept=".pdf,image/*"
+              accept=".pdf,.doc,.docx,image/*"
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -595,7 +657,7 @@ const submit = async () => {
             <VFileInput
               v-model="form.company_approval_letter"
               label="كتاب من الشركة بالموافقة على الانتساب *"
-              accept=".pdf,image/*"
+              accept=".pdf,.doc,.docx,image/*"
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -609,7 +671,7 @@ const submit = async () => {
             <VFileInput
               v-model="form.full_time_engineer_certificate"
               label="شهادة مهندس متفرغ *"
-              accept=".pdf,image/*"
+              accept=".pdf,.doc,.docx,image/*"
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -623,7 +685,7 @@ const submit = async () => {
             <VFileInput
               v-model="form.accountant_certificate_or_contract"
               label="شهادة تفرغ محاسب من نقابة المحاسبين / أو عقد مع مكتب محاسبين معتمد *"
-              accept=".pdf,image/*"
+              accept=".pdf,.doc,.docx,image/*"
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -637,7 +699,7 @@ const submit = async () => {
             <VFileInput
               v-model="form.secretary_contract"
               label="عقد سكرتير *"
-              accept=".pdf,image/*"
+              accept=".pdf,.doc,.docx,image/*"
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -660,6 +722,24 @@ const submit = async () => {
         </VBtn>
       </VCardActions>
     </VCard>
+
+    <!-- Confirm remove specialty dialog -->
+    <VDialog v-model="removeSpecialtyDialog" max-width="400">
+      <VCard>
+        <VCardTitle class="d-flex align-center gap-2" style="font-family:Cairo,sans-serif">
+          <VIcon icon="tabler-alert-triangle" color="error" />
+          تأكيد الحذف
+        </VCardTitle>
+        <VCardText style="font-family:Cairo,sans-serif">
+          هل أنت متأكد من حذف هذا المجال والتصنيف؟ لا يمكن التراجع عن هذا الإجراء.
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" @click="removeSpecialtyDialog = false">إلغاء</VBtn>
+          <VBtn color="error" @click="removeSpecialty">حذف</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
   </div>
 </template>
 

@@ -67,7 +67,6 @@ class NewsDemoSeeder extends Seeder
                     'title'        => $item['title'],
                     'excerpt'      => $item['excerpt'],
                     'body'         => $item['body'],
-                    'category'     => $item['category'],
                     'is_published' => true,
                     'published_at' => now()->subDays($item['days_ago']),
                     'created_by'   => $adminId,

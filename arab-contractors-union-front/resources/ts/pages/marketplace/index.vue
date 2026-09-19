@@ -42,7 +42,7 @@ const editForm = ref({
   equipment_type_id: null as number | null,
   name: '', brand: '', description: '', manufacture_year: null as number | null,
   power: '', condition: 'good', contract_type: 'daily', governorate: '', city: '',
-  daily_price: 0, owner_phone: '', status: 'visible', is_featured: false, needs_maintenance: false, admin_notes: '',
+  owner_phone: '', status: 'visible', is_featured: false, needs_maintenance: false, admin_notes: '',
 })
 
 // image management
@@ -171,7 +171,6 @@ const openEdit = (item: any) => {
     contract_type:    item.contract_type ?? 'daily',
     governorate:      item.governorate ?? '',
     city:             item.city ?? '',
-    daily_price:      Number(item.daily_price),
     owner_phone:      item.owner_phone ?? '',
     status:           item.status ?? 'visible',
     is_featured:      !!item.is_featured,
@@ -423,14 +422,13 @@ const reasonLabel: Record<string, string> = {
             <th style="font-family:Cairo,sans-serif">النوع</th>
             <th style="font-family:Cairo,sans-serif">المالك</th>
             <th style="font-family:Cairo,sans-serif">المحافظة</th>
-            <th style="font-family:Cairo,sans-serif">السعر اليومي</th>
             <th style="font-family:Cairo,sans-serif">الحالة</th>
             <th style="font-family:Cairo,sans-serif">الإجراءات</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="!loading && equipment.length === 0">
-            <td colspan="7" class="text-center pa-10 text-medium-emphasis" style="font-family:Cairo,sans-serif">
+            <td colspan="6" class="text-center pa-10 text-medium-emphasis" style="font-family:Cairo,sans-serif">
               لا توجد آليات مطابقة للبحث
             </td>
           </tr>
@@ -475,10 +473,6 @@ const reasonLabel: Record<string, string> = {
             <td style="font-family:Cairo,sans-serif;color:#374151">{{ item.contractor?.name ?? '—' }}</td>
             <!-- Governorate -->
             <td style="font-family:Cairo,sans-serif;color:#6B7280">{{ item.governorate ?? '—' }}</td>
-            <!-- Price -->
-            <td style="font-family:Cairo,sans-serif;font-weight:600;color:#000269">
-              {{ Number(item.daily_price).toLocaleString('ar') }} ₪
-            </td>
             <!-- Status -->
             <td>
               <VChip
@@ -590,9 +584,6 @@ const reasonLabel: Record<string, string> = {
             </VCol>
             <VCol cols="12" md="4">
               <VTextField v-model="editForm.city" label="المدينة" variant="outlined" density="compact" style="font-family:Cairo,sans-serif" />
-            </VCol>
-            <VCol cols="12" md="4">
-              <VTextField v-model.number="editForm.daily_price" label="السعر اليومي (₪)" type="number" min="0" variant="outlined" density="compact" style="font-family:Cairo,sans-serif" />
             </VCol>
             <VCol cols="12" md="6">
               <VSelect

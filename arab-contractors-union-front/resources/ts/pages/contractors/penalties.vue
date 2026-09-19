@@ -13,6 +13,51 @@ const addDialog = ref(false)
 const addLoading = ref(false)
 const newPenalty = ref({ contractor_id: null as number | null, reason: '', amount: '', notes: '' })
 
+// الحالات الأربع المعتمَدة (REQ-06 #6) — قبل هذا كان النظام يدعم unpaid/paid فقط
+const statusOptions = [
+  { title: 'غير مسدَّدة', value: 'unpaid' },
+  { title: 'مسدَّدة', value: 'paid' },
+  { title: 'مسدَّدة جزئياً', value: 'partially_paid' },
+  { title: 'مرفوضة', value: 'rejected' },
+]
+const statusColor: Record<string, string> = {
+  unpaid: 'error',
+  paid: 'success',
+  partially_paid: 'warning',
+  rejected: 'secondary',
+}
+
+const statusDialog = ref(false)
+const statusLoading = ref(false)
+const statusTarget = ref<any>(null)
+const statusForm = ref({ status: 'unpaid', paid_amount: '', reject_reason: '' })
+
+function openStatusDialog(item: any) {
+  statusTarget.value = item
+  statusForm.value = { status: item.status, paid_amount: '', reject_reason: item.reject_reason ?? '' }
+  statusDialog.value = true
+}
+
+const updateStatus = async () => {
+  statusLoading.value = true
+  try {
+    await api.patch(`/api/v1/penalties/${statusTarget.value.id}/status`, {
+      status: statusForm.value.status,
+      paid_amount: statusForm.value.status === 'partially_paid' ? statusForm.value.paid_amount : undefined,
+      reject_reason: statusForm.value.status === 'rejected' ? (statusForm.value.reject_reason || undefined) : undefined,
+    })
+    statusDialog.value = false
+    notify('تم تحديث حالة الغرامة بنجاح.')
+    fetchPenalties()
+  }
+  catch (err: any) {
+    notify(err?.response?.data?.message || 'فشل تحديث حالة الغرامة.', 'error')
+  }
+  finally {
+    statusLoading.value = false
+  }
+}
+
 // ── Snackbar ──────────────────────────────────────
 const snackbar = ref(false)
 const snackbarText = ref('')
@@ -66,6 +111,7 @@ const headers = [
   { title: 'المبلغ', key: 'amount' },
   { title: 'الحالة', key: 'status' },
   { title: 'التاريخ', key: 'created_at' },
+  { title: 'إجراءات', key: 'actions', sortable: false },
 ]
 
 const fetchPenalties = async () => {
@@ -146,17 +192,27 @@ onMounted(fetchPenalties)
 
         <template #item.status="{ item }">
           <VChip
-            :color="item.status === 'paid' ? 'success' : 'error'"
+            :color="statusColor[item.status] ?? 'default'"
             size="small"
             label
             style="font-family:Cairo,sans-serif"
           >
-            {{ item.status === 'paid' ? 'مدفوع' : 'غير مدفوع' }}
+            {{ item.status_label ?? item.status }}
           </VChip>
+          <div v-if="item.status === 'partially_paid'" class="text-caption text-medium-emphasis mt-1">
+            مسدَّد: ₪ {{ Number(item.paid_amount || 0).toLocaleString() }}
+          </div>
+          <div v-if="item.status === 'rejected' && item.reject_reason" class="text-caption text-medium-emphasis mt-1">
+            {{ item.reject_reason }}
+          </div>
         </template>
 
         <template #item.created_at="{ item }">
           {{ item.created_at ? new Date(item.created_at).toLocaleDateString('ar-PS') : '—' }}
+        </template>
+
+        <template #item.actions="{ item }">
+          <VBtn size="small" variant="text" icon="tabler-edit" title="تحديث الحالة" @click="openStatusDialog(item)" />
         </template>
 
         <template #no-data>
@@ -202,6 +258,50 @@ onMounted(fetchPenalties)
             :loading="addLoading"
             :disabled="addLoading || !newPenalty.contractor_id || !newPenalty.reason || !newPenalty.amount"
             @click="addPenalty"
+          >
+            حفظ
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- Update Status Dialog -->
+    <VDialog v-model="statusDialog" max-width="480">
+      <VCard>
+        <VCardTitle style="font-family:Cairo,sans-serif">تحديث حالة الغرامة</VCardTitle>
+        <VCardText>
+          <VRow>
+            <VCol cols="12">
+              <VSelect
+                v-model="statusForm.status"
+                :items="statusOptions"
+                item-title="title"
+                item-value="value"
+                label="الحالة"
+              />
+            </VCol>
+            <VCol v-if="statusForm.status === 'partially_paid'" cols="12">
+              <VTextField
+                v-model="statusForm.paid_amount"
+                label="المبلغ المسدَّد (₪)"
+                type="number"
+                :hint="`يجب أن يكون أقل من مبلغ الغرامة الكامل (₪ ${Number(statusTarget?.amount || 0).toLocaleString()})`"
+                persistent-hint
+              />
+            </VCol>
+            <VCol v-if="statusForm.status === 'rejected'" cols="12">
+              <VTextField v-model="statusForm.reject_reason" label="سبب الرفض (اختياري)" />
+            </VCol>
+          </VRow>
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" @click="statusDialog = false">إلغاء</VBtn>
+          <VBtn
+            color="primary"
+            :loading="statusLoading"
+            :disabled="statusLoading || (statusForm.status === 'partially_paid' && !statusForm.paid_amount)"
+            @click="updateStatus"
           >
             حفظ
           </VBtn>

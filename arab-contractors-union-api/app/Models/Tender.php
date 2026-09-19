@@ -35,7 +35,7 @@ class Tender extends Model
     ];
 
     protected $casts = [
-        'deadline'         => 'date',
+        'deadline'         => 'datetime',
         'published_at'     => 'datetime',
         'archived_at'      => 'datetime',
         'budget'           => 'decimal:2',

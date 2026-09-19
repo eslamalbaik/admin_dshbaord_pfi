@@ -38,7 +38,6 @@ const form = ref({
   contract_type:     'daily',
   governorate:       '',
   city:              '',
-  daily_price:       0,
   owner_phone:       '',
   status:            'visible',
   is_featured:       false,
@@ -75,7 +74,6 @@ const fetchEquipment = async () => {
       contract_type:     data.contract_type ?? 'daily',
       governorate:       data.governorate ?? '',
       city:              data.city ?? '',
-      daily_price:       Number(data.daily_price),
       owner_phone:       data.owner_phone ?? '',
       status:            data.status ?? 'visible',
       is_featured:       !!data.is_featured,
@@ -350,18 +348,6 @@ const contractTypeOptions = [
               style="font-family:Cairo,sans-serif"
             />
           </VCol>
-          <VCol cols="12" md="4">
-            <VTextField
-              v-model.number="form.daily_price"
-              label="السعر اليومي (₪) *"
-              type="number"
-              min="0"
-              variant="outlined"
-              density="compact"
-              style="font-family:Cairo,sans-serif"
-            />
-          </VCol>
-
           <VDivider class="my-2" />
 
           <!-- Section: إعدادات الظهور -->

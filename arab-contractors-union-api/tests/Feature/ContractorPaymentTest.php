@@ -112,6 +112,35 @@ class ContractorPaymentTest extends TestCase
         $this->assertDatabaseCount('payments', 0);
     }
 
+    public function test_submit_transfer_blocked_when_contractor_suspended(): void
+    {
+        $contractor = $this->createContractor(['status' => 'suspended']);
+        Sanctum::actingAs($contractor, ['*']);
+
+        $response = $this->postJson('/api/v1/contractor/payments/transfer', [
+            'amount'        => 100,
+            'receipt_image' => UploadedFile::fake()->image('r.jpg'),
+            'type'          => 'membership_fee',
+        ]);
+
+        $response->assertStatus(403)->assertJsonPath('error', 'dues_pending');
+        $this->assertDatabaseCount('payments', 0);
+    }
+
+    public function test_submit_transfer_allows_dues_payment_type_even_when_contractor_suspended(): void
+    {
+        $contractor = $this->createContractor(['status' => 'suspended']);
+        Sanctum::actingAs($contractor, ['*']);
+
+        $response = $this->postJson('/api/v1/contractor/payments/transfer', [
+            'amount'        => 50,
+            'receipt_image' => UploadedFile::fake()->image('r.jpg'),
+            'type'          => 'dues_payment',
+        ]);
+
+        $response->assertStatus(201);
+    }
+
     public function test_submit_transfer_allows_dues_payment_type_even_with_outstanding_dues(): void
     {
         $contractor = $this->createContractor();

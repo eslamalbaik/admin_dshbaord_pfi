@@ -8,6 +8,7 @@ use App\Models\Equipment;
 use App\Models\EquipmentImage;
 use App\Models\EquipmentPackage;
 use App\Models\EquipmentReport;
+use App\Models\EquipmentReservation;
 use App\Models\EquipmentType;
 use App\Models\Governorate;
 use App\Models\Setting;
@@ -29,6 +30,7 @@ class ContractorEquipmentController extends Controller
             'contractor_id'     => $e->contractor_id,
             // بطاقة "المالك/المقاول" بشاشة تفاصيل الألية — زر تواصل واتساب مباشر (owner_phone)
             'contractor_name'   => $e->contractor?->name,
+            'equipment_type_id' => $e->equipment_type_id,
             'type'              => $e->type?->only(['id', 'name_ar', 'icon']),
             'name'              => $e->name,
             'brand'             => $e->brand,
@@ -39,7 +41,6 @@ class ContractorEquipmentController extends Controller
             'contract_type'     => $e->contract_type,
             'governorate'       => $e->governorate,
             'city'              => $e->city,
-            'daily_price'       => $e->daily_price,
             'owner_phone'       => $e->owner_phone,
             'status'            => $e->status,
             'is_featured'       => (bool) $e->is_featured,
@@ -128,14 +129,13 @@ class ContractorEquipmentController extends Controller
             'equipment_type_id'  => 'required|exists:equipment_types,id',
             'name'               => 'required|string|max:255',
             'brand'              => 'nullable|string|max:100',
-            'description'        => 'nullable|string',
+            'description'        => 'nullable|string|max:2000',
             'manufacture_year'   => 'nullable|integer|min:1970|max:' . date('Y'),
             'power'              => 'nullable|string|max:50',
             'condition'          => 'nullable|in:excellent,good,fair',
             'contract_type'      => 'required|in:daily,weekly,monthly',
             'governorate'        => 'nullable|string|max:100',
             'city'               => 'nullable|string|max:100',
-            'daily_price'        => 'required|numeric|min:0',
             'owner_phone'        => 'nullable|string|max:20',
             'accept_disclaimer'  => 'sometimes|boolean',
             'images'             => 'nullable|array|max:8',
@@ -189,16 +189,19 @@ class ContractorEquipmentController extends Controller
         }
 
         $data = $request->validate([
+            // كان غائباً عن قواعد التحقق هون رغم وجوده بالفورم المفترَض — أي تعديل لنوع
+            // الآلية من التطبيق كان يُرسَل ويُتجاهَل بصمت لأن Laravel يستبعد أي حقل غير
+            // مُعرَّف بقواعد validate() من مصفوفة النتيجة (REQ-08 #9)
+            'equipment_type_id' => 'sometimes|exists:equipment_types,id',
             'name'              => 'sometimes|string|max:255',
             'brand'             => 'nullable|string|max:100',
-            'description'       => 'nullable|string',
+            'description'       => 'nullable|string|max:2000',
             'manufacture_year'  => 'nullable|integer|min:1970|max:' . date('Y'),
             'power'             => 'nullable|string|max:50',
             'condition'         => 'nullable|in:excellent,good,fair',
             'contract_type'     => 'sometimes|in:daily,weekly,monthly',
             'governorate'       => 'nullable|string|max:100',
             'city'              => 'nullable|string|max:100',
-            'daily_price'       => 'sometimes|numeric|min:0',
             'owner_phone'       => 'nullable|string|max:20',
             'is_hidden'         => 'sometimes|boolean',
             'needs_maintenance' => 'sometimes|boolean',
@@ -207,6 +210,94 @@ class ContractorEquipmentController extends Controller
         $equipment->update($data);
 
         return $this->success($this->format($equipment->fresh(['type', 'images'])), 'تم تحديث الإعلان بنجاح.');
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    //  صور الإعلان بعد النشر (REQ-08 #2/#3/#5) — لم تكن موجودة أصلاً: الصور كانت
+    //  تُرفَع فقط ضمن نفس طلب store() عند الإنشاء، وما في طريقة لإضافة/حذف صورة
+    //  لاحقاً من التطبيق — هذا هو الفجوة الحقيقية خلف شكاوى "ما في زر حفظ بعد رفع
+    //  الصور" و"الرفع لازم يصير مع الإضافة" بالشيت.
+    // ═════════════════════════════════════════════════════════════════════════
+
+    // POST /api/v1/contractor/equipment/{equipment}/images
+    public function uploadImages(Request $request, Equipment $equipment)
+    {
+        if ($equipment->contractor_id !== $request->user()->id) {
+            return $this->error('غير مصرَّح لك بتعديل هذا الإعلان.', 403);
+        }
+
+        $request->validate([
+            'images'   => 'required|array|min:1',
+            'images.*' => 'image|mimes:jpg,jpeg,png,webp|max:3072',
+        ]);
+
+        // الحد 8 صور إجمالي (موجودة + جديدة)، لا الدفعة المرفوعة فقط
+        $existingCount = $equipment->images()->count();
+        $newCount      = count($request->file('images'));
+
+        if ($existingCount + $newCount > 8) {
+            return $this->error(
+                "الحد الأقصى 8 صور لكل آلية. لديك حالياً {$existingCount} صورة، ولا يمكن إضافة {$newCount} أخرى.",
+                422,
+            );
+        }
+
+        $lastOrder  = $equipment->images()->max('sort_order') ?? -1;
+        $hasPrimary = $equipment->images()->where('is_primary', true)->exists();
+
+        foreach ($request->file('images') as $index => $file) {
+            $path = $file->store('equipment/' . $equipment->id, 'public');
+            $lastOrder++;
+            EquipmentImage::create([
+                'equipment_id' => $equipment->id,
+                'path'         => $path,
+                'is_primary'   => ! $hasPrimary && $index === 0,
+                'sort_order'   => $lastOrder,
+            ]);
+            $hasPrimary = true;
+        }
+
+        return $this->success($this->format($equipment->fresh(['type', 'images'])), 'تمت إضافة الصور بنجاح.', 201);
+    }
+
+    // DELETE /api/v1/contractor/equipment/{equipment}/images/{equipmentImage}
+    public function deleteImage(Request $request, Equipment $equipment, EquipmentImage $equipmentImage)
+    {
+        if ($equipment->contractor_id !== $request->user()->id) {
+            return $this->error('غير مصرَّح لك بتعديل هذا الإعلان.', 403);
+        }
+
+        if ($equipmentImage->equipment_id !== $equipment->id) {
+            return $this->error('الصورة لا تعود لهذا الإعلان.', 422);
+        }
+
+        Storage::disk('public')->delete($equipmentImage->path);
+        $wasPrimary = $equipmentImage->is_primary;
+        $equipmentImage->delete();
+
+        if ($wasPrimary) {
+            $next = $equipment->images()->orderBy('sort_order')->first();
+            $next?->update(['is_primary' => true]);
+        }
+
+        return $this->success($this->format($equipment->fresh(['type', 'images'])), 'تم حذف الصورة بنجاح.');
+    }
+
+    // POST /api/v1/contractor/equipment/{equipment}/images/{equipmentImage}/primary
+    public function setPrimaryImage(Request $request, Equipment $equipment, EquipmentImage $equipmentImage)
+    {
+        if ($equipment->contractor_id !== $request->user()->id) {
+            return $this->error('غير مصرَّح لك بتعديل هذا الإعلان.', 403);
+        }
+
+        if ($equipmentImage->equipment_id !== $equipment->id) {
+            return $this->error('الصورة لا تعود لهذا الإعلان.', 422);
+        }
+
+        $equipment->images()->update(['is_primary' => false]);
+        $equipmentImage->update(['is_primary' => true]);
+
+        return $this->success($this->format($equipment->fresh(['type', 'images'])), 'تم تعيين الصورة الرئيسية.');
     }
 
     // DELETE /api/v1/contractor/equipment/{equipment}
@@ -281,6 +372,112 @@ class ContractorEquipmentController extends Controller
         ]);
 
         return $this->success(message: 'تم إرسال بلاغك، وسيتم مراجعته من قِبل الإدارة.', code: 201);
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    //  حجوزات فعلية (REQ-08 #6) — المستأجر يطلب فترة، تُقبل أوتوماتيكياً إن كانت
+    //  متاحة (بدون خطوة موافقة من المالك/الإدارة). يستبدل الاعتماد الوحيد على
+    //  EquipmentBlockedDate (أداة حجب يدوية بلا هوية مستأجر) لتمثيل "المحجوز فعلاً".
+    // ═════════════════════════════════════════════════════════════════════════
+
+    // GET /api/v1/contractor/equipment/marketplace/{equipment}/availability
+    // نطاقات التواريخ غير المتاحة (حجوزات مؤكَّدة + حجب إداري) — لعرضها بتقويم الطلب
+    public function availability(Equipment $equipment)
+    {
+        $reservations = $equipment->reservations()
+            ->where('status', 'confirmed')
+            ->where('end_date', '>=', now()->toDateString())
+            ->get(['start_date', 'end_date']);
+
+        $blocked = $equipment->blockedDates()
+            ->where('blocked_date', '>=', now()->toDateString())
+            ->get(['blocked_date', 'reason']);
+
+        return $this->success([
+            'reserved_ranges' => $reservations->map(fn ($r) => [
+                'start_date' => $r->start_date->toDateString(),
+                'end_date'   => $r->end_date->toDateString(),
+            ])->values(),
+            'blocked_dates' => $blocked->map(fn ($b) => [
+                'date'   => $b->blocked_date->toDateString(),
+                'reason' => $b->reason,
+            ])->values(),
+        ]);
+    }
+
+    // POST /api/v1/contractor/equipment/{equipment}/reservations
+    public function requestReservation(Request $request, Equipment $equipment)
+    {
+        $contractor = $request->user();
+
+        if ($equipment->contractor_id === $contractor->id) {
+            return $this->error('لا يمكنك حجز آليتك الخاصة.', 422);
+        }
+
+        if ($equipment->is_hidden || $equipment->status !== 'visible' || $equipment->needs_maintenance) {
+            return $this->error('هذه الآلية غير متاحة للحجز حالياً.', 422);
+        }
+
+        $data = $request->validate([
+            'start_date' => 'required|date|after_or_equal:today',
+            'end_date'   => 'required|date|after_or_equal:start_date',
+            'notes'      => 'nullable|string|max:500',
+        ]);
+
+        if (EquipmentReservation::hasOverlap($equipment->id, $data['start_date'], $data['end_date'])) {
+            return $this->error(
+                'الفترة المطلوبة غير متاحة — هناك حجز أو حجب سابق يتقاطع معها. جرّب فترة أخرى.',
+                422,
+                null,
+                'dates_unavailable',
+            );
+        }
+
+        $reservation = EquipmentReservation::create([
+            'equipment_id'  => $equipment->id,
+            'contractor_id' => $contractor->id,
+            'start_date'    => $data['start_date'],
+            'end_date'      => $data['end_date'],
+            'status'        => 'confirmed',
+            'notes'         => $data['notes'] ?? null,
+        ]);
+
+        return $this->success(
+            $reservation->fresh(['equipment:id,name'])->toArray(),
+            'تم تأكيد الحجز بنجاح.',
+            201,
+        );
+    }
+
+    // GET /api/v1/contractor/my-equipment-reservations — حجوزاتي كمستأجر
+    public function myReservations(Request $request)
+    {
+        $paginator = $request->user()->equipmentReservations()
+            ->with('equipment:id,name,contractor_id')
+            ->latest('start_date')
+            ->paginate($request->integer('per_page', 15));
+
+        return $this->paginated($paginator);
+    }
+
+    // DELETE /api/v1/contractor/equipment-reservations/{equipmentReservation}
+    public function cancelReservation(Request $request, EquipmentReservation $equipmentReservation)
+    {
+        if ($equipmentReservation->contractor_id !== $request->user()->id) {
+            return $this->error('غير مصرَّح لك بإلغاء هذا الحجز.', 403);
+        }
+
+        if ($equipmentReservation->status !== 'confirmed') {
+            return $this->error('هذا الحجز ملغى مسبقاً.', 422);
+        }
+
+        if ($equipmentReservation->start_date->isPast()) {
+            return $this->error('لا يمكن إلغاء حجز بدأت فترته بالفعل.', 422);
+        }
+
+        $equipmentReservation->update(['status' => 'cancelled']);
+
+        return $this->success(message: 'تم إلغاء الحجز.');
     }
 
     // ═════════════════════════════════════════════════════════════════════════

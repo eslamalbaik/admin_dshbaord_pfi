@@ -17,14 +17,11 @@ class NewsController extends Controller
     {
         $query = News::published()->latest('published_at');
 
-        if ($request->filled('category'))
-            $query->where('category', $request->category);
-
         if ($request->filled('search'))
             $query->where('title', 'like', '%' . $request->search . '%');
 
         $paginator = $query
-            ->select(['id', 'title', 'slug', 'excerpt', 'image', 'video_url', 'external_url', 'gallery', 'category', 'published_at'])
+            ->select(['id', 'title', 'slug', 'excerpt', 'image', 'video_url', 'external_url', 'gallery', 'published_at'])
             ->paginate($request->integer('per_page', 9));
 
         return $this->paginated($paginator);
@@ -35,7 +32,7 @@ class NewsController extends Controller
     {
         $news = News::published()
             ->latest('published_at')
-            ->select(['id', 'title', 'slug', 'excerpt', 'image', 'video_url', 'external_url', 'gallery', 'category', 'published_at'])
+            ->select(['id', 'title', 'slug', 'excerpt', 'image', 'video_url', 'external_url', 'gallery', 'published_at'])
             ->limit(3)
             ->get();
 
@@ -58,9 +55,6 @@ class NewsController extends Controller
     {
         $query = News::with('author:id,name')->latest();
 
-        if ($request->filled('category'))
-            $query->where('category', $request->category);
-
         if ($request->filled('search'))
             $query->where('title', 'like', '%' . $request->search . '%');
 
@@ -82,8 +76,6 @@ class NewsController extends Controller
             'external_url' => 'nullable|url|max:500',
             'gallery'      => 'nullable|array',
             'gallery.*'    => 'image|mimes:jpg,jpeg,png,webp|max:5120',
-            // Announcements/Tenders/Events أصبحوا كيانات مستقلة بجداولهم الخاصة — لا داعي لتصنيف الأخبار كأحدها
-            'category'     => 'required|in:news',
             'is_published' => 'boolean',
             'published_at' => 'nullable|date',
         ]);
@@ -115,7 +107,6 @@ class NewsController extends Controller
             'gallery.*'        => 'image|mimes:jpg,jpeg,png,webp|max:5120',
             'remove_gallery'   => 'nullable|array',
             'remove_gallery.*' => 'string',
-            'category'         => 'sometimes|in:news',
             'is_published'     => 'boolean',
             'published_at'     => 'nullable|date',
         ]);

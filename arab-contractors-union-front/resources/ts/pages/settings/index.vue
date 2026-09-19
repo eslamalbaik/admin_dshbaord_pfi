@@ -118,6 +118,16 @@ const uploadAvatar = async () => {
               title="رسوم الدرجات"
               :to="{ name: 'settings-grade-fees' }"
             />
+            <VListItem
+              prepend-icon="tabler-list-details"
+              title="المجالات والاختصاصات والدرجات"
+              :to="{ name: 'settings-contractor-lookups' }"
+            />
+            <VListItem
+              prepend-icon="tabler-photo"
+              title="صور تصنيفات العطاءات"
+              :to="{ name: 'settings-tender-category-images' }"
+            />
           </VList>
         </VCard>
       </VCol>

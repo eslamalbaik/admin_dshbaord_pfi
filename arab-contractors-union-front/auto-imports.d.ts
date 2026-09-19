@@ -60,6 +60,9 @@ declare global {
   const getCurrentScope: typeof import('vue')['getCurrentScope']
   const h: typeof import('vue')['h']
   const hexToRgb: typeof import('./resources/ts/@core/utils/colorConverter')['hexToRgb']
+  const idbDelete: typeof import('./resources/ts/utils/idbStore')['idbDelete']
+  const idbGet: typeof import('./resources/ts/utils/idbStore')['idbGet']
+  const idbSet: typeof import('./resources/ts/utils/idbStore')['idbSet']
   const ignorableWatch: typeof import('@vueuse/core')['ignorableWatch']
   const inject: typeof import('vue')['inject']
   const injectLocal: typeof import('@vueuse/core')['injectLocal']
@@ -68,6 +71,7 @@ declare global {
   const isDefined: typeof import('@vueuse/core')['isDefined']
   const isEmpty: typeof import('./resources/ts/@core/utils/helpers')['isEmpty']
   const isEmptyArray: typeof import('./resources/ts/@core/utils/helpers')['isEmptyArray']
+  const isIdbAvailable: typeof import('./resources/ts/utils/idbStore')['isIdbAvailable']
   const isNullOrUndefined: typeof import('./resources/ts/@core/utils/helpers')['isNullOrUndefined']
   const isObject: typeof import('./resources/ts/@core/utils/helpers')['isObject']
   const isProxy: typeof import('vue')['isProxy']
@@ -218,6 +222,7 @@ declare global {
   const useDevicesList: typeof import('@vueuse/core')['useDevicesList']
   const useDisplayMedia: typeof import('@vueuse/core')['useDisplayMedia']
   const useDocumentVisibility: typeof import('@vueuse/core')['useDocumentVisibility']
+  const useDraftAutoSave: typeof import('./resources/ts/composables/useDraftAutoSave')['useDraftAutoSave']
   const useDraggable: typeof import('@vueuse/core')['useDraggable']
   const useDropZone: typeof import('@vueuse/core')['useDropZone']
   const useElementBounding: typeof import('@vueuse/core')['useElementBounding']
@@ -435,6 +440,9 @@ declare module 'vue' {
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
     readonly h: UnwrapRef<typeof import('vue')['h']>
     readonly hexToRgb: UnwrapRef<typeof import('./resources/ts/@core/utils/colorConverter')['hexToRgb']>
+    readonly idbDelete: UnwrapRef<typeof import('./resources/ts/utils/idbStore')['idbDelete']>
+    readonly idbGet: UnwrapRef<typeof import('./resources/ts/utils/idbStore')['idbGet']>
+    readonly idbSet: UnwrapRef<typeof import('./resources/ts/utils/idbStore')['idbSet']>
     readonly ignorableWatch: UnwrapRef<typeof import('@vueuse/core')['ignorableWatch']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
     readonly injectLocal: UnwrapRef<typeof import('@vueuse/core')['injectLocal']>
@@ -442,6 +450,7 @@ declare module 'vue' {
     readonly isDefined: UnwrapRef<typeof import('@vueuse/core')['isDefined']>
     readonly isEmpty: UnwrapRef<typeof import('./resources/ts/@core/utils/helpers')['isEmpty']>
     readonly isEmptyArray: UnwrapRef<typeof import('./resources/ts/@core/utils/helpers')['isEmptyArray']>
+    readonly isIdbAvailable: UnwrapRef<typeof import('./resources/ts/utils/idbStore')['isIdbAvailable']>
     readonly isNullOrUndefined: UnwrapRef<typeof import('./resources/ts/@core/utils/helpers')['isNullOrUndefined']>
     readonly isObject: UnwrapRef<typeof import('./resources/ts/@core/utils/helpers')['isObject']>
     readonly isProxy: UnwrapRef<typeof import('vue')['isProxy']>
@@ -589,6 +598,7 @@ declare module 'vue' {
     readonly useDevicesList: UnwrapRef<typeof import('@vueuse/core')['useDevicesList']>
     readonly useDisplayMedia: UnwrapRef<typeof import('@vueuse/core')['useDisplayMedia']>
     readonly useDocumentVisibility: UnwrapRef<typeof import('@vueuse/core')['useDocumentVisibility']>
+    readonly useDraftAutoSave: UnwrapRef<typeof import('./resources/ts/composables/useDraftAutoSave')['useDraftAutoSave']>
     readonly useDraggable: UnwrapRef<typeof import('@vueuse/core')['useDraggable']>
     readonly useDropZone: UnwrapRef<typeof import('@vueuse/core')['useDropZone']>
     readonly useElementBounding: UnwrapRef<typeof import('@vueuse/core')['useElementBounding']>

@@ -21,11 +21,17 @@ class ContractorFinancialService
             ->value('total'), 2);
     }
 
-    /** إجمالي "ما عليه" — دفعات معلّقة + غرامات غير مسدَّدة + ذمم سابقة */
+    /** إجمالي "ما عليه" — دفعات معلّقة + غرامات غير مسدَّدة (بالباقي منها) + ذمم سابقة */
     public function totalObligations(Contractor $contractor): float
     {
         $pendingPayments = (float) $contractor->payments()->where('status', 'pending')->sum('amount');
-        $unpaidPenalties = (float) $contractor->penalties()->where('status', '!=', 'paid')->sum('amount');
+
+        // paid/rejected لا تُحتسَب، وpartially_paid تُحتسَب بالمتبقي منها فقط لا بكامل مبلغها
+        // الأصلي — نفس منطق ContractorRequirements::issues() تماماً (REQ-06 #6).
+        $unpaidPenalties = (float) $contractor->penalties()
+            ->whereIn('status', ['unpaid', 'partially_paid'])
+            ->selectRaw('COALESCE(SUM(amount - paid_amount), 0) as total')
+            ->value('total');
 
         return round($pendingPayments + $unpaidPenalties + $this->outstandingDuesTotal($contractor), 2);
     }

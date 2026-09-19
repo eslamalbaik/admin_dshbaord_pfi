@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\Contractor;
+use App\Models\Setting;
 use App\Models\Tender;
 use App\Models\TenderBookmark;
 use Illuminate\Database\Eloquent\Builder;
@@ -112,7 +113,9 @@ class TenderController extends Controller
             'description'        => 'nullable|string',
             'union_notes'        => 'nullable|string',
             'category'           => ['nullable', Rule::in(Tender::CATEGORIES)],
-            'deadline'           => 'nullable|date',
+            // بتاريخ ووقت معاً (REQ-07 #1/#2)، ولازم يكون بالمستقبل عند الإنشاء — التعديل
+            // يسمح بأي تاريخ حتى لا يُمنع تصحيح حقول أخرى بعطاء انتهى موعده فعلياً.
+            'deadline'           => 'nullable|date|after:now',
             'status'             => 'nullable|in:open,closed,cancelled',
             'submission_types'   => 'nullable|array',
             'submission_types.*' => 'in:email,phone,file',
@@ -241,7 +244,9 @@ class TenderController extends Controller
                         });
                     }
                     if (in_array('closing_soon', $states, true)) {
-                        $q->orWhereBetween('deadline', [now()->toDateString(), now()->addDays(4)->toDateString()]);
+                        // endOfDay() على الحد الأعلى لازم بعد صيرورة deadline وقتاً كاملاً (REQ-07 #2)
+                        // وإلا عطاء بآخر يوم بالنافذة بعد منتصف الليل يسقط خارجها خطأً.
+                        $q->orWhereBetween('deadline', [now(), now()->addDays(4)->endOfDay()]);
                     }
                 });
             }
@@ -298,8 +303,12 @@ class TenderController extends Controller
             'description'         => $t->description,
             'union_notes'         => $forContractor ? $t->union_notes : null,
             'category'            => $t->category,
+            // العطاء نفسه بلا صورة خاصة به — صورة تصنيفه الافتراضية (REQ-07 #7) إن وُجدت
+            'category_image'      => $t->category
+                ? $this->resolveCategoryImage($t->category)
+                : null,
             'budget'              => $t->budget,
-            'deadline'            => $t->deadline?->toDateString(),
+            'deadline'            => $t->deadline?->toIso8601String(),
             'published_at'        => $t->published_at?->toDateString(),
             'status'              => $t->status,
             'display_status'      => $t->display_status,
@@ -312,9 +321,9 @@ class TenderController extends Controller
             'submission_types'    => $t->submission_types,
             'submission_email'    => $t->submission_email,
             'submission_phone'    => $t->submission_phone,
-            'submission_file_url' => $t->submission_file
-                ? Storage::disk('public')->url($t->submission_file)
-                : null,
+            // $t->submission_file مُحلَّل مسبقاً لرابط كامل عبر getSubmissionFileAttribute() —
+            // تمريره مجدداً عبر Storage::url() كان ينتج رابط تحميل مضاعفاً مكسوراً
+            'submission_file_url' => $t->submission_file,
             'attachments'         => $t->attachments->map(fn ($a) => [
                 'id'       => $a->id,
                 'label'    => $a->label,
@@ -366,5 +375,78 @@ class TenderController extends Controller
         $attachment->delete();
 
         return $this->success(message: 'تم حذف المرفق.');
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    //  Admin — صور افتراضية حسب تصنيف العطاء (REQ-07 #7) — العطاء نفسه بلا صورة
+    //  خاصة به إطلاقاً؛ هاي الصور تُعرض بدلاً منها فقط حسب category العطاء.
+    //  تُخزَّن كإعدادات (Setting) بمفتاح لكل تصنيف بدل جدول منفصل — عدد التصنيفات
+    //  ثابت ومحدود (Tender::CATEGORIES) فلا داعي لجدول كامل من أجل صورة واحدة لكل قيمة.
+    // ═════════════════════════════════════════════════════════════════════════
+
+    private static function categoryImageSettingKey(string $category): string
+    {
+        return 'tender_category_image:' . $category;
+    }
+
+    private function resolveCategoryImage(string $category): ?string
+    {
+        $path = Setting::get(self::categoryImageSettingKey($category));
+
+        return $path ? Storage::disk('public')->url($path) : null;
+    }
+
+    /** [category => image_url|null] لكل التصنيفات الثابتة */
+    public function categoryImages()
+    {
+        $images = collect(Tender::CATEGORIES)->mapWithKeys(fn ($category) => [
+            $category => $this->resolveCategoryImage($category),
+        ]);
+
+        return $this->success($images);
+    }
+
+    // POST /api/v1/dashboard/tenders/category-images
+    public function storeCategoryImage(Request $request)
+    {
+        $data = $request->validate([
+            'category' => ['required', Rule::in(Tender::CATEGORIES)],
+            'image'    => 'required|image|mimes:jpg,jpeg,png,webp|max:2048',
+        ]);
+
+        $key = self::categoryImageSettingKey($data['category']);
+        $old = Setting::get($key);
+
+        $path = $request->file('image')->store('tenders/category-images', 'public');
+        Setting::set($key, $path, 'tenders');
+
+        if ($old) {
+            Storage::disk('public')->delete($old);
+        }
+
+        return $this->success(['category' => $data['category'], 'url' => Storage::disk('public')->url($path)], 'تم حفظ صورة التصنيف بنجاح.');
+    }
+
+    // DELETE /api/v1/dashboard/tenders/category-images/{category}
+    public function destroyCategoryImage(string $category)
+    {
+        if (! in_array($category, Tender::CATEGORIES, true)) {
+            return $this->error('تصنيف غير معروف.', 422);
+        }
+
+        $key    = self::categoryImageSettingKey($category);
+        $old    = Setting::get($key);
+        $record = Setting::where('key', $key)->first();
+
+        if ($old) {
+            Storage::disk('public')->delete($old);
+        }
+
+        // حذف الـ model نفسه (لا Setting::where()->delete() المباشر) عمداً — الأخير حذف جماعي
+        // عبر query builder لا يُطلق حدث deleted() فما ينظّف كاش settings.all، فتبقى القيمة
+        // القديمة تُقرأ من الكاش رغم حذف الصف من القاعدة.
+        $record?->delete();
+
+        return $this->success(message: 'تمت إزالة صورة التصنيف — سيُعرض بلا صورة حتى تُرفَع صورة جديدة.');
     }
 }

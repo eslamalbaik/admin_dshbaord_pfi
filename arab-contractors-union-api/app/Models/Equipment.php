@@ -25,7 +25,6 @@ class Equipment extends Model
         'contract_type',
         'governorate',
         'city',
-        'daily_price',
         'owner_phone',
         'status',
         'is_featured',
@@ -35,7 +34,6 @@ class Equipment extends Model
     ];
 
     protected $casts = [
-        'daily_price'      => 'decimal:2',
         'manufacture_year' => 'integer',
         'is_hidden'        => 'boolean',
         'is_featured'      => 'boolean',
@@ -71,6 +69,11 @@ class Equipment extends Model
     public function blockedDates()
     {
         return $this->hasMany(EquipmentBlockedDate::class);
+    }
+
+    public function reservations()
+    {
+        return $this->hasMany(EquipmentReservation::class);
     }
 
     public function reports()

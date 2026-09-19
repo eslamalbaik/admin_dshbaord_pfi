@@ -131,9 +131,23 @@ Everything lives in `arab-contractors-union-api/routes/api.php` (~380 lines), sp
 
 Public, unauthenticated routes also exist for tenders, news, dynamic pages (`pages/{slug}`), and terms — these deliberately omit union-internal fields (see the `tenders-public` vs internal tender comments in the route file).
 
+`ContractorHomeController::buildFeed()`'s combined feed (`GET contractor/home`'s `latest_updates`, and `GET contractor/home/updates`) always uses a numeric `reference_id` (the row's `id`) for every item `type`, including `news` — even though news itself is otherwise routed by `slug` everywhere else (`GET news/{slug}`). A client resolving a `news` feed item still needs to fetch its `slug` separately from `GET news`/`GET news/latest` to open the detail page; `reference_id` alone won't work there. See [Contractor_App_API.postman_collection.json](Contractor_App_API.postman_collection.json)'s `Home`/`Home Updates` request descriptions.
+
 ### Contractor dues ("الذمم") domain
 
 Financial dues/settlements for contractors are a distinct subsystem from `payments`: [ContractorDueController.php](arab-contractors-union-api/app/Http/Controllers/Api/ContractorDueController.php) handles listing, summary, import (from legacy Excel via `ImportLegacyDues` command), manual settlement (`settle`), and admin-initiated payment (`payForContractor`). This is separate from the contractor-facing `payments/transfer` flow (bank transfer notification upload) in [PaymentController.php](arab-contractors-union-api/app/Http/Controllers/Api/PaymentController.php). Renewal eligibility (`contractor/renewal-eligibility`) is gated on unpaid dues — don't conflate due-settlement with membership-payment logic when editing either controller.
+
+### Contractor `status` vs. `is_frozen` — two independent gates
+
+Easy to conflate, confirmed intentional as of 2026-09-19: `is_frozen` is the only thing [EnsureContractorIsActive.php](arab-contractors-union-api/app/Http/Middleware/EnsureContractorIsActive.php) enforces on every authenticated contractor-portal request — it force-revokes all tokens and returns 403 (`account_frozen`, `force_logout: true`). `Contractor.status === 'suspended'` does **not** block login or portal access; it only blocks membership renewal/payment via `ContractorRequirements::renewalBlockers()` (consumed by `PaymentController::submitTransfer`), surfaced under the shared `dues_pending` error key alongside unpaid dues/penalties. Don't add a suspended-check back into the middleware without confirming it's an intentional reversal — see `tests/Feature/ContractorHomeTest.php::test_suspended_contractor_can_still_access_home` and `ContractorPaymentTest.php::test_submit_transfer_blocked_when_contractor_suspended`.
+
+### Penalty statuses (four states, not two)
+
+`Penalty` (financial penalties — distinct from `ContractorDue`) has four statuses: `unpaid`/`paid`/`partially_paid`/`rejected`, updated via `PATCH penalties/{id}/status` (`PenaltyController::updateStatus`, replacing the old paid-only `markPaid`/`/pay` route). `ContractorRequirements::issues()`/`renewalBlockers()` and `ContractorFinancialService::totalObligations()` both treat `partially_paid` the same as `unpaid` (counted at the remaining balance `amount - paid_amount`, not the full original amount) and both fully exclude `rejected` — any new code that reads penalty status for "is this settled"/"is this owed" must follow the same two rules, not just check for `unpaid`.
+
+### Contractor fields/specializations/grades are DB-backed, admin-editable
+
+[ContractorLookups.php](arab-contractors-union-api/app/Support/ContractorLookups.php) reads from the `contractor_fields`/`contractor_specializations`/`contractor_grades` tables (admin CRUD in [ContractorLookupController.php](arab-contractors-union-api/app/Http/Controllers/Api/ContractorLookupController.php) at `dashboard/contractor-{fields,specializations,grades}`), not hardcoded PHP constants — those constants now only serve as an empty-table fallback. "Delete" from the admin UI is always a soft `is_active=false` deactivate, never a hard delete, because these `code` values are consumed directly by `MembershipFeeCalculator`, PDF/Docx certificate generation, and the denormalized `contractors.specialties` JSON on existing records. `ContractorLookups::topTierFields()` (Article 37's field restriction) specifically looks up the grade coded `اولى أ` — it does not mean "whichever grade happens to have `eligible_field_codes` set".
 
 ### Model layout quirk
 

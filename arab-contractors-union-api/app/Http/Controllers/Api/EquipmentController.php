@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Equipment;
 use App\Models\EquipmentBlockedDate;
 use App\Models\EquipmentImage;
+use App\Models\EquipmentReservation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -68,14 +69,13 @@ class EquipmentController extends Controller
             'equipment_type_id' => 'required|exists:equipment_types,id',
             'name'              => 'required|string|max:255',
             'brand'             => 'nullable|string|max:100',
-            'description'       => 'nullable|string',
+            'description'       => 'nullable|string|max:2000',
             'manufacture_year'  => 'nullable|integer|min:1970|max:' . date('Y'),
             'power'             => 'nullable|string|max:50',
             'condition'         => 'nullable|in:excellent,good,needs_maintenance',
             'contract_type'     => 'nullable|in:daily,weekly,monthly',
             'governorate'       => 'nullable|string|max:100',
             'city'              => 'nullable|string|max:100',
-            'daily_price'       => 'required|numeric|min:0',
             'owner_phone'       => 'nullable|string|max:20',
             'status'            => 'nullable|in:visible,hidden,suspended',
             'is_featured'       => 'nullable|boolean',
@@ -119,14 +119,13 @@ class EquipmentController extends Controller
             'equipment_type_id' => 'sometimes|exists:equipment_types,id',
             'name'              => 'sometimes|string|max:255',
             'brand'             => 'nullable|string|max:100',
-            'description'       => 'nullable|string',
+            'description'       => 'nullable|string|max:2000',
             'manufacture_year'  => 'nullable|integer|min:1970|max:' . date('Y'),
             'power'             => 'nullable|string|max:50',
             'condition'         => 'nullable|in:excellent,good,needs_maintenance',
             'contract_type'     => 'nullable|in:daily,weekly,monthly',
             'governorate'       => 'nullable|string|max:100',
             'city'              => 'nullable|string|max:100',
-            'daily_price'       => 'required|numeric|min:0',
             'owner_phone'       => 'nullable|string|max:20',
             'status'            => 'nullable|in:visible,hidden,suspended',
             'is_featured'       => 'nullable|boolean',
@@ -232,6 +231,18 @@ class EquipmentController extends Controller
         $dates = $equipment->blockedDates()->orderBy('blocked_date')->get();
 
         return response()->json($dates);
+    }
+
+    // GET /api/equipment/{equipment}/reservations — حجوزات فعلية طلبها مقاولون عبر التطبيق
+    // (REQ-08 #6)، للعرض فقط بجانب أداة الحجب اليدوي (blocked-dates) أعلاه
+    public function reservations(Equipment $equipment)
+    {
+        $reservations = $equipment->reservations()
+            ->with('contractor:id,name,phone')
+            ->orderByDesc('start_date')
+            ->get();
+
+        return response()->json($reservations);
     }
 
     // POST /api/equipment/{equipment}/blocked-dates

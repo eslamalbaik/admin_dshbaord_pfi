@@ -29,7 +29,7 @@ class NormalizeSpecialtyGrades extends Command
 
     public function handle(): int
     {
-        $canonical = array_keys(ContractorLookups::SPECIALTY_GRADE_LABELS);
+        $canonical = array_keys(ContractorLookups::specialtyGradeLabels());
         $fix       = (bool) $this->option('fix');
 
         $normalizedCount = 0;
@@ -56,7 +56,7 @@ class NormalizeSpecialtyGrades extends Command
                         $fieldId = $spec['field_lk_type'] ?? null;
 
                         if ($raw === 'أ') {
-                            if (in_array($fieldId, ContractorLookups::TOP_TIER_FIELDS, true)) {
+                            if (in_array($fieldId, ContractorLookups::topTierFields(), true)) {
                                 $ambiguous[] = [$contractor->id, $contractor->membership_number, $fieldId, $raw];
                                 continue;
                             }

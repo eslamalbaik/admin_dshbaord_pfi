@@ -18,12 +18,12 @@ class ContractorRequirements
     {
         $issues = [];
 
-        // غرامات تأخير غير مدفوعة
-        foreach ($contractor->penalties()->where('status', 'unpaid')->get() as $penalty) {
+        // غرامات تأخير غير مدفوعة أو مسدَّدة جزئياً فقط — المرفوضة والمسدَّدة بالكامل لا تُحتسَب
+        foreach ($contractor->penalties()->whereIn('status', ['unpaid', 'partially_paid'])->get() as $penalty) {
             $issues[] = [
                 'type'        => 'late_fees',
                 'description' => $penalty->reason ?: 'غرامة تأخير غير مدفوعة',
-                'amount'      => $penalty->amount,
+                'amount'      => $penalty->amount - $penalty->paid_amount,
                 'due_date'    => null,
             ];
         }
@@ -65,14 +65,28 @@ class ContractorRequirements
 
     /**
      * المتطلبات المانعة لتجديد العضوية تحديداً:
-     * الذمم والغرامات فقط — غياب العضوية النشطة ليس مانعاً للتجديد بل سببه.
+     * الذمم والغرامات، بالإضافة لحساب موقوف إدارياً (status=suspended) — هذا
+     * الأخير يمنع التجديد فقط، لا الدخول للتطبيق (راجع is_frozen لقفل الحساب
+     * كاملاً في EnsureContractorIsActive). غياب العضوية النشطة ليس مانعاً
+     * للتجديد بل سببه.
      */
     public static function renewalBlockers(Contractor $contractor): array
     {
-        return array_values(array_filter(
+        $blockers = array_values(array_filter(
             self::issues($contractor),
             fn ($issue) => in_array($issue['type'], ['unpaid_dues', 'late_fees', 'pending_dispute'], true),
         ));
+
+        if ($contractor->status === 'suspended') {
+            $blockers[] = [
+                'type'        => 'account_suspended',
+                'description' => 'حسابك موقوف إدارياً — يُرجى مراجعة إدارة الاتحاد قبل تجديد العضوية.',
+                'amount'      => null,
+                'due_date'    => null,
+            ];
+        }
+
+        return $blockers;
     }
 
     /** مفتاح تفعيل منع التجديد بالذمم — يبدأ مطفأً حتى اكتمال الاستيراد ومراجعته */

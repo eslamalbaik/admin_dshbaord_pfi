@@ -442,14 +442,28 @@ function toggleSelectAllDues() {
 
 const selectedDiscountDialog = ref(false)
 const selectedDiscountForm = ref({ discount_type: 'percent' as 'percent' | 'fixed', discount_value: '', discount_reason: '' })
+const selectedDiscountPreview = ref<any>(null)
 
+function openSelectedDiscount() {
+  selectedDiscountForm.value = { discount_type: 'percent', discount_value: '', discount_reason: '' }
+  selectedDiscountPreview.value = null
+  selectedDiscountDialog.value = true
+}
+
+// dry_run مدعوم أصلاً بالباك (DuesDiscountService::applyBulk، مود ids ومعايير على حدّ سواء) —
+// الفجوة كانت فقط بعدم عرض معاينة قبل التطبيق لمود "المحدَّد بالـ checkboxes" (سؤال #7 بالشيت).
 const applySelectedDiscountMutation = useMutation({
-  mutationFn: async () => (await api.post('/api/v1/dashboard/dues/discount/bulk', {
+  mutationFn: async (dryRun: boolean) => (await api.post('/api/v1/dashboard/dues/discount/bulk', {
     mode: 'ids',
     ids: selectedDueIds.value,
     ...selectedDiscountForm.value,
+    dry_run: dryRun,
   })).data,
   onSuccess: (d: any) => {
+    if (d.items?.is_dry_run) {
+      selectedDiscountPreview.value = d.items
+      return
+    }
     selectedDiscountDialog.value = false
     selectedDueIds.value = []
     flash(`تم تطبيق الخصم على ${d.items?.applied_count ?? 0} ذمة.`)
@@ -496,11 +510,16 @@ const criteriaDiscountMutation = useMutation({
     dry_run: dryRun,
   })).data,
   onSuccess: (d: any) => {
-    criteriaPreview.value = d.items
-    if (!('total_discount_impact_jod' in (d.items ?? {}))) {
-      flash(`تم تطبيق الخصم على ${d.items?.applied_count ?? 0} ذمة.`)
-      refreshAll()
+    if (d.items?.is_dry_run) {
+      criteriaPreview.value = d.items
+      return
     }
+    // تطبيق فعلي ناجح — يُغلق المودل فوراً ويحدّث الجدول بدل بقائه مفتوحاً بلا أي تغيير
+    // ظاهر حتى يعيد المستخدم تحميل الصفحة يدوياً (شكوى الشيت #7).
+    criteriaDiscountDialog.value = false
+    criteriaPreview.value = null
+    flash(`تم تطبيق الخصم على ${d.items?.applied_count ?? 0} ذمة.`)
+    refreshAll()
   },
   onError: (e: any) => flash(e?.response?.data?.message || 'فشل تطبيق الخصم الجماعي.', true),
 })
@@ -690,7 +709,7 @@ const criteriaDiscountMutation = useMutation({
                 <template v-else>
                 <div v-if="selectedDueIds.length" class="d-flex align-center gap-3 pa-2" style="background: rgba(var(--v-theme-info), 0.08);">
                   <span class="text-body-2">{{ selectedDueIds.length }} ذمة محدَّدة</span>
-                  <VBtn size="small" color="info" @click="selectedDiscountDialog = true">تطبيق خصم على المحدَّد</VBtn>
+                  <VBtn size="small" color="info" @click="openSelectedDiscount">تطبيق خصم على المحدَّد</VBtn>
                 </div>
                 <div class="overflow-x-auto">
                 <VTable density="compact" style="background: transparent;">
@@ -1184,14 +1203,37 @@ const criteriaDiscountMutation = useMutation({
               <VTextField v-model="selectedDiscountForm.discount_reason" label="سبب الخصم" dir="rtl" />
             </VCol>
           </VRow>
+
+          <template v-if="selectedDiscountPreview">
+            <VDivider class="my-4" />
+            <VRow dense>
+              <VCol cols="6">
+                <p class="text-caption text-medium-emphasis mb-0">عدد الذمم المطابقة</p>
+                <strong>{{ selectedDiscountPreview.matched_count }}</strong>
+              </VCol>
+              <VCol cols="6">
+                <p class="text-caption text-medium-emphasis mb-0">إجمالي أثر الخصم (د.أ)</p>
+                <strong class="text-info">{{ selectedDiscountPreview.total_discount_impact_jod }}</strong>
+              </VCol>
+            </VRow>
+          </template>
         </VCardText>
         <VCardActions class="justify-end pb-4 px-6">
           <VBtn variant="tonal" color="secondary" @click="selectedDiscountDialog = false">إلغاء</VBtn>
           <VBtn
+            variant="tonal"
             color="info"
             :disabled="!selectedDiscountForm.discount_value"
             :loading="applySelectedDiscountMutation.isPending.value"
-            @click="applySelectedDiscountMutation.mutate()"
+            @click="applySelectedDiscountMutation.mutate(true)"
+          >
+            معاينة (بدون تطبيق)
+          </VBtn>
+          <VBtn
+            color="success"
+            :disabled="!selectedDiscountForm.discount_value"
+            :loading="applySelectedDiscountMutation.isPending.value"
+            @click="applySelectedDiscountMutation.mutate(false)"
           >
             تطبيق الخصم
           </VBtn>

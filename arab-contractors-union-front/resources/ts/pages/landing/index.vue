@@ -24,9 +24,8 @@ definePage({
 function goToRegister() { router.push('/contractor/login') }
 
 // ─── News ─────────────────────────────────────────────────────────────────────
-interface NewsItem { id:number; title:string; slug:string; excerpt:string|null; image:string|null; category:string; published_at:string }
+interface NewsItem { id:number; title:string; slug:string; excerpt:string|null; image:string|null; published_at:string }
 const latestNews = ref<NewsItem[]>([])
-const catLabel: Record<string, string> = { news: 'خبر', announcement: 'إعلان', event: 'فعالية', tender: 'عطاء' }
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString('ar-PS', { year: 'numeric', month: 'long', day: 'numeric' })
 }
@@ -462,7 +461,6 @@ const degrees = [
               <div v-else class="news-ph">
                 <Newspaper :size="44" />
               </div>
-              <span class="news-badge">{{ catLabel[item.category] ?? item.category }}</span>
             </div>
             <div class="news-body">
               <p class="news-date"><CalendarDays :size="12" /> {{ fmtDate(item.published_at) }}</p>
@@ -1139,7 +1137,6 @@ const degrees = [
 .news-img { width: 100%; height: 100%; object-fit: cover; transition: transform .5s; }
 .news-card:hover .news-img { transform: scale(1.06); }
 .news-ph { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--navy-mid); background: linear-gradient(135deg, var(--navy-light), #c5cae9); }
-.news-badge { position: absolute; top: .875rem; right: .875rem; background: var(--navy); color: #fff; font-size: .72rem; font-weight: 700; padding: .25rem .75rem; border-radius: 50px; }
 .news-body { padding: 1.5rem; flex: 1; display: flex; flex-direction: column; gap: .45rem; }
 .news-date { font-size: .78rem; color: var(--gold-dark); font-weight: 700; display: flex; align-items: center; gap: .3rem; }
 .news-title { font-size: .95rem; font-weight: 800; line-height: 1.55; color: var(--text-h); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; }

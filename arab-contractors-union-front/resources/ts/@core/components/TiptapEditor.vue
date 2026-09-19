@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Link } from '@tiptap/extension-link'
 import { Placeholder } from '@tiptap/extension-placeholder'
 import { TextAlign } from '@tiptap/extension-text-align'
 import { Underline } from '@tiptap/extension-underline'
@@ -27,6 +28,13 @@ const editor = useEditor({
       placeholder: props.placeholder ?? 'Write something here...',
     }),
     Underline,
+    // بدونها ما في طريقة لإدراج رابط بالمحتوى إطلاقاً — أي URL يكتبه الأدمن يبقى نص عادي
+    // ولا يُعرض كرابط قابل للنقر بالموقع العام (REQ-10 #4)
+    Link.configure({
+      openOnClick: false,
+      autolink: true,
+      HTMLAttributes: { target: '_blank', rel: 'noopener noreferrer' },
+    }),
   ],
   onUpdate() {
     if (!editor.value)
@@ -35,6 +43,26 @@ const editor = useEditor({
     emit('update:modelValue', editor.value.getHTML())
   },
 })
+
+// يطلب رابط من الأدمن، ويزيله لو ألغى/ترك الحقل فاضياً — يدعم تعديل رابط موجود أصلاً بتحديد نصه أولاً
+const setLink = () => {
+  if (!editor.value)
+    return
+
+  const previousUrl = editor.value.getAttributes('link').href as string | undefined
+  const url = window.prompt('أدخل رابط URL (اتركه فاضياً لإزالة الرابط)', previousUrl ?? '')
+
+  if (url === null)
+    return
+
+  if (url === '') {
+    editor.value.chain().focus().extendMarkRange('link').unsetLink().run()
+
+    return
+  }
+
+  editor.value.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
+}
 
 watch(() => props.modelValue, () => {
   const isSame = editor.value?.getHTML() === props.modelValue
@@ -103,6 +131,16 @@ watch(() => props.modelValue, () => {
         @click="editor.chain().focus().toggleBulletList().run()"
       >
         <VIcon icon="tabler-list" />
+      </IconBtn>
+
+      <IconBtn
+        size="small"
+        rounded
+        :variant="editor.isActive('link') ? 'tonal' : 'text'"
+        :color="editor.isActive('link') ? 'primary' : 'default'"
+        @click="setLink"
+      >
+        <VIcon icon="tabler-link" />
       </IconBtn>
 
       <IconBtn
