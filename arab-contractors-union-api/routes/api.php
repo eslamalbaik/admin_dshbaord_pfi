@@ -590,3 +590,5 @@ Route::prefix('v1')->group(function () {
         });
     });
 });
+
+// mirror-sync workflow test trigger
