@@ -64,3 +64,4 @@ echo "deploy-new: pushed $TIP (through $LAST_SHA)"
 
 git tag -f "$MARKER_TAG" "$LAST_SHA"
 git push origin "refs/tags/$MARKER_TAG" -f
+
