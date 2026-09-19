@@ -15,7 +15,7 @@ SUBDIR=$1        # e.g. arab-contractors-union-api
 REMOTE=$2        # e.g. pcu-back
 MARKER_TAG=$3    # e.g. mirror-api-deploy-new
 
-git fetch "$REMOTE" development deploy-new
+git fetch "$REMOTE"
 
 SHORT_SHA=$(git rev-parse --short HEAD)
 
