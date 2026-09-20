@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\CertificateRequest;
 use App\Models\Contractor;
 use App\Models\Membership;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -57,6 +58,7 @@ class CertificateRequestTest extends TestCase
             'authorization_letter'           => 'docs/auth.pdf',
             'company_approval_letter'        => 'docs/approval.pdf',
             'full_time_engineer_certificate' => 'docs/engineer.pdf',
+            'accountant_certificate_or_contract' => 'docs/accountant.pdf',
             'secretary_contract'             => 'docs/secretary.pdf',
         ], $attrs));
 
@@ -219,6 +221,7 @@ class CertificateRequestTest extends TestCase
             'bank_dealing_letter' => 'x', 'articles_of_association' => 'x', 'internal_bylaws' => 'x',
             'lease_or_ownership_contract' => 'x', 'partners_ids' => 'x', 'authorization_letter' => 'x',
             'company_approval_letter' => 'x', 'full_time_engineer_certificate' => 'x', 'secretary_contract' => 'x',
+            'accountant_certificate_or_contract' => 'x',
         ]); // profile كامل لكن بدون عضوية نشطة
         Sanctum::actingAs($contractor, ['*']);
 
@@ -230,5 +233,85 @@ class CertificateRequestTest extends TestCase
     public function test_store_requires_auth(): void
     {
         $this->postJson('/api/v1/contractor/certificate-requests', ['type' => 'good_standing'])->assertStatus(401);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    //  adminIssueMembership — إصدار مباشر من لوحة التحكم
+    // ─────────────────────────────────────────────────────────────────────
+
+    private function actingAsAdmin(): void
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']), ['*']);
+    }
+
+    public function test_admin_issue_membership_generates_pdf_and_marks_issued(): void
+    {
+        $contractor = $this->createCompliantContractor([
+            'specialties' => [
+                ['field_lk_type' => 1, 'specialization_lk_type' => 1, 'classification' => 'اولى أ'],
+            ],
+        ]);
+        $this->actingAsAdmin();
+
+        $response = $this->postJson('/api/v1/dashboard/certificate-requests/issue-membership', [
+            'contractor_id'   => $contractor->id,
+            'address'         => 'غزة',
+            'decision_number' => '04/2022',
+            'decision_date'   => '2022-04-01',
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('items.type', 'membership')
+            ->assertJsonPath('items.status', 'issued');
+
+        $certRequest = CertificateRequest::firstWhere('contractor_id', $contractor->id);
+        Storage::disk('public')->assertExists($certRequest->certificate_path);
+    }
+
+    /**
+     * بيانات الإنتاج ليست نظيفة: مقاولون بلا تخصصات وبلا عضوية نشطة. التوليد
+     * يجب أن يصمد لأن الفشل هنا يرجع 500 بلا جسم JSON فتظهر للمشرف رسالة عامة.
+     */
+    public function test_admin_issue_membership_survives_contractor_without_specialties_or_membership(): void
+    {
+        $contractor = $this->createContractor(['specialties' => null, 'city' => null]);
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/dashboard/certificate-requests/issue-membership', [
+            'contractor_id' => $contractor->id,
+        ])->assertStatus(201);
+    }
+
+    /** الترقيم القديم (بلا _g) يلحق به "/غ"، والجديد يحملها أصلاً فلا تتكرر */
+    public function test_admin_issue_membership_handles_legacy_membership_number(): void
+    {
+        $contractor = $this->createCompliantContractor([
+            'membership_number' => '184',
+            'specialties'       => [
+                ['field_lk_type' => 99, 'specialization_lk_type' => 99, 'classification' => null],
+            ],
+        ]);
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/dashboard/certificate-requests/issue-membership', [
+            'contractor_id' => $contractor->id,
+        ])->assertStatus(201);
+    }
+
+    public function test_admin_issue_membership_validates_contractor_id(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/dashboard/certificate-requests/issue-membership', ['contractor_id' => 999999])
+            ->assertStatus(422)->assertJsonValidationErrors(['contractor_id']);
+    }
+
+    public function test_admin_issue_membership_requires_auth(): void
+    {
+        $contractor = $this->createCompliantContractor();
+
+        $this->postJson('/api/v1/dashboard/certificate-requests/issue-membership', [
+            'contractor_id' => $contractor->id,
+        ])->assertStatus(401);
     }
 }
