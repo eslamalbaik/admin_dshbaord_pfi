@@ -77,6 +77,14 @@ php artisan optimize
 echo "==> ربط storage"
 php artisan storage:link || true
 
+# هاد السكربت (وrsync قبله) بيشتغلوا بمستخدم root عبر SSH من GitHub Actions، فكل ملف
+# منسوخ أو مُولَّد هون (composer install، php artisan optimize/storage:link) بيصير ملكه
+# root:root. لكن PHP-FPM وworker الطابور وReverb شغّالين بـ www-data، فبدون هالخطوة أي كتابة
+# وقت التشغيل (laravel.log، framework/cache، framework/views، framework/sessions) بترفض
+# بـ Permission denied — وهاد بالذات بيكسر تسجيل الأخطاء نفسه فبيصير "خطأ مضاعف" صعب التشخيص.
+echo "==> إعادة ضبط ملكية storage/ وbootstrap/cache لـ www-data"
+chown -R www-data:www-data "$APP_DIR/storage" "$APP_DIR/bootstrap/cache"
+
 echo "==> إعادة تشغيل خدمات الإشعارات الفورية (Reverb + queue worker)"
 # لازم تعريف الوحدتين systemd أول مرة يدوياً — انظر ملاحظات REALTIME_NOTIFICATIONS.md
 sudo systemctl restart pcu-api-queue pcu-api-reverb || echo "⚠ تخطّي: خدمات pcu-api-queue/pcu-api-reverb غير مُعرَّفة بعد"
