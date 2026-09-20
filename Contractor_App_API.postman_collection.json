@@ -49,7 +49,7 @@
 			"type": "string"
 		},
 		{
-			"key": "news_slug",
+			"key": "news_id",
 			"value": "",
 			"type": "string"
 		},
@@ -1412,7 +1412,7 @@
 								"home"
 							]
 						},
-						"description": "GET /api/v1/contractor/home - home screen, one aggregated call (membership+dues+stats+latest updates).\n\n**`items.latest_updates[]`** — كل عنصر: `type` (tender|news|announcement|due|member|...), `reference_id`, `title`, `subtitle`, `badges[]`, `priority`, `created_at`.\n\n**`reference_id` دائماً رقم (id) بغض النظر عن `type`** — بما فيها `news` (كانت سابقاً ترسل `slug` نصياً لعناصر الأخبار فقط، وحُوِّلت لـ id ليتّسق مع باقي الأنواع). لعرض تفاصيل الخبر ما زال يلزم الـ `slug` (وليس هذا الـ id) عبر `GET /news/{slug}` — اجلبه من قائمة الأخبار (`GET /news` أو `GET /news/latest`) وليس من هذا الحقل."
+						"description": "GET /api/v1/contractor/home - home screen, one aggregated call (membership+dues+stats+latest updates).\n\n**`items.latest_updates[]`** — كل عنصر: `type` (tender|news|announcement|due|member|...), `reference_id`, `title`, `subtitle`, `badges[]`, `priority`, `created_at`.\n\n**`reference_id` دائماً رقم (id) بغض النظر عن `type`** — بما فيها `news` (كانت سابقاً ترسل `slug` نصياً لعناصر الأخبار فقط، وحُوِّلت لـ id ليتّسق مع باقي الأنواع). لعرض تفاصيل الخبر مرّر هذا الرقم مباشرة إلى `GET /news/{id}` — لم تعد هناك حاجة لجلب الـ `slug` من قائمة الأخبار."
 					}
 				},
 				{
@@ -1446,7 +1446,7 @@
 								}
 							]
 						},
-						"description": "GET /api/v1/contractor/home/updates - full updates feed, paginated.\n\nنفس شكل عناصر `items.latest_updates` بشاشة `/contractor/home` (راجع وصفها) — بما فيها أن `reference_id` رقم دائماً، وأن أخبار الأنواع `news` يلزم جلب `slug` تفاصيلها من `GET /news` وليس من `reference_id`."
+						"description": "GET /api/v1/contractor/home/updates - full updates feed, paginated.\n\nنفس شكل عناصر `items.latest_updates` بشاشة `/contractor/home` (راجع وصفها) — بما فيها أن `reference_id` رقم دائماً، وأن عناصر النوع `news` تُفتح مباشرة عبر `GET /news/{reference_id}`."
 					}
 				}
 			]
@@ -2772,16 +2772,16 @@
 							}
 						],
 						"url": {
-							"raw": "{{base_url}}/news/{{news_slug}}",
+							"raw": "{{base_url}}/news/{{news_id}}",
 							"host": [
 								"{{base_url}}"
 							],
 							"path": [
 								"news",
-								"{{news_slug}}"
+								"{{news_id}}"
 							]
 						},
-						"description": "**GET** `/api/v1/news/{slug}` — *عام*\n\nتفاصيل الخبر كاملة: العنوان، النص، الصورة، **رابط فيديو يوتيوب `video_url`**، **رابط خارجي `external_url`**، ومعرض صور `gallery`.\n\n**الأخطاء:** `404` إن لم يوجد الخبر أو لم يُنشر."
+						"description": "**GET** `/api/v1/news/{id}` — *عام*\n\nتفاصيل الخبر كاملة: العنوان، النص، الصورة، **رابط فيديو يوتيوب `video_url`**، **رابط خارجي `external_url`**، ومعرض صور `gallery`.\n\nيقبل **رقم الخبر `id`** — وهو نفسه `reference_id` القادم من `GET contractor/home` / `contractor/home/updates`، فلا حاجة لجلب الـ `slug` أولاً. (الـ `slug` ما زال مقبولاً للتوافق مع الإصدارات القديمة.)\n\n**الأخطاء:** `404` إن لم يوجد الخبر أو لم يُنشر."
 					}
 				},
 				{

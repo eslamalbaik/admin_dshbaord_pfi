@@ -173,7 +173,9 @@ Route::prefix('v1')->group(function () {
     Route::prefix('news')->group(function () {
         Route::get('latest',  [NewsController::class, 'latest']);
         Route::get('/',       [NewsController::class, 'index']);
-        Route::get('{slug}',  [NewsController::class, 'show']);
+        // Accepts the numeric id (matches `reference_id` in the contractor home feed);
+        // a slug still resolves too, for older clients.
+        Route::get('{news}',  [NewsController::class, 'show']);
     });
 
     // --------------------------------------------------------

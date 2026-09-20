@@ -123,7 +123,7 @@ Everything lives in `arab-contractors-union-api/routes/api.php` (~380 lines), sp
 
 Public, unauthenticated routes also exist for tenders, news, dynamic pages (`pages/{slug}`), and terms — these deliberately omit union-internal fields (see the `tenders-public` vs internal tender comments in the route file).
 
-`ContractorHomeController::buildFeed()`'s combined feed (`GET contractor/home`'s `latest_updates`, and `GET contractor/home/updates`) always uses a numeric `reference_id` (the row's `id`) for every item `type`, including `news` — even though news itself is otherwise routed by `slug` everywhere else (`GET news/{slug}`). A client resolving a `news` feed item still needs to fetch its `slug` separately from `GET news`/`GET news/latest` to open the detail page; `reference_id` alone won't work there. See [Contractor_App_API.postman_collection.json](Contractor_App_API.postman_collection.json)'s `Home`/`Home Updates` request descriptions.
+`ContractorHomeController::buildFeed()`'s combined feed (`GET contractor/home`'s `latest_updates`, and `GET contractor/home/updates`) always uses a numeric `reference_id` (the row's `id`) for every item `type`, including `news`. `GET news/{news}` takes that id directly: `NewsController::show` resolves a numeric segment by `id` and anything else by `slug`, so pre-existing slug links (e.g. the `landing/news/[slug].vue` page, `GET news`/`news/latest` list payloads which still return `slug`) keep working. Don't narrow it back to slug-only. See [Contractor_App_API.postman_collection.json](Contractor_App_API.postman_collection.json)'s `Home`/`Home Updates`/`News Details` request descriptions.
 
 ### Contractor dues ("الذمم") domain
 

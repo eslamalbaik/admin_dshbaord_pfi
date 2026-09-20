@@ -39,12 +39,16 @@ class NewsController extends Controller
         return $this->success($news->toArray());
     }
 
-    // GET /api/v1/news/{slug}
-    public function show(string $slug)
+    // GET /api/v1/news/{id}  — also accepts the slug for backwards compatibility
+    public function show(string $identifier)
     {
         $news = News::published()
             ->with('author:id,name')
-            ->where('slug', $slug)
+            ->when(
+                ctype_digit($identifier),
+                fn ($q) => $q->where('id', (int) $identifier),
+                fn ($q) => $q->where('slug', $identifier),
+            )
             ->firstOrFail();
 
         return $this->success($news->toArray());
