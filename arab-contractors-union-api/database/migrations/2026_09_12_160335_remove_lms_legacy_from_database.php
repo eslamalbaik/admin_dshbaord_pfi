@@ -20,7 +20,10 @@ return new class extends Migration
         // 2. Alter the 'role' column enum to only allow 'admin' and 'accountant'
         // Doctrine DBAL (used by Laravel Schema builder for altering) sometimes has issues with ENUMs.
         // It's safer to use a raw DB statement for ENUM alterations.
-        DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'accountant') NOT NULL DEFAULT 'admin'");
+        // MySQL فقط — sqlite بيئة الاختبار لا تدعم MODIFY COLUMN فتفشل كل الاختبارات عند الترحيل
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'accountant') NOT NULL DEFAULT 'admin'");
+        }
 
         // 3. Drop 'total_students' column from 'system_statistics' table
         if (Schema::hasColumn('system_statistics', 'total_students')) {
@@ -35,7 +38,9 @@ return new class extends Migration
      */
     public function down(): void
     {
-        DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'accountant', 'student', 'instructor') NOT NULL DEFAULT 'admin'");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'accountant', 'student', 'instructor') NOT NULL DEFAULT 'admin'");
+        }
 
         if (! Schema::hasColumn('system_statistics', 'total_students')) {
             Schema::table('system_statistics', function (Blueprint $table) {
