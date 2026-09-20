@@ -56,10 +56,13 @@ echo "==> سحب آخر التعديلات من المونوريبو ($MONOREPO_
 git -C "$MONOREPO_DIR" fetch origin "$MONOREPO_BRANCH"
 git -C "$MONOREPO_DIR" reset --hard "origin/$MONOREPO_BRANCH"
 
+# storage/app/private مستثنى مثل public: يحوي ملف اعتماد Firebase (متجاهَل في git)،
+# فبدون الاستثناء كان --delete يمسحه كل نشرة وترتدّ إشعارات Push لوضع log بصمت.
 echo "==> مزامنة arab-contractors-union-api/ إلى $APP_DIR"
 rsync -a --delete \
   --exclude='.env' \
   --exclude='storage/app/public' \
+  --exclude='storage/app/private' \
   --exclude='vendor' \
   --exclude='node_modules' \
   --exclude='.git' \

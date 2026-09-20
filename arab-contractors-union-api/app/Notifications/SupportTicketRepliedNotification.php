@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\SupportTicket;
+use App\Notifications\Channels\FcmChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -22,8 +23,13 @@ class SupportTicketRepliedNotification extends Notification implements ShouldQue
 
     public function via(object $notifiable): array
     {
-        // إشعار داخل التطبيق دائمًا، والبريد إن توفّر بريد للمقاول.
-        return $notifiable->email ? ['database', 'mail'] : ['database'];
+        // إشعار داخل التطبيق و push دائمًا، والبريد إن توفّر بريد للمقاول.
+        $channels = ['database', FcmChannel::class];
+        if ($notifiable->email) {
+            $channels[] = 'mail';
+        }
+
+        return $channels;
     }
 
     public function toArray(object $notifiable): array
@@ -33,6 +39,7 @@ class SupportTicketRepliedNotification extends Notification implements ShouldQue
             'ticket_id' => $this->ticket->id,
             'subject'   => $this->ticket->subject,
             'reply'     => $this->ticket->reply,
+            'title'     => 'تم الرد على طلب الدعم',
             'message'   => "تم الرد على طلبك: {$this->ticket->subject}",
         ];
     }

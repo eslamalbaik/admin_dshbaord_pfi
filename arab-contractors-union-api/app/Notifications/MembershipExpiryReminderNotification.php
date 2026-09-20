@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\Membership;
+use App\Notifications\Channels\FcmChannel;
 use App\Notifications\Channels\SmsChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -23,7 +24,7 @@ class MembershipExpiryReminderNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        $channels = ['database', SmsChannel::class];
+        $channels = ['database', SmsChannel::class, FcmChannel::class];
 
         // قناة البريد تتجاهل من لا بريد له بصمت — نتحقق صراحة
         if (! empty($notifiable->email)) {

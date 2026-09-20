@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\CertificateRequest;
+use App\Notifications\Channels\FcmChannel;
 use App\Notifications\Channels\SmsChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -24,7 +25,7 @@ class CertificateRequestStatusNotification extends Notification implements Shoul
 
     public function via(object $notifiable): array
     {
-        $channels = ['database'];
+        $channels = ['database', FcmChannel::class];
 
         if (! empty($notifiable->email)) {
             $channels[] = 'mail';
@@ -58,6 +59,12 @@ class CertificateRequestStatusNotification extends Notification implements Shoul
             'type'       => 'certificate_request_status',
             'request_id' => $this->certificateRequest->id,
             'status'     => $this->certificateRequest->status,
+            'title'      => match ($this->certificateRequest->status) {
+                'approved' => 'تمت الموافقة على طلب الشهادة',
+                'issued'   => 'شهادتك جاهزة للتحميل',
+                'rejected' => 'تم رفض طلب الشهادة',
+                default    => 'تحديث على طلب الشهادة',
+            },
             'message'    => $this->statusMessage(),
         ];
     }

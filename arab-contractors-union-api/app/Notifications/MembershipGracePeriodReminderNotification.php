@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\Membership;
+use App\Notifications\Channels\FcmChannel;
 use App\Notifications\Channels\SmsChannel;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
@@ -28,7 +29,7 @@ class MembershipGracePeriodReminderNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        $channels = ['database', SmsChannel::class];
+        $channels = ['database', SmsChannel::class, FcmChannel::class];
 
         if (! empty($notifiable->email)) {
             $channels[] = 'mail';

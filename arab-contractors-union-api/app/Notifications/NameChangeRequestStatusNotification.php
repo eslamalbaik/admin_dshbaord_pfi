@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\ContractorNameChangeRequest;
+use App\Notifications\Channels\FcmChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -21,7 +22,12 @@ class NameChangeRequestStatusNotification extends Notification implements Should
 
     public function via(object $notifiable): array
     {
-        return $notifiable->email ? ['database', 'mail'] : ['database'];
+        $channels = ['database', FcmChannel::class];
+        if ($notifiable->email) {
+            $channels[] = 'mail';
+        }
+
+        return $channels;
     }
 
     private function statusMessage(): string
@@ -39,6 +45,9 @@ class NameChangeRequestStatusNotification extends Notification implements Should
             'type'       => 'name_change_request_status',
             'request_id' => $this->request->id,
             'status'     => $this->request->status,
+            'title'      => $this->request->status === 'approved'
+                ? 'تمت الموافقة على تعديل اسم الشركة'
+                : 'تم رفض طلب تعديل اسم الشركة',
             'message'    => $this->statusMessage(),
         ];
     }

@@ -108,6 +108,16 @@ location /app/ {
 }
 ```
 
+### Contractor push notifications (Firebase Cloud Messaging)
+
+Separate from Reverb above: Reverb pushes to **admin browsers**, FCM pushes to **contractor phones**. A notification wanting both lists both channels.
+
+`PushSenderInterface` is bound in [AppServiceProvider.php](arab-contractors-union-api/app/Providers/AppServiceProvider.php) to `FirebasePushSender` **only if** `FIREBASE_CREDENTIALS` names an existing file; otherwise it silently falls back to `LogPushSender`, **which logs and returns `true`**. A push therefore "succeeds" in every code path even when no device was reached — never treat the return value as proof of delivery. Run `php artisan push:diagnose` ([PushDiagnose.php](arab-contractors-union-api/app/Console/Commands/PushDiagnose.php)) to see which sender is actually bound, and `push:diagnose --to={membership_number}` to send a real test push.
+
+The service-account JSON lives at `storage/app/private/firebase/` (gitignored, project `pcu-gaza`) and so is **absent from the monorepo clone the deploy rsyncs from** — `deploy-vps.sh` excludes `storage/app/private` for exactly this reason. Removing that exclude makes `rsync --delete` wipe the credentials on the next deploy and silently demote every push to log mode. Note `storage/app/private/imports/*.xlsx` *is* tracked, so that exclude also freezes those on the server; they're consumed legacy dues uploads, which is why it's safe.
+
+Contractor-facing notifications route through `FcmChannel` (`['database', FcmChannel::class, ...]`); `FcmChannel` reads `toFcm()` if defined, else falls back to `toArray()`'s `title`/`message` keys — a `toArray()` without a `title` silently gets the generic union name as its push heading. Admin-facing ones (`PaymentSubmittedNotification`, `ContractorActivatedNotification`, `EventJoinedNotification`, the `*SubmittedNotification` family) use `broadcast` instead and must **not** get `FcmChannel` — admin `User`s have no `fcm_token`. `tests/Feature/PushChannelWiringTest.php` guards the contractor list, since a dropped channel throws no error and just stops reaching phones.
+
 ### Uploads under `storage/app/public/`
 
 `.gitignore` excludes `contractors/`, `certificates/`, `receipts/`, `announcements/`, `events/`, `news/`. These once held committed dev placeholders; production has real uploads at the same paths. `deploy-vps.sh`'s rsync already passes `--exclude='storage/app/public'` so a normal deploy never touches these — but if anyone ever runs `git` directly inside `/var/www/pcuorg/api` or `/var/www/pcuorg/monorepo` and a `pull`/`reset` aborts with *"local changes would be overwritten"* there, back up (`tar -czf ~/backup.tar.gz storage/app/public`) before discarding anything — a bare `git checkout -- storage/` restores placeholders over real files and a subsequent pull then deletes them.
