@@ -26,8 +26,7 @@ export default [
     title: 'الشؤون المالية',
     icon: { icon: 'tabler-credit-card' },
     children: [
-      // "سجل المدفوعات" (payments-transactions) مخفي عمداً من القائمة — الميزة معطّلة
-      // منتجياً (TASK-04) بينما تبقى الصفحة والراوت شغّالين لمن يملك الرابط المباشر.
+      { title: 'سجل المدفوعات', to: 'payments-transactions' },
       { title: 'الذمم المالية', to: 'dues' },
       { title: 'الغرامات والمخالفات', to: 'contractors-penalties' },
     ],

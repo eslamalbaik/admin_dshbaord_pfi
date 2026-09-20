@@ -4,6 +4,7 @@ import { useDashboardStore } from '@/stores/dashboardStore'
 
 const StatsCards = defineAsyncComponent(() => import('@/views/dashboards/lms/StatsCards.vue'))
 const RevenueChart = defineAsyncComponent(() => import('@/views/dashboards/lms/RevenueChart.vue'))
+const LatestPayments = defineAsyncComponent(() => import('@/views/dashboards/lms/LatestPayments.vue'))
 const LatestContractors = defineAsyncComponent(() => import('@/views/dashboards/lms/LatestStudents.vue'))
 const RecentActivities = defineAsyncComponent(() => import('@/views/dashboards/lms/RecentActivities.vue'))
 
@@ -66,7 +67,14 @@ const handleRefresh = () => {
           </VCardText>
         </VCard>
       </VCol>
-      <!-- بطاقة "المدفوعات" (سجل المدفوعات) مخفية عمداً — الميزة معطّلة منتجياً (TASK-04) -->
+      <VCol cols="12" sm="6" md="3">
+        <VCard class="text-center" :to="{ name: 'payments-transactions' }" style="cursor:pointer">
+          <VCardText class="py-4">
+            <VIcon icon="tabler-credit-card" size="32" color="info" class="mb-2" />
+            <div class="text-body-1 font-weight-medium">المدفوعات</div>
+          </VCardText>
+        </VCard>
+      </VCol>
     </VRow>
 
     <!-- Stats Cards -->
@@ -95,11 +103,16 @@ const handleRefresh = () => {
     </VRow>
 
     <VRow>
-      <!-- ودجت "أحدث المدفوعات" مخفي عمداً — الميزة معطّلة منتجياً (TASK-04)، LatestContractors يأخذ العرض كاملاً بدلاً منه -->
-      <VCol cols="12">
+      <VCol cols="12" lg="6">
         <div style="min-height: 420px;">
           <VSkeletonLoader v-if="isLoading" type="list-item-avatar-two-line@5" height="420" />
           <LatestContractors v-else />
+        </div>
+      </VCol>
+      <VCol cols="12" lg="6">
+        <div style="min-height: 420px;">
+          <VSkeletonLoader v-if="isLoading" type="list-item-avatar-two-line@5" height="420" />
+          <LatestPayments v-else />
         </div>
       </VCol>
     </VRow>
