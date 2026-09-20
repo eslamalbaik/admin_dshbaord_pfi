@@ -33,42 +33,34 @@ Frontend `.env` needs `VITE_API_BASE_URL` pointing at the backend (`http://local
 
 ## Deployment
 
-### Mirror repos — this monorepo is not what production pulls
+### Pushing to `feature/arab-contractors-union` deploys straight to production
 
-Each subdirectory is mirrored into its own GitHub repo with **unrelated history** (not subtrees, not submodules):
+As of [.github/workflows/deploy.yml](.github/workflows/deploy.yml) (commit `3e55c07`, "deploy directly from monorepo, drop mirror-repo dependency"), **this monorepo is what production pulls** — there is no mirror repo in the path anymore. Older PcuGaza mirror repos (`PcuGaza/PCU-Manager-Backend` / `PcuGaza/PCU-Manager-Frontend`, branches `development`/`deploy-new`/`deploy-dist`) still exist but are **retired and no longer deployed from** — pushing to them does nothing for production now.
 
-| Subdirectory | Remote | Repo |
-|---|---|---|
-| `arab-contractors-union-api/` | `pcu-back` | `PcuGaza/PCU-Manager-Backend` |
-| `arab-contractors-union-front/` | `pcu-front` | `PcuGaza/PCU-Manager-Frontend` |
+Pipeline, on every push to `feature/arab-contractors-union` that touches `arab-contractors-union-api/**` or `arab-contractors-union-front/**`:
 
-A mirror commit's tree is an **exact copy** of the monorepo subdirectory tree. Build one with `git commit-tree <subtree-hash> -p <branch-tip> -m "<msg>"` and push the resulting hash to `refs/heads/<branch>` — never copy files by hand. Verify with `git rev-parse <new-commit>^{tree}` against `git rev-parse <monorepo-commit>:<subdir>`; they must match.
+1. GitHub Actions (`appleboy/ssh-action`) SSHes into the VPS using the `SSH_HOST`/`SSH_USERNAME`/`SSH_PRIVATE_KEY` repo secrets.
+2. It runs `cd /var/www/pcuorg/api && ./deploy-vps.sh`, then `cd /var/www/pcuorg/front && ./deploy-vps.sh`.
+3. Each `deploy-vps.sh` does **not** `git pull` inside the app directory. It `git fetch`+`reset --hard origin/feature/arab-contractors-union` a **separate, clean monorepo clone** at `/var/www/pcuorg/monorepo`, then `rsync -a --delete` the matching subdirectory (e.g. `monorepo/arab-contractors-union-api/`) into place (`.env`/`.env.production`, `node_modules`, `dist`, `.git` excluded from the rsync).
+4. Frontend build happens on the server after the rsync: `npm install` + `npm run build`, verified by checking `dist/index.html` exists and the built bundle has the right API base URL baked in.
 
-Two branches per mirror, with **different message conventions**:
-
-- `development` — one squashed commit per sync: `sync: mirror <subdir> from monorepo (through <short-hash>)`
-- `deploy-new` — replays monorepo commits individually, keeping their **original messages**
-
-`pcu-front` also has `deploy-dist`, holding **pre-built output** (`index.html`, `assets/`, `.htaccess` at root) for a separate static host: `deploy: build from monorepo (frontend <development-hash>)`. It is *not* what the VPS serves.
-
-Pushing only to `development` does not reach production — production pulls `deploy-new`.
+**Consequence — `/var/www/pcuorg/api` and `/var/www/pcuorg/front` are themselves git repos, but their git state is vestigial**: they're still checked out on the old `deploy-new` branch, permanently "behind" it and dirty (rsync doesn't commit). **Don't trust `git log`/`git status` inside those two directories to tell you what's live** — grep the source for a known change instead, or check `git log -1` in `/var/www/pcuorg/monorepo`, which *is* a real, clean, up-to-date checkout of `feature/arab-contractors-union`.
 
 ### Production VPS (`srv1962001`, `187.77.172.48`)
 
 | | Backend | Frontend |
 |---|---|---|
 | Path | `/var/www/pcuorg/api` | `/var/www/pcuorg/front` |
-| Branch | `deploy-new` | `deploy-new` |
-| Serves | `https://api.pcuorg.cloud` (base `/api/v1`) | builds `dist/` locally via `npm run build` |
+| Serves | `https://api.pcuorg.cloud` (base `/api/v1`) | builds `dist/` on-server via `npm run build` |
 | Deploy | `./deploy-vps.sh` | `./deploy-vps.sh` |
 
 Both `deploy-vps.sh` scripts back up before touching anything and roll back on failure. The API one aborts if the DB dump is incomplete; the frontend one restores the previous `dist/` if the build fails.
 
-**Do not use [deploy.sh](arab-contractors-union-api/deploy.sh)** — it targets the decommissioned InMotion cPanel host (`~/acu-api`, branch `development`, `ea-php82`).
+**Do not use [deploy.sh](arab-contractors-union-api/deploy.sh)** — it targets the decommissioned InMotion cPanel host (`~/acu-api`, branch `development`, `ea-php82`), unrelated to this pipeline.
 
 `GET /` returns 404 by design; smoke-test the API with `GET /api/v1/tenders-public` (public, no auth).
 
-`VITE_API_BASE_URL` in `.env.production` is **baked in at build time** and cannot be changed afterwards — verify it before building.
+`VITE_API_BASE_URL` in `.env.production` is **baked in at build time** and cannot be changed afterwards — verify it before a push triggers a build.
 
 ### Real-time admin notifications (Reverb + queue worker)
 
@@ -118,7 +110,7 @@ location /app/ {
 
 ### Uploads under `storage/app/public/`
 
-`.gitignore` excludes `contractors/`, `certificates/`, `receipts/`, `announcements/`, `events/`, `news/`. These once held committed dev placeholders; production has real uploads at the same paths. If a `git pull` ever aborts with *"local changes would be overwritten"* there, back up (`tar -czf ~/backup.tar.gz storage/app/public`) before discarding anything — a bare `git checkout -- storage/` restores placeholders over real files and the pull then deletes them.
+`.gitignore` excludes `contractors/`, `certificates/`, `receipts/`, `announcements/`, `events/`, `news/`. These once held committed dev placeholders; production has real uploads at the same paths. `deploy-vps.sh`'s rsync already passes `--exclude='storage/app/public'` so a normal deploy never touches these — but if anyone ever runs `git` directly inside `/var/www/pcuorg/api` or `/var/www/pcuorg/monorepo` and a `pull`/`reset` aborts with *"local changes would be overwritten"* there, back up (`tar -czf ~/backup.tar.gz storage/app/public`) before discarding anything — a bare `git checkout -- storage/` restores placeholders over real files and a subsequent pull then deletes them.
 
 ## Architecture
 
