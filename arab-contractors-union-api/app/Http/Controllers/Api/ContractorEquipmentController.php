@@ -23,6 +23,10 @@ class ContractorEquipmentController extends Controller
 {
     use ApiResponseTrait;
 
+    public function __construct(
+        private \App\Services\ContractorFinancialService $financialService
+    ) {}
+
     private function format(Equipment $e): array
     {
         return [
@@ -121,7 +125,7 @@ class ContractorEquipmentController extends Controller
             return $this->error('تم إيقافك من النشر بسوق الآليات لمخالفة الشروط — يرجى مراجعة الاتحاد.', 403);
         }
 
-        if ($contractor->outstandingDuesTotal() > 0) {
+        if ($this->financialService->outstandingDuesTotal($contractor) > 0) {
             return $this->error('لا يمكن إضافة آلية جديدة قبل تسوية الذمم المالية المستحقّة.', 403, null, 'dues_pending');
         }
 
@@ -133,7 +137,7 @@ class ContractorEquipmentController extends Controller
             'manufacture_year'   => 'nullable|integer|min:1970|max:' . date('Y'),
             'power'              => 'nullable|string|max:50',
             'condition'          => 'nullable|in:excellent,good,fair',
-            'contract_type'      => 'required|in:daily,weekly,monthly',
+            'contract_type'      => 'nullable|in:daily,weekly,monthly',
             'governorate'        => 'nullable|string|max:100',
             'city'               => 'nullable|string|max:100',
             'owner_phone'        => 'nullable|string|max:20',

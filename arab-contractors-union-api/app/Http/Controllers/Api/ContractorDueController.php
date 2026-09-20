@@ -33,7 +33,8 @@ class ContractorDueController extends Controller
     public function __construct(
         private DuesPaymentService $paymentService,
         private DuesDiscountService $discountService,
-        private DuesGenerationService $generationService
+        private DuesGenerationService $generationService,
+        private \App\Services\ContractorFinancialService $financialService
     ) {}
 
     private function financeLog(string $action, array $context = []): void
@@ -128,7 +129,7 @@ class ContractorDueController extends Controller
         ]);
 
         return $this->success(
-            $result + ['remaining_total_jod' => $contractor->outstandingDuesTotal()],
+            $result + ['remaining_total_jod' => $this->financialService->outstandingDuesTotal($contractor)],
             'تم تسجيل الدفعة وتوزيعها على الذمم بنجاح.',
             201,
         );

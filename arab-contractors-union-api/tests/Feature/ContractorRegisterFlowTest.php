@@ -114,7 +114,7 @@ class ContractorRegisterFlowTest extends TestCase
         $this->postJson('/api/v1/contractor/auth/verify-identity', [
             'phone' => '0590000001', 'terms_accepted' => 1,
         ]);
-        $otp = \Illuminate\Support\Facades\Cache::get('register_otp_' . $contractor->id);
+        $otp = \Illuminate\Support\Facades\Cache::get('register_otp_' . $contractor->id)['otp'];
 
         $response = $this->postJson('/api/v1/contractor/auth/verify-otp', [
             'phone' => '0590000001', 'otp' => (string) $otp,

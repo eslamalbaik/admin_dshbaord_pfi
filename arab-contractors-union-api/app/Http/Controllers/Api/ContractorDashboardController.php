@@ -285,7 +285,7 @@ class ContractorDashboardController extends Controller
         return $this->success([
             'can_renew'             => count($blockers) === 0,
             'issues'                => $blockers,
-            'outstanding_total_jod' => $contractor->outstandingDuesTotal(),
+            'outstanding_total_jod' => $this->financialService->outstandingDuesTotal($contractor),
         ]);
     }
 

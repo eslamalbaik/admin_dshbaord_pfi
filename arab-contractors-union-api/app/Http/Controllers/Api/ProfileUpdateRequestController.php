@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exceptions\OtpCooldownException;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\ProfileUpdateRequest;
@@ -9,19 +10,24 @@ use App\Models\User;
 use App\Notifications\ProfileUpdateRequestStatusNotification;
 use App\Notifications\ProfileUpdateRequestSubmittedNotification;
 use App\Services\AuditLogService;
+use App\Services\OtpService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Validation\ValidationException;
 
 /**
  * طلبات تعديل بيانات البروفايل الثانوية (REQ-26) — لا كتابة مباشرة على contractors
- * إلا بعد موافقة الإدارة. تغيير الجوال له مسار مستقل فوري (ContractorAuthController)
- * التسجيل الموجود بـContractorRegisterController (Cache + mt_rand، بلا مزوّد SMS فعلي بعد).
+ * إلا بعد موافقة الإدارة. تغيير الجوال هنا مسموح أيضاً (مساره الأصلي الفوري بدون موافقة
+ * يبقى قائماً في ContractorAuthController) لكنه يتطلب تحقق OTP مسبق عبر send-phone-otp
+ * (نفس OtpService المستخدم بمسار ContractorAuthController، بنفس الـ purpose "profile_phone").
  */
 class ProfileUpdateRequestController extends Controller
 {
     use ApiResponseTrait;
+
+    public function __construct(private OtpService $otpService) {}
 
     private function format(ProfileUpdateRequest $r): array
     {
@@ -58,7 +64,8 @@ class ProfileUpdateRequestController extends Controller
     /**
      * POST /api/v1/contractor/profile-update-requests
      * الحقول المسموح تعديلها فقط (ProfileUpdateRequest::ALLOWED_FIELDS) — الاسم/رقم
-     * العضوية/رقم المشتغل مقفلة تماماً ولا تُقبل هنا إطلاقاً.
+     * العضوية/رقم المشتغل مقفلة تماماً ولا تُقبل هنا إطلاقاً. تغيير الجوال يتطلب otp
+     * صحيح تم تحقيقه مسبقاً عبر send-phone-otp (نفس رقم الجوال المُرسَل هنا).
      */
     public function store(Request $request)
     {
@@ -74,8 +81,20 @@ class ProfileUpdateRequestController extends Controller
             'authorized_person_title' => 'sometimes|nullable|string|max:255',
             'email'                   => 'sometimes|nullable|email|max:255',
             'address'                 => 'sometimes|string|max:500',
+            'phone'                   => 'sometimes|string|max:20|unique:contractors,phone,' . $contractor->id,
+            'otp'                     => 'required_with:phone|string|size:6',
             'attachment'              => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240',
         ]);
+
+        $phoneOtpVerifiedAt = null;
+        if (array_key_exists('phone', $data)) {
+            try {
+                $this->otpService->verifyOtp('profile_phone', $contractor->id, $data['otp']);
+            } catch (ValidationException $e) {
+                return $this->error('رمز التحقق غير صحيح أو انتهت صلاحيته.', 422, null, 'invalid_otp');
+            }
+            $phoneOtpVerifiedAt = now();
+        }
 
         // whitelist صريح — استبعاد أي حقل خارج ALLOWED_FIELDS حتى لو مرّ التحقق أعلاه بالخطأ مستقبلاً
         $proposedData = array_intersect_key($data, array_flip(ProfileUpdateRequest::ALLOWED_FIELDS));
@@ -87,9 +106,10 @@ class ProfileUpdateRequestController extends Controller
         $attachmentPath = $request->file('attachment')->store('contractors/profile-update', 'public');
 
         $profileRequest = $contractor->profileUpdateRequests()->create([
-            'proposed_data' => $proposedData,
-            'attachment'    => $attachmentPath,
-            'status'        => 'pending',
+            'proposed_data'         => $proposedData,
+            'attachment'            => $attachmentPath,
+            'status'                => 'pending',
+            'phone_otp_verified_at' => $phoneOtpVerifiedAt,
         ]);
 
         $admins = User::where('role', 'admin')->get();
@@ -102,6 +122,34 @@ class ProfileUpdateRequestController extends Controller
             'تم تقديم طلب تعديل البيانات بنجاح، وستبقى بياناتك الحالية سارية لحين المراجعة.',
             201,
         );
+    }
+
+    /**
+     * POST /api/v1/contractor/profile-update-requests/send-phone-otp
+     * الخطوة 1 قبل تضمين phone بطلب تعديل بيانات — يرسل رمز تحقق يُستخدم لاحقاً في store().
+     */
+    public function sendPhoneOtp(Request $request)
+    {
+        $data = $request->validate(['phone' => 'required|string|max:20']);
+        $contractor = $request->user();
+
+        try {
+            $result = $this->otpService->sendOtp(
+                'profile_phone',
+                $contractor->id,
+                $data['phone'],
+                'اتحاد المقاولين: رمز تحقق تعديل رقم الجوال: {otp}. صالح لمدة 10 دقائق.',
+            );
+        } catch (OtpCooldownException $e) {
+            return $this->error($e->getMessage(), 429, ['expires_in' => $e->expiresIn], 'otp_cooldown');
+        }
+
+        $responseData = ['expires_in' => $result['expires_in']];
+        if ($result['is_preview']) {
+            $responseData['otp_preview'] = $result['otp'];
+        }
+
+        return $this->success($responseData, 'تم إرسال رمز التحقق إلى رقم الجوال.');
     }
 
     // ═════════════════════════════════════════════════════════════════════════

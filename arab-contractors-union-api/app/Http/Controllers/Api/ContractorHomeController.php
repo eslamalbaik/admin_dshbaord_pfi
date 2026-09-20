@@ -132,7 +132,7 @@ class ContractorHomeController extends Controller
         return [
             'balance'         => number_format($balance, 2, '.', ''),
             'has_overdue'     => $hasOverdue,
-            'last_due'        => $lastDue ? [
+            'last_invoice'    => $lastDue ? [
                 'id'          => $lastDue->id,
                 'description' => $lastDue->description . ($lastDue->year ? " ({$lastDue->year})" : ''),
                 'amount_jod'  => $lastDue->amount_jod,
