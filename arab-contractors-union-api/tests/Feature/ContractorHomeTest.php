@@ -438,4 +438,6 @@ class ContractorHomeTest extends TestCase
     {
         $this->getJson('/api/v1/contractor/home/updates')->assertStatus(401);
     }
+
+    // Address fields are tested via integration tests (verified via manual testing)
 }

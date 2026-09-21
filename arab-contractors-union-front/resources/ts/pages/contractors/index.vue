@@ -383,7 +383,11 @@ const contactRows = computed(() => {
     { label: 'الجوال', value: t.phone || '—', dir: 'ltr', icon: 'tabler-device-mobile' },
     { label: 'الهاتف/الفاكس', value: t.fax || '—', dir: 'ltr', icon: 'tabler-phone' },
     { label: 'البريد الإلكتروني', value: t.email || '—', icon: 'tabler-mail' },
+    { label: 'المحافظة', value: t.governorate?.name || '—', icon: 'tabler-map' },
     { label: 'المدينة', value: t.city || '—', icon: 'tabler-map-pin' },
+    { label: 'الحي', value: t.district || '—', icon: 'tabler-map-pin-2' },
+    { label: 'العمارة', value: t.building || '—', icon: 'tabler-building' },
+    { label: 'الطابق', value: t.floor || '—', icon: 'tabler-stairs' },
     { label: 'العنوان التفصيلي', value: t.address || '—', icon: 'tabler-map-2' },
     { label: 'رقم الرخصة', value: t.license_number || '—', icon: 'tabler-license' },
   ]

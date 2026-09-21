@@ -266,7 +266,7 @@ class ContractorController extends Controller
     {
         $contractor->withFileUrls = true;
 
-        return $this->success($contractor->load('activeMembership')->toArray());
+        return $this->success($contractor->load(['activeMembership', 'governorate:id,name'])->toArray());
     }
 
     // PUT/PATCH /api/contractors/{id}

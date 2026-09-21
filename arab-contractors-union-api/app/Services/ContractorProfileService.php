@@ -96,6 +96,7 @@ class ContractorProfileService
             'partners'          => $contractor->partners,
             'specialties'       => $contractor->specialties,
             'fax'               => $contractor->fax,
+            'district'          => $contractor->district,
             'building'          => $contractor->building,
             'floor'             => $contractor->floor,
             'capital'           => $contractor->capital,
