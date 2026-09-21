@@ -139,7 +139,6 @@ class TenderController extends Controller
         $validated['created_by'] = Auth::id();
         $tender = Tender::create($validated);
         $tender->update(['reference_number' => $this->generateReferenceNumber($tender)]);
-        $tender->refresh();
 
         $this->notifyContractorsOfNewTender($tender);
 
