@@ -185,6 +185,7 @@ class ContractorRegisterController extends Controller
             'phone'                 => 'required|string',
             'password'              => 'required|string|min:8',
             'password_confirmation' => 'required|string',
+            'fcm_token'             => 'nullable|string|max:500',
         ]);
 
         $contractor = Contractor::where('phone', trim($request->phone))->first();
@@ -216,6 +217,7 @@ class ContractorRegisterController extends Controller
         $contractor->update([
             'password'          => Hash::make($request->password),
             'profile_completed' => true,
+            'fcm_token'         => $request->fcm_token ?: $contractor->fcm_token,
             // فتح الحساب من التطبيق ينقل الحالة من "معلّق" إلى "نشط" تلقائياً —
             // 'expired' تبقى كما هي لأنها تخص انتهاء العضوية لا اكتمال التسجيل.
             ...($contractor->status === 'pending' ? ['status' => 'active'] : []),

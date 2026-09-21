@@ -370,6 +370,13 @@
 									"key": "password_confirmation",
 									"value": "{{password}}",
 									"type": "text"
+								},
+								{
+									"key": "fcm_token",
+									"value": "",
+									"type": "text",
+									"disabled": true,
+									"description": "Firebase Cloud Messaging token for push notifications (optional)"
 								}
 							]
 						},
@@ -384,7 +391,7 @@
 								"set-password"
 							]
 						},
-						"description": "**POST** `/api/v1/contractor/auth/set-password`\n\nشاشة التسجيل — الخطوة 3 (بعد تفعيل الجوال): تعيين كلمة المرور وتسجيل الدخول مباشرة (يعود التوكن).\n\n- يتطلب أن يكون الجوال مفعّلاً مسبقاً عبر verify-otp، وإلا `422 phone_not_verified`.\n- إذا كان للحساب كلمة مرور بالفعل → `422 already_registered`.\n- **⚠️ تحديث جديد:** نفس فحص `verify-identity` — لازم يكون عند المقاول `membership_number` مسجّل، غير هيك `422 no_membership_number`. لا حقل إضافي مطلوب بالـ request.\n- بعد النجاح ترجع بيانات العضوية الحقيقية (membership_number/commercial_register/trade/classification) من سجل المقاول — لو طلعت null تأكد إنه المقاول فعلاً معبّى هالحقول بالداتابيز.\n\n**Form-Data**"
+						"description": "**POST** `/api/v1/contractor/auth/set-password`\n\nشاشة التسجيل — الخطوة 3 (بعد تفعيل الجوال): تعيين كلمة المرور وتسجيل الدخول مباشرة (يعود التوكن).\n\n- يتطلب أن يكون الجوال مفعّلاً مسبقاً عبر verify-otp، وإلا `422 phone_not_verified`.\n- إذا كان للحساب كلمة مرور بالفعل → `422 already_registered`.\n- **⚠️ تحديث جديد:** نفس فحص `verify-identity` — لازم يكون عند المقاول `membership_number` مسجّل، غير هيك `422 no_membership_number`. لا حقل إضافي مطلوب بالـ request.\n- بعد النجاح ترجع بيانات العضوية الحقيقية (membership_number/commercial_register/trade/classification) من سجل المقاول — لو طلعت null تأكد إنه المقاول فعلاً معبّى هالحقول بالداتابيز.\n- **تحديث:** `fcm_token` اختياري ويُستخدم لتسجيل جهاز المقاول لاستقبال إشعارات فورية. لو تم تمريره يتم حفظه مباشرة (لا تنتظر طلب منفصل).\n\n**Form-Data**""
 					},
 					"event": [
 						{

@@ -72,7 +72,7 @@ class ContractorAuthController extends Controller
         // تحديث آخر دخول + fcm_token
         $contractor->update([
             'last_login_at' => now(),
-            'fcm_token'     => $request->fcm_token ?? $contractor->fcm_token,
+            'fcm_token'     => $request->fcm_token ?: $contractor->fcm_token,
         ]);
 
         // تذكير بإكمال الملف الشخصي — مرة واحدة فقط طالما التذكير السابق لم يُقرأ بعد

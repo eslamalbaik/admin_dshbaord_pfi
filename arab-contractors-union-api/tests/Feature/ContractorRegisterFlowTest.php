@@ -232,6 +232,65 @@ class ContractorRegisterFlowTest extends TestCase
         $response->assertStatus(422)->assertJsonPath('error', 'already_registered');
     }
 
+    public function test_set_password_with_fcm_token_persists_it(): void
+    {
+        $this->createContractor(['phone_verified_at' => now()]);
+
+        $response = $this->postJson('/api/v1/contractor/auth/set-password', [
+            'phone' => '0590000001',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'fcm_token' => 'test-fcm-token-12345',
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertDatabaseHas('contractors', [
+            'phone' => '0590000001',
+            'fcm_token' => 'test-fcm-token-12345',
+        ]);
+    }
+
+    public function test_set_password_without_fcm_token_leaves_previous_value_intact(): void
+    {
+        $this->createContractor([
+            'phone_verified_at' => now(),
+            'fcm_token' => 'existing-token-xyz',
+        ]);
+
+        $response = $this->postJson('/api/v1/contractor/auth/set-password', [
+            'phone' => '0590000001',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertDatabaseHas('contractors', [
+            'phone' => '0590000001',
+            'fcm_token' => 'existing-token-xyz',
+        ]);
+    }
+
+    public function test_set_password_empty_string_does_not_clear_previous_fcm_token(): void
+    {
+        $this->createContractor([
+            'phone_verified_at' => now(),
+            'fcm_token' => 'existing-token-abc',
+        ]);
+
+        $response = $this->postJson('/api/v1/contractor/auth/set-password', [
+            'phone' => '0590000001',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'fcm_token' => '',
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertDatabaseHas('contractors', [
+            'phone' => '0590000001',
+            'fcm_token' => 'existing-token-abc',
+        ]);
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     //  login
     // ─────────────────────────────────────────────────────────────────────
@@ -283,5 +342,46 @@ class ContractorRegisterFlowTest extends TestCase
         ]);
 
         $response->assertStatus(403)->assertJsonPath('error', 'phone_not_verified');
+    }
+
+    public function test_login_with_fcm_token_persists_it(): void
+    {
+        $this->createContractor([
+            'phone_verified_at' => now(),
+            'password' => Hash::make('password123'),
+        ]);
+
+        $response = $this->postJson('/api/v1/contractor/auth/login', [
+            'membership_number' => '905_g',
+            'password' => 'password123',
+            'fcm_token' => 'new-fcm-token-xyz',
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertDatabaseHas('contractors', [
+            'membership_number' => '905_g',
+            'fcm_token' => 'new-fcm-token-xyz',
+        ]);
+    }
+
+    public function test_login_empty_fcm_token_does_not_clear_existing(): void
+    {
+        $this->createContractor([
+            'phone_verified_at' => now(),
+            'password' => Hash::make('password123'),
+            'fcm_token' => 'existing-token-123',
+        ]);
+
+        $response = $this->postJson('/api/v1/contractor/auth/login', [
+            'membership_number' => '905_g',
+            'password' => 'password123',
+            'fcm_token' => '',
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertDatabaseHas('contractors', [
+            'membership_number' => '905_g',
+            'fcm_token' => 'existing-token-123',
+        ]);
     }
 }
