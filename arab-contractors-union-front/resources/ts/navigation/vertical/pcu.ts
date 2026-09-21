@@ -59,7 +59,10 @@ if (!isAccountant) {
   menuItems.push({
     title: 'العطاءات',
     icon: { icon: 'tabler-files' },
-    to: 'tenders',
+    children: [
+      { title: 'قائمة العطاءات', to: 'tenders' },
+      { title: 'صور تصنيفات العطاءات', to: 'settings-tender-category-images' },
+    ],
   })
 
   menuItems.push({ heading: 'سوق الآليات' })
