@@ -53,6 +53,44 @@ class TenderAdminTest extends TestCase
     }
 
     // ─────────────────────────────────────────────────────────────────────
+    //  store — response contains persisted database defaults (status, display_status)
+    // ─────────────────────────────────────────────────────────────────────
+
+    public function test_store_returns_open_status_when_not_provided(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->postJson('/api/v1/tenders', [
+            'title'       => 'عطاء اختباري',
+            'description' => 'وصف العطاء',
+            'deadline'    => now()->addDays(7)->toDateTimeLocalString(),
+        ]);
+
+        $response->assertStatus(201);
+        $this->assertEquals('open', $response->json('items.status'));
+        $this->assertTrue($response->json('items.is_active'));
+        $this->assertEquals('new', $response->json('items.display_status'));
+    }
+
+    public function test_store_response_matches_database_row(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->postJson('/api/v1/tenders', [
+            'title'       => 'عطاء اختباري للمطابقة',
+            'issuing_entity' => 'جهة اختبار',
+            'deadline'    => now()->addDays(5)->toDateTimeLocalString(),
+        ]);
+
+        $response->assertStatus(201);
+        $createdFromResponse = $response->json('items');
+        $createdFromDB = Tender::find($createdFromResponse['id'])->toArray();
+
+        $this->assertEquals($createdFromDB['status'], $createdFromResponse['status']);
+        $this->assertEquals($createdFromDB['display_status'], $createdFromResponse['display_status']);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
     //  update — never touches attachments (they're a separate resource/table)
     // ─────────────────────────────────────────────────────────────────────
 
