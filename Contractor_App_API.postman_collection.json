@@ -1419,7 +1419,7 @@
 								"home"
 							]
 						},
-						"description": "GET /api/v1/contractor/home - home screen, one aggregated call (membership+dues+stats+latest updates).\n\n**`items.latest_updates[]`** — كل عنصر: `type` (tender|news|announcement|due|member|...), `reference_id`, `title`, `subtitle`, `badges[]`, `priority`, `created_at`.\n\n**`reference_id` دائماً رقم (id) بغض النظر عن `type`** — بما فيها `news` (كانت سابقاً ترسل `slug` نصياً لعناصر الأخبار فقط، وحُوِّلت لـ id ليتّسق مع باقي الأنواع). لعرض تفاصيل الخبر مرّر هذا الرقم مباشرة إلى `GET /news/{id}` — لم تعد هناك حاجة لجلب الـ `slug` من قائمة الأخبار."
+						"description": "GET /api/v1/contractor/home - home screen, one aggregated call (membership+dues+stats+latest updates).\n\n**`items.latest_updates[]`** — كل عنصر: `type` (tender|news|announcement|due|member|...), `reference_id`, `title`, `subtitle`, `badges[]`, `priority`, `created_at`.\n\n**`reference_id` دائماً رقم (id) بغض النظر عن `type`** — بما فيها `news` (كانت سابقاً ترسل `slug` نصياً لعناصر الأخبار فقط، وحُوِّلت لـ id ليتّسق مع باقي الأنواع). لعرض تفاصيل الخبر مرّر هذا الرقم مباشرة إلى `GET /news/{id}` — لم تعد هناك حاجة لجلب الـ `slug` من قائمة الأخبار.\n\n**تحديث (TASK-15 #8):** `latest_updates` يعيد الآن **3 عناصر** فقط (بدلاً من 10). زر \"عرض المزيد\" في التطبيق يوجّه إلى `GET /contractor/home/updates` (المُرقَّم بـ 20 عنصراً في الصفحة) للحصول على التسلسل الكامل."
 					}
 				},
 				{

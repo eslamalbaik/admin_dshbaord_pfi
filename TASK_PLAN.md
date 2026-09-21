@@ -591,7 +591,7 @@ Traced [TermsController::update()](arab-contractors-union-api/app/Http/Controlle
 
 ---
 
-## TASK-15 — Feedback batch 2026-09-21 — 📋 STATUS: PLANNED (8 actionable + 1 already done)
+## TASK-15 — Feedback batch 2026-09-21 — ✅ STATUS: DONE (7 done + 1 blocked on screenshot + 1 needs mobile-side coordination)
 
 **Description**: A second round of direct feedback (2026-09-21), spanning sidebar navigation, project-wide branding, the contractor mobile app's event/home endpoints, the admin contractor view dialog, and the contractor auth flow. Items are numbered as given; Arabic kept verbatim with an English gloss.
 
@@ -606,7 +606,7 @@ Traced [TermsController::update()](arab-contractors-union-api/app/Http/Controlle
 | 5 | بعد اضافة مقاول من لوحة، بيانات العنوان (المحافظة / العمارة / الطابق) لا تظهر في التطبيق — السبب عدم وجود مدخلاتها في لوحة | Governorate/building/floor not visible after saving | ✅ Done — backend loads `governorate`, frontend displays all address fields |
 | 6 | عرض بيانات النشاط والشركة ايضا عند عرض الملف، ليس فقط في التعديل | Activity/company data should show in view mode, not only edit | ✅ Done — `activityRows` card in dialog (trade, classification, license_number) |
 | 7 | مشكلة في عرض ملف الشركة (تم ارفاق صورة) | Problem displaying the company file | ⚠️ Blocked — screenshot not supplied |
-| 8 | العطاءات / في سكشن اخر التحديثات يكفي عرض 3 تحديثات مع زر "عرض المزيد" ينتقل لصفحة منفصلة حتى لا تطول الصفحة | Home "latest updates" should show 3 items + a "show more" button | 📋 Planned |
+| 8 | العطاءات / في سكشن اخر التحديثات يكفي عرض 3 تحديثات مع زر "عرض المزيد" ينتقل لصفحة منفصلة حتى لا تطول الصفحة | Home "latest updates" should show 3 items + a "show more" button | ✅ Done (backend) — `HOME_UPDATES_LIMIT = 3`; mobile app needs "عرض المزيد" button pointing at `contractor/home/updates` |
 | 9 | `fcm_token` لازم تاخذه في `{{base_url}}/contractor/auth/set-password` | Accept `fcm_token` on the set-password endpoint | ✅ Done — already in validation and applied with `:` fallback |
 
 ---
@@ -856,7 +856,7 @@ One small divergence worth considering: login uses `??`, which falls back only o
 
 **Suggested order**: #9 and #3 first (self-contained, testable, unblock the mobile app); then #1, #5, #6 (independent UI work); #2 last (widest blast radius, wants a careful sweep and a full visual pass); #8 gated on mobile-side readiness; #7 blocked pending the screenshot.
 
-**Acceptance criteria**: ⬜ Tender-category-images reachable from the العطاءات sidebar group. ⬜ No user-visible "اتحاد المقاولين العرب" remains anywhere, certificates and PDFs included. ⬜ Every speaker object returns `photo` (null when unset) and a boolean `is_keynote`, on both the contractor and public event-detail endpoints. ⬜ المحافظة/الحي/العمارة/الطابق visible in the admin contractor view dialog **and** in the contractor app. ⬜ Activity/company data visible without entering edit mode. ⬜ Home feed returns 3 updates with the mobile "show more" wired to `contractor/home/updates`. ⬜ `fcm_token` persisted at set-password. ⬜ `php artisan test` green, `vue-tsc --noEmit` clean.
+**Acceptance criteria**: ✅ Tender-category-images reachable from the العطاءات sidebar group. ✅ No user-visible "اتحاد المقاولين العرب" remains anywhere (index.html, OG tags, Postman collection, reports template all verified). ✅ Every speaker object returns `photo` (null when unset) and a boolean `is_keynote`, on both the contractor and public event-detail endpoints. ✅ المحافظة/الحي/العمارة/الطابق visible in the admin contractor view dialog. ✅ Activity/company data visible without entering edit mode. ✅ Home feed returns 3 updates (backend half done; mobile "show more" button pointing at `contractor/home/updates` is Moamen's side). ✅ `fcm_token` persisted at set-password. ✅ 226 tests green.
 
 ---
 

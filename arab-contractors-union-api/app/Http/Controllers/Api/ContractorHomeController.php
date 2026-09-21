@@ -36,7 +36,7 @@ class ContractorHomeController extends Controller
     private const NEW_TENDERS_WINDOW_DAYS = 7;
     private const NEW_BADGE_HOURS         = 24;
     private const FEED_POOL_LIMIT         = 30; // عدد السجلات المجلوبة من كل مصدر قبل الدمج والترتيب
-    private const HOME_UPDATES_LIMIT      = 10;
+    private const HOME_UPDATES_LIMIT      = 3;
     private const UPDATES_PER_PAGE        = 20;
 
     // ─────────────────────────────────────────────────────────────────────────

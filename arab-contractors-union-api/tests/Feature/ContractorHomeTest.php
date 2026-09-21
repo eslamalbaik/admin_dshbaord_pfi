@@ -321,19 +321,19 @@ class ContractorHomeTest extends TestCase
     //  Latest updates feed
     // ─────────────────────────────────────────────────────────────────────
 
-    public function test_latest_updates_caps_at_ten_and_sorts_by_recency(): void
+    public function test_latest_updates_caps_at_three_and_sorts_by_recency(): void
     {
         $contractor = $this->createContractor();
 
-        for ($i = 0; $i < 15; $i++) {
+        for ($i = 0; $i < 10; $i++) {
             Tender::create(['title' => "عطاء $i", 'status' => 'open']);
         }
 
         Sanctum::actingAs($contractor, ['*']);
         $updates = $this->getJson('/api/v1/contractor/home')->json('items.latest_updates');
 
-        $this->assertCount(10, $updates);
-        $this->assertEquals('عطاء 14', $updates[0]['title']); // آخر عنصر أُنشئ يظهر أولاً
+        $this->assertCount(3, $updates);
+        $this->assertEquals('عطاء 9', $updates[0]['title']); // آخر عنصر أُنشئ يظهر أولاً
     }
 
     public function test_new_badge_applied_within_24_hours(): void
