@@ -195,4 +195,16 @@ class TenderAdminTest extends TestCase
             },
         );
     }
+
+    /** استجابة store لازم تحتوي على status='open' و is_active=true عند الإنشاء بدون status. */
+    public function test_store_response_contains_correct_status_and_is_active(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->postJson('/api/v1/tenders', ['title' => 'عطاء للاختبار']);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('items.status', 'open')
+            ->assertJsonPath('items.is_active', true);
+    }
 }

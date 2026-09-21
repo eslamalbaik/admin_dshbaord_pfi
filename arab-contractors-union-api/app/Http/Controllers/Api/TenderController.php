@@ -142,6 +142,8 @@ class TenderController extends Controller
 
         $this->notifyContractorsOfNewTender($tender);
 
+        $tender->refresh();
+
         return $this->success($tender->toArray(), 'تم إضافة العطاء بنجاح.', 201);
     }
 
