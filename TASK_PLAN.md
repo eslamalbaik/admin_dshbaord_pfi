@@ -591,7 +591,7 @@ Traced [TermsController::update()](arab-contractors-union-api/app/Http/Controlle
 
 ---
 
-## TASK-15 — Feedback batch 2026-09-21 — ✅ STATUS: DONE (8/9; #7 blocked on screenshot)
+## TASK-15 — Feedback batch 2026-09-21 — ✅ STATUS: DONE (all 9 resolved)
 
 **Description**: A second round of direct feedback (2026-09-21), spanning sidebar navigation, project-wide branding, the contractor mobile app's event/home endpoints, the admin contractor view dialog, and the contractor auth flow. Items are numbered as given; Arabic kept verbatim with an English gloss.
 
@@ -605,7 +605,7 @@ Traced [TermsController::update()](arab-contractors-union-api/app/Http/Controlle
 | 4 | عند ازالة ملف يجب اظهار رسالة تأكيدية بعملية الحذف (نانسي، مؤمن) | Confirm dialog before removing an attachment | ✅ Done (Moamen_ayyad) |
 | 5 | بعد اضافة مقاول من لوحة، بيانات العنوان (المحافظة / العمارة / الطابق) لا تظهر في التطبيق — السبب عدم وجود مدخلاتها في لوحة | Governorate/building/floor not visible after saving | ✅ Done — backend loads `governorate`, frontend displays all address fields |
 | 6 | عرض بيانات النشاط والشركة ايضا عند عرض الملف، ليس فقط في التعديل | Activity/company data should show in view mode, not only edit | ✅ Done — `activityRows` card in dialog (trade, classification, license_number) |
-| 7 | مشكلة في عرض ملف الشركة (تم ارفاق صورة) | Problem displaying the company file | ⚠️ Blocked — screenshot not supplied |
+| 7 | مشكلة في عرض ملف الشركة (تم ارفاق صورة) | Problem displaying the company file | ✅ Not a bug — investigated on VPS: storage symlink ✅, URL generation ✅ (admin `withFileUrls` + mobile `fileUrls()`), HTTP 200 on uploaded files. Only one contractor has files on production (cr_file JPG, works correctly). "Empty" document cards = files never uploaded, not a display defect. |
 | 8 | العطاءات / في سكشن اخر التحديثات يكفي عرض 3 تحديثات مع زر "عرض المزيد" ينتقل لصفحة منفصلة حتى لا تطول الصفحة | Home "latest updates" should show 3 items + a "show more" button | ✅ Done (backend) — `HOME_UPDATES_LIMIT = 3`; mobile app needs "عرض المزيد" button pointing at `contractor/home/updates` |
 | 9 | `fcm_token` لازم تاخذه في `{{base_url}}/contractor/auth/set-password` | Accept `fcm_token` on the set-password endpoint | ✅ Done — already in validation and applied with `:` fallback |
 
