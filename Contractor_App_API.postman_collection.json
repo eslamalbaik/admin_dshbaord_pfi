@@ -1292,7 +1292,7 @@
 								}
 							]
 						},
-						"description": "**GET** `/api/v1/contractor/auth/notifications`\n\nصندوق وارد المقاول — مُرقّم **15 لكل صفحة**، وغير المقروء **يظهر أولاً** ثم الأحدث فالأقدم.\n\n**الاستجابة:** `items.notifications` = `{ data, current_page, last_page, total }` بالإضافة إلى `items.unread_count` بنفس النداء (لا حاجة لنداء العدّاد معها)."
+						"description": "**GET** `/api/v1/contractor/auth/notifications`\n\nصندوق وارد المقاول — مُرقّم **15 لكل صفحة**، وغير المقروء **يظهر أولاً** ثم الأحدث فالأقدم.\n\n**الاستجابة:** `items.notifications` = `{ data, current_page, last_page, total }` بالإضافة إلى `items.unread_count` بنفس النداء (لا حاجة لنداء العدّاد معها).\n\n---\n\n### النوع `new_tender_published`\n\nيُرسَل لكل مقاول غير محظور عند نشر عطاء جديد من لوحة التحكم — على القناتين معاً: سجل في هذه القائمة **و** إشعار Push على الجهاز.\n\nحمولة `data`:\n\n```json\n{\n  \"type\": \"new_tender_published\",\n  \"tender_id\": 12,\n  \"reference_number\": \"TND-2026-012\",\n  \"category\": \"طرق\",\n  \"title\": \"عطاء جديد\",\n  \"message\": \"تم نشر عطاء جديد: <عنوان العطاء>\"\n}\n```\n\n`tender_id` هو مفتاح الـ deep link — استخدمه مع `GET /contractor/tenders/{id}` لفتح العطاء عند الضغط على الإشعار. `category` قد يكون `null` (عطاء بلا تصنيف).\n\nملاحظة: الإشعار يُرسَل لكل المقاولين بغضّ النظر عن تخصصاتهم؛ لا فلترة على `category` مقابل `specialties`."
 					}
 				},
 				{

@@ -8,9 +8,11 @@ use App\Models\Contractor;
 use App\Models\Setting;
 use App\Models\Tender;
 use App\Models\TenderBookmark;
+use App\Notifications\NewTenderPublishedNotification;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Notification as NotificationFacade;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
@@ -138,7 +140,38 @@ class TenderController extends Controller
         $tender = Tender::create($validated);
         $tender->update(['reference_number' => $this->generateReferenceNumber($tender)]);
 
+        $this->notifyContractorsOfNewTender($tender);
+
         return $this->success($tender->toArray(), 'تم إضافة العطاء بنجاح.', 201);
+    }
+
+    /**
+     * إشعار المقاولين بعطاء جديد — database + push معاً.
+     *
+     * يُستدعى بعد توليد الرقم المرجعي لا قبله، لأن generateReferenceNumber() يحتاج
+     * $tender->id فلا يتوفّر إلا بعد الحفظ؛ الاستدعاء المبكر يُنزِل reference_number
+     * فارغاً في حمولة الإشعار.
+     *
+     * المحظورون مستثنون: EnsureContractorIsActive يردّهم 403 ويُلغي توكناتهم عند أي
+     * طلب، فالإشعار إليهم إزعاج بلا فائدة. لا نفلتر على fcm_token عمداً — المقاول بلا
+     * توكن يجب أن يبقى له سجل database يراه داخل التطبيق، وFcmChannel يتخطّاه بصمت.
+     */
+    private function notifyContractorsOfNewTender(Tender $tender): void
+    {
+        // عطاء يُنشأ مباشرة كمغلق/ملغى ليس "عطاءً جديداً" يستحق إشعاراً.
+        //
+        // نقرأ الحالة بـfresh() لا من الكائن في الذاكرة: Tender::create() لا يحمّل قيم
+        // DB الافتراضية، فـ$tender->status يبقى null عند عدم إرسال status في الطلب رغم
+        // أن العمود يُكتب 'open' افتراضياً — ومقارنته مباشرة كانت تُسقط كل إشعار.
+        if ($tender->fresh()?->status !== 'open') {
+            return;
+        }
+
+        Contractor::where('is_frozen', false)
+            ->chunkById(500, fn ($contractors) => NotificationFacade::send(
+                $contractors,
+                new NewTenderPublishedNotification($tender),
+            ));
     }
 
     /** رقم مرجعي بصيغة TND-<سنة>-<رقم العطاء بـ3 خانات> — يُولَّد مرة واحدة عند الإنشاء */
