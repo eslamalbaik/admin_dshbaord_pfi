@@ -348,7 +348,13 @@ const deleteAnnouncement = async () => {
               />
             </VCol>
             <VCol cols="12" md="6">
-              <VTextField v-model="form.published_at" label="تاريخ النشر (اختياري — الآن افتراضياً)" type="date" style="font-family:Cairo,sans-serif" />
+              <VTextField
+                v-model="form.published_at"
+                label="تاريخ النشر (اختياري — الآن افتراضياً)"
+                type="date"
+                :min="isEditing ? undefined : new Date().toISOString().slice(0, 10)"
+                style="font-family:Cairo,sans-serif"
+              />
             </VCol>
             <VCol cols="12">
               <VTextarea v-model="form.body" label="نص التعميم" rows="6" style="font-family:Cairo,sans-serif" />

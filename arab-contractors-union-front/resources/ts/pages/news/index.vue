@@ -103,6 +103,12 @@ const form = ref(emptyForm())
 // emits a bare `File` (not an array), so read it through firstFile().
 const mainImageFile = ref<SingleFileModel>(null)
 
+// حد أقصى 5 صور بالمعرض بالمجموع (موجودة + مُضافة حديثاً) — نفس القيد اللي الباك اند يتحقق منه
+const galleryTotalCount = computed(() => form.value.existingGallery.length + form.value.gallery.length)
+const galleryOverLimitMessage = computed(() =>
+  galleryTotalCount.value > 5 ? [`تجاوزت الحد الأقصى (${galleryTotalCount.value}/5) — احذف صور قبل الإضافة`] : [],
+)
+
 const openCreate = () => {
   form.value = emptyForm()
   mainImageFile.value = null
@@ -141,6 +147,10 @@ const openView = (item: any) => {
 const saveNews = async () => {
   if (!form.value.title || !form.value.body) {
     notify('العنوان والمحتوى مطلوبان', 'error')
+    return
+  }
+  if (galleryTotalCount.value > 5) {
+    notify('تجاوزت الحد الأقصى لصور المعرض (5 صور)', 'error')
     return
   }
   formLoading.value = true
@@ -314,11 +324,12 @@ const deleteNews = async () => {
             </VCol>
             <VCol cols="12" md="6">
               <VFileInput
-                label="إضافة صور للمعرض"
+                label="إضافة صور للمعرض (الحد الأقصى 5 صور بالمجموع)"
                 prepend-inner-icon="tabler-photo-plus"
                 prepend-icon=""
                 accept="image/*"
                 multiple
+                :error-messages="galleryOverLimitMessage"
                 style="font-family:Cairo,sans-serif"
                 :model-value="form.gallery"
                 @update:model-value="form.gallery = toFileArray($event)"
@@ -357,7 +368,13 @@ const deleteNews = async () => {
             </VCol>
 
             <VCol cols="12" md="6">
-              <VTextField v-model="form.published_at" label="تاريخ النشر (اختياري — الآن افتراضياً)" type="date" style="font-family:Cairo,sans-serif" />
+              <VTextField
+                v-model="form.published_at"
+                label="تاريخ النشر (اختياري — الآن افتراضياً)"
+                type="date"
+                :min="isEditing ? undefined : new Date().toISOString().slice(0, 10)"
+                style="font-family:Cairo,sans-serif"
+              />
             </VCol>
             <VCol cols="12" md="6" class="d-flex align-center">
               <VSwitch v-model="form.is_published" label="نشر مباشرة" color="success" style="font-family:Cairo,sans-serif" />
@@ -367,7 +384,7 @@ const deleteNews = async () => {
         <VCardActions>
           <VSpacer />
           <VBtn variant="tonal" @click="formDialog = false">إلغاء</VBtn>
-          <VBtn color="primary" :loading="formLoading" @click="saveNews">{{ isEditing ? 'حفظ التعديلات' : 'نشر' }}</VBtn>
+          <VBtn color="primary" :loading="formLoading" :disabled="galleryTotalCount > 5" @click="saveNews">{{ isEditing ? 'حفظ التعديلات' : 'نشر' }}</VBtn>
         </VCardActions>
       </VCard>
     </VDialog>

@@ -21,6 +21,7 @@ const notify = (text: string, color: 'success' | 'error' = 'success') => {
 
 const search = ref('')
 const publishedFilter = ref('')
+const scopeFilter = ref('')
 
 const eventFormatOptions = [
   { title: 'وجاهي', value: 'onsite' },
@@ -40,6 +41,7 @@ const headers = [
   { title: 'المكان', key: 'event_location' },
   { title: 'المهتمون', key: 'registrations_count', sortable: false },
   { title: 'الحالة', key: 'is_published' },
+  { title: 'الأرشفة', key: 'is_archived', sortable: false },
   { title: 'إجراءات', key: 'actions', sortable: false },
 ]
 
@@ -50,6 +52,7 @@ const fetchEvents = async () => {
       params: {
         search: search.value || undefined,
         is_published: publishedFilter.value !== '' ? publishedFilter.value : undefined,
+        scope: scopeFilter.value || undefined,
         page: page.value,
       },
     })
@@ -326,6 +329,14 @@ const deleteEvent = async () => {
           style="max-width:150px"
           @update:model-value="page = 1"
         />
+        <VSelect
+          v-model="scopeFilter"
+          :items="[{ title: 'الكل', value: '' }, { title: 'نشطة', value: 'active' }, { title: 'مؤرشفة', value: 'archived' }]"
+          label="الأرشفة"
+          density="compact"
+          style="max-width:150px"
+          @update:model-value="page = 1"
+        />
       </VCardText>
 
       <VDataTableServer
@@ -371,6 +382,13 @@ const deleteEvent = async () => {
         <template #item.is_published="{ item }">
           <VChip :color="item.is_published ? 'success' : 'secondary'" size="small" label style="font-family:Cairo,sans-serif">
             {{ item.is_published ? 'منشور' : 'مسودة' }}
+          </VChip>
+        </template>
+
+        <!-- أُرشفت تلقائياً (events:archive، تشغيل يومي) بعد ما يفوت موعد الفعالية -->
+        <template #item.is_archived="{ item }">
+          <VChip :color="item.is_archived ? 'secondary' : 'info'" size="small" variant="tonal" label style="font-family:Cairo,sans-serif">
+            {{ item.is_archived ? 'مؤرشفة' : 'نشطة' }}
           </VChip>
         </template>
 
@@ -463,7 +481,7 @@ const deleteEvent = async () => {
                 style="font-family:Cairo,sans-serif"
               />
             </VCol>
-            <VCol v-if="form.event_format === 'onsite'" cols="12" md="4">
+            <VCol v-if="form.event_format === 'onsite' || form.event_format === 'hybrid'" cols="12" md="4">
               <VTextField
                 v-model="form.event_location"
                 label="مكان الفعالية *"
@@ -473,7 +491,7 @@ const deleteEvent = async () => {
               />
             </VCol>
 
-            <VCol cols="12" md="6">
+            <VCol v-if="form.event_format !== 'onsite'" cols="12" md="6">
               <VTextField
                 v-model="form.stream_url"
                 label="رابط البث المباشر (Zoom)"
@@ -522,7 +540,19 @@ const deleteEvent = async () => {
                   />
                 </VCol>
                 <VCol cols="12" md="1" class="text-center">
-                  <VBtn icon="tabler-trash" size="small" variant="text" color="error" @click="confirmRemoveSpeaker(i)" />
+                  <VBtn
+                    icon
+                    size="small"
+                    variant="text"
+                    color="error"
+                    :disabled="form.speakers.length === 1"
+                    @click="confirmRemoveSpeaker(i)"
+                  >
+                    <VIcon icon="tabler-trash" />
+                    <VTooltip v-if="form.speakers.length === 1" activator="parent">
+                      لازم يبقى متحدث واحد على الأقل — احذف الفعالية للمتحدث بالكامل بدل ما تصفّر القائمة
+                    </VTooltip>
+                  </VBtn>
                 </VCol>
               </VRow>
               <p v-if="!form.speakers.length" class="text-body-2 text-medium-emphasis" style="font-family:Cairo,sans-serif">
@@ -531,7 +561,13 @@ const deleteEvent = async () => {
             </VCol>
 
             <VCol cols="12" md="6">
-              <VTextField v-model="form.published_at" label="تاريخ النشر (اختياري — الآن افتراضياً)" type="date" style="font-family:Cairo,sans-serif" />
+              <VTextField
+                v-model="form.published_at"
+                label="تاريخ النشر (اختياري — الآن افتراضياً)"
+                type="date"
+                :min="isEditing ? undefined : new Date().toISOString().slice(0, 10)"
+                style="font-family:Cairo,sans-serif"
+              />
             </VCol>
             <VCol cols="12" md="6" class="d-flex align-center">
               <VSwitch v-model="form.is_published" label="نشر مباشرة" color="success" style="font-family:Cairo,sans-serif" />

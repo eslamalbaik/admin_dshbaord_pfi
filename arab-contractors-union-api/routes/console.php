@@ -51,3 +51,8 @@ Schedule::command('tenders:archive')
 Schedule::command('tenders:purge')
     ->weekly()
     ->onFailure(fn () => Log::channel('reminders')->error('schedule: tenders:purge failed'));
+
+// أرشفة الفعاليات المنتهية يومياً — نفس نمط tenders:archive
+Schedule::command('events:archive')
+    ->dailyAt('01:05')
+    ->onFailure(fn () => Log::channel('reminders')->error('schedule: events:archive failed'));

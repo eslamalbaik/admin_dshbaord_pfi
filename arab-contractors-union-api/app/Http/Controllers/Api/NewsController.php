@@ -78,10 +78,12 @@ class NewsController extends Controller
             'image'        => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
             'video_url'    => 'nullable|url|max:500',
             'external_url' => 'nullable|url|max:500',
-            'gallery'      => 'nullable|array',
+            'gallery'      => 'nullable|array|max:5',
             'gallery.*'    => 'image|mimes:jpg,jpeg,png,webp|max:5120',
             'is_published' => 'boolean',
-            'published_at' => 'nullable|date',
+            // لازم اليوم أو بعده عند الإنشاء (REQ-10 #2) — التعديل يبقى بلا قيد (نفس نمط
+            // Tenders/Announcement/Event) حتى لا يُمنع تصحيح خبر قديم تاريخ نشره بالماضي فعلياً.
+            'published_at' => 'nullable|date|after_or_equal:today',
         ]);
 
         $this->handleMediaUploads($request, $validated);
@@ -116,6 +118,13 @@ class NewsController extends Controller
         ]);
 
         $this->handleMediaUploads($request, $validated, $news);
+
+        // handleMediaUploads يدمج الصور الجديدة فوق الموجودة (بعد استبعاد remove_gallery) — الحد
+        // الأقصى 5 لازم يُتحقّق على الإجمالي النهائي هون، مش على عدد الملفات المرفوعة لوحدها
+        // (اللي كانت validate بأعلى تتحقق منه لو كان array rule عادي).
+        if (isset($validated['gallery']) && count($validated['gallery']) > 5) {
+            return $this->error('لا يمكن أن يتجاوز عدد صور المعرض 5 صور.', 422, ['gallery' => ['الحد الأقصى 5 صور.']]);
+        }
 
         if (isset($validated['title']))
             $validated['slug'] = News::generateSlug($validated['title']);

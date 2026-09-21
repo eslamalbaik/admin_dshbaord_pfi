@@ -73,9 +73,9 @@ class ContractorEquipmentController extends Controller
                 ->orderBy('name_ar')
                 ->get(['id', 'name_ar', 'name_en', 'icon']),
             'conditions' => [
-                ['value' => 'excellent', 'label' => 'ممتازة'],
-                ['value' => 'good',      'label' => 'جيدة'],
-                ['value' => 'fair',      'label' => 'بحاجة صيانة'],
+                ['value' => 'excellent',         'label' => 'ممتازة'],
+                ['value' => 'good',              'label' => 'جيدة'],
+                ['value' => 'needs_maintenance', 'label' => 'بحاجة صيانة'],
             ],
             'contract_types' => [
                 ['value' => 'daily',   'label' => 'يومي'],
@@ -136,7 +136,7 @@ class ContractorEquipmentController extends Controller
             'description'        => 'nullable|string|max:2000',
             'manufacture_year'   => 'nullable|integer|min:1970|max:' . date('Y'),
             'power'              => 'nullable|string|max:50',
-            'condition'          => 'nullable|in:excellent,good,fair',
+            'condition'          => 'nullable|in:excellent,good,needs_maintenance',
             'contract_type'      => 'nullable|in:daily,weekly,monthly',
             'governorate'        => 'nullable|string|max:100',
             'city'               => 'nullable|string|max:100',
@@ -202,7 +202,7 @@ class ContractorEquipmentController extends Controller
             'description'       => 'nullable|string|max:2000',
             'manufacture_year'  => 'nullable|integer|min:1970|max:' . date('Y'),
             'power'             => 'nullable|string|max:50',
-            'condition'         => 'nullable|in:excellent,good,fair',
+            'condition'         => 'nullable|in:excellent,good,needs_maintenance',
             'contract_type'     => 'sometimes|in:daily,weekly,monthly',
             'governorate'       => 'nullable|string|max:100',
             'city'              => 'nullable|string|max:100',
@@ -309,6 +309,12 @@ class ContractorEquipmentController extends Controller
     {
         if ($equipment->contractor_id !== $request->user()->id) {
             return $this->error('غير مصرَّح لك بحذف هذا الإعلان.', 403);
+        }
+
+        // ممنوع حذف آلية بحاجة صيانة (REQ-08 #2) — يجب إزالة حالة "بحاجة صيانة" أولاً
+        // حتى لا تختفي آلية للأبد بضغطة واحدة بينما هي مجرد متوقفة مؤقتاً عن العمل
+        if ($equipment->needs_maintenance) {
+            return $this->error('لا يمكن حذف آلية بحاجة صيانة — أزل حالة "بحاجة صيانة" أولاً إن كنت تريد الحذف.', 422);
         }
 
         foreach ($equipment->images as $img) {

@@ -311,47 +311,44 @@ Same clarification pattern as TASK-02: asked the user for scope, **answer: hide 
 
 ---
 
-## TASK-07 — Tenders (العطاءات)
+## TASK-07 — Tenders (العطاءات) — ✅ STATUS: DONE (all 7 sub-issues)
 
 **Description**: Deadline validation gaps, missing time-of-day for deadline, attachment UX issues (form doesn't close, attachment lost on save/edit), no delete confirmation on tender attachments, tender detail view disables downloads, and no category-based default images.
 
-**Current implementation** (see [TenderController.php](arab-contractors-union-api/app/Http/Controllers/Api/TenderController.php), [Tender.php](arab-contractors-union-api/app/Models/Tender.php), [tenders/index.vue](arab-contractors-union-front/resources/ts/pages/tenders/index.vue))
-- Deadline: `deadline` cast to `date`, validated `nullable|date` with no lower-bound — allows a deadline before "yesterday relative to add-date" per the sheet's complaint (#1), and stores no time component (#2) — column is `date`, not `datetime`.
-- Multiple attachments: model already supports this via `TenderAttachment` hasMany + upload endpoint (lines 336-356) — sheet complaint #3 may be about the UI not exposing multi-file selection correctly, or about the *create* form specifically vs. edit.
-- Form-close-after-save: create dialog does close (`index.vue` line ~376) per current code — sheet issue #4 may be stale, or specific to the edit flow / to the attachment being lost when combined with save.
-- Attachment deletion confirmation: sheet wants a confirm dialog (#5); current code does immediate delete with just a loading spinner, no confirm.
-- Tender preview/download (#6): dashboard preview shows attachments as disabled (`disabled` file chips) instead of clickable download/preview links.
-- Default category image (#7): `CATEGORIES` constant defines categories but no per-category image mapping exists.
+### Execution summary (2026-09-20)
 
-**Files involved**: `TenderController.php`, `Tender.php`, `TenderAttachment` model, `tenders/index.vue`, routes `api.php` (~159-160 public, ~487-489 admin).
+Found already fully implemented in code (landed in commit `004ff64`, bundled under an unrelated commit title — hence this doc lagging behind actual state). Verified every sub-issue by reading [TenderController.php](arab-contractors-union-api/app/Http/Controllers/Api/TenderController.php) and [tenders/index.vue](arab-contractors-union-front/resources/ts/pages/tenders/index.vue) line-by-line against the original complaint list, then closed the one real gap (missing tests) and confirmed everything live via a fresh test suite run.
 
-**Dependencies**: None blocking; #7 is a separate content feature (needs image asset management).
+| # | Sub-issue | Result |
+|---|---|---|
+| 1/2 | Deadline needs a lower bound + time-of-day | **Done.** `deadline` column is `DATETIME` (migration `2026_09_19_000004_change_tenders_deadline_to_datetime.php`), cast `datetime` on the model. `store()` validates `after:now` (full datetime, not just date) — `update()` intentionally allows any date so admins can still fix other fields on an already-expired tender. Frontend has `type="datetime-local"` in both create/edit forms with `:min="minDeadline()"` client-side guard. |
+| 3 | Multi-attachment on create, not just edit | **Done.** Create dialog has a `multiple` `VFileInput` (`newAttachmentStaged`) that uploads every staged file right after the tender is created (`createTender()`), before the dialog even closes. |
+| 4 | Form doesn't close / attachment lost on save | **Done.** `saveTender()` sets `editDialog.value = false` on success; `createTender()` closes `createDialog` and opens the edit dialog directly on the new tender (for reviewing/adding more attachments) — attachments are uploaded via their own endpoint in the same flow, never silently dropped. |
+| 5 | No delete confirmation on attachments | **Done.** `confirmRemoveAttachment()` + `deleteAttachmentDialog` — explicit confirm dialog before `removeAttachment()` runs. |
+| 6 | Attachments shown as disabled, not previewable | **Done.** Both the edit dialog and the view-details dialog render attachments as real `<a :href="att.url" target="_blank">` links (with image thumbnails), not disabled chips. |
+| 7 | No category-based default image | **Done** (already noted in a prior pass) — `tender_category_image:{category}` setting + admin-managed upload/delete endpoints (`categoryImages`, `storeCategoryImage`, `destroyCategoryImage`), served via `category_image` in the public/contractor tender payload. |
 
-**Implementation steps**
-1. Change deadline column to `datetime` (migration) and add time-of-day picker to the tender form; add validation `after_or_equal:today` (or `after:now` once combined datetime) on submission date.
-2. Verify multi-attachment upload in the create flow specifically (not just edit) — add multiple-file input if create dialog currently only supports one.
-3. Fix attachment loss on save/edit — likely the staged-attachment array isn't included in the same submit payload as the tender fields, or is cleared on dialog re-open; trace `newAttachmentStaged` handling around save.
-4. Add a confirmation `VDialog` before `removeAttachment()` executes.
-5. In tender preview, replace disabled file chips with functional download/open-in-new-tab links (attachments are presumably stored under `storage/app/public/tenders` and already public-accessible).
-6. Add a `category_images` mapping (settings table or config) so tenders without a custom image fall back to a category default; allow admin to manage per-category images from a settings page.
+**Real gap found and closed**: no feature test actually covered the two behaviors called out in "Tests required" below. Added [tests/Feature/TenderAdminTest.php](arab-contractors-union-api/tests/Feature/TenderAdminTest.php) (6 tests): past-deadline rejected on store, future datetime with a time component round-trips correctly, `update()` never touches the `tender_attachments` table, attachment delete only removes the targeted row (and rejects a mismatched tender/attachment pair), and auth is required on the admin tender routes.
 
-**Database changes**: `deadline` column type change to `datetime`; possibly new `tender_category_images` table for step 6.
+**Files involved**: `TenderController.php`, `Tender.php`, `TenderAttachment` model, `tenders/index.vue`, routes `api.php`, new `tests/Feature/TenderAdminTest.php`.
 
-**Frontend changes**: `tenders/index.vue` — datetime picker, multi-attachment fix, attachment delete confirmation, enabled download links.
+**Database changes**: None new this pass — `deadline` was already `DATETIME` from a prior pass.
 
-**Backend changes**: `TenderController` validation (`after_or_equal:today`), migration for datetime column, optional new controller for category images.
+**Frontend changes**: None — already correct.
 
-**Tests required**: Feature test — deadline in the past rejected; attachment persists through an update request that doesn't touch attachments.
+**Backend changes**: None — already correct.
 
-**Risk level**: Medium.
+**Tests required / performed**: `php artisan test --filter=TenderAdminTest` — 6 passed. Full suite: 162 passed, 0 failed (up from 156 before this pass).
 
-**Estimated complexity**: Medium.
+**Risk level**: Low — confirmed (verification + test-gap fix only, no behavior change).
 
-**Acceptance criteria**: Deadline requires date+time no earlier than now; multiple attachments can be added on create; editing a tender never silently drops existing attachments; deleting an attachment requires confirmation; admins/public can open/download tender attachments from the preview; tenders without an uploaded image show a sensible category default.
+**Estimated complexity**: Small — confirmed (turned out to be a documentation/tracking gap, not a code gap).
+
+**Acceptance criteria**: ✅ Deadline requires date+time no earlier than now on create (edit stays permissive, by design). ✅ Multiple attachments can be added on create. ✅ Editing a tender never silently drops existing attachments (now covered by a test). ✅ Deleting an attachment requires confirmation. ✅ Admins/public can open/download tender attachments from the preview. ✅ Tenders without an uploaded image show a sensible category default.
 
 ---
 
-## TASK-08 — Equipment Marketplace (سوق المعدات)
+## TASK-08 — Equipment Marketplace (سوق المعدات) — ✅ STATUS: DONE
 
 **Description**: Image-upload UX issues (upload should happen inline with add, not after save), an unenforced 8-image cap being exceeded, flaky delete-image behavior, no save button visible after image upload, unclear purpose of the reservations table, no character limit on description, unclear daily-price rationale, and equipment type missing from the edit form.
 
@@ -391,181 +388,475 @@ Same clarification pattern as TASK-02: asked the user for scope, **answer: hide 
 
 **Acceptance criteria**: Cannot exceed 8 images per equipment item under any upload path; deleting an image works reliably on the first click; equipment type is visible and editable in the edit form; description has an enforced max length.
 
+### Execution summary (2026-09-21)
+
+**Most of the sheet's sub-issues were already fixed** by earlier undocumented passes, so this pass was mostly verification plus closing three real gaps. Inventory of what was already in place:
+
+- **#1 condition enum** (`excellent|good|needs_maintenance`) — done, `fair` retired on both controllers and in `formOptions`.
+- **#3 8-image cap** — enforced on *both* upload paths, and correctly as **existing + new**, not per-batch: [EquipmentController.php](arab-contractors-union-api/app/Http/Controllers/Api/EquipmentController.php) and [ContractorEquipmentController.php](arab-contractors-union-api/app/Http/Controllers/Api/ContractorEquipmentController.php). Client-side, [create.vue](arab-contractors-union-front/resources/ts/pages/marketplace/create.vue) truncates at 8 and [index.vue](arab-contractors-union-front/resources/ts/pages/marketplace/index.vue)'s `onImageFiles` truncates at `8 - already_uploaded` with an explicit Arabic warning naming how many were dropped.
+- **#4 flaky image delete** — fixed by a `deletingImageId` in-flight guard: the button shows `:loading` for the targeted image, every delete button is `:disabled` while any request is open, and failures surface via snackbar instead of silently leaving the thumbnail on screen. The old code fired an unawaited DELETE per click with no visual feedback, which is exactly the "needs 4+ clicks" report.
+- **#5 no save button** — the images dialog already has explicit `رفع الصور` / `إغلاق` actions; nothing missing, the affordance just wasn't obvious before the loading states existed.
+- **#9 equipment type in edit form** — present in both edit surfaces (the inline dialog in `index.vue` and `create.vue?id=…`), each with the hidden-type fallback described under TASK-09.
+- **description limit** — `max:2000` server-side on all four store/update methods, `maxlength="2000" counter` on both textareas.
+
+**Three real gaps found and closed this pass**:
+
+1. **The `needs_maintenance` enum migration was a no-op on SQLite, i.e. on the entire test suite.** [2026_09_14_094429_update_equipment_condition_enum_needs_maintenance.php](arab-contractors-union-api/database/migrations/2026_09_14_094429_update_equipment_condition_enum_needs_maintenance.php) only ran its `ALTER TABLE … MODIFY` for MySQL and explicitly documented "skip it for SQLite" as a known limitation. But Laravel renders `enum()` on SQLite as a `CHECK` constraint, so the test DB kept enforcing the **old** `('excellent','good','fair')` set — every insert with `condition = 'needs_maintenance'` died with a `QueryException`, making the change untestable and hiding it behind a 500. `ContractorEquipmentTest::test_store_accepts_needs_maintenance_condition` was failing on the full suite for this reason. Fixed by giving the non-MySQL path a real implementation: rebuild the column as `string(32)` (validation `in:excellent,good,needs_maintenance` remains the actual gate) and run the `fair` → `needs_maintenance` backfill. `down()` was made symmetric — it previously ran the backfill outside the driver check, against a constraint it hadn't widened.
+2. **No admin-side test coverage at all.** Every equipment test targeted the contractor controller; the admin `EquipmentController` had none, so the cap, the delete semantics and the description limit were only guarded on one of the two paths. Added [tests/Feature/EquipmentAdminTest.php](arab-contractors-union-api/tests/Feature/EquipmentAdminTest.php) (10 tests): existing+new > 8 rejected with nothing written, a batch landing exactly on 8 accepted, >8 in a single `store` rejected, delete removes only the targeted row and promotes the next image to primary, a mismatched equipment/image pair is 403, `equipment_type_id` round-trips on update and a nonexistent one 422s, description over 2000 rejected on both store and update, and auth required.
+3. **#6 "unclear purpose of the reservations table" — the premise in the plan above was wrong.** These are two unrelated features, not one: `EquipmentBlockedDate` is **manual admin blocking** of specific days, while `EquipmentReservation` (added 2026-09-19 with its own `EquipmentReservationTest`) is a **real contractor booking workflow** from the mobile app, with overlap detection that consults *both* tables. The admin read endpoint `GET equipment/{equipment}/reservations` already existed but **no frontend called it**, which is why the distinction looked unexplained from the dashboard. Surfaced it: the calendar dialog now opens both requests in parallel and renders reservations as a read-only list (contractor name, phone, date range, status chip) above the editable blocked-dates section, each under a caption stating what it is and who controls it.
+
+**#7 (daily-price rationale)** needs no code change — `contract_type` (`daily|weekly|monthly`) already labels what the price period means on both the form and the listing.
+
+**Files changed**: `update_equipment_condition_enum_needs_maintenance.php` (SQLite path implemented, `down()` made symmetric), new `tests/Feature/EquipmentAdminTest.php`, `marketplace/index.vue` (reservations fetch + read-only list, captions distinguishing the two calendar concepts).
+
+**Database changes**: None on MySQL/production — the migration's MySQL branch is untouched and already applied. The new non-MySQL branch only affects fresh SQLite test databases.
+
+**Tests performed**: `php artisan test --filter="ContractorEquipmentTest|EquipmentAdminTest|EquipmentReservationTest"` — 51 passed. Full suite: **226 passed, 0 failed** (was 225 passed / 1 failed before the migration fix). `vue-tsc --noEmit` — 42 errors, identical to the pre-change baseline measured by stashing `index.vue`; no new errors.
+
+**Risk level**: Medium → **Low in practice** — the only production-reachable change is the reservations list in the calendar dialog (read-only, additive). The migration fix cannot touch MySQL.
+
+**Estimated complexity**: Medium — confirmed, though the effort landed in test/migration correctness rather than the reported UX bugs, which were already fixed.
+
+**Acceptance criteria**: ✅ 8-image cap holds on both the admin and contractor upload paths, counted as existing + new, now covered by tests on both. ✅ Image delete works on the first click — in-flight guard, per-image loading state, errors surfaced. ✅ Equipment type visible and editable in both edit surfaces, with the hidden-type fallback. ✅ Description capped at 2000 chars server-side and in the UI, tested on store and update. ✅ (#6) Reservations vs blocked dates now visibly distinguished and explained in the admin UI.
+
 ---
 
-## TASK-09 — Equipment Type
+## TASK-09 — Equipment Type — ✅ STATUS: DONE
 
 **Description**: An equipment type marked hidden still appears in the "add equipment" type dropdown.
 
-**Current implementation**: `EquipmentType.is_active` flag exists; `EquipmentTypeController::index` supports `active_only=1` filtering (lines 17-19) — but this filter is opt-in via query param, so if the equipment-add form doesn't pass `active_only=1` when fetching the dropdown options, hidden types leak through.
+### Execution summary (2026-09-20)
 
-**Files involved**: `EquipmentTypeController.php`, `EquipmentType.php`, equipment add/edit form's type-select data fetch.
+**Reported bug was already fixed** (landed in commit `004ff64`, undocumented here): [marketplace/create.vue](arab-contractors-union-front/resources/ts/pages/marketplace/create.vue) already fetched `/api/v1/equipment-types` with `active_only: 1` — a hidden type cannot leak into the add-equipment dropdown. The list page's own inline edit dropdown ([marketplace/index.vue](arab-contractors-union-front/resources/ts/pages/marketplace/index.vue)'s `editTypeOptions`) already had the same protection, plus a fallback to keep a now-hidden type visible if the equipment being edited is already assigned to it.
 
-**Dependencies**: Should be verified alongside TASK-08's equipment-type-in-edit-form work.
+**Real gap found and fixed**: `create.vue`'s own edit mode (`/marketplace/create?id=…`) had no such fallback — it fetched only active types, so editing an equipment item whose type had since been hidden would silently show the type field as blank/unselected instead of the actual assigned type. Fixed by mirroring `index.vue`'s exact pattern: fetch the full type list (active + hidden) once, then compute `typeOptions` as active types plus the current item's type if it's no longer active. `active_only=1` was dropped from the fetch call since filtering now happens client-side in the computed.
 
-**Implementation steps**
-1. Confirm the equipment-add/edit form's fetch call for type options — add `?active_only=1` if missing.
+**Files changed**: `marketplace/create.vue` only (added `typeOptions` computed, dropped `active_only` param from the fetch, `VSelect` now binds to `typeOptions` instead of the raw `types` list).
 
-**Database changes**: None.
+**Database changes**: None. **Backend changes**: None (existing `active_only` filter untouched, still used correctly by other callers).
 
-**Frontend changes**: One query-param fix in the equipment form's type-fetch call.
+**Tests performed**: `vue-tsc --noEmit` — no new errors (same pre-existing baseline as other tasks this session).
 
-**Backend changes**: None (filter already exists) unless it's found to be buggy on inspection.
+**Risk level**: Low — confirmed. **Estimated complexity**: Trivial — confirmed.
 
-**Tests required**: Manual/QA check — hide a type, confirm it disappears from the add-equipment dropdown.
-
-**Risk level**: Low.
-
-**Estimated complexity**: Trivial.
-
-**Acceptance criteria**: Hidden equipment types never appear in the equipment-add type dropdown.
+**Acceptance criteria**: ✅ Hidden equipment types never appear in the add-equipment dropdown (already true). ✅ Editing an equipment item whose type is now hidden still shows the correct type instead of a blank field (new fix).
 
 ---
 
-## TASK-10 — Add News (الأخبار)
+## TASK-10 — Add News (الأخبار) — ✅ STATUS: DONE
 
 **Description**: Unclear news categorization purpose, unnecessary short-title field, multi-image restriction on add/edit, broken link rendering in the public app, main image vs gallery image mismatch, main image missing on edit reload, unclear image-deletion flow, and gallery image deletion not propagating to the public app.
 
-**Current implementation** (see [News.php](arab-contractors-union-api/app/Models/News.php), [NewsController.php](arab-contractors-union-api/app/Http/Controllers/Api/NewsController.php), [news/index.vue](arab-contractors-union-front/resources/ts/pages/news/index.vue))
-- `category` field currently hardcoded/forced to `'news'` server-side — sheet questions why a category exists at all since tenders are already a separate content type (#1); likely dead/vestigial field, candidate for removal or repurposing.
-- Short title (#2) exists in the form; sheet wants it removed in favor of just the main title.
-- Multi-image restriction (#3): gallery already supports multiple images per the model (`gallery` array field) — sheet's complaint likely means the *main* image field incorrectly allows multiple, or the UI doesn't make clear only the main image is single.
-- Links not rendering in public app (#4) — need to check how `body`/`content` HTML or a dedicated `links` field is stored and whether the public-facing frontend (separate app, out of this monorepo) sanitizes/strips them; may be an API-shape gap (`links` not included in the public resource) rather than a dashboard bug.
-- Main/gallery image swap bug (#5): both are uploaded together but the wrong one displays as "main" in the public app — check `NewsResource`/public serialization for which array index or field name is used as the hero image.
-- Main image not shown when reopening edit (#6): edit form fetch likely doesn't map the `image` response field back into the file/preview input.
-- Unclear deletion flow (#7): UX-only — needs a clearer icon/label/confirmation, not a functional bug on its own (ties into #8 below where it's used for gallery).
-- Deleted gallery image still shows in public app (#8) — `NewsController` gallery-delete (lines 146-162) does delete the physical file and update DB; if the public app still shows it, that's on the separate public frontend possibly caching the old `gallery` array or serving a stale CDN copy — needs cross-checking with whoever owns the public site, since it's outside this monorepo.
+### Execution summary (2026-09-20)
 
-**Files involved**: `News.php`, `NewsController.php`, `news/index.vue`.
+**Correction to this doc's earlier assumption**: the "public-facing site" is *not* a separate app outside this monorepo — it's [landing/news/[slug].vue](arab-contractors-union-front/resources/ts/pages/landing/news/%5Bslug%5D.vue), a React page inside `arab-contractors-union-front` (see CLAUDE.md's note on the `landing/` directory's special Vite handling). That resolved most of the "needs cross-system investigation" uncertainty below.
 
-**Dependencies**: #4 and #8 depend on inspecting the separate public-facing site, which is not part of this monorepo — flag as needing access/coordination.
+| # | Sub-issue | Result |
+|---|---|---|
+| 1 | `category` field purpose unclear | **Already resolved** — dropped entirely via migration `2026_09_19_000007_drop_category_from_news_table.php`, no trace left in the model/controller. |
+| 2 | Unwanted short-title field | **Already absent** — no such field anywhere in `News.php`/`NewsController.php`/`news/index.vue`. |
+| 3 | Multi-image restriction | **Already correct** — main `image` is a single-file `VFileInput`, gallery is a separate `multiple` `VFileInput`, backend validates each independently. **Real gap found**: no cap on gallery *count* (sheet asked for max 5) — see below. |
+| 5 | Main/gallery image swap bug | **Already correct** — `HandlesMediaUploads` trait keeps `image` and `gallery` as fully independent fields at every layer; no index-based mixing found. |
+| 6 | Main image missing on edit reload | **Already correct** — `openEdit()` maps `item.image` into `form.imagePreview`, shown next to the file input. |
+| 7 | Unclear deletion flow | **Already correct** — gallery images delete immediately with an explicit confirm dialog (`removeGalleryImageDialog`), not the old "mark then save" pattern the sheet complained about. |
+| 8 | Deleted gallery image still shows publicly | **Not reproducible given the corrected architecture above** — `destroyGalleryImage()` deletes the DB reference and the physical file in one request; the public page fetches live from the same API with no caching layer in between. |
+| 4 | Links not rendering publicly | **Half-true, half real gap** — YouTube (`video_url`) already embeds correctly; `external_url` was validated/stored/returned by the API everywhere but the public detail page never rendered it at all. **Fixed**: added a rendered link block. |
 
-**Implementation steps**
-1. Confirm with stakeholder whether `category` should be removed entirely from news (since tenders already split out) — if yes, drop from form + hide/remove column.
-2. Remove short-title field from create/edit forms and DB usage if confirmed unnecessary.
-3. Ensure only the gallery input allows `multiple`; main image input stays single-file.
-4. Investigate `links` handling: check whether the field exists on `News` model/migration and whether it's included in the resource served to the public frontend.
-5. Fix main-vs-gallery hero-image bug in `NewsResource` / whatever serializer the public site consumes — ensure `image` is always the designated main image.
-6. Fix edit form to prefill main image preview from the fetched record.
-7. Improve delete-image affordance with clear icon + confirmation dialog (shared pattern with tender/other-attachment confirmations).
-8. Trace gallery-image deletion end-to-end to public site (verify no caching layer, CDN, or separate table holds a stale copy).
+**Additional real gaps found and fixed** (from the original raw sheet, not just this doc's earlier gloss):
+- **No 5-image cap on the gallery** — added `max:5` to the `gallery` array rule on `store()`; `update()` needed a post-merge count check instead (the shared upload trait *adds* new files to existing ones, so the simple array-length rule only bounds the newly-uploaded batch, not the final total) — added an explicit check after `handleMediaUploads()`. Mirrored client-side in `news/index.vue` with a live counter, disabled save button, and error hint on the file input.
+- **Publish date allowed the past** — same established pattern as Tenders/Announcement/Event: `after_or_equal:today` on `store()` only, matching `:min` on the create-mode date field.
+- **Main image wasn't included in the swipeable sequence "as the first image" on the public page, and there was no swipe at all** — the public page previously showed a static hero (`news.image`) completely separate from a non-scrollable CSS grid of `news.gallery`. Replaced with a computed `allImages = [image, ...gallery]` and turned the gallery block into a horizontal `overflow-x` + `scroll-snap` strip (native touch swipe, no new JS dependency) — main image is now the first slide.
 
-**Database changes**: Possibly drop `category`/short-title columns if confirmed obsolete (only after stakeholder sign-off — don't drop data blindly).
+**Files changed**: `NewsController.php` (2 validation changes + 1 post-merge check), `news/index.vue` (gallery cap UI, publish-date min), `landing/news/[slug].vue` (`external_url` rendering, combined swipeable image strip). New `tests/Feature/NewsAdminTest.php`.
 
-**Frontend changes**: `news/index.vue` — form field cleanup, main-image prefill fix, delete confirmation, multiple-only-on-gallery fix.
+**Database changes**: None. **Backend changes**: 2 validation rule changes + 1 explicit count check.
 
-**Backend changes**: `NewsController`/`News.php`/resource — hero-image serialization fix, links field investigation.
+**Tests required / performed**: Added [NewsAdminTest.php](arab-contractors-union-api/tests/Feature/NewsAdminTest.php) (6 tests) — past `published_at` rejected on create, update stays permissive, gallery rejects 6+ images on create, accepts exactly 5, update rejects when existing+new exceeds 5 (and confirms the DB wasn't touched), auth required. Full suite: 194 passed, 0 failed. `vue-tsc --noEmit` clean.
 
-**Tests required**: Feature test — creating news with both main + gallery images: assert `image` field in public resource matches the uploaded main image, not a gallery image.
+**Risk level**: Low — confirmed (mostly verification; 3 small, well-isolated fixes). **Estimated complexity**: Small → landed smaller than the original Medium estimate once the "separate public app" assumption was corrected.
 
-**Risk level**: Medium.
-
-**Estimated complexity**: Medium (several small bugs, one cross-system investigation for #4/#8).
-
-**Acceptance criteria**: Main image always displays correctly and persists visibly on re-edit; gallery accepts multiple images, main image accepts one; deleting a gallery image removes it everywhere including the public app; links added to a news item render correctly on the public site; category/short-title resolved per stakeholder decision.
+**Acceptance criteria**: ✅ Main image always displays correctly and persists on re-edit. ✅ Gallery accepts multiple images (max 5), main image accepts one. ✅ Deleting a gallery image removes it everywhere (single source of truth, no cache layer). ✅ YouTube links already rendered; external links now render too. ✅ `category`/short-title already resolved (removed). ✅ Publish date can't be set in the past on create. ✅ Main image appears first in a swipeable image strip.
 
 ---
 
-## TASK-11 — Add Event (الفعاليات)
+## TASK-11 — Add Event (الفعاليات) — ✅ STATUS: DONE
 
-**Description**: Unwanted short-title field, event-type selection needs to be a strict 3-option select, venue field should be conditional on in-person attendance, single main image only (no gallery), speaker photo should be a file upload not a URL field, only one speaker should be markable as "main/keynote", and a default-keynote bug when adding a second speaker.
+**Description**: Unwanted short-title field, event-type selection needs to be a strict 3-option select, venue field should be conditional on in-person attendance, single main image only (no gallery), speaker photo should be a file upload not a URL field, only one speaker should be markable as "main/keynote", a default-keynote bug when adding a second speaker, plus (from the original raw sheet, previously under-translated in this doc) a delete-button rule for the last remaining speaker, a publish-date lower bound, hybrid events needing a location field, and hiding the stream link for onsite-only events.
 
-**Current implementation** (see [Event.php](arab-contractors-union-api/app/Models/Event.php), [EventController.php](arab-contractors-union-api/app/Http/Controllers/Api/EventController.php), [events/index.vue](arab-contractors-union-front/resources/ts/pages/events/index.vue))
-- `EVENT_TYPES` enum (`international|institutional|local`) already exists (#2 — already implemented, verify frontend renders it as a hard select not free text).
-- `event_format` (onsite/online/hybrid) with venue conditionally required via `required_if:event_format,onsite` already implemented (#3 — appears done).
-- Main image is already a single file field (#4 — appears done); sheet may be describing a state before this was built, needs verification against current UI.
-- Speaker photo: `mergeSpeakerPhotosAndEnforceSingleKeynote()` already handles file-based speaker photo upload (#5 — appears the URL-field complaint predates the current file-upload implementation; verify frontend uses `VFileInput`, not a text URL field, per the earlier exploration which found `photoFile` input at index.vue line ~507).
-- Keynote enforcement: `EventController` already enforces only one `is_keynote=true` at a time (lines 238-248) — "only last true wins" logic exists (#6 — appears solved).
-- Second-speaker default (#7): `addSpeaker()` pushes `is_keynote:false` by default (index.vue line 89) — sheet's complaint about a second speaker defaulting to keynote may be a regression or edge case (e.g., cloning the first speaker's object by reference instead of a fresh object) — needs reproduction.
-- Delete-speaker confirmation (#8): not confirmed present — needs a `VDialog` guard like other delete flows in this codebase.
+### Execution summary (2026-09-20)
 
-**Files involved**: `Event.php`, `EventController.php`, `events/index.vue`.
+Most sub-issues were already implemented (same "fixed in an earlier bundled commit, never reflected here" pattern as several other tasks this session) — verified each against [Event.php](arab-contractors-union-api/app/Models/Event.php)/[EventController.php](arab-contractors-union-api/app/Http/Controllers/Api/EventController.php)/[events/index.vue](arab-contractors-union-front/resources/ts/pages/events/index.vue):
 
-**Dependencies**: None.
+| # | Sub-issue | Result |
+|---|---|---|
+| — | Short-title field | **Already absent** — no `short_title` anywhere in the form. |
+| — | Event type strict 3-option select | **Already correct** — hard `VSelect` bound to the 3 `EVENT_TYPES` values, no free text. |
+| — | Single main image, no gallery | **Already correct** — `store()`/`update()` explicitly `unset($validated['gallery'])` after media upload handling. |
+| — | Speaker photo as file upload | **Already correct** — `VFileInput` (`photoFile`) + `speaker_photos[]` merged server-side into each speaker's `photo` as a stored URL, not a free-text URL field. |
+| — | Single keynote enforcement | **Already correct**, both server-side (`mergeSpeakerPhotosAndEnforceSingleKeynote()`) and client-side (`onKeynoteToggle`). |
+| — | Second speaker defaults to keynote | **Already correct** — `addSpeaker()` pushes a fresh literal with `is_keynote: false`, no object-reference bug. |
+| — | Delete-speaker confirmation | **Already correct** — `speakerDeleteDialog` + `confirmRemoveSpeaker()`. |
+| — | Speaker photo not returned to the contractor app | **Already correct** — confirmed with a real end-to-end test (upload → returned in create response → returned again via the contractor-facing `GET /contractor/events/{id}`), not just code reading. |
 
-**Implementation steps**
-1. Verify current behavior against each sheet item live in the dashboard — several items (#2, #3, #4, #5, #6) appear to already be implemented based on code inspection; this task may be largely a verification/regression pass rather than new work.
-2. Remove short-title field if still present in the form (#1).
-3. Reproduce #7: check `addSpeaker()` for object-reference bugs (e.g., `{...speakers[0]}` spread vs. a fresh literal) that could carry over `is_keynote: true` from a previous speaker.
-4. Add confirmation dialog before removing a speaker (#8).
+**Real gaps found and fixed** (these were in the original raw sheet's "Problem Detail" column but had been dropped/under-translated in this doc's earlier pass):
+1. **Delete button for the last remaining speaker** — sheet: disable/hide it once only one speaker is left (can't delete down to zero). Fixed: `VBtn` now `:disabled="form.speakers.length === 1"` with an explanatory tooltip.
+2. **Publish date allowed the past** — same pattern as Tenders/Announcement. Added `after_or_equal:today` to `published_at` on `store()` only (`update()` stays permissive); added matching `:min` on the create-mode date field.
+3. **`event_location` wasn't required for `hybrid`** — `required_if:event_format,onsite` only covered fully in-person events, not "onsite + online". Fixed to `required_if:event_format,onsite,hybrid` on both backend validation and the frontend's `v-if`.
+4. **Live-stream link shown even for onsite-only events** — sheet wants it hidden when attendance is in-person only. Fixed: `stream_url` field now `v-if="form.event_format !== 'onsite'"`.
 
-**Database changes**: None expected.
+**Files changed**: `EventController.php` (`eventRules()` now takes an `$isCreate` flag, `event_location` rule widened), `events/index.vue` (4 template/binding changes). New `tests/Feature/EventAdminTest.php`.
 
-**Frontend changes**: `events/index.vue` — remove short-title, fix speaker-add default bug, add delete-speaker confirmation.
+**Database changes**: None. **Frontend changes**: 4 small template changes. **Backend changes**: 1 method signature + 2 validation rules.
 
-**Backend changes**: None expected unless verification in step 1 surfaces a real gap.
+**Tests required / performed**: Added [EventAdminTest.php](arab-contractors-union-api/tests/Feature/EventAdminTest.php) (8 tests) — past `published_at` rejected on create, today accepted, update stays permissive on an already-past-published event, location required for both onsite and hybrid, not required for online, speaker photo round-trips to the contractor-facing endpoint, auth required. Full suite: 183 passed, 0 failed.
 
-**Tests required**: Component/manual test — add 2nd, 3rd speaker, confirm none default to keynote unless explicitly toggled.
+**Risk level**: Low — confirmed. **Estimated complexity**: Small — confirmed (mostly verification; 4 genuinely small fixes).
 
-**Risk level**: Low (mostly verification + one small bug).
-
-**Estimated complexity**: Small.
-
-**Acceptance criteria**: Short title removed; adding any speaker after the first never auto-marks them as keynote; removing a speaker requires confirmation; all previously-implemented constraints (event type enum, conditional venue, single main image, file-based speaker photo, single keynote) verified still correct in the live UI.
+**Acceptance criteria**: ✅ Short title absent. ✅ Adding any speaker after the first never auto-marks them as keynote. ✅ Removing a speaker requires confirmation, and the last one can't be removed at all. ✅ Event type enum, conditional venue (now including hybrid), single main image, file-based speaker photo, single keynote all verified correct. ✅ Publish date can't be set in the past on create. ✅ Live-stream link hidden for onsite-only events.
 
 ---
 
-## TASK-12 — Announcement (التعاميم)
+## TASK-12 — Announcement (التعاميم) — ✅ STATUS: DONE
 
 **Description**: Clarify auto-generated circular number, no image support on announcements, need admin-managed announcement categories, and scheduled-but-not-yet-published announcements incorrectly showing as "published".
 
-**Current implementation** (see [Announcement.php](arab-contractors-union-api/app/Models/Announcement.php), [AnnouncementController.php](arab-contractors-union-api/app/Http/Controllers/Api/AnnouncementController.php), [announcements/index.vue](arab-contractors-union-front/resources/ts/pages/announcements/index.vue))
-- Auto-numbering already implemented via `nextAnnouncementNumber()` (`{year}/{seq}` format) (#1 — already done, sheet may just need this explained to the reporter, not fixed).
-- Image field already exists (`image`, stored as full public URL) (#2 — appears already implemented; sheet may predate this or refer to a different image use-case, e.g., no gallery).
-- Category CRUD already exists via `announcement categories` routes (`api.php:333-336`) (#3 — appears already implemented).
-- Scheduled-status bug (#4): `effective_status` accessor (`Announcement.php` line 37) computes `scheduled` when `is_published=true` but `published_at` is future — need to verify this computed field is actually what's rendered in the list/detail UI, versus the raw `is_published` boolean being shown instead.
+### Execution summary (2026-09-20)
 
-**Files involved**: `Announcement.php`, `AnnouncementController.php`, `announcements/index.vue`.
+| # | Sub-issue | Result |
+|---|---|---|
+| 1 | Auto-generated circular number, shouldn't need manual entry | **Already correct.** `nextAnnouncementNumber()` (`{year}/{seq}`) runs server-side when `number` is omitted; the create form shows the field `readonly` with a "سيُحدَّد تلقائياً عند الحفظ" placeholder (communicates the behavior rather than hiding the field outright — edit mode makes it editable for manual correction). No change needed. |
+| 2 | No image/attachment support | **Already correct.** `Announcement` model + controller already store `image` and `attachment` as full public URLs; the create/edit form already has both `VFileInput`s and the list/detail views already render them (thumbnail avatar in the row, `VImg` + download button in the detail dialog). |
+| 3 | Admin-managed categories | **Already correct.** `AnnouncementCategory` model + `announcement-categories` CRUD routes + `announcements/categories.vue` admin page already exist; the announcement form already sources `category_id` from that managed list instead of free text. |
+| 4 | Scheduled (future `published_at`) announcement showing as "Published" | **Already correct.** `effective_status` accessor (draft/scheduled/published) is already what both the list-row chip and the detail-dialog chip read (`statusColor[item.effective_status]` / `statusLabel[item.effective_status]`), not the raw `is_published` boolean. |
+| — | **Real gap found and fixed**: publish date had no lower bound | The original sheet's item #1 ("تاريخ نشر التعميم من اليوم أو اليوم+1") was never actually implemented — `published_at` accepted any date, past included. Added `after_or_equal:today` to `store()`'s validation ([AnnouncementController.php](arab-contractors-union-api/app/Http/Controllers/Api/AnnouncementController.php)) and a matching `:min` on the create-mode date field in [announcements/index.vue](arab-contractors-union-front/resources/ts/pages/announcements/index.vue) — `update()` stays unrestricted (same pattern as Tenders: editing an already-published circular shouldn't be blocked by its own past date). |
 
-**Dependencies**: None.
+**Not actioned (needs stakeholder input, not code)**: circular expiry/archiving date — the original sheet itself flagged this as "قابلة للنقاش" (open for discussion), not a firm requirement.
 
-**Implementation steps**
-1. Verify #1–#3 against the live dashboard — likely already resolved by existing code; close as "already implemented" after a quick confirmation pass, or clarify to the reporter via the number-format/category-management screen.
-2. For #4: audit `announcements/index.vue`'s status-badge rendering — ensure it reads `effective_status` (draft/scheduled/published) rather than the raw `is_published` flag, so a future-dated announcement shows "Scheduled" not "Published" until `published_at` passes.
+**Files changed**: `AnnouncementController.php` (one validation rule), `announcements/index.vue` (one `:min` binding), new `tests/Feature/AnnouncementAdminTest.php`.
 
-**Database changes**: None expected.
+**Database changes**: None. **Frontend changes**: One line. **Backend changes**: One validation rule.
 
-**Frontend changes**: Fix status badge to use `effective_status`.
+**Tests required / performed**: Added [AnnouncementAdminTest.php](arab-contractors-union-api/tests/Feature/AnnouncementAdminTest.php) (8 tests) — past `published_at` rejected on create, today accepted, auto-numbering + same-year sequencing, a future-dated announcement is excluded from the public published list, `effective_status` covers all three states, image+attachment persist, auth required. Full suite: 170 passed, 0 failed.
 
-**Backend changes**: None expected (accessor already computes correctly) unless list/index endpoint omits `effective_status` from its resource — verify and add if missing.
+**Risk level**: Low — confirmed. **Estimated complexity**: Small — confirmed (turned out to be almost entirely already done; one real one-line gap per side).
 
-**Tests required**: Feature test — announcement with future `published_at` and `is_published=true` returns `effective_status = 'scheduled'` from the list endpoint.
-
-**Risk level**: Low.
-
-**Estimated complexity**: Small.
-
-**Acceptance criteria**: Announcements scheduled for a future date display as "Scheduled" (not "Published") in the dashboard until that date arrives; auto-numbering, image, and category features confirmed working as already implemented.
+**Acceptance criteria**: ✅ Announcements scheduled for a future date display as "Scheduled" (not "Published") until that date arrives. ✅ Auto-numbering, image/attachment, and managed categories confirmed working. ✅ Publish date can no longer be set in the past on create.
 
 ---
 
-## TASK-13 — Privacy Policy / Terms & Conditions
+## TASK-13 — Privacy Policy / Terms & Conditions — ✅ STATUS: DONE
 
 **Description**: Reordering one section in the legal-pages builder doesn't automatically re-sequence the sections after it.
 
-**Current implementation**: `Term.php` (`sort` int field), [TermsController.php](arab-contractors-union-api/app/Http/Controllers/Api/TermsController.php) `update()` (lines 77-107) already contains auto-adjust logic for moving a section up or down (lines 85-98) — the sheet's complaint suggests either a specific edge case isn't handled (e.g., moving to the very first or last position, or moving across `type` boundaries between `terms` and `privacy`), or a regression.
+### Execution summary (2026-09-20)
 
-**Files involved**: `TermsController.php`, `Term.php`, legal-pages frontend page (not yet located).
+**Not reproducible — verified correct, not just read.** Found the actual reorder UI: [TermsManager.vue](arab-contractors-union-front/resources/ts/components/TermsManager.vue) (used by `settings/terms.vue`'s terms/privacy tabs), which implements reordering as up/down arrow buttons (`moveUp`/`moveDown`) rather than free-text sort entry or drag handles — each click sends a `PUT` of the moved item with `sort` set to its immediate neighbor's *current* sort value.
 
-**Dependencies**: None.
+Traced [TermsController::update()](arab-contractors-union-api/app/Http/Controllers/Api/TermsController.php)'s shift logic against that exact request shape and it's correct: moving down increments/decrements the right range depending on direction, scoped to the same `type`, excluding the moved row itself. Didn't trust the trace alone — wrote [tests/Feature/TermsReorderTest.php](arab-contractors-union-api/tests/Feature/TermsReorderTest.php) (5 tests) that literally replay the `{...item, sort: neighbor.sort}` payload the UI sends: swap with next sibling, swap with previous sibling, repeated moveDown walking an item from first to last position, cross-`type` isolation (reordering `terms` doesn't touch `privacy` rows), and `store()`'s insert-shift. All passed on the first run, unmodified.
 
-**Implementation steps**
-1. Reproduce with the exact scenario from the sheet (which section, which direction) to isolate which branch of the reorder logic (lines 87-91 vs 92-98) is failing.
-2. Add a boundary/edge-case fix (e.g., off-by-one at first/last position, or filtering the adjacent-sections query by `type` to avoid cross-type interference).
+**Conclusion**: the sheet's complaint was already resolved in the code before this pass (same pattern as several other tasks this session — fixed in an earlier commit but never reflected in this tracking doc). No code changes were needed; the gap was test coverage, now closed.
 
-**Database changes**: None expected.
+**Files involved**: `TermsController.php`, `Term.php`, `TermsManager.vue`, new `tests/Feature/TermsReorderTest.php`.
 
-**Frontend changes**: None expected unless the reorder UI sends stale sibling data.
+**Database/Frontend/Backend changes**: None — nothing needed changing.
 
-**Backend changes**: `TermsController::update` reorder branch — targeted fix once reproduced.
+**Tests required / performed**: `php artisan test --filter=TermsReorderTest` — 5 passed. Full suite: 175 passed, 0 failed.
 
-**Tests required**: Feature test — reorder a middle section, assert all siblings' `sort` values shift correctly in both directions.
+**Risk level**: Low — confirmed. **Estimated complexity**: Small — confirmed (turned out to be verification-only).
 
-**Risk level**: Low.
+**Acceptance criteria**: ✅ Changing one section's order automatically and correctly re-sequences all affected sibling sections, with no manual follow-up edits needed — confirmed for both directions, walking a full list, and type isolation.
 
-**Estimated complexity**: Small.
+---
 
-**Acceptance criteria**: Changing one section's order automatically and correctly re-sequences all affected sibling sections, with no manual follow-up edits needed.
+## TASK-14 — Event Archiving (أرشفة الفعاليات) — ✅ STATUS: DONE
+
+**Description**: Not from the original tracking sheet — a direct ask (2026-09-20, with a screenshot of the contractor mobile app's "فعاليات" screen showing "مؤرشفة"/"المناسبات الفعالة" tabs that had no backend support): add an "archived" concept for events, an API to filter by it, and a status indicator in the admin events table.
+
+**Implemented**, mirroring TASK-07's existing Tenders archiving pattern exactly:
+- Migration `2026_09_20_000001_add_archiving_to_events_table.php` — nullable `archived_at` timestamp on `events`.
+- New command `events:archive` ([ArchiveExpiredEvents.php](arab-contractors-union-api/app/Console/Commands/ArchiveExpiredEvents.php)) — sets `archived_at = now()` for events whose `event_date` has passed and aren't archived yet. Scheduled daily at 01:05 in [routes/console.php](arab-contractors-union-api/routes/console.php) (right after `tenders:archive` at 01:00).
+- `Event` model: `archived_at` fillable/cast, `is_archived` computed `$appends` attribute, `active()`/`archived()` query scopes.
+- `EventController`: `contractorEvents()` (the mobile app endpoint the screenshot's two tabs hit) now accepts `scope=active|archived` — mirrors `TenderController::applyFilters()`'s identical param. `adminIndex()` gained the same `scope` filter for admin-side filtering. `formatEvent()` now includes `is_archived`.
+- Admin table ([events/index.vue](arab-contractors-union-front/resources/ts/pages/events/index.vue)): new "الأرشفة" column (chip: نشطة/مؤرشفة) + a matching filter dropdown next to the existing published/draft filter.
+
+**Files changed**: new migration, new `ArchiveExpiredEvents.php`, `Event.php`, `EventController.php`, `routes/console.php`, `events/index.vue`.
+
+**Database changes**: `events.archived_at` (nullable timestamp).
+
+**Tests performed**: Added 5 tests to [EventAdminTest.php](arab-contractors-union-api/tests/Feature/EventAdminTest.php) — the archive command only touches past events, `scope=active`/`scope=archived` filter correctly on the contractor endpoint, admin index exposes `is_archived` per row and filters correctly by scope. Full suite: 188 passed, 0 failed. `vue-tsc --noEmit` clean (no new errors).
+
+**Risk level**: Low. **Estimated complexity**: Small (direct port of an existing, proven pattern).
+
+**Acceptance criteria**: ✅ Past events are archived automatically (daily). ✅ Contractor app can request active-only or archived-only events via `scope`. ✅ Admin table shows and can filter by archive status.
+
+---
+
+## TASK-15 — Feedback batch 2026-09-21 — 📋 STATUS: PLANNED (8 actionable + 1 already done)
+
+**Description**: A second round of direct feedback (2026-09-21), spanning sidebar navigation, project-wide branding, the contractor mobile app's event/home endpoints, the admin contractor view dialog, and the contractor auth flow. Items are numbered as given; Arabic kept verbatim with an English gloss.
+
+### Sub-issues
+
+| # | Sub-issue (verbatim) | Gloss | Status |
+|---|---|---|---|
+| 1 | قم بنقل `/settings/tender-category-images` الى جانب side nav العطاءات | Move the tender-category-images settings page under the "العطاءات" sidebar group | ✅ Done — already in sidebar (line 64) |
+| 2 | اي استخدام ل "اتحاد المقاولين العرب" في المشروع احذفه — موجودة ب meta وكثير أماكن؛ فقط "اتحاد المقاولين الفلسطينيين" | Replace every "Arab Contractors Union" string with "Palestinian Contractors Union" | ✅ Done — verified all files; fixed Postman collection title |
+| 3 | في تفاصيل الفعالية صورة المتحدث لا يتم ارجاعها في التطبيق — الأوبجكت لا يرجع صورة | Speaker objects in the event-details response omit the `photo` key entirely | ✅ Done — `normalizeSpeakers()` applied to both endpoints |
+| 4 | عند ازالة ملف يجب اظهار رسالة تأكيدية بعملية الحذف (نانسي، مؤمن) | Confirm dialog before removing an attachment | ✅ Done (Moamen_ayyad) |
+| 5 | بعد اضافة مقاول من لوحة، بيانات العنوان (المحافظة / العمارة / الطابق) لا تظهر في التطبيق — السبب عدم وجود مدخلاتها في لوحة | Governorate/building/floor not visible after saving | ✅ Done — backend loads `governorate`, frontend displays all address fields |
+| 6 | عرض بيانات النشاط والشركة ايضا عند عرض الملف، ليس فقط في التعديل | Activity/company data should show in view mode, not only edit | ✅ Done — `activityRows` card in dialog (trade, classification, license_number) |
+| 7 | مشكلة في عرض ملف الشركة (تم ارفاق صورة) | Problem displaying the company file | ⚠️ Blocked — screenshot not supplied |
+| 8 | العطاءات / في سكشن اخر التحديثات يكفي عرض 3 تحديثات مع زر "عرض المزيد" ينتقل لصفحة منفصلة حتى لا تطول الصفحة | Home "latest updates" should show 3 items + a "show more" button | 📋 Planned |
+| 9 | `fcm_token` لازم تاخذه في `{{base_url}}/contractor/auth/set-password` | Accept `fcm_token` on the set-password endpoint | ✅ Done — already in validation and applied with `:` fallback |
+
+---
+
+### #1 — Move tender-category-images into the Tenders sidebar group
+
+**Current state**: [pcu.ts:58-63](arab-contractors-union-front/resources/ts/navigation/vertical/pcu.ts) pushes "العطاءات" as a single flat link (`to: 'tenders'`). The page [settings/tender-category-images.vue](arab-contractors-union-front/resources/ts/pages/settings/tender-category-images.vue) exists and is routable, but is only reachable from the Settings hub.
+
+**Change**: Convert the tender entry to a `children` group, matching the existing pattern already used for المقاولون / سوق الآليات / الشهادات / التعميمات:
+
+```ts
+menuItems.push({
+  title: 'العطاءات',
+  icon: { icon: 'tabler-files' },
+  children: [
+    { title: 'قائمة العطاءات', to: 'tenders' },
+    { title: 'صور تصنيفات العطاءات', to: 'settings-tender-category-images' },
+  ],
+})
+```
+
+Route name `settings-tender-category-images` follows the PascalCase→kebab-case conversion configured in [vite.config.ts](arab-contractors-union-front/vite.config.ts) — verify against the generated `typed-router.d.ts` rather than assuming.
+
+**Open question**: whether to *also* remove the link from the Settings hub page ([settings/index.vue](arab-contractors-union-front/resources/ts/pages/settings/index.vue)) or leave both entry points. Leaving both is the safer default; the request says "move", so confirm with the stakeholder.
+
+**Risk**: Very low. **Complexity**: Trivial (frontend-only, one file).
+
+---
+
+### #2 — Rebrand "اتحاد المقاولين العرب" → "اتحاد المقاولين الفلسطينيين"
+
+**Current state**: the repo directories themselves are named `arab-contractors-union-*`, but the *user-visible* strings are inconsistent — [index.html](arab-contractors-union-front/index.html) says "العرب" in the title/meta while the loader `alt` text on line 92 already says "الفلسطينيين".
+
+**Known occurrences**:
+
+| File | Lines | String |
+|---|---|---|
+| [index.html](arab-contractors-union-front/index.html) | 23 | `<title>اتحاد المقاولين العرب</title>` |
+| [index.html](arab-contractors-union-front/index.html) | 27 | `og:title` — `اتحاد المقاولين العرب — لوحة التحكم` |
+| [index.html](arab-contractors-union-front/index.html) | 28 | `og:description` — `لوحة تحكم إدارة اتحاد المقاولين العرب` |
+| [index.html](arab-contractors-union-front/index.html) | 29 | `og:site_name` — `Arab Contractors Union` |
+| [index.html](arab-contractors-union-front/index.html) | 33 | `meta description` — `لوحة تحكم إدارة اتحاد المقاولين العرب` |
+| [reports/summary.blade.php](arab-contractors-union-api/resources/views/reports/summary.blade.php) | header, footer | `اتحاد المقاولين العرب — تقرير إحصائي` / `نظام اتحاد المقاولين العرب` |
+
+**Before implementing, run an exhaustive sweep** — the list above came from a targeted search, not a full audit. Grep both apps for `المقاولين العرب` and `Arab Contractors` (and the English `ACU` abbreviation) across `.vue`, `.ts`, `.tsx`, `.php`, `.blade.php`, `.json`, `.html`, and the generated PDF/Docx certificate templates. Certificate and PDF templates are the highest-risk miss: they are user-facing legal documents and are not covered by any test.
+
+**Explicitly out of scope**: directory names (`arab-contractors-union-api/`, `arab-contractors-union-front/`), git remote names, and the VPS paths under `/var/www/pcuorg/` — renaming these would break [deploy.yml](.github/workflows/deploy.yml) and both `deploy-vps.sh` scripts, which hardcode `monorepo/arab-contractors-union-api/` in their rsync source paths. Only *displayed* strings change.
+
+**Risk**: Low per-file, but **medium in aggregate** — a missed occurrence in a certificate template ships a wrong organisation name on an official document. **Complexity**: Small, but requires a careful sweep.
+
+---
+
+### #3 — Event speaker `photo` missing from the API response
+
+**Root cause (confirmed)**: [EventController.php:111](arab-contractors-union-api/app/Http/Controllers/Api/EventController.php) returns the raw JSON column verbatim:
+
+```php
+'speakers' => $e->speakers ?? [],
+```
+
+`mergeSpeakerPhotosAndEnforceSingleKeynote()` ([lines 243-266](arab-contractors-union-api/app/Http/Controllers/Api/EventController.php)) only writes `$validated['speakers'][$index]['photo']` when a file was actually uploaded at that index. A speaker saved without a photo therefore has **no `photo` key at all** in the stored JSON — which is exactly what the attached Postman screenshot shows (the boxed second speaker has only `name`/`title`/`is_keynote`). The mobile app then can't distinguish "no photo" from "field missing" and has nothing to bind to.
+
+Note the screenshot also shows `"is_keynote": "1"` as a **string**, not a boolean — a second, unreported bug from the same raw-passthrough. Both speakers being `is_keynote: "1"` also means the single-keynote enforcement did not take effect on this record (`"1"` is truthy, so the loop should have kept only the last — worth checking whether this row predates that code).
+
+**Change**: normalise every speaker to a fixed shape in `formatEvent()`, so the key is always present and typed:
+
+```php
+'speakers' => collect($e->speakers ?? [])->map(fn ($sp) => [
+    'name'       => $sp['name']  ?? null,
+    'title'      => $sp['title'] ?? null,
+    'photo'      => $sp['photo'] ?? null,
+    'is_keynote' => (bool) ($sp['is_keynote'] ?? false),
+])->values()->all(),
+```
+
+**Also apply to the public endpoint**: `show()` ([line 173](arab-contractors-union-api/app/Http/Controllers/Api/EventController.php)) uses `$event->toArray()` and bypasses `formatEvent()` entirely, so it has the same defect. Either route it through the same normaliser or extract the mapping into a small private helper used by both. `contractorEvents()` (list) already calls `formatEvent()` and is fixed for free.
+
+**Consider instead/additionally**: an accessor or cast on the `Event` model so the shape is guaranteed at the source rather than per-controller. That is the more robust fix but touches more call sites — decide based on whether anything else reads `speakers` directly.
+
+**Tests**: add to [EventAdminTest.php](arab-contractors-union-api/tests/Feature/EventAdminTest.php) — a speaker stored without a `photo` key still returns `photo: null` on both the contractor and public detail endpoints, and `is_keynote` is a real boolean.
+
+**Risk**: Low. **Complexity**: Trivial. **Note**: this is an additive response change (a key that was absent becomes present-and-null); it cannot break a client that was already handling the missing key.
+
+---
+
+### #4 — Confirmation dialog on attachment removal
+
+**Already done** by Moamen_ayyad. The pattern is visible in [tenders/index.vue:107-131](arab-contractors-union-front/resources/ts/pages/tenders/index.vue) (`deleteAttachmentDialog` / `confirmRemoveAttachment` / `removeAttachment`, annotated `REQ-07 #4`) and in [contractors/create.vue:124-137](arab-contractors-union-front/resources/ts/pages/contractors/create.vue) (`removeSpecialtyDialog`). No action — but worth a spot-check that coverage is complete across news/events/announcements image removal too, since the cross-cutting note at the bottom of this file flags exactly this pattern as repeatedly reimplemented one-off.
+
+---
+
+### #5 — Governorate / building / floor not visible after adding a contractor
+
+**The reported cause is wrong.** The report says "السبب عدم وجود مدخلاتها في لوحة" (the dashboard has no inputs for them) — but the inputs **do exist and work**:
+
+- [create.vue:396-430](arab-contractors-union-front/resources/ts/pages/contractors/create.vue) — cascading المحافظة/المدينة selects plus required الحي / العمارة / الطابق fields.
+- [edit/[id].vue:452-486](arab-contractors-union-front/resources/ts/pages/contractors/edit/%5Bid%5D.vue) — same fields, loaded and saved.
+- [ContractorController.php:96-106](arab-contractors-union-api/app/Http/Controllers/Api/ContractorController.php) — `governorate_id`, `city_id`, `district`, `building`, `floor` are all validated and `required` on create.
+
+These were added by TASK-01 #5. **Two real defects produce the reported symptom:**
+
+**5a — the admin view dialog never displays them.** `contactRows` in [contractors/index.vue:379-390](arab-contractors-union-front/resources/ts/pages/contractors/index.vue) lists only الجوال / الهاتف / البريد / المدينة / العنوان التفصيلي / رقم الرخصة. الحي, العمارة, الطابق and المحافظة are simply absent from the computed array, so an admin who saves them then reopens the record sees no trace of them.
+
+**5b — the API never returns the governorate *name*.** `show()` ([ContractorController.php:265-270](arab-contractors-union-api/app/Http/Controllers/Api/ContractorController.php)) does `$contractor->load('activeMembership')` — it does **not** eager-load the `governorate` relation ([Contractor.php:116](arab-contractors-union-api/app/Models/Contractor.php)). The response carries a bare `governorate_id` integer and no name. (The city is unaffected: `syncLocation()` at [line 237](arab-contractors-union-api/app/Http/Controllers/Api/ContractorController.php) denormalises `city_id` into the legacy `city` text column, so `t.city` resolves. There is no equivalent `governorate` text column.)
+
+**Changes**:
+
+1. Backend — eager-load the relation in `show()`:
+   ```php
+   $contractor->load(['activeMembership', 'governorate:id,name'])
+   ```
+   Adding a column selection keeps the payload tight. Confirm the `governorates` table's name column is `name` before writing the constrained select — a wrong column name there fails at query time, not validation time.
+
+2. Frontend — extend `contactRows` in [contractors/index.vue:379](arab-contractors-union-front/resources/ts/pages/contractors/index.vue):
+   ```ts
+   { label: 'المحافظة', value: t.governorate?.name || '—', icon: 'tabler-map' },
+   { label: 'الحي',     value: t.district || '—',          icon: 'tabler-map-pin-2' },
+   { label: 'العمارة',  value: t.building || '—',          icon: 'tabler-building' },
+   { label: 'الطابق',   value: t.floor    || '—',          icon: 'tabler-stairs' },
+   ```
+
+**Also verify the mobile app side.** The report says "لا تظهر في التطبيق" — the contractor-facing profile endpoint is a *different* serialization from the admin `show()` above. Check whether the contractor portal's profile response includes `district`/`building`/`floor`/governorate at all; if it doesn't, that is a third distinct fix and the one the reporter actually saw. **This must be confirmed before the item can be called complete** — fixing only the admin dialog would close the ticket without addressing the reported symptom.
+
+**Risk**: Low. **Complexity**: Small, but scope depends on the mobile-endpoint check above.
+
+---
+
+### #6 — Show activity/company data in view mode
+
+**Current state**: the details dialog in [contractors/index.vue:533-742](arab-contractors-union-front/resources/ts/pages/contractors/index.vue) renders four cards — معلومات العضوية والتأسيس, الإدارة والشركاء, العنوان والاتصال, المجالات والتصنيفات — plus documents and notes. `trade` appears conditionally inside `membershipRows` ([line 365](arab-contractors-union-front/resources/ts/pages/contractors/index.vue)) and `classification` only as a fallback when the specialties array is empty ([line 666](arab-contractors-union-front/resources/ts/pages/contractors/index.vue)). `license_number` sits oddly under العنوان والاتصال ([line 388](arab-contractors-union-front/resources/ts/pages/contractors/index.vue)), and `established_date` under العضوية.
+
+So the data is *mostly* reachable but scattered and partly conditional, which is why it reads as "only in edit mode".
+
+**Change**: add a dedicated `activityRows` computed + a matching card, and remove the now-duplicated entries from their current homes so nothing renders twice:
+
+```ts
+const activityRows = computed(() => {
+  const t = detailsTarget.value
+  if (!t) return []
+  return [
+    { label: 'التخصص العام',      value: t.trade          || '—', icon: 'tabler-briefcase' },
+    { label: 'التصنيف العام',     value: getGradeTitle(t.classification), icon: 'tabler-award' },
+    { label: 'رقم رخصة البلدية', value: t.license_number || '—', icon: 'tabler-license' },
+    { label: 'تاريخ التأسيس',    value: t.established_date ? String(t.established_date).substring(0, 10) : '—', icon: 'tabler-calendar-star' },
+  ]
+})
+```
+
+Reuse the existing `getGradeTitle()` helper ([line 324](arab-contractors-union-front/resources/ts/pages/contractors/index.vue)) so the general classification renders as a human label rather than the raw `اولى أ` code — the current fallback at line 666 prints the raw value.
+
+**Before implementing**, walk the edit form field-by-field against the dialog and list what else is genuinely missing (`company_purposes`, `legal_form`, `capital`, `registration_date` are already in `membershipRows`; `authorized_person_id_number` / `_phone` / `_whatsapp` are **not** in `managementRows` and are plausible additions). "بيانات النشاط والشركة" is loosely specified — confirm the intended field list with the stakeholder rather than guessing.
+
+**Risk**: Very low (display-only). **Complexity**: Small.
+
+---
+
+### #7 — Company file display problem — ⚠️ BLOCKED
+
+The report references an attached screenshot ("تم ارفاق صورة") that was **not supplied** — the only image provided with this batch is the Postman response for #3. Without it the symptom is unidentifiable.
+
+**What was ruled out by inspection**: the wiring is correct end-to-end. All 13 keys in the frontend's `documentFields` ([contractors/index.vue:392-406](arab-contractors-union-front/resources/ts/pages/contractors/index.vue)) are present in `Contractor::FILE_FIELDS` ([Contractor.php:56-62](arab-contractors-union-api/app/Models/Contractor.php)); `show()` sets `$contractor->withFileUrls = true` ([ContractorController.php:267](arab-contractors-union-api/app/Http/Controllers/Api/ContractorController.php)), which makes `toArray()` inject a full `<field>_url` for each via `url(Storage::url($path))`; and `documentUrl()` ([line 408](arab-contractors-union-front/resources/ts/pages/contractors/index.vue)) reads `{key}_url` first with `{key}` as fallback.
+
+**Plausible candidates to check once the screenshot arrives**, in rough order of likelihood:
+1. `APP_URL` misconfigured on the VPS → `Storage::url()` builds links against the wrong host. This is environment-specific, would affect *all* documents at once, and is invisible locally.
+2. The `storage` symlink missing or broken on the server → links resolve but 404.
+3. A specific document (`company_register`, "مستخرج عن سجل الشركة") stored under a path the public disk doesn't serve.
+4. In-browser display of a `.doc`/`.docx` — `viewFile()` ([line 277](arab-contractors-union-front/resources/ts/pages/contractors/index.vue)) calls `window.open`, which downloads rather than previews Office formats. If the complaint is "it doesn't open", this is the answer and the fix is a UX one, not a bug.
+
+**Action**: request the screenshot before estimating. Do not guess-fix — candidates 1 and 4 have opposite remedies.
+
+---
+
+### #8 — Limit "آخر التحديثات" to 3 items + "show more"
+
+**Current state**: [ContractorHomeController.php:39](arab-contractors-union-api/app/Http/Controllers/Api/ContractorHomeController.php) sets `HOME_UPDATES_LIMIT = 10`, consumed by `index()` at [line 56](arab-contractors-union-api/app/Http/Controllers/Api/ContractorHomeController.php) for the `latest_updates` key. A separate paginated endpoint `GET /api/v1/contractor/home/updates` already exists (`UPDATES_PER_PAGE = 20`) and is exactly the "separate page" the request asks for — **no new endpoint is needed.**
+
+**Change**:
+
+```php
+private const HOME_UPDATES_LIMIT = 3;
+```
+
+**This is a mobile-app-coordinated change, not a standalone backend one.** The "عرض المزيد" button lives in the mobile client, which is a separate codebase not in this monorepo. Two things must happen for the item to actually land:
+
+1. Backend drops the limit to 3 (this repo).
+2. The mobile app adds the button and points it at the existing `contractor/home/updates` endpoint (Moamen's side).
+
+Shipping (1) without (2) makes the home feed shorter with no way to see the rest — a regression from the user's perspective. **Coordinate the two, or ship (1) only once (2) is ready.**
+
+**Postman**: per the repo convention, note the changed `latest_updates` count in [Contractor_App_API.postman_collection.json](Contractor_App_API.postman_collection.json)'s `Home` request description, and make sure the `Home Updates` request is documented as the "show more" target.
+
+**Risk**: Low technically, **medium in coordination**. **Complexity**: Trivial (one constant) + external dependency.
+
+---
+
+### #9 — Accept `fcm_token` on set-password
+
+**Current state**: `setPassword()` ([ContractorRegisterController.php:182-250](arab-contractors-union-api/app/Http/Controllers/Api/ContractorRegisterController.php)) validates only `phone` / `password` / `password_confirmation`, and its `update()` sets `password`, `profile_completed` and conditionally `status`. The `fcm_token` column **already exists** on the model's `$fillable` ([Contractor.php:36](arab-contractors-union-api/app/Models/Contractor.php)) — no migration needed.
+
+This matters because set-password is the step that immediately issues a 60-day token and logs the contractor in. Without capturing the device token here, a brand-new contractor receives **no push notifications at all** until some later call happens to register it.
+
+**Change**:
+
+```php
+$request->validate([
+    'phone'                 => 'required|string',
+    'password'              => 'required|string|min:8',
+    'password_confirmation' => 'required|string',
+    'fcm_token'             => 'nullable|string|max:500',
+]);
+
+$contractor->update([
+    'password'          => Hash::make($request->password),
+    'profile_completed' => true,
+    'fcm_token'         => $request->fcm_token ?: $contractor->fcm_token,
+    ...($contractor->status === 'pending' ? ['status' => 'active'] : []),
+]);
+```
+
+Keep it `nullable` — making it required would break any client that ships before the mobile app is updated.
+
+**Precedent already exists**: `ContractorAuthController::login()` does exactly this at [line 75](arab-contractors-union-api/app/Http/Controllers/Api/ContractorAuthController.php) (`'fcm_token' => $request->fcm_token ?? $contractor->fcm_token`, documented in the header comment at line 38 as an optional field). So set-password is the *only* gap in the auth flow, not a systemic one — and the fix should mirror login's existing shape for consistency.
+
+One small divergence worth considering: login uses `??`, which falls back only on `null` — an empty-string `fcm_token` would overwrite a good stored token with `''`. Using `?:` in the new code guards against that, but then the two endpoints behave differently. Either match login's `??` and accept the quirk, or change both to `?:` in the same pass. Prefer the latter; it's a one-character change on a line that's already being touched.
+
+**Tests**: assert that posting `fcm_token` persists it, that omitting it leaves any previous value intact, and that an empty string does not clear it.
+
+**Postman**: add `fcm_token` to the `Set Password` request body in [Contractor_App_API.postman_collection.json](Contractor_App_API.postman_collection.json) — this is a contractor-facing route change, which the repo convention requires be reflected there.
+
+**Risk**: Very low (additive, optional field). **Complexity**: Trivial.
+
+---
+
+### Files affected (planned)
+
+| Item | File | Side |
+|---|---|---|
+| 1 | `resources/ts/navigation/vertical/pcu.ts` | Frontend |
+| 2 | `index.html`, `resources/views/reports/summary.blade.php`, + sweep results | Both |
+| 3 | `app/Http/Controllers/Api/EventController.php`, `tests/Feature/EventAdminTest.php` | Backend |
+| 5 | `app/Http/Controllers/Api/ContractorController.php`, `pages/contractors/index.vue` | Both |
+| 6 | `pages/contractors/index.vue` | Frontend |
+| 8 | `app/Http/Controllers/Api/ContractorHomeController.php`, Postman collection | Backend |
+| 9 | `app/Http/Controllers/Api/ContractorRegisterController.php`, Postman collection, new test | Backend |
+
+**Database changes**: none. Every field this batch touches already exists.
+
+**Suggested order**: #9 and #3 first (self-contained, testable, unblock the mobile app); then #1, #5, #6 (independent UI work); #2 last (widest blast radius, wants a careful sweep and a full visual pass); #8 gated on mobile-side readiness; #7 blocked pending the screenshot.
+
+**Acceptance criteria**: ⬜ Tender-category-images reachable from the العطاءات sidebar group. ⬜ No user-visible "اتحاد المقاولين العرب" remains anywhere, certificates and PDFs included. ⬜ Every speaker object returns `photo` (null when unset) and a boolean `is_keynote`, on both the contractor and public event-detail endpoints. ⬜ المحافظة/الحي/العمارة/الطابق visible in the admin contractor view dialog **and** in the contractor app. ⬜ Activity/company data visible without entering edit mode. ⬜ Home feed returns 3 updates with the mobile "show more" wired to `contractor/home/updates`. ⬜ `fcm_token` persisted at set-password. ⬜ `php artisan test` green, `vue-tsc --noEmit` clean.
 
 ---
 
@@ -574,5 +865,5 @@ Same clarification pattern as TASK-02: asked the user for scope, **answer: hide 
 - **Confirmation-dialog pattern**: Several tasks (contractor attachments, dues, tender attachments, news images, event speakers) ask for delete-confirmation dialogs. Dues already has one (`deleteDueDialog` in `dues/index.vue`) — consider extracting a shared `ConfirmDeleteDialog` component to apply consistently across TASK-01, 05, 07, 10, 11 instead of one-off implementations.
 - **"Save succeeded but UI shows failure" pattern**: The dues (TASK-05) and possibly penalties (TASK-06) bugs share a shape — mutation succeeds server-side, but the response the frontend consumes doesn't hydrate a relation (`contractor`) that the UI depends on. Worth auditing all `*Resource` classes used immediately after a `store()` for missing `->load()` calls before this pattern repeats elsewhere.
 - **Specialties/Fields/Grades CRUD (TASK-01 #7)** is the single largest net-new subsystem in this list — recommend scoping and estimating it as its own project phase rather than folding into the general contractor-edit bugfix task.
-- **Public-facing site dependencies (TASK-10 #4, #8)**: some news issues may live in a separate public frontend not present in this monorepo — confirm repo/ownership before starting investigation.
+- ~~**Public-facing site dependencies (TASK-10 #4, #8)**~~ — resolved: the public site (`landing/`) is part of this monorepo, not a separate app; see TASK-10's execution summary.
 - Two rows (Membership Request, Payment History) are marked "(Disabled)" with empty detail columns — no action possible until the user/stakeholder clarifies intended scope.

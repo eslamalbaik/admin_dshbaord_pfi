@@ -56,6 +56,10 @@ const calLoading     = ref(false)
 const newDates       = ref<string[]>([])
 const dateReason     = ref('booked')
 
+// حجوزات فعلية طلبها مقاولون من التطبيق — للعرض فقط، مختلفة تماماً عن blockedDates
+// (حجب يدوي يضيفه الأدمن). الفصل بينهم هو جواب REQ-08 #6
+const reservations   = ref<any[]>([])
+
 // ─── Options ────────────────────────────────────────────────────────────────
 const statusOptions = [
   { title: 'الكل', value: '' },
@@ -154,6 +158,15 @@ watch([search, filterType, filterStatus, filterGov, filterContractType], () => {
   page.value = 1
   fetchEquipment()
 })
+
+// زر إلغاء الفلاتر المحددة بالبحث (REQ-08 #9)
+const resetFilters = () => {
+  search.value = ''
+  filterType.value = ''
+  filterStatus.value = ''
+  filterGov.value = ''
+  filterContractType.value = ''
+}
 
 watch(page, fetchEquipment)
 
@@ -264,9 +277,21 @@ const uploadImages = async () => {
   }
 }
 
+// حماية ضد النقر المتكرر (REQ-08 #2 — كانت الصورة تحتاج أكثر من نقرة على أيقونة الحذف):
+// بدون هالحماية كل نقرة قبل رجوع أول طلب كانت تطلق DELETE جديد بلا أي إشارة تحميل
+const deletingImageId = ref<number | null>(null)
+
 const deleteImage = async (img: any) => {
-  await api.delete(`/api/v1/equipment/${selectedItem.value.id}/images/${img.id}`)
-  equipImages.value = equipImages.value.filter(i => i.id !== img.id)
+  if (deletingImageId.value !== null) return
+  deletingImageId.value = img.id
+  try {
+    await api.delete(`/api/v1/equipment/${selectedItem.value.id}/images/${img.id}`)
+    equipImages.value = equipImages.value.filter(i => i.id !== img.id)
+  } catch (err: any) {
+    notify(err?.response?.data?.message || 'تعذّر حذف الصورة', 'error')
+  } finally {
+    deletingImageId.value = null
+  }
 }
 
 const setPrimary = async (img: any) => {
@@ -281,8 +306,12 @@ const openCalendar = async (item: any) => {
   calendarDialog.value = true
   newDates.value      = []
   try {
-    const { data } = await api.get(`/api/v1/equipment/${item.id}/blocked-dates`)
-    blockedDates.value = data
+    const [blockedRes, reservationsRes] = await Promise.all([
+      api.get(`/api/v1/equipment/${item.id}/blocked-dates`),
+      api.get(`/api/v1/equipment/${item.id}/reservations`),
+    ])
+    blockedDates.value = blockedRes.data
+    reservations.value = reservationsRes.data
   }
   finally {
     calLoading.value = false
@@ -306,6 +335,11 @@ const removeDate = async (bd: any) => {
 
 const reasonLabel: Record<string, string> = {
   booked: 'محجوز', maintenance: 'صيانة', other: 'أخرى',
+}
+
+const reservationStatus: Record<string, { color: string; label: string }> = {
+  confirmed: { color: 'success', label: 'مؤكَّد' },
+  cancelled: { color: 'secondary', label: 'ملغى' },
 }
 </script>
 
@@ -409,6 +443,18 @@ const reasonLabel: Record<string, string> = {
               style="font-family:Cairo,sans-serif"
             />
           </VCol>
+          <VCol cols="12" class="d-flex justify-end">
+            <VBtn
+              variant="text"
+              size="small"
+              prepend-icon="tabler-filter-x"
+              :disabled="!search && !filterType && !filterStatus && !filterGov && !filterContractType"
+              style="font-family:Cairo,sans-serif"
+              @click="resetFilters"
+            >
+              إلغاء الفلاتر
+            </VBtn>
+          </VCol>
         </VRow>
       </VCardText>
     </VCard>
@@ -502,9 +548,18 @@ const reasonLabel: Record<string, string> = {
                   <VIcon icon="tabler-calendar" size="16" />
                   <VTooltip activator="parent">تواريخ عدم التوفر (حجز/صيانة)</VTooltip>
                 </VBtn>
-                <VBtn icon size="x-small" variant="tonal" color="error" @click="openDelete(item)">
+                <VBtn
+                  icon
+                  size="x-small"
+                  variant="tonal"
+                  color="error"
+                  :disabled="item.needs_maintenance"
+                  @click="openDelete(item)"
+                >
                   <VIcon icon="tabler-trash" size="16" />
-                  <VTooltip activator="parent">حذف</VTooltip>
+                  <VTooltip activator="parent">
+                    {{ item.needs_maintenance ? 'أزل حالة "بحاجة صيانة" أولاً قبل الحذف' : 'حذف' }}
+                  </VTooltip>
                 </VBtn>
               </div>
             </td>
@@ -656,6 +711,8 @@ const reasonLabel: Record<string, string> = {
                 <VBtn
                   icon size="x-small" variant="flat" color="error"
                   style="width:24px;height:24px;min-width:24px"
+                  :loading="deletingImageId === img.id"
+                  :disabled="deletingImageId !== null"
                   @click="deleteImage(img)"
                 >
                   <VIcon icon="tabler-trash" size="12" />
@@ -706,8 +763,48 @@ const reasonLabel: Record<string, string> = {
           تواريخ عدم التوفر: {{ selectedItem?.name }}
         </VCardTitle>
         <VCardText>
+          <!-- Reservations (read-only) — طلبات حجز وصلت من تطبيق المقاولين -->
+          <p class="text-subtitle-2 mb-1" style="font-family:Cairo,sans-serif">حجوزات المقاولين</p>
+          <p class="text-caption text-medium-emphasis mb-2" style="font-family:Cairo,sans-serif">
+            حجوزات طلبها مقاولون عبر التطبيق — للاطّلاع فقط، تُلغى من جهة المقاول
+          </p>
+          <div v-if="reservations.length === 0 && !calLoading" class="text-medium-emphasis mb-4" style="font-family:Cairo,sans-serif">
+            لا توجد حجوزات على هذه الآلية
+          </div>
+          <VList v-else density="compact" class="mb-4 pa-0">
+            <VListItem
+              v-for="r in reservations"
+              :key="r.id"
+              class="px-0"
+            >
+              <template #prepend>
+                <VChip
+                  :color="reservationStatus[r.status]?.color ?? 'secondary'"
+                  variant="tonal"
+                  size="x-small"
+                  class="me-2"
+                  style="font-family:Cairo,sans-serif"
+                >
+                  {{ reservationStatus[r.status]?.label ?? r.status }}
+                </VChip>
+              </template>
+              <VListItemTitle style="font-family:Cairo,sans-serif;font-size:13px">
+                {{ r.contractor?.name ?? '—' }}
+              </VListItemTitle>
+              <VListItemSubtitle style="font-family:Cairo,sans-serif;font-size:12px">
+                {{ r.start_date?.slice(0, 10) }} ← {{ r.end_date?.slice(0, 10) }}
+                <span v-if="r.contractor?.phone"> · {{ r.contractor.phone }}</span>
+              </VListItemSubtitle>
+            </VListItem>
+          </VList>
+
+          <VDivider class="mb-4" />
+
           <!-- Blocked dates list -->
-          <p class="text-subtitle-2 mb-2" style="font-family:Cairo,sans-serif">الأيام المحجوزة / الموقوفة</p>
+          <p class="text-subtitle-2 mb-1" style="font-family:Cairo,sans-serif">الأيام المحجوزة / الموقوفة</p>
+          <p class="text-caption text-medium-emphasis mb-2" style="font-family:Cairo,sans-serif">
+            حجب يدوي يضيفه الأدمن لمنع الحجز في أيام محددة (صيانة أو ارتباط خارج المنصة)
+          </p>
           <div v-if="blockedDates.length === 0 && !calLoading" class="text-medium-emphasis mb-4" style="font-family:Cairo,sans-serif">
             لا توجد تواريخ محجوزة
           </div>

@@ -18,17 +18,26 @@ class Event extends Model
         'image', 'video_url', 'external_url', 'gallery',
         'is_published',
         'event_date', 'event_location', 'event_format', 'is_international', 'event_type', 'stream_url', 'speakers',
-        'published_at', 'created_by',
+        'published_at', 'archived_at', 'created_by',
     ];
 
     protected $casts = [
         'is_published'     => 'boolean',
         'published_at'     => 'datetime',
         'event_date'       => 'datetime',
+        'archived_at'      => 'datetime',
         // لا cast على gallery — الـ accessor/mutator في HasPublicMediaUrls يتولّياه
         'is_international' => 'boolean',
         'speakers'         => 'array',
     ];
+
+    protected $appends = ['is_archived'];
+
+    /** true بعد ما events:archive تؤرشفها (event_date فات) — تُستخدم لتبويب "مؤرشفة" بتطبيق المقاول */
+    public function getIsArchivedAttribute(): bool
+    {
+        return $this->archived_at !== null;
+    }
 
     protected static function booted(): void
     {
@@ -46,6 +55,16 @@ class Event extends Model
         return $query->where('is_published', true)
                      ->whereNotNull('published_at')
                      ->where('published_at', '<=', now());
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->whereNull('archived_at');
+    }
+
+    public function scopeArchived($query)
+    {
+        return $query->whereNotNull('archived_at');
     }
 
     // ─── Relations ───────────────────────────────────────────────────────────

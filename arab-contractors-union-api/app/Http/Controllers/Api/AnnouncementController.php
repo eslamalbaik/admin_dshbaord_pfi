@@ -174,7 +174,9 @@ class AnnouncementController extends Controller
             'attachment'   => 'nullable|file|mimes:pdf,doc,docx|max:10240',
             'is_published' => 'boolean',
             'is_pinned'    => 'boolean',
-            'published_at' => 'nullable|date',
+            // لازم اليوم أو بعده عند الإنشاء (REQ-12 #1) — التعديل يبقى بلا قيد حتى لا يُمنع
+            // تصحيح حقول أخرى بتعميم قديم تاريخ نشره بالماضي فعلياً (نفس نمط Tenders/News).
+            'published_at' => 'nullable|date|after_or_equal:today',
         ]);
 
         if (empty($validated['number'])) {

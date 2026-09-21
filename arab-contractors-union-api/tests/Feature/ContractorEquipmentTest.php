@@ -398,6 +398,68 @@ class ContractorEquipmentTest extends TestCase
         $this->deleteJson('/api/v1/contractor/equipment/999999')->assertStatus(404);
     }
 
+    public function test_destroy_blocked_when_equipment_needs_maintenance(): void
+    {
+        $contractor = $this->createContractor();
+        $type = $this->type();
+        $equipment = Equipment::create([
+            'contractor_id' => $contractor->id, 'equipment_type_id' => $type->id,
+            'name' => 'حفارة', 'needs_maintenance' => true,
+        ]);
+        Sanctum::actingAs($contractor, ['*']);
+
+        $this->deleteJson("/api/v1/contractor/equipment/{$equipment->id}")->assertStatus(422);
+
+        $this->assertDatabaseHas('equipment', ['id' => $equipment->id, 'deleted_at' => null]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    //  condition enum — 'fair' was retired in favor of 'needs_maintenance' by a
+    //  migration; ContractorEquipmentController's validation/formOptions lagged behind
+    // ─────────────────────────────────────────────────────────────────────
+
+    public function test_store_accepts_needs_maintenance_condition(): void
+    {
+        $contractor = $this->createContractor();
+        $type = $this->type();
+        Sanctum::actingAs($contractor, ['*']);
+
+        $response = $this->postJson('/api/v1/contractor/equipment', [
+            'equipment_type_id' => $type->id,
+            'name'              => 'حفارة بحاجة صيانة',
+            'condition'         => 'needs_maintenance',
+            'accept_disclaimer' => true,
+        ]);
+
+        $response->assertStatus(201)->assertJsonPath('items.condition', 'needs_maintenance');
+    }
+
+    public function test_store_rejects_retired_fair_condition_value(): void
+    {
+        $contractor = $this->createContractor();
+        $type = $this->type();
+        Sanctum::actingAs($contractor, ['*']);
+
+        $this->postJson('/api/v1/contractor/equipment', [
+            'equipment_type_id' => $type->id,
+            'name'              => 'حفارة',
+            'condition'         => 'fair',
+            'accept_disclaimer' => true,
+        ])->assertStatus(422)->assertJsonValidationErrors(['condition']);
+    }
+
+    public function test_form_options_conditions_do_not_include_retired_fair_value(): void
+    {
+        $contractor = $this->createContractor();
+        Sanctum::actingAs($contractor, ['*']);
+
+        $response = $this->getJson('/api/v1/contractor/equipment/form-options');
+
+        $values = collect($response->json('items.conditions'))->pluck('value');
+        $this->assertTrue($values->contains('needs_maintenance'));
+        $this->assertFalse($values->contains('fair'));
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     //  report
     // ─────────────────────────────────────────────────────────────────────

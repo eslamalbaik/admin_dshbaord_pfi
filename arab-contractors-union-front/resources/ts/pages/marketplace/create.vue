@@ -16,6 +16,20 @@ const pageTitle  = computed(() => isEdit.value ? 'تعديل بيانات الآ
 const types       = ref<any[]>([])
 const contractors = ref<any[]>([])
 
+// types يُجلب كاملاً (فعّال + مخفي)، ونفلتر هون للظاهر فقط — مع استثناء: لو كانت الآلية
+// الحالية (وضع التعديل) مربوطة بنوع صار مخفياً بعدين، يبقى ظاهراً كخيار وإلا يختفي من
+// الفورم عند فتح التعديل (نفس النمط المستخدم بمنتقي التعديل السريع في marketplace/index.vue)
+const typeOptions = computed(() => {
+  const active = types.value.filter((t: any) => t.is_active)
+  const currentId = form.value.equipment_type_id
+  if (currentId && !active.some((t: any) => String(t.id) === String(currentId))) {
+    const current = types.value.find((t: any) => String(t.id) === String(currentId))
+    if (current) return [...active, current]
+  }
+
+  return active
+})
+
 const governorates = [
   'غزة', 'شمال غزة', 'خانيونس', 'رفح', 'الوسطى',
   'رام الله والبيرة', 'نابلس', 'جنين', 'طولكرم', 'قلقيلية',
@@ -51,7 +65,7 @@ const imageErrors = ref('')
 // ─── Load reference data + edit data ─────────────────────────────────────────
 const fetchRef = async () => {
   const [typesRes, contractorsRes] = await Promise.all([
-    api.get('/api/v1/equipment-types', { params: { active_only: 1 } }),
+    api.get('/api/v1/equipment-types'),
     api.get('/api/v1/contractors?per_page=200'),
   ])
   types.value       = typesRes.data
@@ -214,7 +228,7 @@ const contractTypeOptions = [
           <VCol cols="12" md="6">
             <VSelect
               v-model="form.equipment_type_id"
-              :items="types"
+              :items="typeOptions"
               item-title="name_ar"
               item-value="id"
               label="نوع المعدة *"

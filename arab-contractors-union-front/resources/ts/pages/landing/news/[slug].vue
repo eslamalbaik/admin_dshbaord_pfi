@@ -22,6 +22,7 @@ interface NewsDetail {
   body: string
   image: string | null
   video_url: string | null
+  external_url: string | null
   gallery: string[] | null
   published_at: string
   author?: { id: number; name: string }
@@ -42,6 +43,13 @@ function youtubeEmbedUrl(url: string): string | null {
   const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([\w-]{11})/)
   return m ? `https://www.youtube.com/embed/${m[1]}` : null
 }
+
+// الصورة الرئيسية تظهر أيضاً كأول صورة بشريط الصور القابل للتنقل بالسحب (بدل ما تكون
+// منفصلة تماماً عن المعرض) — overflow-x + scroll-snap يعطي سحب أصلي على اللمس بدون مكتبة جديدة
+const allImages = computed(() => {
+  if (!news.value) return []
+  return [news.value.image, ...(news.value.gallery ?? [])].filter((u): u is string => !!u)
+})
 
 onMounted(async () => {
   try {
@@ -115,9 +123,14 @@ onMounted(async () => {
             <a v-else :href="news.video_url" target="_blank" rel="noopener" class="video-fallback-link">مشاهدة الفيديو ↗</a>
           </div>
 
-          <!-- Gallery -->
-          <div v-if="news.gallery && news.gallery.length > 0" class="article-gallery">
-            <img v-for="(img, i) in news.gallery" :key="i" :src="img" :alt="`${news.title} - ${i + 1}`" />
+          <!-- External link -->
+          <a v-if="news.external_url" :href="news.external_url" target="_blank" rel="noopener" class="article-external-link">
+            رابط ذو صلة ↗
+          </a>
+
+          <!-- Gallery — الصورة الرئيسية أول صورة بالشريط أيضاً، وقابل للتنقل بالسحب على اللمس -->
+          <div v-if="allImages.length > 1" class="article-gallery">
+            <img v-for="(img, i) in allImages" :key="i" :src="img" :alt="`${news.title} - ${i + 1}`" />
           </div>
 
           <!-- Divider -->
@@ -275,17 +288,32 @@ onMounted(async () => {
   font-weight: 700;
 }
 
-/* Gallery */
+.article-external-link {
+  display: inline-block;
+  margin-bottom: 1.5rem;
+  padding: 0.6rem 1.25rem;
+  border: 1.5px solid #1a237e;
+  border-radius: 10px;
+  color: #1a237e;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+/* Gallery — سحب أفقي أصلي على اللمس عبر scroll-snap، الصورة الرئيسية أول عنصر بالشريط */
 .article-gallery {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
   gap: 0.75rem;
   margin-bottom: 1.5rem;
+  padding-bottom: 0.25rem;
 }
 
 .article-gallery img {
-  width: 100%;
-  height: 110px;
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  width: 220px;
+  height: 150px;
   object-fit: cover;
   border-radius: 10px;
   border: 1px solid #e5e7eb;

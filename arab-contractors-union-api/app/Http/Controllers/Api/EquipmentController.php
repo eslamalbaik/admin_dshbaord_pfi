@@ -141,6 +141,13 @@ class EquipmentController extends Controller
     // DELETE /api/equipment/{equipment}
     public function destroy(Equipment $equipment)
     {
+        // ممنوع حذف آلية بحاجة صيانة (REQ-08 #2) — أزل الحالة أولاً إذا الحذف مقصود فعلاً
+        if ($equipment->needs_maintenance) {
+            return response()->json([
+                'message' => 'لا يمكن حذف آلية بحاجة صيانة — أزل حالة "بحاجة صيانة" أولاً إن كنت تريد الحذف.',
+            ], 422);
+        }
+
         // delete stored images from disk
         foreach ($equipment->images as $img) {
             Storage::disk('public')->delete($img->path);
