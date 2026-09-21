@@ -24,6 +24,7 @@ class EventController extends Controller
     // ═════════════════════════════════════════════════════════════════════════
 
     // GET /api/v1/contractor/events
+    // scope=active|archived — تبويبا "المناسبات الفعالة"/"مؤرشفة" بالتطبيق؛ بدون scope تُرجع الكل
     public function contractorEvents(Request $request)
     {
         $query = Event::published()->orderBy('event_date');
@@ -31,11 +32,17 @@ class EventController extends Controller
         if ($request->filled('search'))
             $query->where('title', 'like', '%' . $request->search . '%');
 
+        if ($request->input('scope') === 'active') {
+            $query->active();
+        } elseif ($request->input('scope') === 'archived') {
+            $query->archived();
+        }
+
         $paginator = $query
             ->select([
                 'id', 'title', 'slug', 'excerpt', 'body', 'image', 'gallery',
                 'event_date', 'event_location', 'event_format', 'is_international', 'stream_url', 'speakers',
-                'published_at',
+                'published_at', 'archived_at',
             ])
             ->withCount('registrations')
             ->paginate($request->integer('per_page', 15))
@@ -94,13 +101,14 @@ class EventController extends Controller
             'image'             => $e->image,
             'gallery'           => $e->gallery,
             'event_date'        => $e->event_date,
+            'is_archived'       => $e->is_archived,
             'event_location'    => $e->event_location,
             // نوع الحضور: onsite (وجاهي) | online (أونلاين) | hybrid (وجاهي + أونلاين)
             'event_format'      => $e->event_format,
             'is_international'  => (bool) $e->is_international,
             'stream_url'        => $streamAvailable ? $e->stream_url : null,
             'stream_available'  => $streamAvailable,
-            'speakers'          => $e->speakers ?? [],
+            'speakers'          => $this->normalizeSpeakers($e->speakers ?? []),
             'attendees_count'   => $e->registrations_count ?? 0,
             'is_registered'     => $contractor
                 ? EventRegistration::where('event_id', $e->id)->where('contractor_id', $contractor->id)->exists()
@@ -174,6 +182,7 @@ class EventController extends Controller
         $data = $event->toArray();
         $data['stream_url'] = $streamAvailable ? $event->stream_url : null;
         $data['stream_available'] = $streamAvailable;
+        $data['speakers'] = $this->normalizeSpeakers($data['speakers'] ?? []);
 
         return $this->success($data);
     }
@@ -193,21 +202,30 @@ class EventController extends Controller
         if ($request->filled('is_published'))
             $query->where('is_published', (bool) $request->is_published);
 
+        if ($request->input('scope') === 'active') {
+            $query->active();
+        } elseif ($request->input('scope') === 'archived') {
+            $query->archived();
+        }
+
         return $this->paginated($query->paginate(15));
     }
 
     // القواعد المشتركة بين store/update لحقول الفعالية (باستثناء title/body اللي تختلف required/sometimes)
-    private function eventRules(): array
+    // $isCreate: تاريخ النشر لازم يكون اليوم أو بعده بس عند الإنشاء (REQ-11 #2) — التعديل يبقى
+    // بلا قيد حتى لا يُمنع تصحيح حقول أخرى بفعالية قديمة تاريخ نشرها بالماضي فعلياً (نفس نمط Tenders/Announcement).
+    private function eventRules(bool $isCreate = false): array
     {
         return [
             'image'          => 'nullable',
             'video_url'      => 'nullable|url|max:500',
             'external_url'   => 'nullable|url|max:500',
             'is_published'   => 'boolean',
-            'published_at'   => 'nullable|date',
+            'published_at'   => $isCreate ? 'nullable|date|after_or_equal:today' : 'nullable|date',
             'event_date'     => 'nullable|date',
-            // مكان الفعالية إلزامي فقط لو نوع الحضور "وجاهي" (بند 9ج)
-            'event_location' => 'required_if:event_format,onsite|nullable|string|max:255',
+            // مكان الفعالية إلزامي لو نوع الحضور "وجاهي" أو "وجاهي + أونلاين" (بند 9ج) — hybrid
+            // كان ناقصاً هون فيقدر الأدمن يحفظ فعالية hybrid بلا مكان رغم إنها تحتاجه فعلياً
+            'event_location' => 'required_if:event_format,onsite,hybrid|nullable|string|max:255',
             'event_format'      => 'nullable|in:onsite,online,hybrid',
             'event_type'        => ['nullable', Rule::in(Event::EVENT_TYPES)],
             'stream_url'        => 'nullable|url|max:500',
@@ -256,7 +274,7 @@ class EventController extends Controller
             'excerpt' => 'nullable|string|max:500',
             'body' => 'required|string',
             'is_international' => 'boolean',
-        ], $this->eventRules()));
+        ], $this->eventRules(isCreate: true)));
 
         $this->handleMediaUploads($request, $validated, null, 'events', 'events/gallery');
         // فعاليات: صورة رئيسية واحدة فقط، لا معرض صور (بند 9د) — handleMediaUploads يقرأ الملفات من
@@ -327,5 +345,15 @@ class EventController extends Controller
         $event->delete();
 
         return $this->success(message: 'تم حذف الفعالية بنجاح.');
+    }
+
+    private function normalizeSpeakers(array $speakers): array
+    {
+        return collect($speakers)->map(fn ($sp) => [
+            'name' => $sp['name'] ?? null,
+            'title' => $sp['title'] ?? null,
+            'photo' => $sp['photo'] ?? null,
+            'is_keynote' => (bool) ($sp['is_keynote'] ?? false),
+        ])->values()->all();
     }
 }
