@@ -359,10 +359,8 @@ const membershipRows = computed(() => {
     { label: 'رقم السجل التجاري', value: t.commercial_register || '—', icon: 'tabler-file-certificate' },
     { label: 'رأس المال', value: t.capital || '—', icon: 'tabler-currency-dollar' },
     { label: 'تاريخ التسجيل', value: t.registration_date || '—', icon: 'tabler-calendar-event' },
-    { label: 'تاريخ التأسيس', value: t.established_date ? String(t.established_date).substring(0, 10) : '—', icon: 'tabler-calendar-star' },
     { label: 'الشكل القانوني', value: t.legal_form || '—', icon: 'tabler-gavel' },
     { label: 'غايات الشركة', value: t.company_purposes || '—', icon: 'tabler-target-arrow' },
-    ...(t.trade ? [{ label: 'التخصص', value: t.trade, icon: 'tabler-briefcase' }] : []),
   ]
 })
 
@@ -389,7 +387,17 @@ const contactRows = computed(() => {
     { label: 'العمارة', value: t.building || '—', icon: 'tabler-building' },
     { label: 'الطابق', value: t.floor || '—', icon: 'tabler-stairs' },
     { label: 'العنوان التفصيلي', value: t.address || '—', icon: 'tabler-map-2' },
-    { label: 'رقم الرخصة', value: t.license_number || '—', icon: 'tabler-license' },
+  ]
+})
+
+const activityRows = computed(() => {
+  const t = detailsTarget.value
+  if (!t) return []
+  return [
+    { label: 'التخصص العام', value: t.trade || '—', icon: 'tabler-briefcase' },
+    { label: 'التصنيف العام', value: getGradeTitle(t.classification), icon: 'tabler-award' },
+    { label: 'رقم رخصة البلدية', value: t.license_number || '—', icon: 'tabler-license' },
+    { label: 'تاريخ التأسيس', value: t.established_date ? String(t.established_date).substring(0, 10) : '—', icon: 'tabler-calendar-star' },
   ]
 })
 
@@ -641,6 +649,29 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
               </VCard>
             </VCol>
 
+            <!-- بيانات النشاط والشركة -->
+            <VCol cols="12" md="6">
+              <VCard variant="outlined" class="h-100 details-section-card">
+                <VCardItem>
+                  <template #prepend>
+                    <VAvatar color="primary" variant="tonal" size="38" rounded="lg">
+                      <VIcon icon="tabler-briefcase" size="20" />
+                    </VAvatar>
+                  </template>
+                  <VCardTitle class="text-subtitle-1 font-weight-bold">بيانات النشاط والشركة</VCardTitle>
+                </VCardItem>
+                <VCardText class="pt-0">
+                  <div v-for="row in activityRows" :key="row.label" class="details-row">
+                    <span class="d-flex align-center gap-2 text-body-2 details-row-label">
+                      <VIcon :icon="row.icon" size="16" color="primary" />
+                      {{ row.label }}
+                    </span>
+                    <span class="text-body-2 font-weight-medium text-end details-row-value">{{ row.value }}</span>
+                  </div>
+                </VCardText>
+              </VCard>
+            </VCol>
+
             <!-- المجالات والتصنيفات -->
             <VCol cols="12" md="6">
               <VCard variant="outlined" class="h-100 details-section-card">
@@ -667,7 +698,7 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
                   </div>
                   <div v-else class="details-row">
                     <span class="text-body-2 text-medium-emphasis">التصنيف</span>
-                    <span class="text-body-2 font-weight-medium">{{ detailsTarget.classification || '—' }}</span>
+                    <span class="text-body-2 font-weight-medium">{{ getGradeTitle(detailsTarget.classification) }}</span>
                   </div>
                 </VCardText>
               </VCard>
