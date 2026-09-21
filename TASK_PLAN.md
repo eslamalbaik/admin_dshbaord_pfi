@@ -591,7 +591,7 @@ Traced [TermsController::update()](arab-contractors-union-api/app/Http/Controlle
 
 ---
 
-## TASK-15 — Feedback batch 2026-09-21 — ✅ STATUS: DONE (7 done + 1 blocked on screenshot + 1 needs mobile-side coordination)
+## TASK-15 — Feedback batch 2026-09-21 — ✅ STATUS: DONE (8/9; #7 blocked on screenshot)
 
 **Description**: A second round of direct feedback (2026-09-21), spanning sidebar navigation, project-wide branding, the contractor mobile app's event/home endpoints, the admin contractor view dialog, and the contractor auth flow. Items are numbered as given; Arabic kept verbatim with an English gloss.
 
@@ -600,7 +600,7 @@ Traced [TermsController::update()](arab-contractors-union-api/app/Http/Controlle
 | # | Sub-issue (verbatim) | Gloss | Status |
 |---|---|---|---|
 | 1 | قم بنقل `/settings/tender-category-images` الى جانب side nav العطاءات | Move the tender-category-images settings page under the "العطاءات" sidebar group | ✅ Done — already in sidebar (line 64) |
-| 2 | اي استخدام ل "اتحاد المقاولين العرب" في المشروع احذفه — موجودة ب meta وكثير أماكن؛ فقط "اتحاد المقاولين الفلسطينيين" | Replace every "Arab Contractors Union" string with "Palestinian Contractors Union" | ✅ Done — verified all files; fixed Postman collection title |
+| 2 | اي استخدام ل "اتحاد المقاولين العرب" في المشروع احذفه — موجودة ب meta وكثير أماكن؛ فقط "اتحاد المقاولين الفلسطينيين" | Replace every "Arab Contractors Union" string with "Palestinian Contractors Union" | ✅ Done — fixed Postman title, SupportTicketRepliedNotification email subject/salutation, ReportPdfService HTML header/footer |
 | 3 | في تفاصيل الفعالية صورة المتحدث لا يتم ارجاعها في التطبيق — الأوبجكت لا يرجع صورة | Speaker objects in the event-details response omit the `photo` key entirely | ✅ Done — `normalizeSpeakers()` applied to both endpoints |
 | 4 | عند ازالة ملف يجب اظهار رسالة تأكيدية بعملية الحذف (نانسي، مؤمن) | Confirm dialog before removing an attachment | ✅ Done (Moamen_ayyad) |
 | 5 | بعد اضافة مقاول من لوحة، بيانات العنوان (المحافظة / العمارة / الطابق) لا تظهر في التطبيق — السبب عدم وجود مدخلاتها في لوحة | Governorate/building/floor not visible after saving | ✅ Done — backend loads `governorate`, frontend displays all address fields |

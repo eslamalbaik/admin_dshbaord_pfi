@@ -47,12 +47,12 @@ class SupportTicketRepliedNotification extends Notification implements ShouldQue
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject('رد على طلب الدعم — اتحاد المقاولين العرب')
+            ->subject('رد على طلب الدعم — اتحاد المقاولين الفلسطينيين')
             ->greeting("مرحبًا {$notifiable->name}")
             ->line("لقد تم الرد على طلبك: «{$this->ticket->subject}»")
             ->line('نص الرد:')
             ->line($this->ticket->reply)
             ->line('يمكنك متابعة طلبك من خلال التطبيق.')
-            ->salutation('مع تحيات اتحاد المقاولين العرب');
+            ->salutation('مع تحيات اتحاد المقاولين الفلسطينيين');
     }
 }

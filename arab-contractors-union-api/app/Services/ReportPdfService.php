@@ -111,7 +111,7 @@ class ReportPdfService
 </head>
 <body>
 <div class="header">
-  <h1>اتحاد المقاولين العرب — تقرير إحصائي</h1>
+  <h1>اتحاد المقاولين الفلسطينيين — تقرير إحصائي</h1>
   <div class="sub">{$periodLabel} &nbsp;|&nbsp; النوع: {$periodTypeLabel}</div>
   <div class="meta">تاريخ الإنشاء: {$generatedAt}</div>
 </div>
@@ -169,7 +169,7 @@ HTML;
   <tbody><tr>{$revenueValues}</tr></tbody>
 </table>
 
-<div class="footer">تم إنشاء هذا التقرير تلقائياً بواسطة نظام اتحاد المقاولين العرب — {$generatedAt}</div>
+<div class="footer">تم إنشاء هذا التقرير تلقائياً بواسطة نظام اتحاد المقاولين الفلسطينيين — {$generatedAt}</div>
 </body>
 </html>
 HTML;
