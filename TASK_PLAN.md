@@ -728,7 +728,17 @@ These were added by TASK-01 #5. **Two real defects produce the reported symptom:
    { label: 'الطابق',   value: t.floor    || '—',          icon: 'tabler-stairs' },
    ```
 
-**Also verify the mobile app side.** The report says "لا تظهر في التطبيق" — the contractor-facing profile endpoint is a *different* serialization from the admin `show()` above. Check whether the contractor portal's profile response includes `district`/`building`/`floor`/governorate at all; if it doesn't, that is a third distinct fix and the one the reporter actually saw. **This must be confirmed before the item can be called complete** — fixing only the admin dialog would close the ticket without addressing the reported symptom.
+**Mobile app side — verified and fixed (2026-09-22):**
+
+`ContractorProfileService::fullResource()` already included `district`/`building`/`floor` (lines 99-101) and `liteResource()` already returned `governorate` as `{id, name}` object. The missing piece was `district` in `UpdateFullProfileRequest` — added `'district' => 'nullable|string|max:100'` so contractors can also update their own district from the mobile app.
+
+Covered by [ContractorProfileAddressTest.php](arab-contractors-union-api/tests/Feature/ContractorProfileAddressTest.php) (4 tests, all pass):
+1. `test_profile_returns_address_fields_set_by_admin` — GET profile returns `governorate.{id,name}`, `district`, `building`, `floor`
+2. `test_profile_returns_null_governorate_when_not_set` — nulls when no address set
+3. `test_update_full_profile_persists_district` — POST profile/update persists district and returns it
+4. `test_update_full_profile_requires_auth` — 401 without auth
+
+**Key testing lesson**: `$request->user('contractor')` requires the `contractor` guard to be explicitly set — `Sanctum::actingAs($contractor, ['*'])` alone (default `sanctum` guard) passes `auth:sanctum` middleware but leaves `$request->user('contractor')` returning null. Use both: `Sanctum::actingAs($contractor, ['*'])` + `app('auth')->guard('contractor')->setUser($contractor)` (via the `actingAsContractor()` helper in the test class).
 
 **Risk**: Low. **Complexity**: Small, but scope depends on the mobile-endpoint check above.
 

@@ -33,6 +33,7 @@ class UpdateFullProfileRequest extends FormRequest
             // Text fields
             'partners'                      => 'nullable|string',
             'fax'                           => 'nullable|string|max:50',
+            'district'                      => 'nullable|string|max:100',
             'building'                      => 'nullable|string|max:100',
             'floor'                         => 'nullable|string|max:50',
             'capital'                       => 'nullable|string|max:100',
