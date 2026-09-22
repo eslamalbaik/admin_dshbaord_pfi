@@ -105,8 +105,23 @@ const handleNotificationClick = async (notification: Notification) => {
     await markRead(notification.id)
 
   const dbN = rawNotifications.value.find(n => n.id === notification.id)
-  if (dbN && dbN.data && dbN.data.course_id)
-    router.push(`/courses/${dbN.data.course_id}/builder`)
+  if (!dbN || !dbN.data)
+    return
+
+  const d = dbN.data
+  const type = d.type
+
+  // توجيه بناءً على نوع الإشعار
+  if (type === 'payment_submitted') {
+    // توجيه لصفحة الدفعات مع عرض التفاصيل
+    router.push(`/payments/transactions?id=${d.payment_id}`)
+  } else if (type === 'contractor_activated') {
+    // توجيه لصفحة تفاصيل المقاول
+    router.push(`/contractors/${d.contractor_id}/edit`)
+  } else if (type === 'event_joined') {
+    // توجيه لصفحة الفعاليات
+    router.push(`/events`)
+  }
 }
 </script>
 

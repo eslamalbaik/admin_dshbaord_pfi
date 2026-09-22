@@ -20,6 +20,7 @@ interface NotificationItem {
 // ─── State ────────────────────────────────────────────────────
 const page            = ref(1)
 const notifications   = ref<NotificationItem[]>([])
+const rawNotifications = ref<any[]>([])
 const unreadCount     = ref(0)
 const totalPages      = ref(1)
 const isLoading       = ref(false)
@@ -116,12 +117,14 @@ async function fetchNotifications() {
     const raw        = paginator.data || []
     unreadCount.value = payload?.unread_count ?? 0
     totalPages.value  = paginator.last_page ?? 1
+    rawNotifications.value = raw
     notifications.value = raw.map(mapRawNotification)
   }
   catch (err) {
     console.error('Error fetching notifications:', err)
     isError.value = true
     notifications.value = []
+    rawNotifications.value = []
   }
   finally {
     isLoading.value = false
@@ -153,7 +156,25 @@ async function markAllRead() {
 
 function handleClick(item: NotificationItem) {
   if (!item.isSeen) markAsRead(item.id)
-  if (item.link)    router.push(item.link)
+
+  // البحث عن البيانات الأصلية للإشعار
+  const rawNotif = rawNotifications.value.find(n => n.id === item.id)
+  if (!rawNotif) return
+
+  const d = rawNotif.data || {}
+  const type = d.type
+
+  // توجيه بناءً على نوع الإشعار
+  if (type === 'payment_submitted') {
+    // توجيه لصفحة الدفعات مع عرض التفاصيل
+    router.push(`/payments/transactions?id=${d.payment_id}`)
+  } else if (type === 'contractor_activated') {
+    // توجيه لصفحة تفاصيل المقاول
+    router.push(`/contractors/${d.contractor_id}/edit`)
+  } else if (type === 'event_joined') {
+    // توجيه لصفحة الفعاليات
+    router.push(`/events`)
+  }
 }
 
 watch(page, fetchNotifications)
