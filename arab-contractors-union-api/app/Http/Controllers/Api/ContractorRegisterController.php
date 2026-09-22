@@ -270,10 +270,10 @@ class ContractorRegisterController extends Controller
             return $this->error('حسابك مجمّد. تواصل مع الاتحاد لمزيد من المعلومات.', 403, null, 'account_inactive');
         }
 
-        // استعادة كلمة المرور متاحة فقط لمقاول عضويته فعّالة
-        if (! $contractor->activeMembership) {
-            return $this->error('لا يمكن استعادة كلمة المرور — لا توجد لديك عضوية فعّالة في الاتحاد. يرجى التواصل مع الاتحاد.', 403, null, 'membership_inactive');
-        }
+        // استعادة كلمة المرور لا تُقيَّد بالعضوية الفعّالة — تماماً كتسجيل الدخول
+        // (loginEligibility لا يفحص activeMembership). إثبات ملكية الجوال عبر الـ OTP
+        // كافٍ؛ حالة العضوية/الدفع تمنع التجديد والشهادات فقط لا الدخول. is_frozen
+        // وحده يقفل الحساب (مفحوص أعلاه). راجع ForgotPasswordTest.
 
         try {
             $result = $this->otpService->sendOtp(
@@ -321,10 +321,10 @@ class ContractorRegisterController extends Controller
             return $this->error('حسابك مجمّد. تواصل مع الاتحاد لمزيد من المعلومات.', 403, null, 'account_inactive');
         }
 
-        // استعادة كلمة المرور متاحة فقط لمقاول عضويته فعّالة
-        if (! $contractor->activeMembership) {
-            return $this->error('لا يمكن استعادة كلمة المرور — لا توجد لديك عضوية فعّالة في الاتحاد. يرجى التواصل مع الاتحاد.', 403, null, 'membership_inactive');
-        }
+        // استعادة كلمة المرور لا تُقيَّد بالعضوية الفعّالة — تماماً كتسجيل الدخول
+        // (loginEligibility لا يفحص activeMembership). إثبات ملكية الجوال عبر الـ OTP
+        // كافٍ؛ حالة العضوية/الدفع تمنع التجديد والشهادات فقط لا الدخول. is_frozen
+        // وحده يقفل الحساب (مفحوص أعلاه). راجع ForgotPasswordTest.
 
         try {
             $this->otpService->verifyOtp('forgot', $contractor->id, $request->otp);
