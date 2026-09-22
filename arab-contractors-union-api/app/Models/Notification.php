@@ -9,6 +9,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Notification extends Model
 {
     /**
+     * اسم الجدول app_notifications لا notifications — الأخير محجوز لجدول Laravel
+     * الافتراضي (uuid/morph) المستخدم لإشعارات الأدمن عبر facade Notification::send().
+     * هذا الموديل خاص بإشعارات تطبيق المقاول.
+     *
+     * @var string
+     */
+    protected $table = 'app_notifications';
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var array<int, string>

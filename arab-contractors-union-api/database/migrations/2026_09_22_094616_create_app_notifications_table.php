@@ -11,7 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('notifications', function (Blueprint $table) {
+        // اسم الجدول app_notifications وليس notifications — الأخير محجوز لجدول Laravel
+        // الافتراضي (uuid/morph) المستخدم لإشعارات الأدمن عبر قناة database. راجع
+        // 2026_06_03_150943_create_notifications_table وموديل App\Models\Notification.
+        Schema::create('app_notifications', function (Blueprint $table) {
             $table->id();
             $table->foreignId('contractor_id')->constrained('contractors')->onDelete('cascade');
             $table->enum('type', ['announcement', 'payment_reminder', 'expiry_reminder'])->index();
@@ -24,9 +27,9 @@ return new class extends Migration
             $table->foreignId('run_id')->nullable()->constrained('notification_runs')->onDelete('set null');
             $table->timestamps();
 
-            // Indexes for efficient querying
+            // Indexes for efficient querying — 'type' is already indexed inline above
+            // (->index() on the enum column); re-indexing it here duplicates the key name.
             $table->index(['contractor_id', 'created_at']);
-            $table->index('type');
             $table->index('run_id');
         });
     }
@@ -36,6 +39,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('notifications');
+        Schema::dropIfExists('app_notifications');
     }
 };
