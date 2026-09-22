@@ -1,9 +1,14 @@
 /**
  * Notification Service — App Notifications (Announcements, Reminders)
- * Handles fetching and managing contractor notifications from the API
+ * Handles fetching and managing contractor notifications from the API.
+ *
+ * Uses the project's shared ofetch client ($api from utils/api.ts) — which
+ * bakes in the API base URL and bearer auth. Response envelopes follow the
+ * Laravel ApiResponseTrait shape: lists come back as { status, items, meta }
+ * and single payloads under `items` (NOT axios-style `.data.data`).
  */
 
-import { api } from '@/utils/api'
+import { $api } from '@/utils/api'
 
 export interface AppNotification {
   id: number
@@ -32,81 +37,50 @@ export interface PaginatedNotifications {
   }
 }
 
-export interface UnreadCountResponse {
-  status: boolean
-  data: {
-    unread_count: number
-  }
-}
-
 class NotificationService {
   /**
-   * Fetch paginated notifications for the authenticated contractor
+   * Fetch paginated notifications for the authenticated contractor.
    * GET /contractor/app-notifications
    */
-  async fetchNotifications(page: number = 1, perPage: number = 15): Promise<PaginatedNotifications> {
-    try {
-      const response = await api.get<PaginatedNotifications>('/contractor/app-notifications', {
-        params: {
-          page,
-          per_page: perPage,
-        },
-      })
-      return response.data
-    } catch (error) {
-      console.error('Failed to fetch notifications:', error)
-      throw error
-    }
+  async fetchNotifications(page = 1, perPage = 15): Promise<PaginatedNotifications> {
+    return await $api<PaginatedNotifications>('/contractor/app-notifications', {
+      query: { page, per_page: perPage },
+    })
   }
 
   /**
-   * Mark a specific notification as read
+   * Mark a specific notification as read.
    * PATCH /contractor/app-notifications/{id}
    */
-  async markAsRead(notificationId: number): Promise<AppNotification> {
-    try {
-      const response = await api.patch<{ status: boolean; data: AppNotification }>(`/contractor/app-notifications/${notificationId}`)
-      return response.data.data
-    } catch (error) {
-      console.error(`Failed to mark notification ${notificationId} as read:`, error)
-      throw error
-    }
+  async markAsRead(notificationId: number): Promise<void> {
+    await $api(`/contractor/app-notifications/${notificationId}`, { method: 'PATCH' })
   }
 
   /**
-   * Get count of unread notifications
+   * Get count of unread notifications.
    * GET /contractor/app-notifications/unread-count
    */
   async getUnreadCount(): Promise<number> {
     try {
-      const response = await api.get<{ status: boolean; data: { unread_count: number } }>('/contractor/app-notifications/unread-count')
-      return response.data.data.unread_count
-    } catch (error) {
+      const res = await $api<{ status: boolean; items: { unread_count: number } }>(
+        '/contractor/app-notifications/unread-count',
+      )
+
+      return res.items.unread_count
+    }
+    catch (error) {
       console.error('Failed to fetch unread count:', error)
+
       return 0
     }
   }
 
   /**
-   * Get notification by ID (for detail view)
-   */
-  async getNotification(notificationId: number): Promise<AppNotification | null> {
-    try {
-      const response = await api.get<{ status: boolean; data: AppNotification }>(`/contractor/app-notifications/${notificationId}`)
-      return response.data.data
-    } catch (error) {
-      console.error(`Failed to fetch notification ${notificationId}:`, error)
-      return null
-    }
-  }
-
-  /**
-   * Navigate to notification action URL
+   * Navigate to a notification's action URL, if any.
    */
   navigateToAction(notification: AppNotification): void {
-    if (notification.action_url) {
+    if (notification.action_url)
       window.location.href = notification.action_url
-    }
   }
 }
 
