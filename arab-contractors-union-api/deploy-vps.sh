@@ -71,6 +71,9 @@ rsync -a --delete \
 echo "==> تثبيت حزم Composer (بدون dev)"
 composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
 
+echo "==> تثبيت حزم Node (Puppeteer لـ Browsershot)"
+npm install --production
+
 echo "==> تشغيل الترحيلات"
 php artisan migrate --force
 

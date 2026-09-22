@@ -68,6 +68,14 @@ class PmaRateScraperService
      */
     private function postExportForm(string $date): string
     {
+        // تحقق سريع: هل node_modules و puppeteer مثبتة؟ إذا لا، توقّف هنا قبل محاولة بطيئة وفاشلة
+        $puppeteerPath = base_path('node_modules/puppeteer');
+        if (! is_dir($puppeteerPath)) {
+            throw new \RuntimeException(
+                'pma_scrape_missing_puppeteer: Puppeteer لم يثبّت (npm install)، تجاوز محاولة Browsershot.',
+            );
+        }
+
         $js = <<<JS
         async () => {
             const hidden = document.querySelector('input[type="hidden"]');

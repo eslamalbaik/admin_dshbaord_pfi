@@ -61,7 +61,7 @@ class FetchPmaExchangeRates extends Command
 
                 return self::SUCCESS;
             } catch (\Throwable $e) {
-                $lastError = "[{$source}] {$e->getMessage()}";
+                $lastError = "[{$source}] " . $this->simplifyErrorMessage($e->getMessage());
                 Log::channel('finance')->warning('pma_rates.source_failed', ['source' => $source, 'error' => $e->getMessage()]);
             }
         }
@@ -75,5 +75,19 @@ class FetchPmaExchangeRates extends Command
         }
 
         return self::FAILURE;
+    }
+
+    /** تبسيط رسالة الخطأ الطويلة من Browsershot/Puppeteer لتكون واضحة وقابلة للقراءة */
+    private function simplifyErrorMessage(string $msg): string
+    {
+        // استخرج السبب الأساسي إن أمكن
+        if (preg_match('/pma_scrape_\w+|supabase_proxy_\w+: (.+?)(?:\n|$)/', $msg, $m)) {
+            return $m[1] ?? 'فشل غير متوقع';
+        }
+        if (preg_match('/^[^:]+: (.+?)(?:\n|$)/', $msg, $m)) {
+            return $m[1];
+        }
+        // حد أقصى 120 حرف إذا كانت الرسالة طويلة
+        return strlen($msg) > 120 ? substr($msg, 0, 120) . '…' : $msg;
     }
 }
