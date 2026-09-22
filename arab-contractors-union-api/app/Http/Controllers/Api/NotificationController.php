@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\NotificationResource;
 use App\Http\Traits\ApiResponseTrait;
+use App\Models\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
@@ -97,5 +98,80 @@ class NotificationController extends Controller
             ['recipients_count' => $contractors->count()],
             'تم إرسال الإشعار لـ' . $contractors->count() . ' مقاول.',
         );
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    //  Contractor App Notifications (App Notification System)
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /**
+     * GET /contractor/notifications
+     * Get paginated notifications for the authenticated contractor.
+     */
+    public function getContractorNotifications(Request $request): JsonResponse
+    {
+        $contractor = $request->user();
+
+        $validated = $request->validate([
+            'page' => 'integer|min:1',
+            'per_page' => 'integer|min:1|max:100',
+        ]);
+
+        $perPage = $validated['per_page'] ?? 15;
+
+        $paginator = Notification::where('contractor_id', $contractor->id)
+            ->orderBy('created_at', 'desc')
+            ->paginate($perPage);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'تمت العملية بنجاح',
+            'status_code' => 200,
+            'items' => $paginator->items(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ]);
+    }
+
+    /**
+     * PATCH /contractor/notifications/{id}
+     * Mark a notification as read.
+     */
+    public function markNotificationAsRead(Request $request, Notification $notification): JsonResponse
+    {
+        $contractor = $request->user();
+
+        // Ensure the notification belongs to the authenticated contractor
+        if ($notification->contractor_id !== $contractor->id) {
+            return $this->error('غير مصرح بالوصول', 403);
+        }
+
+        $notification->markAsRead();
+
+        return $this->success([
+            'id' => $notification->id,
+            'read_at' => $notification->read_at,
+        ], 'تم وضع علامة على الإشعار كمقروء');
+    }
+
+    /**
+     * GET /contractor/notifications/unread-count
+     * Get the count of unread notifications for the contractor.
+     */
+    public function getContractorUnreadCount(Request $request): JsonResponse
+    {
+        $contractor = $request->user();
+
+        $unreadCount = Notification::where('contractor_id', $contractor->id)
+            ->whereNull('read_at')
+            ->count();
+
+        return $this->success([
+            'unread_count' => $unreadCount,
+        ]);
     }
 }

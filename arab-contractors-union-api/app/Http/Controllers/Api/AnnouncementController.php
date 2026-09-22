@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\AnnouncementPublished;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\Announcement;
@@ -205,6 +206,10 @@ class AnnouncementController extends Controller
         $announcement = Announcement::create($validated);
 
         if ($announcement->is_published) {
+            // Dispatch event to trigger announcement notification listener
+            event(new AnnouncementPublished($announcement));
+
+            // Keep legacy push job for backward compatibility
             \App\Jobs\SendPushToContractorsJob::dispatch(
                 Contractor::whereNotNull('fcm_token')->pluck('id')->all(),
                 'تعميم جديد',
@@ -252,6 +257,10 @@ class AnnouncementController extends Controller
         $announcement->update($validated);
 
         if ($newlyPublished) {
+            // Dispatch event to trigger announcement notification listener
+            event(new AnnouncementPublished($announcement));
+
+            // Keep legacy push job for backward compatibility
             \App\Jobs\SendPushToContractorsJob::dispatch(
                 Contractor::whereNotNull('fcm_token')->pluck('id')->all(),
                 'تعميم جديد',

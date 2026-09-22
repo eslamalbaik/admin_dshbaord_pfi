@@ -69,11 +69,16 @@ Route::prefix('v1')->group(function () {
         Route::get('name-change-request',  [ContractorNameChangeRequestController::class, 'show']);
         Route::post('name-change-request', [ContractorNameChangeRequestController::class, 'store']);
 
-        // إشعارات المقاول (صندوق الوارد)
+        // إشعارات المقاول (صندوق الوارد) — نظام الإشعارات القديم (Laravel notifications)
         Route::get('notifications',                    [NotificationController::class, 'index']);
         Route::get('notifications/unread-count',       [NotificationController::class, 'unreadCount']);
         Route::post('notifications/read',              [NotificationController::class, 'markAllRead']);
         Route::patch('notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead']);
+
+        // إشعارات التطبيق الجديدة (App Notifications — Announcements, Reminders, etc.)
+        Route::get('app-notifications',                 [NotificationController::class, 'getContractorNotifications']);
+        Route::get('app-notifications/unread-count',    [NotificationController::class, 'getContractorUnreadCount']);
+        Route::patch('app-notifications/{notification}', [NotificationController::class, 'markNotificationAsRead']);
     });
 
     // --------------------------------------------------------
@@ -128,6 +133,9 @@ Route::prefix('v1')->group(function () {
         // التعميمات الثابتة — Pop-up أول فتح + إقرار القراءة (REQ-20)
         Route::get('circulars/pending', [\App\Http\Controllers\Api\AnnouncementController::class, 'pending']);
         Route::post('circulars/{announcement}/acknowledge', [\App\Http\Controllers\Api\AnnouncementController::class, 'acknowledge']);
+
+        // أرشيف التعميمات + فتح تفاصيل التعميم من الإشعار (Deep linking)
+        Route::get('announcements/{announcement}', [\App\Http\Controllers\Api\AnnouncementController::class, 'show']);
 
         // الفعاليات — تصفح + انضمام/إلغاء (RSVP) — REQ-21
         Route::get('events',                  [EventController::class, 'contractorEvents']);

@@ -60,5 +60,11 @@ class AppServiceProvider extends ServiceProvider
         });
 
         \App\Models\User::observe(\App\Observers\UserObserver::class);
+
+        // Register event listeners for app notifications
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Events\AnnouncementPublished::class,
+            \App\Listeners\SendAnnouncementNotifications::class,
+        );
     }
 }
