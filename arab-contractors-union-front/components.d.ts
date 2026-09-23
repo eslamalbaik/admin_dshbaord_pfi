@@ -37,6 +37,7 @@ declare module 'vue' {
     ErrorHeader: typeof import('./resources/ts/components/ErrorHeader.vue')['default']
     I18n: typeof import('./resources/ts/@core/components/I18n.vue')['default']
     MoreBtn: typeof import('./resources/ts/@core/components/MoreBtn.vue')['default']
+    NotificationItem: typeof import('./resources/ts/components/NotificationItem.vue')['default']
     Notifications: typeof import('./resources/ts/@core/components/Notifications.vue')['default']
     ProductDescriptionEditor: typeof import('./resources/ts/@core/components/ProductDescriptionEditor.vue')['default']
     PublicFooter: typeof import('./resources/ts/components/PublicFooter.vue')['default']

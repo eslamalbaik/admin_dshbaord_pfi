@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Exceptions\OtpCooldownException;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
+use App\Models\Contractor;
 use App\Models\ProfileUpdateRequest;
 use App\Models\User;
 use App\Notifications\ProfileUpdateRequestStatusNotification;
@@ -31,19 +32,43 @@ class ProfileUpdateRequestController extends Controller
 
     private function format(ProfileUpdateRequest $r): array
     {
+        $contractor = $r->contractor;
+
         return [
-            'id'             => $r->id,
-            'contractor_id'  => $r->contractor_id,
-            'contractor'     => $r->contractor?->name,
-            'proposed_data'  => $r->proposed_data,
-            'attachment_url' => $r->attachment_url,
-            'status'         => $r->status,
-            'status_label'   => $r->status_label,
-            'reject_reason'  => $r->reject_reason,
-            'reviewed_by'    => $r->reviewer?->name,
-            'reviewed_at'    => $r->reviewed_at,
-            'created_at'     => $r->created_at,
+            'id'                => $r->id,
+            'contractor_id'     => $r->contractor_id,
+            'contractor'        => $contractor?->name,
+            'membership_number' => $contractor?->membership_number,
+            // القيم الحالية للحقول المطلوب تعديلها فقط — تُمكّن لوحة الأدمن من عرض
+            // "الحالي ← المقترح" بدل قائمة قيم مقترحة بلا سياق يُبتّ بها بالموافقة.
+            'current_data'      => $this->currentDataFor($r, $contractor),
+            'proposed_data'     => $r->proposed_data,
+            'attachment_url'    => $r->attachment_url,
+            'status'            => $r->status,
+            'status_label'      => $r->status_label,
+            'reject_reason'     => $r->reject_reason,
+            'reviewed_by'       => $r->reviewer?->name,
+            'reviewed_at'       => $r->reviewed_at,
+            'created_at'        => $r->created_at,
         ];
+    }
+
+    /**
+     * القيم الحالية المقابلة لمفاتيح proposed_data. بعد الموافقة تكون قيمة العقد قد
+     * طُبّقت فعلاً على contractors، فتتطابق الحالية مع المقترحة — وهذا مقصود: الفرق
+     * يهمّ فقط أثناء المراجعة (pending).
+     */
+    private function currentDataFor(ProfileUpdateRequest $r, ?Contractor $contractor): array
+    {
+        if (! $contractor) {
+            return [];
+        }
+
+        $keys = array_intersect(array_keys($r->proposed_data ?? []), ProfileUpdateRequest::ALLOWED_FIELDS);
+
+        return collect($keys)
+            ->mapWithKeys(fn ($key) => [$key => $contractor->{$key}])
+            ->all();
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -159,7 +184,12 @@ class ProfileUpdateRequestController extends Controller
     /** GET /api/v1/dashboard/profile-update-requests */
     public function index(Request $request)
     {
-        $query = ProfileUpdateRequest::with(['contractor:id,name,membership_number', 'reviewer:id,name']);
+        // لا بدّ من تحميل أعمدة ALLOWED_FIELDS أيضاً — format() يبني منها current_data،
+        // وقصر الـ select على id,name,membership_number كان يُرجعها null دائماً.
+        $query = ProfileUpdateRequest::with([
+            'contractor:id,name,membership_number,' . implode(',', ProfileUpdateRequest::ALLOWED_FIELDS),
+            'reviewer:id,name',
+        ]);
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);

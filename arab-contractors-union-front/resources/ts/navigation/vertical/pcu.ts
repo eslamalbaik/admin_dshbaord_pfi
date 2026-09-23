@@ -33,9 +33,9 @@ if (!isAccountant) {
     children: [
       { title: 'قائمة المقاولين', to: 'contractors' },
       { title: 'تسجيل مقاول جديد', to: 'contractors-create' },
-      // "طلبات الانتساب" (contractors-memberships) مخفية عمداً من القائمة — الميزة معطّلة
-      // منتجياً (TASK-02) بينما تبقى الصفحة والراوت شغّالين لمن يملك الرابط المباشر.
+      { title: 'طلبات الانتساب', to: 'contractors-memberships' },
       { title: 'طلبات تعديل اسم الشركة', to: 'contractors-name-change-requests' },
+      { title: 'طلبات تعديل البيانات', to: 'contractors-profile-update-requests' },
     ],
   })
 }

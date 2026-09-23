@@ -58,6 +58,8 @@ const ROUTE_TAB_TITLES: Record<string, string> = {
   'contractors': 'المقاولون',
   'contractors-create': 'إضافة مقاول',
   'contractors-memberships': 'العضويات',
+  'contractors-name-change-requests': 'طلبات تعديل اسم الشركة',
+  'contractors-profile-update-requests': 'طلبات تعديل البيانات',
   'contractors-penalties': 'المخالفات',
   'contractors-qr': 'رمز QR',
   'tenders': 'العطاءات',

@@ -248,4 +248,154 @@ class ProfileUpdateRequestTest extends TestCase
 
         $this->assertDatabaseCount('profile_update_requests', 2);
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    //  Admin dashboard list (TASK-16 #7) — الطلبات كانت تُنشأ بلا أي واجهة
+    //  تستهلكها، فبقي هذا المسار بلا تغطية رغم أنه واجهة البتّ الوحيدة.
+    // ─────────────────────────────────────────────────────────────────────
+
+    private function actingAsAdmin(): void
+    {
+        Sanctum::actingAs(\App\Models\User::factory()->create(['role' => 'admin']), ['*']);
+    }
+
+    public function test_admin_index_lists_pending_requests(): void
+    {
+        $contractor = $this->createContractor(['membership_number' => '990_g']);
+
+        ProfileUpdateRequest::create([
+            'contractor_id' => $contractor->id,
+            'proposed_data' => ['address' => 'العنوان الجديد'],
+            'attachment'    => 'a.pdf',
+            'status'        => 'pending',
+        ]);
+
+        $this->actingAsAdmin();
+
+        $response = $this->getJson('/api/v1/dashboard/profile-update-requests');
+        $response->assertStatus(200);
+        $this->assertCount(1, $response->json('items'));
+        $this->assertEquals('شركة اختبار للمقاولات', $response->json('items.0.contractor'));
+        $this->assertEquals('990_g', $response->json('items.0.membership_number'));
+    }
+
+    public function test_admin_index_returns_current_values_alongside_proposed(): void
+    {
+        $contractor = $this->createContractor([
+            'membership_number' => '991_g',
+            'address'           => 'العنوان القديم',
+            'email'             => 'old@example.com',
+        ]);
+
+        ProfileUpdateRequest::create([
+            'contractor_id' => $contractor->id,
+            'proposed_data' => ['address' => 'العنوان الجديد', 'email' => 'new@example.com'],
+            'attachment'    => 'a.pdf',
+            'status'        => 'pending',
+        ]);
+
+        $this->actingAsAdmin();
+
+        $response = $this->getJson('/api/v1/dashboard/profile-update-requests');
+        $response->assertStatus(200);
+
+        // current_data يجب أن يحمل قيم المقاول الحالية لنفس مفاتيح proposed_data —
+        // بدونها لا يستطيع الأدمن معرفة ما الذي سيتغيّر قبل الموافقة.
+        $this->assertEquals('العنوان القديم', $response->json('items.0.current_data.address'));
+        $this->assertEquals('old@example.com', $response->json('items.0.current_data.email'));
+        $this->assertEquals('العنوان الجديد', $response->json('items.0.proposed_data.address'));
+        $this->assertEquals('new@example.com', $response->json('items.0.proposed_data.email'));
+    }
+
+    public function test_admin_index_filters_by_status(): void
+    {
+        $contractor = $this->createContractor(['membership_number' => '992_g']);
+
+        foreach (['pending', 'approved', 'rejected'] as $i => $status) {
+            ProfileUpdateRequest::create([
+                'contractor_id' => $contractor->id,
+                'proposed_data' => ['address' => "عنوان {$i}"],
+                'attachment'    => 'a.pdf',
+                'status'        => $status,
+            ]);
+        }
+
+        $this->actingAsAdmin();
+
+        $response = $this->getJson('/api/v1/dashboard/profile-update-requests?status=pending');
+        $response->assertStatus(200);
+        $this->assertCount(1, $response->json('items'));
+        $this->assertEquals('pending', $response->json('items.0.status'));
+    }
+
+    public function test_admin_approve_applies_proposed_data_to_contractor(): void
+    {
+        $contractor = $this->createContractor([
+            'membership_number' => '993_g',
+            'address'           => 'العنوان القديم',
+        ]);
+
+        $request = ProfileUpdateRequest::create([
+            'contractor_id' => $contractor->id,
+            'proposed_data' => ['address' => 'العنوان الجديد'],
+            'attachment'    => 'a.pdf',
+            'status'        => 'pending',
+        ]);
+
+        $this->actingAsAdmin();
+
+        $this->postJson("/api/v1/dashboard/profile-update-requests/{$request->id}/approve")
+            ->assertStatus(200);
+
+        $this->assertEquals('approved', $request->fresh()->status);
+        $this->assertEquals('العنوان الجديد', $contractor->fresh()->address);
+    }
+
+    public function test_admin_reject_stores_reason_and_leaves_contractor_untouched(): void
+    {
+        $contractor = $this->createContractor([
+            'membership_number' => '994_g',
+            'address'           => 'العنوان القديم',
+        ]);
+
+        $request = ProfileUpdateRequest::create([
+            'contractor_id' => $contractor->id,
+            'proposed_data' => ['address' => 'العنوان الجديد'],
+            'attachment'    => 'a.pdf',
+            'status'        => 'pending',
+        ]);
+
+        $this->actingAsAdmin();
+
+        $this->postJson("/api/v1/dashboard/profile-update-requests/{$request->id}/reject", [
+            'reject_reason' => 'المرفق غير واضح',
+        ])->assertStatus(200);
+
+        $fresh = $request->fresh();
+        $this->assertEquals('rejected', $fresh->status);
+        $this->assertEquals('المرفق غير واضح', $fresh->reject_reason);
+        $this->assertEquals('العنوان القديم', $contractor->fresh()->address);
+    }
+
+    public function test_admin_cannot_action_an_already_decided_request(): void
+    {
+        $contractor = $this->createContractor(['membership_number' => '995_g']);
+
+        $request = ProfileUpdateRequest::create([
+            'contractor_id' => $contractor->id,
+            'proposed_data' => ['address' => 'العنوان الجديد'],
+            'attachment'    => 'a.pdf',
+            'status'        => 'approved',
+        ]);
+
+        $this->actingAsAdmin();
+
+        $this->postJson("/api/v1/dashboard/profile-update-requests/{$request->id}/approve")
+            ->assertStatus(422);
+    }
+
+    public function test_admin_index_requires_auth(): void
+    {
+        $this->getJson('/api/v1/dashboard/profile-update-requests')->assertStatus(401);
+    }
 }

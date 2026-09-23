@@ -58,7 +58,14 @@ const handleRefresh = () => {
           </VCardText>
         </VCard>
       </VCol>
-      <!-- بطاقة "طلبات الانتساب" مخفية عمداً — الميزة معطّلة منتجياً (TASK-02) -->
+      <VCol cols="12" sm="6" md="3">
+        <VCard class="text-center" :to="{ name: 'contractors-memberships' }" style="cursor:pointer">
+          <VCardText class="py-4">
+            <VIcon icon="tabler-user-check" size="32" color="warning" class="mb-2" />
+            <div class="text-body-1 font-weight-medium">طلبات الانتساب</div>
+          </VCardText>
+        </VCard>
+      </VCol>
       <VCol cols="12" sm="6" md="3">
         <VCard class="text-center" :to="{ name: 'tenders' }" style="cursor:pointer">
           <VCardText class="py-4">
