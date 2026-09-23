@@ -93,7 +93,11 @@ Each task below corresponds to one row ("Feature Name") in the sheet. Sub-issues
 
 ---
 
-## TASK-02 — Membership Request (Disabled) — ✅ STATUS: DONE
+## TASK-02 — Membership Request (Disabled) — ⚠️ STATUS: REVERSED (2026-09-22)
+
+> **Reversed by TASK-16 #6.** The "hide the nav link only" decision below was implemented on 2026-09-19. On 2026-09-22 the stakeholder reported «لا يتم اظهار طلب في لوحة» — membership requests were still arriving and being stored the whole time, but with all three entry points removed nobody could reach the page to action them. All three were restored (`navigation/vertical/pcu.ts`, `navigation/horizontal/index.ts`, `pages/dashboards/index.vue`). The original task record is kept below unchanged.
+>
+> **Lesson**: hiding a working feature by commenting out its only entry points produced a bug report three days later — the same shape as TASK-04's reversal. Prefer an explicit disabled state or a feature flag.
 
 **Description**: Feature marked disabled in the sheet with no further detail — flagged for confirmation only.
 
@@ -870,10 +874,140 @@ One small divergence worth considering: login uses `??`, which falls back only o
 
 ---
 
+## TASK-16 — Feedback batch 2026-09-22 — 🔄 STATUS: CODE COMPLETE, awaiting production PHP-FPM limit change (2026-09-22)
+
+### Execution summary (2026-09-22) — first pass
+
+| Sub-issue | Result |
+|---|---|
+| #6 Membership requests invisible | **Done.** Restored the three commented-out entry points (`navigation/vertical/pcu.ts`, `navigation/horizontal/index.ts`, `pages/dashboards/index.vue`), reversing TASK-02. Verified the dormant `memberships.vue` had not rotted — it calls `/api/v1/memberships{,/{id}/approve,/reject}`, which still match `routes/api.php:386-390`. Breadcrumb mapping already existed. |
+| #7 Profile edit requests invisible | **Done.** New page `pages/contractors/profile-update-requests.vue` + nav entry + breadcrumb. Route name confirmed generated as `contractors-profile-update-requests` in `typed-router.d.ts`, matching the nav `to:`. **Two backend gaps found while building it** (see below). |
+| #1 Home feed 5 + عرض المزيد | **Done (backend).** `HOME_UPDATES_LIMIT` 3 → 5; added `latest_updates_total` + `has_more`. `buildFeed()` is now called once and reused — the old inline `buildFeed()->take()` would have rebuilt the whole 7-query feed a second time just to count it. Postman `Home` description updated. Mobile-side button remains Moamen's. |
+| #5 Preview field parity | **Done.** Exactly three fields were genuinely missing, all in the management group: `authorized_person_id_number`, `authorized_person_phone`, `authorized_person_whatsapp`. «التصنيف العام» was already present (added by TASK-03). Also had to add the `:dir="row.dir"` binding to the management rows — that section, unlike `contactRows`, never bound it, so the two new phone fields would have rendered RTL-mangled. |
+| #4 Delete documents on edit | **Done.** Backend: extracted the 14-entry file-field map out of `handleFileUploads()` into a `FILE_FIELDS` constant so the new `remove_documents.*` rule derives its allowlist (`Rule::in`) from the same source; added `handleDocumentRemovals()`. A replacement uploaded for the same field in the same request **wins over** a stale remove flag — applying the removal after the upload would delete the file the user just uploaded. Frontend: per-document 🗑 button on all 13 blocks, confirm dialog, a reversible "سيُحذف عند الحفظ" state, and `remove_documents[]` appended at submit. Deliberately **not** "empty value means delete" — that would re-break TASK-01 #4. New `ContractorDocumentRemovalTest` (7 tests). |
+| #2, #3 Upload size limits & error clarity | **Code done; server change still pending (stakeholder is applying it).** Key decision: the limit is now **derived from `ini_get('upload_max_filesize')` at runtime** via the new `App\Support\UploadLimits`, not a hardcoded number. The old `max:10240` promised 10 MB while the server allowed 2 MB — a fixed number on either side drifts silently. Deriving it means the form tells the truth **today at 2 MB** and self-corrects to 12 MB the moment the server is raised, with no redeploy. Exposed through the existing `specialties-catalog` payload (already fetched by both forms) rather than a new endpoint. New `DetectDiscardedRequestBody` middleware returns a 413 explaining the size when PHP has silently dropped the body, registered **before** validation so it can't be masked by the bogus "required" cascade. Both forms now: show a per-field hint, reject an oversize file client-side before any bytes move, block submit when the *total* exceeds `post_max_size`, and handle 413 distinctly. New `ContractorUploadLimitsTest` (5 tests). |
+
+**Backend gaps found while building #7's page** (neither was in the plan — the plan assumed the endpoint was complete):
+1. `index()` eager-loaded `contractor:id,name,membership_number` only. Any attempt to show the contractor's *current* values would have silently returned `null` for all of them.
+2. `format()` returned `proposed_data` but no current values and no `membership_number` — an admin would have been approving a list of proposed values with nothing to compare them against. Added `current_data` (restricted to the keys actually present in `proposed_data`, intersected with `ALLOWED_FIELDS`) and `membership_number`, and widened the eager-load select accordingly. Both changes are additive, so the contractor-app `mine()` endpoint that shares `format()` is unaffected.
+
+**Tests**: `ProfileUpdateRequestTest` 13 → 20 (7 new admin-side tests; the admin list/approve/reject path had **zero** coverage despite being the only way to action a request). `ContractorHomeTest` 23 → 26; renamed `test_latest_updates_caps_at_three…` → `…caps_at_five…` and added `has_more` cases above, below and exactly at the cap. Both files fully green.
+
+**Regression caught during US5**: `create.vue`'s file inputs already carried `:rules="[v => !!v || 'مطلوب']"` (documents are required on create, unlike edit). Adding a second `:rules` binding produced 13 `TS1117` duplicate-property errors — the size check was merged into the existing rule array instead. Worth remembering that the two forms are *not* symmetric here.
+
+**Verification**: 257 passed (245 at the start of this pass). 20 failures are **pre-existing and unrelated** — `AnnouncementNotificationTest`, `ExpiryReminderTest`, `PaymentReminderTest` all fail with `Class "Database\Factories\ContractorFactory" not found`; `database/factories/` only contains `UserFactory.php`. Confirmed by stashing all working-tree changes and re-running `ExpiryReminderTest`: still 7/7 red. Spawned as a separate task. `vue-tsc` reports the same 32 pre-existing error files as before the change, none of them touched here. `npm run lint` cannot run at all repo-wide — the script passes `--rulesdir eslint-internal-rules/`, a directory that does not exist.
+
+**Browser verification not performed**: the admin dashboard needs an authenticated session, and the local API cannot serve one — `php -S` is single-threaded and `PHP_CLI_SERVER_WORKERS` is POSIX-only, so on Windows the preview tool's keepalive connections starve every API request (`tenders-public` timed out at `000`). The Vue app itself was confirmed to boot with no console errors. The four stories above are covered by the feature tests and typecheck instead; a manual pass on a real environment is still worth doing before sign-off.
+
+---
+
+### Original plan (below)
+
+
+**Description**: Seventh feedback batch. Seven sub-issues across three areas: the contractor home feed page length, the admin contractor add/edit document-upload experience (three related sub-issues, all rooted in one server-config defect), the contractor preview dialog's field coverage, and two "request submitted from the app but never appears in the panel" reports — both of which are **gaps left by TASK-02 and TASK-03**, not new bugs.
+
+### ⚠️ Headline finding — production PHP limits contradict the app's own validation
+
+Verified live on `srv1962001` (`php -i` + `/etc/php/*/fpm/`):
+
+| Setting | Production value | What the app assumes |
+|---|---|---|
+| `upload_max_filesize` | **2M** | `max:10240` (10 MB) in `ContractorController::getValidationRules()` |
+| `post_max_size` | **8M** | 14 document fields × up to 10 MB each |
+| `max_file_uploads` | 20 | 14 document fields + other inputs |
+| nginx `client_max_body_size` | 20M | — (nginx is *not* the bottleneck) |
+
+This single misconfiguration causes sub-issues #2 **and** #3 and makes them look like two different bugs:
+
+- **Any single file > 2 MB** is discarded by PHP before Laravel runs. The field simply arrives absent, so Laravel never emits a size error — it emits nothing about that file at all. The UI falls back to the generic `'فشل تسجيل المقاول. يرجى التحقق من المدخلات.'` at [create.vue:217](arab-contractors-union-front/resources/ts/pages/contractors/create.vue) — exactly the red banner in the attached screenshot, with every document field still showing a filename.
+- **Total request body > 8 MB** makes PHP discard the **entire** body: `$_POST` and `$_FILES` both come back empty. Laravel then sees a blank request and fails "required" on fields the user demonstrably filled in. This is why the reporter deleted many document entries and re-submitted, yet the browser still spent a long time uploading everything before failing — the browser always uploads the full body; PHP only drops it *after* the transfer completes.
+
+**The fix is therefore server-side first, code second.** Raising `max:10240` in Laravel or adding a client-side hint alone will not fix it. Note `deploy-vps.sh` does not manage `php.ini`, so this change must be applied directly on the VPS and recorded in [CLAUDE.md](CLAUDE.md) — otherwise a server rebuild silently reintroduces it.
+
+### Sub-issues
+
+| # | Sub-issue (verbatim from the sheet) | Area |
+|---|---|---|
+| 1 | في سكشن اخر التحديثات يكفي عرض 5 تحديثات مع وجود زر عرض المزيد بنتقل لصفحة منفصلة حتى لا يتم اطالة الصفحة (`{{base_url}}/contractor/home`) | Backend |
+| 2 | اظهار قيود مستندات الحجم المسموح به كحد اقصى لانه عند الحفظ رفض الحفظ بسبب انه حجم الملفات كبير | Server + Both |
+| 3 | عند اضافة ملفات كبيرة ولم يقبل النظام بحفظها دون اظهار سبب انها كبيرة تم حذف جزء كبير من مدخلات المستندات وضغط على زر حفظ الا انه الزمني برفع كامل الملفات حتى يتم الحفظ | Server + Frontend |
+| 4 | عند التعديل لا يسمح بحذف المستندات فقط استبدالها | Both |
+| 5 | اثناء معاينة بيانات اي مقاول يجب عرض جميع البيانات مماثلة الى ما تم ادخاله اثناء الاضافة مثل التصنيف العام رقم هوية المفوض | Frontend |
+| 6 | Membership Request — عند طلب شهادة عضوية يتم دفع رسوم العضوية من التطبيق ثم يتم ارسال الطلب مباشرة على لوحة والموافقة عليه او رفضه لكن لا يتم اظهار طلب في لوحة | Frontend |
+| 7 | Edit Company Profile — تم تعديل ملف الشركة من خلال التطبيق لكن لن يتم عرض الطلب في لوحة رغم التحديث | Frontend |
+
+### Current implementation
+
+**#1 — Home feed**: `ContractorHomeController::index()` returns `latest_updates` capped by `HOME_UPDATES_LIMIT`, currently **3** ([ContractorHomeController.php:39](arab-contractors-union-api/app/Http/Controllers/Api/ContractorHomeController.php)) — TASK-15 set this to 3; the sheet now asks for 5. The "عرض المزيد" target already exists and is fully built: `GET contractor/home/updates` (`updates()`, line 65) paginates the same feed at `UPDATES_PER_PAGE = 20` via `LengthAwarePaginator`. The gap is that the `index()` payload exposes **no total or `has_more` flag**, so the app has no signal for whether to render the button. The consuming screen is the Flutter app (the Vue `pages/contractor/dashboard.vue` never renders `latest_updates`).
+
+**#2/#3 — Document uploads**: 14 `nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240` rules at [ContractorController.php:117-130](arab-contractors-union-api/app/Http/Controllers/Api/ContractorController.php). Both forms use `VFileInput` with `accept=".pdf,.doc,.docx,image/*"` and **no `rules`, no `hint`, and no size text anywhere** — confirmed across all 14 inputs in [edit/[id].vue](arab-contractors-union-front/resources/ts/pages/contractors/edit/%5Bid%5D.vue) and [create.vue](arab-contractors-union-front/resources/ts/pages/contractors/create.vue). `create.vue`'s catch block maps `err.response.data.errors` into `validationErrors` and jumps to the offending step, but a body dropped by PHP produces no per-field errors to map.
+
+**#4 — Document deletion**: `handleFileUploads()` ([ContractorController.php:131-158](arab-contractors-union-api/app/Http/Controllers/Api/ContractorController.php)) only ever writes a new path when a file is present, and deletes the old file from storage solely as a side-effect of replacement. There is **no delete endpoint and no clear/remove control** in either form; TASK-01 #4 deliberately added a guard that *skips* empty `VFileInput` arrays when building `FormData`, which locked out clearing as a side effect. Result: once attached, a document can only ever be swapped.
+
+**#5 — Preview dialog**: [contractors/index.vue](arab-contractors-union-front/resources/ts/pages/contractors/index.vue) builds `membershipRows` (354), `managementRows` (367), `contactRows` (377). `التصنيف العام` **is** already present (lines 398 and 701 — added by TASK-03). `authorized_person_id_number` is on both forms and in backend validation but appears **nowhere** in the dialog. The sub-issue says "مثل" (e.g.), so this needs a systematic form-field-vs-dialog-field diff, not just the two named fields.
+
+**#6 — Membership requests**: root cause is **TASK-02**. The feature is entirely intact — `MembershipController` (`pending`/`index`/`store`/`approve`/`reject`), routes at [api.php:386-390](arab-contractors-union-api/routes/api.php), page [contractors/memberships.vue](arab-contractors-union-front/resources/ts/pages/contractors/memberships.vue). On 2026-09-19, per a stakeholder instruction recorded in TASK-02 ("hide the nav link only"), the entry points were commented out in three places: [pcu.ts:36](arab-contractors-union-front/resources/ts/navigation/vertical/pcu.ts), [horizontal/index.ts:20](arab-contractors-union-front/resources/ts/navigation/horizontal/index.ts), [dashboards/index.vue:61](arab-contractors-union-front/resources/ts/pages/dashboards/index.vue). Requests have been arriving in the panel this whole time — nobody can navigate to them. **Confirmed with the reporter on 2026-09-22 that this reverses the TASK-02 decision.**
+
+**#7 — Profile update requests**: root cause is a **wrong conclusion in TASK-03**. That task inspected the Vue contractor portal, saw it posts to `contractor/auth/profile/update` (direct write, no approval), and concluded the `ProfileUpdateRequest` approval queue was "an unrelated dead-end". But the reporter uses the **Flutter mobile app**, which posts to `POST contractor/profile-update-requests` — that handler ([ProfileUpdateRequestController.php:108-113](arab-contractors-union-api/app/Http/Controllers/Api/ProfileUpdateRequestController.php)) creates a real row with `status='pending'`, and the admin list endpoint `GET dashboard/profile-update-requests` (`index()`, line 160) works and returns it. What does not exist is any consumer: `grep -rn "profile-update-requests" arab-contractors-union-front/resources/ts/` returns **zero hits**. There is no page and no menu entry. Rows have been accumulating in `profile_update_requests` unseen.
+
+### Implementation steps
+
+**Server (do first — #2, #3 are not reproducible or verifiable until this lands)**
+1. On the VPS, set `upload_max_filesize = 12M`, `post_max_size = 60M`, `max_file_uploads = 30` in the PHP-FPM ini, `systemctl reload php*-fpm`, and confirm via `php -i`. `post_max_size` must exceed `upload_max_filesize` × realistic concurrent uploads — 60M covers all 14 documents at typical scan sizes without permitting a 140M request. Raise nginx `client_max_body_size` from 20M to 64M to stay above `post_max_size`. Document all of it in CLAUDE.md as deploy-invisible server state.
+
+**Backend**
+2. `HOME_UPDATES_LIMIT` 3 → 5, and add `latest_updates_total` + `has_more` to the `index()` payload so the app knows whether to draw "عرض المزيد" (#1). Update the `Home` request description in [Contractor_App_API.postman_collection.json](Contractor_App_API.postman_collection.json) — contractor-facing contract change.
+3. Add a `post_max_size`-exceeded guard: when the request is non-GET, `Content-Length` is set, and `$_POST`/`$_FILES` are both empty, return a 413 with an explicit Arabic message instead of letting it fall through to a misleading "required" cascade (#3). Middleware is the right home for this, since it must run before validation.
+4. Align `max:10240` with whatever `upload_max_filesize` ends up being, and surface the effective ceiling through an endpoint (or the existing catalog endpoint) so the forms display a value that cannot drift from the server (#2).
+5. Add document deletion (#4): accept an explicit `remove_documents[]` array of field names on update; for each, `Storage::delete()` the old path and null the column. Must be an explicit opt-in list — reusing "empty value means delete" would re-break the TASK-01 #4 fix that stopped cleared `VFileInput` arrays from being sent as values.
+
+**Frontend**
+6. Add a `rules` size check plus `hint`/`persistent-hint` stating the max size and allowed types to all 14 `VFileInput`s in **both** `create.vue` and `edit/[id].vue`, sourced from the endpoint in step 4 (#2). Client-side rejection is what actually prevents the wasted upload described in #3 — the browser never starts the transfer.
+7. Show a clear, specific message on 413 / oversize rejection, and preserve entered form state on failure (#3).
+8. Add a delete (🗑) control next to each already-uploaded document in `edit/[id].vue`, with the shared confirm-dialog pattern, wired to step 5's `remove_documents[]` (#4).
+9. Diff every field on `create.vue`/`edit/[id].vue` against the preview dialog's row builders and add all missing ones — `authorized_person_id_number` confirmed missing; audit the rest rather than fixing only the named example (#5).
+10. Restore the three commented-out "طلبات الانتساب" entry points, reversing TASK-02 (#6). Update TASK-02's status line to record the reversal, matching how TASK-04 documents its own reversal.
+11. Build `pages/contractors/profile-update-requests.vue` against the existing `GET dashboard/profile-update-requests` endpoint — list, view proposed-vs-current diff, approve, reject with reason — plus a sidebar entry. Model it on the existing `name-change-requests.vue`, which is the same approve/reject shape (#7).
+
+**Correction to TASK-03's parting note** (verified 2026-09-22): TASK-03 flagged `POST profile-update-requests/send-phone-otp` as pointing at a non-existent `ProfileUpdateRequestController::sendPhoneOtp`. **That is no longer true** — the method is fully implemented at [ProfileUpdateRequestController.php:131](arab-contractors-union-api/app/Http/Controllers/Api/ProfileUpdateRequestController.php) and covered by `test_send_phone_otp_is_rate_limited_by_cooldown` in `tests/Feature/ProfileUpdateRequestTest.php`. No action needed; the note is retired here so it stops being carried forward.
+
+### Files involved
+
+| # | Files | Layer |
+|---|---|---|
+| — | VPS `php.ini` / FPM pool, nginx site config, `CLAUDE.md` | Server |
+| 1 | `ContractorHomeController.php`, `Contractor_App_API.postman_collection.json` | Backend |
+| 2 | `ContractorController.php`, `create.vue`, `edit/[id].vue` | Both |
+| 3 | new middleware, `create.vue`, `edit/[id].vue` | Both |
+| 4 | `ContractorController.php`, `edit/[id].vue` | Both |
+| 5 | `pages/contractors/index.vue` | Frontend |
+| 6 | `navigation/vertical/pcu.ts`, `navigation/horizontal/index.ts`, `pages/dashboards/index.vue` | Frontend |
+| 7 | new `pages/contractors/profile-update-requests.vue`, `navigation/vertical/pcu.ts`, `routes/api.php` (dead route) | Both |
+
+**Database changes**: none. Every table, column and status enum this batch needs already exists — `profile_update_requests` and `memberships` are both fully migrated.
+
+**Dependencies**: Step 1 (server limits) blocks meaningful verification of #2 and #3. Step 4 blocks step 6. Step 5 blocks step 8. #1, #5, #6, #7 are all independent.
+
+**Suggested order**: Step 1 first (unblocks the most-complained-about defect immediately, zero code risk). Then #6 (three uncommented lines, restores a feature that has silently been collecting requests). Then #7 (largest net-new piece, and rows are already queued waiting for it). Then #1 and #5 (self-contained). Then #2/#3/#4 as one coherent document-handling pass.
+
+**Tests required**: Feature test that an oversize upload returns a clear size error rather than a generic failure (#2/#3). Feature test for `remove_documents[]` nulling the column and deleting the file while leaving other documents intact (#4). Feature test asserting `latest_updates` returns 5 with a correct `has_more` (#1). `tests/Feature/ProfileUpdateRequestTest.php` already covers #7's backend end-to-end (13 tests) — #7 is frontend-only work, no new backend test needed.
+
+**Task breakdown**: granular, executable task list in [TASK-16-tasks.md](TASK-16-tasks.md).
+
+**Risk level**: Medium. Step 1 touches shared production PHP config and affects every upload path in the app, not just contractors — apply it during a quiet window and verify `tenders-public` still responds. #4 deletes files from storage permanently, so it needs the confirm dialog and a careful read of `handleFileUploads()` before wiring. #6 reverses an explicit prior stakeholder decision — recorded above as confirmed on 2026-09-22.
+
+**Estimated complexity**: Medium. Step 1 is minutes. #6 is trivial. #7 is the bulk of the work (one new page, ~300 lines against an endpoint that already exists).
+
+**Acceptance criteria**: 🔲 A 9 MB PDF uploads successfully; a file above the ceiling is rejected **client-side** with a specific Arabic size message before any bytes are sent. 🔲 Every document field shows its max size and allowed types before the user picks a file. 🔲 An admin can delete an attached document, not only replace it, behind a confirm dialog. 🔲 A failed save preserves all entered form data. 🔲 The preview dialog shows every field the add form collects, `authorized_person_id_number` included. 🔲 "طلبات الانتساب" is reachable from the sidebar and dashboard again. 🔲 A profile edit submitted from the mobile app appears in a new admin list and can be approved or rejected. 🔲 `POST profile-update-requests/send-phone-otp` resolves to a real method or is removed. 🔲 Test suite green.
+
+---
+
 ## Cross-cutting notes
 
 - **Confirmation-dialog pattern**: Several tasks (contractor attachments, dues, tender attachments, news images, event speakers) ask for delete-confirmation dialogs. Dues already has one (`deleteDueDialog` in `dues/index.vue`) — consider extracting a shared `ConfirmDeleteDialog` component to apply consistently across TASK-01, 05, 07, 10, 11 instead of one-off implementations.
 - **"Save succeeded but UI shows failure" pattern**: The dues (TASK-05) and possibly penalties (TASK-06) bugs share a shape — mutation succeeds server-side, but the response the frontend consumes doesn't hydrate a relation (`contractor`) that the UI depends on. Worth auditing all `*Resource` classes used immediately after a `store()` for missing `->load()` calls before this pattern repeats elsewhere.
 - **Specialties/Fields/Grades CRUD (TASK-01 #7)** is the single largest net-new subsystem in this list — recommend scoping and estimating it as its own project phase rather than folding into the general contractor-edit bugfix task.
 - ~~**Public-facing site dependencies (TASK-10 #4, #8)**~~ — resolved: the public site (`landing/`) is part of this monorepo, not a separate app; see TASK-10's execution summary.
-- Two rows (Membership Request, Payment History) are marked "(Disabled)" with empty detail columns — no action possible until the user/stakeholder clarifies intended scope.
+- ~~Two rows (Membership Request, Payment History) are marked "(Disabled)" with empty detail columns — no action possible until the user/stakeholder clarifies intended scope.~~ — both have since been clarified and reversed: Payment History in TASK-04 (2026-09-20), Membership Request in TASK-16 #6 (2026-09-22). **Pattern worth noting: hiding a working feature behind a commented-out nav link produced a bug report ~3 days later in both cases.** Prefer an explicit disabled state or a feature flag over silently removing the only entry point.
+- **"Works in the API, invisible in the panel" pattern**: TASK-16 #6 and #7 are both fully-built backends with no reachable frontend — one had its nav link removed, the other never had a page at all. When auditing a "nothing shows in the dashboard" report, check for a *missing consumer* before debugging the query; `grep -rn "<endpoint>" arab-contractors-union-front/resources/ts/` returning zero hits is the fastest discriminator.
+- **Two contractor profile-edit paths exist and behave differently** — the Vue portal posts to `contractor/auth/profile/update` (direct write, no review), the Flutter app posts to `contractor/profile-update-requests` (pending approval queue). TASK-03 examined only the first and wrongly dismissed the second. Always confirm *which client* a contractor-side report came from before tracing the endpoint.
