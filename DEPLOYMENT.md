@@ -18,7 +18,7 @@
 | Reverb | `127.0.0.1:8080` | `127.0.0.1:8081` |
 | الخدمات | `pcu-api-queue` · `pcu-api-reverb` | `pcu-prod-queue` · `pcu-prod-reverb` |
 | Firebase | **معطّل** → `LogPushSender` | **مفعّل** → `FirebasePushSender` |
-| النشر | تلقائي على كل push | **يتطلب موافقة يدوية** |
+| النشر | تلقائي على كل push | **يدوي فقط — لا مُشغِّل تلقائي إطلاقاً** |
 
 كلاهما على نفس الـVPS (`187.77.172.48`). العزل بالبيانات كامل؛ المشترك هو CPU/RAM وpool واحد لـPHP-FPM.
 
@@ -27,16 +27,23 @@
 ## 2. تدفّق العمل
 
 ```
-فرع ميزة ──PR──▶ feature/arab-contractors-union ──push──▶ STAGING (تلقائي، بلا موافقة)
+فرع ميزة ──PR──▶ feature/arab-contractors-union ──push──▶ STAGING (تلقائي)
                                 │
                                 │  بعد الاختبار: مزامنة يدوية (§6)
                                 ▼
-                    PcuGaza/*/main ──push──▶ [بوابة موافقة] ──▶ PRODUCTION
+                    PcuGaza/*/main ──[تشغيل يدوي صريح]──▶ PRODUCTION
 ```
 
 **حاجزان يمنعان النشر العَرَضي على الإنتاج:**
 1. الإنتاج في **مستودعين مختلفين** لا يصلهما الـpush اليومي.
-2. `environment: production` في الـworkflow يوقف التشغيل حتى توافق من تبويب Actions.
+2. **لا يوجد `on: push` في workflows الإنتاج إطلاقاً** — `workflow_dispatch` فقط. الدفع إلى `main` لا ينشر شيئاً؛ يلزم ضغط زر.
+
+> **لماذا لا توجد "بوابة موافقة" بالمعنى الحرفي؟** قاعدة *required reviewers* على البيئات **وحماية الفروع** كلتاهما تتطلبان GitHub Pro/Team للمستودعات الخاصة، ومنظمة PcuGaza على الخطة المجانية (`HTTP 422/403` عند المحاولة — مُختبَر 2026-09-23).
+>
+> الخطر الحقيقي هنا ليس غياب البوابة، بل **بوابة وهمية**: لو تُرك `on: push` مع `environment: production` بلا قاعدة حماية، فإن GitHub ينشئ البيئة تلقائياً **بلا أي حماية** وينشر كل دمج في `main` فوراً — بينما الـworkflow يبدو محمياً. وقد حدث هذا فعلاً أثناء الإعداد: انطلقت 3 نشرات تلقائية، ونجت فقط لأن الأسرار لم تكن قد أُضيفت بعد ففشلت جميعها.
+>
+> الحل المطبَّق يعطي ضماناً **أقوى** بلا تكلفة: لا مسار تلقائي أصلاً.
+> **عند الترقية إلى Pro/Team:** أعد `on: push: branches: [main]` وأضف required reviewers على بيئة `production`.
 
 ---
 
@@ -50,11 +57,19 @@ git push origin feature/arab-contractors-union
 
 ### Production
 1. زامن الكود من staging إلى مستودعي PcuGaza (§6).
-2. ادفع/ادمج في `main`.
-3. اذهب إلى **Actions** في المستودع → التشغيل معلّق بانتظار الموافقة → **Review deployments** → **Approve**.
-4. راقب حتى `✔ تم نشر الإنتاج بنجاح`.
+2. ادفع/ادمج في `main` — **هذا وحده لا ينشر شيئاً**.
+3. **Actions** → `Deploy backend to production` → **Run workflow** → Branch: `main` → Run.
+4. كرّر في مستودع الفرونت.
+5. راقب حتى `✔ تم نشر الإنتاج بنجاح`.
 
-الباك إند والفرونت مستودعان مستقلان، فلكل منهما تشغيل وموافقة منفصلان.
+الباك إند والفرونت مستودعان مستقلان، فلكل منهما تشغيل منفصل. رتّب الباك إند أولاً إن كانت هناك ترحيلات.
+
+بالسطر الواحد (يحتاج توكن بصلاحية `repo`):
+```bash
+curl -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+  https://api.github.com/repos/PcuGaza/PCU-Manager-Backend/actions/workflows/deploy-production.yml/dispatches \
+  -d '{"ref":"main"}'
+```
 
 ### يدويًا من الخادم (عند تعطّل GitHub Actions)
 ```bash
