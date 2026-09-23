@@ -147,10 +147,6 @@ export default defineConfig({
               return 'vendor_i18n'
             if (id.includes('react') || id.includes('framer-motion') || id.includes('lucide-react'))
               return 'vendor_react_landing'
-            if (id.includes('mapbox-gl'))
-              return 'vendor_mapbox'
-            if (id.includes('@fullcalendar'))
-              return 'vendor_calendar'
             return 'vendor_core'
           }
         }
