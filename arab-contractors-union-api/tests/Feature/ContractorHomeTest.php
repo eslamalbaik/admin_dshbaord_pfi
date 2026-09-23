@@ -321,7 +321,7 @@ class ContractorHomeTest extends TestCase
     //  Latest updates feed
     // ─────────────────────────────────────────────────────────────────────
 
-    public function test_latest_updates_caps_at_three_and_sorts_by_recency(): void
+    public function test_latest_updates_caps_at_five_and_sorts_by_recency(): void
     {
         $contractor = $this->createContractor();
 
@@ -332,8 +332,59 @@ class ContractorHomeTest extends TestCase
         Sanctum::actingAs($contractor, ['*']);
         $updates = $this->getJson('/api/v1/contractor/home')->json('items.latest_updates');
 
-        $this->assertCount(3, $updates);
+        $this->assertCount(5, $updates);
         $this->assertEquals('عطاء 9', $updates[0]['title']); // آخر عنصر أُنشئ يظهر أولاً
+    }
+
+    /**
+     * TASK-16 #1 — زر "عرض المزيد" يعتمد على has_more؛ بدونه لا يملك التطبيق
+     * أي إشارة تُميّز "هذه كل التحديثات" عن "هناك المزيد في صفحة منفصلة".
+     */
+    public function test_home_reports_has_more_when_feed_exceeds_the_cap(): void
+    {
+        $contractor = $this->createContractor();
+
+        for ($i = 0; $i < 8; $i++) {
+            Tender::create(['title' => "عطاء $i", 'status' => 'open']);
+        }
+
+        Sanctum::actingAs($contractor, ['*']);
+        $home = $this->getJson('/api/v1/contractor/home');
+
+        $this->assertCount(5, $home->json('items.latest_updates'));
+        $this->assertEquals(8, $home->json('items.latest_updates_total'));
+        $this->assertTrue($home->json('items.has_more'));
+    }
+
+    public function test_home_reports_no_more_when_feed_fits_within_the_cap(): void
+    {
+        $contractor = $this->createContractor();
+
+        for ($i = 0; $i < 3; $i++) {
+            Tender::create(['title' => "عطاء $i", 'status' => 'open']);
+        }
+
+        Sanctum::actingAs($contractor, ['*']);
+        $home = $this->getJson('/api/v1/contractor/home');
+
+        $this->assertCount(3, $home->json('items.latest_updates'));
+        $this->assertEquals(3, $home->json('items.latest_updates_total'));
+        $this->assertFalse($home->json('items.has_more'));
+    }
+
+    public function test_home_reports_no_more_at_exactly_the_cap(): void
+    {
+        $contractor = $this->createContractor();
+
+        for ($i = 0; $i < 5; $i++) {
+            Tender::create(['title' => "عطاء $i", 'status' => 'open']);
+        }
+
+        Sanctum::actingAs($contractor, ['*']);
+        $home = $this->getJson('/api/v1/contractor/home');
+
+        $this->assertCount(5, $home->json('items.latest_updates'));
+        $this->assertFalse($home->json('items.has_more'));
     }
 
     public function test_new_badge_applied_within_24_hours(): void

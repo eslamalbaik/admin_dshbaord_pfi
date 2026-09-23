@@ -36,7 +36,7 @@ class ContractorHomeController extends Controller
     private const NEW_TENDERS_WINDOW_DAYS = 7;
     private const NEW_BADGE_HOURS         = 24;
     private const FEED_POOL_LIMIT         = 30; // عدد السجلات المجلوبة من كل مصدر قبل الدمج والترتيب
-    private const HOME_UPDATES_LIMIT      = 3;
+    private const HOME_UPDATES_LIMIT      = 5;
     private const UPDATES_PER_PAGE        = 20;
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -46,6 +46,10 @@ class ContractorHomeController extends Controller
     {
         $contractor = $request->user();
 
+        // يُبنى مرة واحدة — النسخة السابقة كانت تستدعي buildFeed() داخل take() مباشرة،
+        // فإضافة العدّ الكلي كانت ستعيد بناء الخلاصة (7 استعلامات) مرة ثانية بلا داعٍ.
+        $feed = $this->buildFeed($contractor);
+
         return $this->success([
             'contractor'                 => $this->contractorCard($contractor),
             'membership'                 => $this->membershipStatus($contractor),
@@ -53,9 +57,12 @@ class ContractorHomeController extends Controller
             'stats'                      => $this->statsCard($contractor),
             'cta_certificate'            => $this->ctaCertificate($contractor),
             'unread_notifications_count' => $contractor->unreadNotifications()->count(),
-            'latest_updates'             => $this->presentFeed(
-                $this->buildFeed($contractor)->take(self::HOME_UPDATES_LIMIT)
-            ),
+            'latest_updates'             => $this->presentFeed($feed->take(self::HOME_UPDATES_LIMIT)),
+            // إشارة زر "عرض المزيد" — التطبيق يحوّل بها إلى contractor/home/updates.
+            // ملاحظة: buildFeed() محدودة بـ FEED_POOL_LIMIT لكل مصدر، فالعدّ سقفه العملي
+            // هو حجم التجمّع لا العدد الكلي في قاعدة البيانات — وهو ما تعرضه شاشة "عرض الكل" نفسها.
+            'latest_updates_total'       => $feed->count(),
+            'has_more'                   => $feed->count() > self::HOME_UPDATES_LIMIT,
         ]);
     }
 

@@ -371,6 +371,9 @@ const managementRows = computed(() => {
     { label: 'صاحب المنشأة', value: t.owner_name || '—', icon: 'tabler-user' },
     { label: 'أسماء الشركاء', value: t.partners || '—', icon: 'tabler-users' },
     { label: 'المفوض بالتوقيع', value: t.authorized_person || '—', icon: 'tabler-signature' },
+    { label: 'رقم هوية المفوض', value: t.authorized_person_id_number || '—', icon: 'tabler-id' },
+    { label: 'رقم جوال المفوض', value: t.authorized_person_phone || '—', dir: 'ltr', icon: 'tabler-device-mobile' },
+    { label: 'رقم واتساب المفوض', value: t.authorized_person_whatsapp || '—', dir: 'ltr', icon: 'tabler-brand-whatsapp' },
   ]
 })
 
@@ -620,7 +623,7 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
                       <VIcon :icon="row.icon" size="16" color="info" />
                       {{ row.label }}
                     </span>
-                    <span class="text-body-2 font-weight-medium text-end details-row-value">{{ row.value }}</span>
+                    <span class="text-body-2 font-weight-medium text-end details-row-value" :dir="row.dir">{{ row.value }}</span>
                   </div>
                 </VCardText>
               </VCard>
