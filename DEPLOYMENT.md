@@ -208,6 +208,15 @@ crontab -u www-data -l
 chown -R www-data:www-data <مجلد التطبيق>/storage <مجلد التطبيق>/bootstrap/cache
 ```
 
+**فخّ ملكية `.env` — قنبلة موقوتة صامتة.** لو كان `.env` مملوكًا لـ`root` بصلاحية `640`
+فإن PHP-FPM (يعمل بـ`www-data`) **لا يستطيع قراءته**. الموقع يظل يعمل ما دام
+`bootstrap/cache/config.php` موجودًا، فلا شيء يبدو خاطئًا — ثم ينهار عند أول
+`php artisan config:clear` أو `optimize:clear`. تحقّق دائمًا:
+```bash
+sudo -u www-data test -r <مجلد التطبيق>/.env && echo ok || echo 'BROKEN'
+```
+الصحيح: `chown www-data:www-data .env && chmod 640 .env`.
+
 **حدود الرفع:** PHP-FPM مضبوط على `upload_max_filesize=2M` و`post_max_size=8M` بينما قواعد Laravel تسمح بـ10M. الرفع الأكبر يفشل برسالة "الحقل مطلوب" مضلّلة. للرفع حتى 10M عدّل `/etc/php/8.5/fpm/php.ini` ثم `systemctl restart php8.5-fpm`.
 
 ---
