@@ -43,6 +43,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('api', [
             \App\Http\Middleware\NoCacheHeaders::class,
             \App\Http\Middleware\SetLocale::class,
+            // يجب أن يسبق التحقق: الطلب الذي أسقط PHP جسمه يصل فارغاً، فيُفشله
+            // التحقق بـ"الحقل مطلوب" على حقول مملوءة ويُخفي السبب الحقيقي (TASK-16 #3).
+            \App\Http\Middleware\DetectDiscardedRequestBody::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

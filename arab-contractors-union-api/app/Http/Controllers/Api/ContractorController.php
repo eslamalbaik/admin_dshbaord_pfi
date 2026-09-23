@@ -55,6 +55,12 @@ class ContractorController extends Controller
 
     private function getValidationRules($isUpdate = false, $contractorId = null)
     {
+        // السقف مشتق من UploadLimits لا رقماً ثابتاً: 10240 السابقة كانت تَعِد بـ10MB
+        // بينما upload_max_filesize على الخادم 2M، فكل ملف أكبر كان يُسقَط قبل التحقق
+        // دون أي رسالة حجم (TASK-16 #2/#3).
+        $fileRule = 'nullable|file|mimes:' . implode(',', \App\Support\UploadLimits::ALLOWED_EXTENSIONS)
+            . '|max:' . \App\Support\UploadLimits::maxFileKb();
+
         return [
             'name'                          => 'required|string|max:255',
             'membership_number'             => [
@@ -114,49 +120,95 @@ class ContractorController extends Controller
             'authorized_person_whatsapp'    => 'nullable|string|max:20',
 
             // Files
-            'cr_file'                       => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
-            'id_file'                       => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
-            'lease_or_ownership_contract'   => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
-            'company_approval_letter'       => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
-            'municipal_license'             => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
-            'company_register'              => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
-            'articles_of_association'       => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
-            'internal_bylaws'               => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
-            'bank_dealing_letter'           => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
-            'secretary_contract'            => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
-            'full_time_engineer_certificate'=> 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
-            'accountant_certificate_or_contract' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
-            'partners_ids'                  => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
-            'authorization_letter'          => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
+            'cr_file'                       => $fileRule,
+            'id_file'                       => $fileRule,
+            'lease_or_ownership_contract'   => $fileRule,
+            'company_approval_letter'       => $fileRule,
+            'municipal_license'             => $fileRule,
+            'company_register'              => $fileRule,
+            'articles_of_association'       => $fileRule,
+            'internal_bylaws'               => $fileRule,
+            'bank_dealing_letter'           => $fileRule,
+            'secretary_contract'            => $fileRule,
+            'full_time_engineer_certificate'=> $fileRule,
+            'accountant_certificate_or_contract' => $fileRule,
+            'partners_ids'                  => $fileRule,
+            'authorization_letter'          => $fileRule,
+
+            // حذف مستندات قائمة (TASK-16 #4) — محصور بمفاتيح FILE_FIELDS حتى لا يُمرَّر
+            // اسم عمود عشوائي فيُفرَّغ من قاعدة البيانات.
+            'remove_documents'              => 'nullable|array',
+            'remove_documents.*'            => ['string', Rule::in(array_keys(self::FILE_FIELDS))],
         ];
     }
 
+    /**
+     * حقول المستندات ومسار تخزين كلٍّ منها. كانت مصفوفة محلية داخل handleFileUploads()،
+     * ورُفعت لثابت ليشتقّ منه قيد remove_documents قائمته البيضاء من نفس المصدر
+     * بدل تكرار الأسماء الأربعة عشر مرتين.
+     */
+    private const FILE_FIELDS = [
+        'cr_file'                       => 'contractors/cr',
+        'id_file'                       => 'contractors/id',
+        'lease_or_ownership_contract'   => 'contractors/leases',
+        'company_approval_letter'       => 'contractors/approvals',
+        'municipal_license'             => 'contractors/licenses',
+        'company_register'              => 'contractors/registers',
+        'articles_of_association'       => 'contractors/articles',
+        'internal_bylaws'               => 'contractors/bylaws',
+        'bank_dealing_letter'           => 'contractors/bank_letters',
+        'secretary_contract'            => 'contractors/secretary_contracts',
+        'full_time_engineer_certificate'=> 'contractors/engineer_certs',
+        'accountant_certificate_or_contract' => 'contractors/accountant_certs',
+        'partners_ids'                  => 'contractors/partners_ids',
+        'authorization_letter'          => 'contractors/authorization_letters',
+    ];
+
     private function handleFileUploads(Request $request, &$validated, $contractor = null)
     {
-        $fileFields = [
-            'cr_file'                       => 'contractors/cr',
-            'id_file'                       => 'contractors/id',
-            'lease_or_ownership_contract'   => 'contractors/leases',
-            'company_approval_letter'       => 'contractors/approvals',
-            'municipal_license'             => 'contractors/licenses',
-            'company_register'              => 'contractors/registers',
-            'articles_of_association'       => 'contractors/articles',
-            'internal_bylaws'               => 'contractors/bylaws',
-            'bank_dealing_letter'           => 'contractors/bank_letters',
-            'secretary_contract'            => 'contractors/secretary_contracts',
-            'full_time_engineer_certificate'=> 'contractors/engineer_certs',
-            'accountant_certificate_or_contract' => 'contractors/accountant_certs',
-            'partners_ids'                  => 'contractors/partners_ids',
-            'authorization_letter'          => 'contractors/authorization_letters',
-        ];
+        $uploaded = [];
 
-        foreach ($fileFields as $field => $path) {
+        foreach (self::FILE_FIELDS as $field => $path) {
             if ($request->hasFile($field)) {
                 if ($contractor && $contractor->$field) {
                     Storage::disk('public')->delete($contractor->$field);
                 }
                 $validated[$field] = $request->file($field)->store($path, 'public');
+                $uploaded[] = $field;
             }
+        }
+
+        $this->handleDocumentRemovals($request, $validated, $contractor, $uploaded);
+    }
+
+    /**
+     * حذف مستندات صراحةً عبر remove_documents[] (TASK-16 #4) — سابقاً كان الاستبدال
+     * هو السبيل الوحيد لإزالة مستند.
+     *
+     * قائمة صريحة عمداً لا "القيمة الفارغة تعني الحذف": VFileInput يُرجع [] عند تفريغه،
+     * وتفسير الفراغ كحذف يُعيد كسر إصلاح TASK-01 #4 الذي أوقف إرسال تلك المصفوفة أصلاً.
+     */
+    private function handleDocumentRemovals(Request $request, &$validated, $contractor, array $uploaded): void
+    {
+        // ليس عموداً في الجدول — يُزال صراحةً بدل الاتّكال على حماية mass-assignment وحدها.
+        unset($validated['remove_documents']);
+
+        if (! $contractor) {
+            return;
+        }
+
+        foreach ((array) $request->input('remove_documents', []) as $field) {
+            // رفعُ ملف جديد لنفس الحقل في الطلب ذاته يتقدّم على علامة حذف قديمة —
+            // الاستبدال حذف أصلاً للملف السابق أعلاه، وتطبيق الحذف بعده يمسح الجديد.
+            if (! isset(self::FILE_FIELDS[$field]) || in_array($field, $uploaded, true)) {
+                continue;
+            }
+
+            if ($contractor->$field) {
+                Storage::disk('public')->delete($contractor->$field);
+            }
+
+            $validated[$field] = null;
         }
     }
 

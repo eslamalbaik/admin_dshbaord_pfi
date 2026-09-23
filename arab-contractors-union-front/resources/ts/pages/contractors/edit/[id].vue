@@ -130,6 +130,35 @@ const governorates = ref<Array<{ id: number, name: string, cities: Array<{ id: n
 const citiesForGovernorate = (governorateId: number | null) =>
   governorates.value.find(g => g.id === governorateId)?.cities ?? []
 
+
+// قيود رفع المستندات (TASK-16 #2) — تُجلب من الخادم لأن السقف الحقيقي هو
+// upload_max_filesize في ini لا رقم ثابت هنا؛ رقم ثابت يفارق الخادم بصمت.
+const uploadLimits = ref({ max_file_kb: 0, max_file_mb: 0, max_post_mb: 0, allowed_extensions: [] as string[] })
+
+const fileHint = computed(() => uploadLimits.value.max_file_mb
+  ? `الحد الأقصى ${uploadLimits.value.max_file_mb} ميجابايت للملف — الصيغ المسموحة: ${uploadLimits.value.allowed_extensions.join('، ')}`
+  : '')
+
+// الرفض هنا قبل بدء الرفع هو ما يمنع انتظار رفع ملف سيُرفض أصلاً (TASK-16 #3):
+// المتصفح يرسل الجسم كاملاً ثم يُسقطه PHP، فالتحقق بعد الوصول لا يوفّر الانتظار.
+const fileSizeRule = (v: any) => {
+  const max = uploadLimits.value.max_file_kb
+  if (!max) return true
+  const files = Array.isArray(v) ? v : (v ? [v] : [])
+  const tooBig = files.find((f: any) => f instanceof File && f.size / 1024 > max)
+  return tooBig
+    ? `حجم الملف ${(tooBig.size / 1024 / 1024).toFixed(1)} ميجابايت — يتجاوز الحد الأقصى ${uploadLimits.value.max_file_mb} ميجابايت.`
+    : true
+}
+
+const totalAttachmentsMb = computed(() => {
+  const vals = Object.values(form.value).filter((v: any) => v instanceof File) as File[]
+  return vals.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024
+})
+
+const attachmentsTooLarge = computed(() =>
+  !!uploadLimits.value.max_post_mb && totalAttachmentsMb.value > uploadLimits.value.max_post_mb)
+
 const fetchCatalog = async () => {
   try {
     const { data } = await api.get('/api/v1/app/specialties-catalog')
@@ -140,6 +169,7 @@ const fetchCatalog = async () => {
     gradeOptions.value = (items.grades ?? []).map((g: any) => ({ title: g.label, value: g.value }))
     topTierFields.value = (items.grades ?? []).find((g: any) => g.eligible_fields)?.eligible_fields ?? []
     overallGradeOptions.value = (items.overall_grades ?? []).map((g: any) => ({ title: g.label, value: g.value }))
+    if (items.upload_limits) uploadLimits.value = items.upload_limits
   } catch (err) {
     console.error('Failed to fetch specialties catalog', err)
   }
@@ -163,6 +193,46 @@ const documentKeys = [
 ] as const
 
 const existingFiles = ref<Record<string, string | null>>({})
+
+// ── حذف مستند قائم (TASK-16 #4) ──
+// سابقاً كان الاستبدال هو السبيل الوحيد لإزالة مستند. يُجمَع المحدَّد للحذف محلياً
+// ويُرسَل عند الحفظ كـ remove_documents[]، لا فوراً — حتى يبقى "إلغاء" ممكناً قبل الحفظ،
+// ولأن الحذف على الخادم لا رجعة فيه (يُمحى الملف من القرص).
+const documentLabels: Record<string, string> = {
+  lease_or_ownership_contract: 'عقد الإيجار أو الملكية',
+  company_approval_letter: 'كتاب الموافقة على الانتساب',
+  municipal_license: 'رخصة المهن',
+  company_register: 'مستخرج عن سجل الشركة',
+  cr_file: 'السجل التجاري',
+  articles_of_association: 'عقد تأسيس الشركة',
+  internal_bylaws: 'النظام الداخلي',
+  bank_dealing_letter: 'شهادة تعامل بنك',
+  secretary_contract: 'عقد سكرتير',
+  full_time_engineer_certificate: 'شهادة مهندس متفرغ',
+  accountant_certificate_or_contract: 'شهادة تفرغ محاسب / عقد مكتب',
+  partners_ids: 'صور هويات الشركاء',
+  authorization_letter: 'كتاب تفويض المعتمد بالتوقيع',
+}
+
+const documentsToRemove = ref<string[]>([])
+const removeDocumentDialog = ref(false)
+const removingDocumentKey = ref<string | null>(null)
+
+const confirmRemoveDocument = (key: string) => {
+  removingDocumentKey.value = key
+  removeDocumentDialog.value = true
+}
+
+const removeDocument = () => {
+  if (removingDocumentKey.value && !documentsToRemove.value.includes(removingDocumentKey.value))
+    documentsToRemove.value.push(removingDocumentKey.value)
+  removeDocumentDialog.value = false
+  removingDocumentKey.value = null
+}
+
+const undoRemoveDocument = (key: string) => {
+  documentsToRemove.value = documentsToRemove.value.filter(k => k !== key)
+}
 
 const fetchContractor = async () => {
   try {
@@ -244,6 +314,17 @@ watch(() => form.value.governorate_id, () => {
 const uploadProgress = ref(0)
 
 const submit = async () => {
+  // فحص المجموع قبل أي رفع (TASK-16 #3): المتصفح يرفع الجسم كاملاً ثم يُسقطه PHP
+  // لتجاوزه post_max_size — فبدون هذا الفحص ينتظر المستخدم رفع كل الملفات ثم يفشل.
+  if (attachmentsTooLarge.value) {
+    errorMsg.value = `مجموع أحجام المرفقات ${totalAttachmentsMb.value.toFixed(1)} ميجابايت `
+      + `ويتجاوز الحد الأقصى ${uploadLimits.value.max_post_mb} ميجابايت للطلب الواحد. `
+      + 'يرجى تقليل حجم بعض الملفات قبل الحفظ.'
+    step.value = 4
+
+    return
+  }
+
   loading.value = true
   uploadProgress.value = 0
   errorMsg.value = ''
@@ -268,6 +349,15 @@ const submit = async () => {
         }
       }
     })
+    // المستندات المحدَّدة للحذف — قائمة صريحة، لا "قيمة فارغة تعني الحذف": VFileInput
+    // يُرجع [] عند تفريغه والفحص أعلاه يتخطّاها عمداً (إصلاح REQ-01 #4).
+    documentsToRemove.value.forEach(key => {
+      // رفعُ بديل لنفس الحقل يُلغي علامة الحذف — الخادم يُرجّح الرفع أيضاً، لكن عدم
+      // إرسالها أصلاً أوضح من الاتّكال على ترتيب المعالجة هناك.
+      if (!form.value[key as keyof typeof form.value])
+        fd.append('remove_documents[]', key)
+    })
+
     await api.post(`/api/v1/contractors/${route.params.id}`, fd, {
       headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress: e => {
@@ -277,6 +367,16 @@ const submit = async () => {
     router.push({ name: 'contractors' })
   }
   catch (err: any) {
+    // 413 = أسقط PHP جسم الطلب لتجاوزه post_max_size؛ رسالة الخادم تشرح الحد
+    // بدقة، والرسالة العامة هنا كانت تُخفي أن السبب هو الحجم لا المدخلات (TASK-16 #3).
+    if (err?.response?.status === 413) {
+      errorMsg.value = err?.response?.data?.message
+        || 'حجم المرفقات يتجاوز الحد الأقصى المسموح به. يرجى تقليل حجم الملفات أو رفعها على دفعات.'
+      step.value = 4
+
+      return
+    }
+
     errorMsg.value = err?.response?.data?.message || 'فشل تحديث المقاول. يرجى التحقق من المدخلات.'
     
     const errors = err?.response?.data?.errors
@@ -590,16 +690,26 @@ const submit = async () => {
         <VRow>
           <VCol cols="12" md="6">
             <div v-if="existingFiles.cr_file && !form.cr_file" class="d-flex align-center gap-2 mb-1">
-              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
-              <a :href="existingFiles.cr_file!" target="_blank" class="text-body-2 d-flex align-center gap-1">
-                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
-              </a>
+              <template v-if="documentsToRemove.includes('cr_file')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('cr_file')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.cr_file!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('cr_file')" />
+              </template>
             </div>
             <VFileInput
               v-model="form.cr_file"
               label="السجل التجاري (للتحديث)"
               :error-messages="validationErrors.cr_file"
               accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -609,16 +719,26 @@ const submit = async () => {
           </VCol>
           <VCol cols="12" md="6">
             <div v-if="existingFiles.company_register && !form.company_register" class="d-flex align-center gap-2 mb-1">
-              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
-              <a :href="existingFiles.company_register!" target="_blank" class="text-body-2 d-flex align-center gap-1">
-                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
-              </a>
+              <template v-if="documentsToRemove.includes('company_register')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('company_register')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.company_register!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('company_register')" />
+              </template>
             </div>
             <VFileInput
               v-model="form.company_register"
               label="مستخرج عن سجل الشركة (للتحديث)"
               :error-messages="validationErrors.company_register"
               accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -628,16 +748,26 @@ const submit = async () => {
           </VCol>
           <VCol cols="12" md="6">
             <div v-if="existingFiles.municipal_license && !form.municipal_license" class="d-flex align-center gap-2 mb-1">
-              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
-              <a :href="existingFiles.municipal_license!" target="_blank" class="text-body-2 d-flex align-center gap-1">
-                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
-              </a>
+              <template v-if="documentsToRemove.includes('municipal_license')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('municipal_license')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.municipal_license!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('municipal_license')" />
+              </template>
             </div>
             <VFileInput
               v-model="form.municipal_license"
               label="رخصة المهن سارية المفعول (للتحديث)"
               :error-messages="validationErrors.municipal_license"
               accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -647,16 +777,26 @@ const submit = async () => {
           </VCol>
           <VCol cols="12" md="6">
             <div v-if="existingFiles.bank_dealing_letter && !form.bank_dealing_letter" class="d-flex align-center gap-2 mb-1">
-              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
-              <a :href="existingFiles.bank_dealing_letter!" target="_blank" class="text-body-2 d-flex align-center gap-1">
-                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
-              </a>
+              <template v-if="documentsToRemove.includes('bank_dealing_letter')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('bank_dealing_letter')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.bank_dealing_letter!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('bank_dealing_letter')" />
+              </template>
             </div>
             <VFileInput
               v-model="form.bank_dealing_letter"
               label="شهادة تعامل للشركة مع بنك (للتحديث)"
               :error-messages="validationErrors.bank_dealing_letter"
               accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -666,16 +806,26 @@ const submit = async () => {
           </VCol>
           <VCol cols="12" md="6">
             <div v-if="existingFiles.articles_of_association && !form.articles_of_association" class="d-flex align-center gap-2 mb-1">
-              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
-              <a :href="existingFiles.articles_of_association!" target="_blank" class="text-body-2 d-flex align-center gap-1">
-                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
-              </a>
+              <template v-if="documentsToRemove.includes('articles_of_association')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('articles_of_association')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.articles_of_association!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('articles_of_association')" />
+              </template>
             </div>
             <VFileInput
               v-model="form.articles_of_association"
               label="عقد تأسيس الشركة (للتحديث)"
               :error-messages="validationErrors.articles_of_association"
               accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -685,16 +835,26 @@ const submit = async () => {
           </VCol>
           <VCol cols="12" md="6">
             <div v-if="existingFiles.internal_bylaws && !form.internal_bylaws" class="d-flex align-center gap-2 mb-1">
-              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
-              <a :href="existingFiles.internal_bylaws!" target="_blank" class="text-body-2 d-flex align-center gap-1">
-                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
-              </a>
+              <template v-if="documentsToRemove.includes('internal_bylaws')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('internal_bylaws')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.internal_bylaws!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('internal_bylaws')" />
+              </template>
             </div>
             <VFileInput
               v-model="form.internal_bylaws"
               label="النظام الداخلي (للتحديث)"
               :error-messages="validationErrors.internal_bylaws"
               accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -704,16 +864,26 @@ const submit = async () => {
           </VCol>
           <VCol cols="12" md="6">
             <div v-if="existingFiles.lease_or_ownership_contract && !form.lease_or_ownership_contract" class="d-flex align-center gap-2 mb-1">
-              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
-              <a :href="existingFiles.lease_or_ownership_contract!" target="_blank" class="text-body-2 d-flex align-center gap-1">
-                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
-              </a>
+              <template v-if="documentsToRemove.includes('lease_or_ownership_contract')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('lease_or_ownership_contract')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.lease_or_ownership_contract!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('lease_or_ownership_contract')" />
+              </template>
             </div>
             <VFileInput
               v-model="form.lease_or_ownership_contract"
               label="عقد الإيجار أو الملكية لمقر الشركة (للتحديث)"
               :error-messages="validationErrors.lease_or_ownership_contract"
               accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -723,16 +893,26 @@ const submit = async () => {
           </VCol>
           <VCol cols="12" md="6">
             <div v-if="existingFiles.partners_ids && !form.partners_ids" class="d-flex align-center gap-2 mb-1">
-              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
-              <a :href="existingFiles.partners_ids!" target="_blank" class="text-body-2 d-flex align-center gap-1">
-                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
-              </a>
+              <template v-if="documentsToRemove.includes('partners_ids')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('partners_ids')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.partners_ids!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('partners_ids')" />
+              </template>
             </div>
             <VFileInput
               v-model="form.partners_ids"
               label="صور هويات الشركاء (للتحديث)"
               :error-messages="validationErrors.partners_ids"
               accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -742,16 +922,26 @@ const submit = async () => {
           </VCol>
           <VCol cols="12" md="6">
             <div v-if="existingFiles.authorization_letter && !form.authorization_letter" class="d-flex align-center gap-2 mb-1">
-              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
-              <a :href="existingFiles.authorization_letter!" target="_blank" class="text-body-2 d-flex align-center gap-1">
-                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
-              </a>
+              <template v-if="documentsToRemove.includes('authorization_letter')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('authorization_letter')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.authorization_letter!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('authorization_letter')" />
+              </template>
             </div>
             <VFileInput
               v-model="form.authorization_letter"
               label="كتاب تفويض المعتمد بالتوقيع (للتحديث)"
               :error-messages="validationErrors.authorization_letter"
               accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -761,16 +951,26 @@ const submit = async () => {
           </VCol>
           <VCol cols="12" md="6">
             <div v-if="existingFiles.company_approval_letter && !form.company_approval_letter" class="d-flex align-center gap-2 mb-1">
-              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
-              <a :href="existingFiles.company_approval_letter!" target="_blank" class="text-body-2 d-flex align-center gap-1">
-                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
-              </a>
+              <template v-if="documentsToRemove.includes('company_approval_letter')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('company_approval_letter')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.company_approval_letter!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('company_approval_letter')" />
+              </template>
             </div>
             <VFileInput
               v-model="form.company_approval_letter"
               label="كتاب موافقة على الانتساب (للتحديث)"
               :error-messages="validationErrors.company_approval_letter"
               accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -780,16 +980,26 @@ const submit = async () => {
           </VCol>
           <VCol cols="12" md="6">
             <div v-if="existingFiles.full_time_engineer_certificate && !form.full_time_engineer_certificate" class="d-flex align-center gap-2 mb-1">
-              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
-              <a :href="existingFiles.full_time_engineer_certificate!" target="_blank" class="text-body-2 d-flex align-center gap-1">
-                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
-              </a>
+              <template v-if="documentsToRemove.includes('full_time_engineer_certificate')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('full_time_engineer_certificate')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.full_time_engineer_certificate!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('full_time_engineer_certificate')" />
+              </template>
             </div>
             <VFileInput
               v-model="form.full_time_engineer_certificate"
               label="شهادة مهندس متفرغ (للتحديث)"
               :error-messages="validationErrors.full_time_engineer_certificate"
               accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -799,16 +1009,26 @@ const submit = async () => {
           </VCol>
           <VCol cols="12" md="6">
             <div v-if="existingFiles.accountant_certificate_or_contract && !form.accountant_certificate_or_contract" class="d-flex align-center gap-2 mb-1">
-              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
-              <a :href="existingFiles.accountant_certificate_or_contract!" target="_blank" class="text-body-2 d-flex align-center gap-1">
-                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
-              </a>
+              <template v-if="documentsToRemove.includes('accountant_certificate_or_contract')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('accountant_certificate_or_contract')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.accountant_certificate_or_contract!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('accountant_certificate_or_contract')" />
+              </template>
             </div>
             <VFileInput
               v-model="form.accountant_certificate_or_contract"
               label="شهادة تفرغ محاسب من نقابة المحاسبين / أو عقد مع مكتب محاسبين معتمد (للتحديث)"
               :error-messages="validationErrors.accountant_certificate_or_contract"
               accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -818,16 +1038,26 @@ const submit = async () => {
           </VCol>
           <VCol cols="12" md="6">
             <div v-if="existingFiles.secretary_contract && !form.secretary_contract" class="d-flex align-center gap-2 mb-1">
-              <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
-              <a :href="existingFiles.secretary_contract!" target="_blank" class="text-body-2 d-flex align-center gap-1">
-                <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
-              </a>
+              <template v-if="documentsToRemove.includes('secretary_contract')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('secretary_contract')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.secretary_contract!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('secretary_contract')" />
+              </template>
             </div>
             <VFileInput
               v-model="form.secretary_contract"
               label="عقد سكرتير (للتحديث)"
               :error-messages="validationErrors.secretary_contract"
               accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -870,6 +1100,25 @@ const submit = async () => {
           <VSpacer />
           <VBtn variant="tonal" @click="removeSpecialtyDialog = false">إلغاء</VBtn>
           <VBtn color="error" @click="removeSpecialty">حذف</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- تأكيد حذف مستند (TASK-16 #4) — الحذف الفعلي يقع عند الحفظ لا الآن -->
+    <VDialog v-model="removeDocumentDialog" max-width="440">
+      <VCard>
+        <VCardTitle class="d-flex align-center gap-2" style="font-family:Cairo,sans-serif">
+          <VIcon icon="tabler-alert-triangle" color="error" />
+          تأكيد حذف المستند
+        </VCardTitle>
+        <VCardText style="font-family:Cairo,sans-serif">
+          سيُحذف مستند «{{ documentLabels[removingDocumentKey ?? ''] ?? '' }}» نهائياً من الخادم عند حفظ التعديلات،
+          ولا يمكن استرجاعه بعدها. يمكنك التراجع قبل الحفظ.
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" @click="removeDocumentDialog = false">إلغاء</VBtn>
+          <VBtn color="error" @click="removeDocument">تحديد للحذف</VBtn>
         </VCardActions>
       </VCard>
     </VDialog>

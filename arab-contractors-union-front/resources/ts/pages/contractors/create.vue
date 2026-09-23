@@ -162,6 +162,35 @@ const governorates = ref<Array<{ id: number, name: string, cities: Array<{ id: n
 const citiesForGovernorate = (governorateId: number | null) =>
   governorates.value.find(g => g.id === governorateId)?.cities ?? []
 
+
+// قيود رفع المستندات (TASK-16 #2) — تُجلب من الخادم لأن السقف الحقيقي هو
+// upload_max_filesize في ini لا رقم ثابت هنا؛ رقم ثابت يفارق الخادم بصمت.
+const uploadLimits = ref({ max_file_kb: 0, max_file_mb: 0, max_post_mb: 0, allowed_extensions: [] as string[] })
+
+const fileHint = computed(() => uploadLimits.value.max_file_mb
+  ? `الحد الأقصى ${uploadLimits.value.max_file_mb} ميجابايت للملف — الصيغ المسموحة: ${uploadLimits.value.allowed_extensions.join('، ')}`
+  : '')
+
+// الرفض هنا قبل بدء الرفع هو ما يمنع انتظار رفع ملف سيُرفض أصلاً (TASK-16 #3):
+// المتصفح يرسل الجسم كاملاً ثم يُسقطه PHP، فالتحقق بعد الوصول لا يوفّر الانتظار.
+const fileSizeRule = (v: any) => {
+  const max = uploadLimits.value.max_file_kb
+  if (!max) return true
+  const files = Array.isArray(v) ? v : (v ? [v] : [])
+  const tooBig = files.find((f: any) => f instanceof File && f.size / 1024 > max)
+  return tooBig
+    ? `حجم الملف ${(tooBig.size / 1024 / 1024).toFixed(1)} ميجابايت — يتجاوز الحد الأقصى ${uploadLimits.value.max_file_mb} ميجابايت.`
+    : true
+}
+
+const totalAttachmentsMb = computed(() => {
+  const vals = Object.values(form.value).filter((v: any) => v instanceof File) as File[]
+  return vals.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024
+})
+
+const attachmentsTooLarge = computed(() =>
+  !!uploadLimits.value.max_post_mb && totalAttachmentsMb.value > uploadLimits.value.max_post_mb)
+
 const fetchCatalog = async () => {
   try {
     const { data } = await api.get('/api/v1/app/specialties-catalog')
@@ -172,6 +201,7 @@ const fetchCatalog = async () => {
     gradeOptions.value = (items.grades ?? []).map((g: any) => ({ title: g.label, value: g.value }))
     topTierFields.value = (items.grades ?? []).find((g: any) => g.eligible_fields)?.eligible_fields ?? []
     overallGradeOptions.value = (items.overall_grades ?? []).map((g: any) => ({ title: g.label, value: g.value }))
+    if (items.upload_limits) uploadLimits.value = items.upload_limits
   } catch (err) {
     console.error('Failed to fetch specialties catalog', err)
   }
@@ -190,6 +220,17 @@ const nextStep = () => { if (step.value < 4) step.value++ }
 const prevStep = () => { if (step.value > 1) step.value-- }
 
 const submit = async () => {
+  // فحص المجموع قبل أي رفع (TASK-16 #3): المتصفح يرفع الجسم كاملاً ثم يُسقطه PHP
+  // لتجاوزه post_max_size — فبدون هذا الفحص ينتظر المستخدم رفع كل الملفات ثم يفشل.
+  if (attachmentsTooLarge.value) {
+    errorMsg.value = `مجموع أحجام المرفقات ${totalAttachmentsMb.value.toFixed(1)} ميجابايت `
+      + `ويتجاوز الحد الأقصى ${uploadLimits.value.max_post_mb} ميجابايت للطلب الواحد. `
+      + 'يرجى تقليل حجم بعض الملفات قبل الحفظ.'
+    step.value = 4
+
+    return
+  }
+
   loading.value = true
   errorMsg.value = ''
   validationErrors.value = {}
@@ -214,6 +255,16 @@ const submit = async () => {
     router.push({ name: 'contractors' })
   }
   catch (err: any) {
+    // 413 = أسقط PHP جسم الطلب لتجاوزه post_max_size؛ رسالة الخادم تشرح الحد
+    // بدقة، والرسالة العامة هنا كانت تُخفي أن السبب هو الحجم لا المدخلات (TASK-16 #3).
+    if (err?.response?.status === 413) {
+      errorMsg.value = err?.response?.data?.message
+        || 'حجم المرفقات يتجاوز الحد الأقصى المسموح به. يرجى تقليل حجم الملفات أو رفعها على دفعات.'
+      step.value = 4
+
+      return
+    }
+
     errorMsg.value = err?.response?.data?.message || 'فشل تسجيل المقاول. يرجى التحقق من المدخلات.'
     
     const errors = err?.response?.data?.errors
@@ -532,13 +583,15 @@ const submit = async () => {
               v-model="form.cr_file"
               label="السجل التجاري *"
               accept=".pdf,.doc,.docx,image/*"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
               :color="form.cr_file ? 'success' : ''"
               :prepend-icon="form.cr_file ? 'tabler-circle-check' : 'tabler-cloud-upload'"
               :error-messages="validationErrors.cr_file"
-              :rules="[v => !!v || 'مطلوب']"
+              :rules="[v => !!v || 'مطلوب', fileSizeRule]"
             />
           </VCol>
           <VCol cols="12" md="6">
@@ -546,13 +599,15 @@ const submit = async () => {
               v-model="form.company_register"
               label="مستخرج عن سجل الشركة *"
               accept=".pdf,.doc,.docx,image/*"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
               :color="form.company_register ? 'success' : ''"
               :prepend-icon="form.company_register ? 'tabler-circle-check' : 'tabler-cloud-upload'"
               :error-messages="validationErrors.company_register"
-              :rules="[v => !!v || 'مطلوب']"
+              :rules="[v => !!v || 'مطلوب', fileSizeRule]"
             />
           </VCol>
           <VCol cols="12" md="6">
@@ -560,13 +615,15 @@ const submit = async () => {
               v-model="form.municipal_license"
               label="رخصة المهن (الحرف) سارية المفعول *"
               accept=".pdf,.doc,.docx,image/*"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
               :color="form.municipal_license ? 'success' : ''"
               :prepend-icon="form.municipal_license ? 'tabler-circle-check' : 'tabler-cloud-upload'"
               :error-messages="validationErrors.municipal_license"
-              :rules="[v => !!v || 'مطلوب']"
+              :rules="[v => !!v || 'مطلوب', fileSizeRule]"
             />
           </VCol>
           <VCol cols="12" md="6">
@@ -574,13 +631,15 @@ const submit = async () => {
               v-model="form.bank_dealing_letter"
               label="شهادة تعامل للشركة مع بنك *"
               accept=".pdf,.doc,.docx,image/*"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
               :color="form.bank_dealing_letter ? 'success' : ''"
               :prepend-icon="form.bank_dealing_letter ? 'tabler-circle-check' : 'tabler-cloud-upload'"
               :error-messages="validationErrors.bank_dealing_letter"
-              :rules="[v => !!v || 'مطلوب']"
+              :rules="[v => !!v || 'مطلوب', fileSizeRule]"
             />
           </VCol>
           <VCol cols="12" md="6">
@@ -588,13 +647,15 @@ const submit = async () => {
               v-model="form.articles_of_association"
               label="عقد تأسيس الشركة *"
               accept=".pdf,.doc,.docx,image/*"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
               :color="form.articles_of_association ? 'success' : ''"
               :prepend-icon="form.articles_of_association ? 'tabler-circle-check' : 'tabler-cloud-upload'"
               :error-messages="validationErrors.articles_of_association"
-              :rules="[v => !!v || 'مطلوب']"
+              :rules="[v => !!v || 'مطلوب', fileSizeRule]"
             />
           </VCol>
           <VCol cols="12" md="6">
@@ -602,13 +663,15 @@ const submit = async () => {
               v-model="form.internal_bylaws"
               label="النظام الداخلي *"
               accept=".pdf,.doc,.docx,image/*"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
               :color="form.internal_bylaws ? 'success' : ''"
               :prepend-icon="form.internal_bylaws ? 'tabler-circle-check' : 'tabler-cloud-upload'"
               :error-messages="validationErrors.internal_bylaws"
-              :rules="[v => !!v || 'مطلوب']"
+              :rules="[v => !!v || 'مطلوب', fileSizeRule]"
             />
           </VCol>
           <VCol cols="12" md="6">
@@ -616,13 +679,15 @@ const submit = async () => {
               v-model="form.lease_or_ownership_contract"
               label="عقد الإيجار أو الملكية لمقر الشركة *"
               accept=".pdf,.doc,.docx,image/*"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
               :color="form.lease_or_ownership_contract ? 'success' : ''"
               :prepend-icon="form.lease_or_ownership_contract ? 'tabler-circle-check' : 'tabler-cloud-upload'"
               :error-messages="validationErrors.lease_or_ownership_contract"
-              :rules="[v => !!v || 'مطلوب']"
+              :rules="[v => !!v || 'مطلوب', fileSizeRule]"
             />
           </VCol>
           <VCol cols="12" md="6">
@@ -630,13 +695,15 @@ const submit = async () => {
               v-model="form.partners_ids"
               label="صور هويات الشركاء *"
               accept=".pdf,.doc,.docx,image/*"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
               :color="form.partners_ids ? 'success' : ''"
               :prepend-icon="form.partners_ids ? 'tabler-circle-check' : 'tabler-cloud-upload'"
               :error-messages="validationErrors.partners_ids"
-              :rules="[v => !!v || 'مطلوب']"
+              :rules="[v => !!v || 'مطلوب', fileSizeRule]"
             />
           </VCol>
           <VCol cols="12" md="6">
@@ -644,13 +711,15 @@ const submit = async () => {
               v-model="form.authorization_letter"
               label="كتاب تفويض المعتمد بالتوقيع *"
               accept=".pdf,.doc,.docx,image/*"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
               :color="form.authorization_letter ? 'success' : ''"
               :prepend-icon="form.authorization_letter ? 'tabler-circle-check' : 'tabler-cloud-upload'"
               :error-messages="validationErrors.authorization_letter"
-              :rules="[v => !!v || 'مطلوب']"
+              :rules="[v => !!v || 'مطلوب', fileSizeRule]"
             />
           </VCol>
           <VCol cols="12" md="6">
@@ -658,13 +727,15 @@ const submit = async () => {
               v-model="form.company_approval_letter"
               label="كتاب من الشركة بالموافقة على الانتساب *"
               accept=".pdf,.doc,.docx,image/*"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
               :color="form.company_approval_letter ? 'success' : ''"
               :prepend-icon="form.company_approval_letter ? 'tabler-circle-check' : 'tabler-cloud-upload'"
               :error-messages="validationErrors.company_approval_letter"
-              :rules="[v => !!v || 'مطلوب']"
+              :rules="[v => !!v || 'مطلوب', fileSizeRule]"
             />
           </VCol>
           <VCol cols="12" md="6">
@@ -672,13 +743,15 @@ const submit = async () => {
               v-model="form.full_time_engineer_certificate"
               label="شهادة مهندس متفرغ *"
               accept=".pdf,.doc,.docx,image/*"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
               :color="form.full_time_engineer_certificate ? 'success' : ''"
               :prepend-icon="form.full_time_engineer_certificate ? 'tabler-circle-check' : 'tabler-cloud-upload'"
               :error-messages="validationErrors.full_time_engineer_certificate"
-              :rules="[v => !!v || 'مطلوب']"
+              :rules="[v => !!v || 'مطلوب', fileSizeRule]"
             />
           </VCol>
           <VCol cols="12" md="6">
@@ -686,13 +759,15 @@ const submit = async () => {
               v-model="form.accountant_certificate_or_contract"
               label="شهادة تفرغ محاسب من نقابة المحاسبين / أو عقد مع مكتب محاسبين معتمد *"
               accept=".pdf,.doc,.docx,image/*"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
               :color="form.accountant_certificate_or_contract ? 'success' : ''"
               :prepend-icon="form.accountant_certificate_or_contract ? 'tabler-circle-check' : 'tabler-cloud-upload'"
               :error-messages="validationErrors.accountant_certificate_or_contract"
-              :rules="[v => !!v || 'مطلوب']"
+              :rules="[v => !!v || 'مطلوب', fileSizeRule]"
             />
           </VCol>
           <VCol cols="12" md="6">
@@ -700,13 +775,15 @@ const submit = async () => {
               v-model="form.secretary_contract"
               label="عقد سكرتير *"
               accept=".pdf,.doc,.docx,image/*"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
               :color="form.secretary_contract ? 'success' : ''"
               :prepend-icon="form.secretary_contract ? 'tabler-circle-check' : 'tabler-cloud-upload'"
               :error-messages="validationErrors.secretary_contract"
-              :rules="[v => !!v || 'مطلوب']"
+              :rules="[v => !!v || 'مطلوب', fileSizeRule]"
             />
           </VCol>
           <VCol cols="12">

@@ -219,6 +219,9 @@ class SettingController extends Controller
             'field_specializations' => \App\Support\ContractorLookups::fieldSpecializationsMap(),
             'grades'                => \App\Support\ContractorLookups::gradesList(),
             'overall_grades'        => $overallGrades,
+            // قيود رفع المستندات (TASK-16 #2) — تُقرأ من ini وقت التشغيل، فتعرض نماذج
+            // المقاولين السقف الحقيقي بدل رقم ثابت بالواجهة يفارق إعداد الخادم.
+            'upload_limits'         => \App\Support\UploadLimits::toArray(),
         ], 'تم جلب كتالوج التخصصات بنجاح');
     }
 
