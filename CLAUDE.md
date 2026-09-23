@@ -33,11 +33,17 @@ Frontend `.env` needs `VITE_API_BASE_URL` pointing at the backend (`http://local
 
 ## Deployment
 
-### Pushing to `feature/arab-contractors-union` deploys straight to production
+> **Full practical guide: [DEPLOYMENT.md](DEPLOYMENT.md)** — rollback, env vars, DNS/SSL, isolation proofs, and the "never do this on production" list. The summary below is orientation only.
 
-As of [.github/workflows/deploy.yml](.github/workflows/deploy.yml) (commit `3e55c07`, "deploy directly from monorepo, drop mirror-repo dependency"), **this monorepo is what production pulls** — there is no mirror repo in the path anymore. Older PcuGaza mirror repos (`PcuGaza/PCU-Manager-Backend` / `PcuGaza/PCU-Manager-Frontend`, branches `development`/`deploy-new`/`deploy-dist`) still exist but are **retired and no longer deployed from** — pushing to them does nothing for production now.
+### Pushing to `feature/arab-contractors-union` deploys to STAGING, not production
 
-Pipeline, on every push to `feature/arab-contractors-union` that touches `arab-contractors-union-api/**` or `arab-contractors-union-front/**`:
+As of 2026-09-23 the environments are split. **This monorepo deploys only to staging**: `staging.pcuorg.cloud` + `api.pcuorg.cloud`, DB `pcuorg`, `/var/www/pcuorg/{api,front}`, Reverb `:8080`, and **Firebase deliberately disabled** (`FIREBASE_CREDENTIALS=` empty → `LogPushSender`) so test pushes can never reach real contractor phones.
+
+**Production is a different pair of repos**, revived for exactly this purpose and no longer stale: `PcuGaza/PCU-Manager-Backend` and `PcuGaza/PCU-Manager-Frontend`, branch **`main`** → `pcuorg.cloud` / `production.pcuorg.cloud` / `api-production.pcuorg.cloud`, DB `pcuorg_production`, `/var/www/pcuorg/production/{api,front}`, Reverb `:8081`. Their workflows sit behind `environment: production`, so a push to `main` waits for a human approval in the Actions tab before anything ships. Their older branches (`development`, `deploy-new`, `deploy-dist`) are untouched and still retired — only `main` matters now.
+
+The PcuGaza repos **share no git history with this monorepo** (`git merge-base` is empty), so syncing code to production is a tree copy via `commit-tree`, never a merge — see DEPLOYMENT.md §6, including the two files that are *deliberately* divergent there (`deploy-vps.sh`, `.github/workflows/deploy-production.yml`).
+
+Staging pipeline, on every push to `feature/arab-contractors-union` that touches `arab-contractors-union-api/**` or `arab-contractors-union-front/**`:
 
 1. GitHub Actions (`appleboy/ssh-action`) SSHes into the VPS using the `SSH_HOST`/`SSH_USERNAME`/`SSH_PRIVATE_KEY` repo secrets.
 2. It runs `cd /var/www/pcuorg/api && ./deploy-vps.sh`, then `cd /var/www/pcuorg/front && ./deploy-vps.sh`.
@@ -46,15 +52,17 @@ Pipeline, on every push to `feature/arab-contractors-union` that touches `arab-c
 
 **Consequence — `/var/www/pcuorg/api` and `/var/www/pcuorg/front` are themselves git repos, but their git state is vestigial**: they're still checked out on the old `deploy-new` branch, permanently "behind" it and dirty (rsync doesn't commit). **Don't trust `git log`/`git status` inside those two directories to tell you what's live** — grep the source for a known change instead, or check `git log -1` in `/var/www/pcuorg/monorepo`, which *is* a real, clean, up-to-date checkout of `feature/arab-contractors-union`.
 
-### Production VPS (`srv1962001`, `187.77.172.48`)
+### VPS layout (`srv1962001`, `187.77.172.48`) — both environments, one box
 
-| | Backend | Frontend |
-|---|---|---|
-| Path | `/var/www/pcuorg/api` | `/var/www/pcuorg/front` |
-| Serves | `https://api.pcuorg.cloud` (base `/api/v1`) | builds `dist/` on-server via `npm run build` |
-| Deploy | `./deploy-vps.sh` | `./deploy-vps.sh` |
+| | Staging backend | Staging frontend | Production backend | Production frontend |
+|---|---|---|---|---|
+| Path | `/var/www/pcuorg/api` | `/var/www/pcuorg/front` | `/var/www/pcuorg/production/api` | `/var/www/pcuorg/production/front` |
+| Serves | `api.pcuorg.cloud` | `staging.pcuorg.cloud` | `api-production.pcuorg.cloud` | `pcuorg.cloud`, `www`, `production.pcuorg.cloud` |
+| DB | `pcuorg` | — | `pcuorg_production` | — |
 
-Both `deploy-vps.sh` scripts back up before touching anything and roll back on failure. The API one aborts if the DB dump is incomplete; the frontend one restores the previous `dist/` if the build fails.
+Data isolation is complete (separate DB + DB user that is *denied* on the other database, separate Redis db indexes and key prefixes, separate `APP_KEY` so tokens don't cross, separate storage dirs). What they share is CPU/RAM and a single PHP-FPM pool — heavy load on staging can *slow* production, though it cannot corrupt it.
+
+All four `deploy-vps.sh` scripts back up before touching anything and roll back on failure. The API ones abort if the DB dump is incomplete; the frontend ones restore the previous `dist/` if the build fails. Each also **refuses to run against the wrong environment** by checking `DB_DATABASE` / `VITE_API_BASE_URL` first — don't disable that guard.
 
 **Do not use [deploy.sh](arab-contractors-union-api/deploy.sh)** — it targets the decommissioned InMotion cPanel host (`~/acu-api`, branch `development`, `ea-php82`), unrelated to this pipeline.
 

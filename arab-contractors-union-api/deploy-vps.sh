@@ -1,7 +1,11 @@
 #!/bin/bash
 #
-# نشر الباك إند على سيرفر الإنتاج (Ubuntu VPS — srv1962001 / api.pcuorg.cloud)
+# نشر الباك إند على بيئة الـSTAGING (Ubuntu VPS — api.pcuorg.cloud)
 #   الاستخدام:  ./deploy-vps.sh
+#
+# ⚠ هذا سكربت الـstaging. الإنتاج له مستودع منفصل تماماً بسكربته الخاص:
+#   PcuGaza/PCU-Manager-Backend فرع main → /var/www/pcuorg/production/api
+#   انظر DEPLOYMENT.md.
 #
 # ملاحظة: deploy.sh المجاور خاص بسيرفر InMotion cPanel القديم — لا تخلط بينهما.
 #
@@ -21,6 +25,13 @@ mkdir -p "$BACKUP_DIR"
 #  نسخ احتياطية — قبل أي تعديل
 # ---------------------------------------------------------------
 DB_NAME="$(grep -E '^DB_DATABASE=' .env | cut -d= -f2-)"
+
+# حارس البيئة — لا تنشر كود staging فوق قاعدة الإنتاج
+if [ "$DB_NAME" != "pcuorg" ]; then
+  echo "✘ توقّف: .env يشير إلى قاعدة '$DB_NAME' وليس pcuorg (staging)."
+  exit 1
+fi
+
 DB_USER="$(grep -E '^DB_USERNAME=' .env | cut -d= -f2-)"
 DB_PASS="$(grep -E '^DB_PASSWORD=' .env | cut -d= -f2-)"
 

@@ -1,10 +1,17 @@
-name: Deploy to production
+name: Deploy to staging
 
-# Pushes to the working branch are deployed straight from this monorepo:
-# the server pulls admin_dshbaord_pfi itself (via a read-only deploy key set
-# up once on the VPS) and each deploy-vps.sh rsyncs its own subdirectory into
-# place before running its normal build/migrate steps. No intermediate
-# mirror repo or token is involved in this pipeline.
+# هذا المونوريبو ينشر على بيئة الـ**staging** فقط.
+#   staging.pcuorg.cloud  +  api.pcuorg.cloud   →  /var/www/pcuorg/{front,api}
+#   قاعدة البيانات: pcuorg   ·   Reverb: 8080   ·   Firebase: معطّل (LogPushSender)
+#
+# الإنتاج لا يُنشر من هنا إطلاقاً. له مستودعان منفصلان بفرع main وبوابة موافقة
+# يدوية، وينشر على /var/www/pcuorg/production/* وقاعدة pcuorg_production:
+#   https://github.com/PcuGaza/PCU-Manager-Backend
+#   https://github.com/PcuGaza/PCU-Manager-Frontend
+# التفاصيل الكاملة في DEPLOYMENT.md.
+#
+# الدفع هنا لا يحتاج موافقة — وهذا مقصود: staging هي مساحة الاختبار.
+
 on:
   push:
     branches: [feature/arab-contractors-union]
@@ -14,7 +21,7 @@ on:
 
 jobs:
   deploy:
-    name: Deploy to production
+    name: Deploy to staging
     runs-on: ubuntu-latest
     steps:
       - name: Deploy over SSH

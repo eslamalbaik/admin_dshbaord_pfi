@@ -1,10 +1,14 @@
 #!/bin/bash
 #
-# نشر الفرونت إند على سيرفر الإنتاج (Ubuntu VPS — srv1962001)
+# نشر الفرونت إند على بيئة الـSTAGING (Ubuntu VPS — staging.pcuorg.cloud)
 #   الاستخدام:  ./deploy-vps.sh
 #
-# السيرفر يبني من المصدر: يسحب فرع deploy-new ثم ينفّذ npm run build محلياً،
-# والناتج في dist/ هو ما يُقدَّم للزوار. لذلك لا نسحب فرع deploy-dist هنا.
+# ⚠ هذا سكربت الـstaging. الإنتاج له مستودع منفصل تماماً بسكربته الخاص:
+#   PcuGaza/PCU-Manager-Frontend فرع main → /var/www/pcuorg/production/front
+#   انظر DEPLOYMENT.md.
+#
+# السيرفر يبني من المصدر: يسحب المونوريبو ثم ينفّذ npm run build محلياً،
+# والناتج في dist/ هو ما يُقدَّم للزوار.
 #
 set -euo pipefail
 
@@ -18,6 +22,15 @@ BACKUP="$BACKUP_DIR/front-dist-$STAMP.tar.gz"
 
 cd "$APP_DIR"
 mkdir -p "$BACKUP_DIR"
+
+# ---------------------------------------------------------------
+#  حارس البيئة — VITE_API_BASE_URL يُخبَز وقت البناء ولا يُصحَّح بعده
+# ---------------------------------------------------------------
+GUARD_URL="$(grep -E '^VITE_API_BASE_URL=' .env.production | cut -d= -f2-)"
+if [ "$GUARD_URL" != "https://api.pcuorg.cloud" ]; then
+  echo "✘ توقّف: .env.production يشير إلى '$GUARD_URL' وليس api.pcuorg.cloud (staging)."
+  exit 1
+fi
 
 # ---------------------------------------------------------------
 #  نسخة احتياطية من البناء الحالي — هي خط الرجوع لو فشل البناء
