@@ -176,6 +176,31 @@ git diff --name-status --diff-filter=D origin/main $COMMIT   # يجب أن يك�
 - `VITE_REVERB_APP_KEY` في الفرونت **يجب أن يطابق** `REVERB_APP_KEY` في `.env` الخاص بنفس البيئة.
 - `VITE_API_BASE_URL` = **أصل الدومين فقط** بدون `/api/v1` (الكود يضيفه).
 
+### ‼ فخّ `FRONTEND_URL` — رسالة خطأ تكذب عليك
+
+**غيّرت دومين واجهة؟ غيّر `FRONTEND_URL` و`LANDING_URL` في `.env` الخاص بتلك البيئة في نفس اللحظة.**
+
+`config/cors.php` يبني `allowed_origins` من هذين المتغيّرين حصراً. فإن أشارا إلى دومين لم يعد دومين الواجهة، يرد الـAPI على الـpreflight بـ**`204` بلا رأس `Access-Control-Allow-Origin`** — فيحجب المتصفح الطلب.
+
+والواجهة تعرض حينها:
+
+> **خطأ في الشبكة: لا يمكن الوصول إلى خادم API (تأكد من تشغيله على المنفذ 8000)**
+
+**هذه الرسالة مضلّلة تماماً.** لا علاقة للمنفذ 8000 بالأمر — هي نص ثابت في صفحة الدخول يظهر لأي فشل شبكة، وسيرسلك للبحث في مكان خاطئ لساعات. حدث هذا فعلاً عند نقل staging من `pcuorg.cloud` إلى `staging.pcuorg.cloud` (2026-09-23).
+
+**التشخيص في سطرين** — وجود الرأس هو الفيصل، لا رمز الحالة:
+```bash
+curl -si -X OPTIONS https://<api-domain>/api/v1/auth/login \
+  -H 'Origin: https://<front-domain>' -H 'Access-Control-Request-Method: POST' \
+  | grep -i access-control-allow-origin      # لا مخرجات = محجوب
+```
+
+**الإصلاح:** عدّل المتغيّرين ثم `php artisan optimize` (الإعدادات مكتشة، فالتعديل وحده لا يكفي).
+
+> `FRONTEND_URL` يُستخدم أيضاً في روابط إعادة تعيين كلمة المرور ([PasswordResetController.php](arab-contractors-union-api/app/Http/Controllers/Api/PasswordResetController.php))، فقيمة خاطئة ترسل المستخدمين إلى البيئة الخطأ.
+>
+> **لا تختبر بـcurl مجرّد** — بدون رأس `Origin` ينجح الطلب دائماً ويخفي العطل. حاكِ المتصفح: preflight ثم POST، كلاهما مع `Origin`.
+
 الأسرار محفوظة في `/root/pcu-secrets-vault/` بصلاحيات `700`:
 `prod-db-password.txt` · `prod-reverb-app-key.txt` · `prod-admin-password.txt` · `pcu-gaza-firebase-adminsdk.json`
 
@@ -255,6 +280,24 @@ curl -s -o /dev/null -w '%{http_code}\n' https://api.pcuorg.cloud/api/v1/user \
 curl -si -X OPTIONS https://api-production.pcuorg.cloud/api/v1/auth/login \
   -H 'Origin: https://staging.pcuorg.cloud' -H 'Access-Control-Request-Method: POST' \
   | grep -i access-control-allow-origin                    # لا رأس ✓
+```
+
+### ‼ لا تتحقق من الحجب وحده — تحقّق من السماح أيضاً
+
+فحص الحجب يمرّ حتى لو كانت البيئة **معطّلة بالكامل**، لأن "لا رأس" هي نفس نتيجة الإعداد الخاطئ. لهذا مرّ عطل staging دون أن يُكتشف. شغّل هذه المصفوفة بعد أي تغيير في الدومينات — الأربعة الأولى **يجب أن تسمح** والأخيرتان **يجب أن تحجبا**:
+
+```bash
+chk() { printf '%-46s ' "$1 -> $2"
+  curl -s -i -X OPTIONS "$2/api/v1/auth/login" -H "Origin: $1" \
+    -H 'Access-Control-Request-Method: POST' --max-time 15 \
+    | grep -qi '^access-control-allow-origin' && echo ALLOWED || echo BLOCKED; }
+
+chk https://staging.pcuorg.cloud    https://api.pcuorg.cloud             # ALLOWED
+chk https://pcuorg.cloud            https://api-production.pcuorg.cloud  # ALLOWED
+chk https://www.pcuorg.cloud        https://api-production.pcuorg.cloud  # ALLOWED
+chk https://production.pcuorg.cloud https://api-production.pcuorg.cloud  # ALLOWED
+chk https://staging.pcuorg.cloud    https://api-production.pcuorg.cloud  # BLOCKED
+chk https://evil.example.com        https://api-production.pcuorg.cloud  # BLOCKED
 ```
 
 ---
