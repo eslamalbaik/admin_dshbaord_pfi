@@ -255,12 +255,11 @@ const statusLabels: Record<string, string> = {
         <VCardText>
           <VAutocomplete
             v-model="createForm.contractor_id"
+            v-model:search="contractorSearch"
             label="المقاول"
             :items="contractorOptions"
             item-title="name"
             item-value="id"
-            :search-input.sync="contractorSearch"
-            :loading="false"
             dir="rtl"
             class="mb-4"
           />
