@@ -143,6 +143,27 @@ The service-account JSON lives at `storage/app/private/firebase/` (gitignored, p
 
 Contractor-facing notifications route through `FcmChannel` (`['database', FcmChannel::class, ...]`); `FcmChannel` reads `toFcm()` if defined, else falls back to `toArray()`'s `title`/`message` keys — a `toArray()` without a `title` silently gets the generic union name as its push heading. Admin-facing ones (`PaymentSubmittedNotification`, `ContractorActivatedNotification`, `EventJoinedNotification`, the `*SubmittedNotification` family) use `broadcast` instead and must **not** get `FcmChannel` — admin `User`s have no `fcm_token`. `tests/Feature/PushChannelWiringTest.php` guards the contractor list, since a dropped channel throws no error and just stops reaching phones.
 
+### Upload size limits — PHP-FPM + nginx, shared by both environments
+
+Like Reverb and FCM above, this is **server state `deploy-vps.sh` does not manage**: a rebuilt box silently reverts to the Debian defaults and every document over 2 MB starts failing again.
+
+Applied 2026-09-24 (TASK-16 T003–T005), raised from the stock values:
+
+| Setting | Where | Was | Now |
+|---|---|---|---|
+| `upload_max_filesize` | `/etc/php/8.5/fpm/php.ini` | `2M` | `12M` |
+| `post_max_size` | same | `8M` | `60M` |
+| `max_file_uploads` | same | `20` | `30` |
+| `client_max_body_size` | `sites-available/api.pcuorg.cloud` **and** `api-production.pcuorg.cloud` | `20M` | `64M` |
+
+Three traps:
+
+- **There is one PHP-FPM pool for both environments** (`php8.5-fpm`, a single `/etc/php/8.5/` tree). The PHP half of this is *not scopeable* — changing it for staging changes it for production in the same breath. Only the nginx half is per-environment, and both blocks are set.
+- **The server runs PHP 8.5, not the 8.2 the API's `composer.json` targets.** Don't path-guess `/etc/php/8.2/`.
+- **`php -i` reads the CLI ini, not FPM's** — it will happily report the old values while the web path uses the new ones. Verify with `php-fpm8.5 -i | grep -E "upload_max_filesize|post_max_size|max_file_uploads"`. Likewise `grep -R` (not `-r`) for the nginx setting, since `sites-enabled` is symlinks.
+
+`post_max_size` must stay comfortably above `upload_max_filesize` so a multi-document submit fits, and `client_max_body_size` above `post_max_size` so nginx is never the limiting factor — nginx rejects with a bare 413 that the frontend cannot explain. Laravel's own `max:` rules in `ContractorController::getValidationRules()` are pinned to `upload_max_filesize`; move them together.
+
 ### Uploads under `storage/app/public/`
 
 `.gitignore` excludes `contractors/`, `certificates/`, `receipts/`, `announcements/`, `events/`, `news/`. These once held committed dev placeholders; production has real uploads at the same paths. `deploy-vps.sh`'s rsync already passes `--exclude='storage/app/public'` so a normal deploy never touches these — but if anyone ever runs `git` directly inside `/var/www/pcuorg/api` or `/var/www/pcuorg/monorepo` and a `pull`/`reset` aborts with *"local changes would be overwritten"* there, back up (`tar -czf ~/backup.tar.gz storage/app/public`) before discarding anything — a bare `git checkout -- storage/` restores placeholders over real files and a subsequent pull then deletes them.

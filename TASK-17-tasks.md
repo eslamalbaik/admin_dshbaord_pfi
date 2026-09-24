@@ -56,12 +56,26 @@ Read that section first — it carries the root-cause analysis these tasks depen
 
 **⚠️ Do this before writing any code for US7/US8/US9.** Three sub-issues in this batch are verbatim repeats of TASK-16 items recorded as done. The deploy history (TASK_PLAN.md § *Deploy-history evidence*) suggests the frontend work is live and the gaps are real, but a frontend build failure restores the previous `dist/` while the workflow still reports success, so "run succeeded" is not "dist updated".
 
-- [ ] T011 `GET https://api.pcuorg.cloud/api/v1/app/specialties-catalog` → read `items.upload_limits`. `max_file_mb: 2` means TASK-16 Phase 2 never ran; the key being absent means the API deploy is stale too
-- [ ] T012 [P] On `srv1962001`: `php -i | grep -E "upload_max_filesize|post_max_size|max_file_uploads"` — confirms T011 independently of the API
-- [ ] T013 [P] `grep -R client_max_body_size /etc/nginx` (`-R`, not `-r` — symlinks under `sites-enabled` hide it)
-- [ ] T014 [P] Is the live frontend the TASK-16 build? `grep -l "سيُحذف عند الحفظ" /var/www/pcuorg/front/dist/assets/*.js`. Present ⇒ current build, US7/US8 are real code work. Absent ⇒ the front deploy rolled back and the first fix is a redeploy
-- [ ] T015 [P] `git log -1` in `/var/www/pcuorg/monorepo` — the only trustworthy checkout on the box; `/var/www/pcuorg/{api,front}` git state is vestigial and lies
-- [ ] T016 Write the five answers into this file before proceeding, and adjust US7/US8/US9 scope accordingly
+- [x] T011 `GET https://api.pcuorg.cloud/api/v1/app/specialties-catalog` → read `items.upload_limits`. `max_file_mb: 2` means TASK-16 Phase 2 never ran; the key being absent means the API deploy is stale too
+- [x] T012 [P] On `srv1962001`: `php -i | grep -E "upload_max_filesize|post_max_size|max_file_uploads"` — confirms T011 independently of the API
+- [x] T013 [P] `grep -R client_max_body_size /etc/nginx` (`-R`, not `-r` — symlinks under `sites-enabled` hide it)
+- [x] T014 [P] Is the live frontend the TASK-16 build? `grep -l "سيُحذف عند الحفظ" /var/www/pcuorg/front/dist/assets/*.js`. Present ⇒ current build, US7/US8 are real code work. Absent ⇒ the front deploy rolled back and the first fix is a redeploy
+- [x] T015 [P] `git log -1` in `/var/www/pcuorg/monorepo` — the only trustworthy checkout on the box; `/var/www/pcuorg/{api,front}` git state is vestigial and lies
+- [x] T016 Write the five answers into this file before proceeding, and adjust US7/US8/US9 scope accordingly
+
+> **The five answers (2026-09-24).** Phase 3 was run *after* Phase 4, not before it, because the server change was already in flight. The answers are unaffected — T011/T012/T013 record the post-change state, and the "before" column is the TASK-16 baseline verified 2026-09-22.
+>
+> | # | Check | Answer |
+> |---|---|---|
+> | T011 | `items.upload_limits` | `max_file_kb: 12288`, `max_post_kb: 61440`, `max_files: 30` on **both** staging and production. Key present ⇒ API deploy is current |
+> | T012 | PHP-FPM ini | `12M` / `60M` / `30` — was `2M` / `8M` / `20` |
+> | T013 | `grep -R client_max_body_size` | `64M` in `api.pcuorg.cloud` and `api-production.pcuorg.cloud`. The "3 places" is 2 live blocks + 1 `.bak-2026-09-20` file |
+> | T014 | Live `dist` is the TASK-16 build? | **Yes**, both environments (`front/dist/assets/_id_-D90bmqj7.js`, `production/front/dist/assets/_id_-dPF0plmR.js`) |
+> | T015 | `monorepo` checkout | `9113efc` (2026-09-24), clean — matches the team-branch head before this merge |
+>
+> **Scope impact:** US9 is done (T017–T021). **US7 and US8 are genuine code work** — the front deploy did *not* roll back, so the reported gaps are real and a redeploy will not fix them.
+>
+> **Two corrections to this file's own instructions**, found while executing. The box runs **PHP 8.5**, so `/etc/php/*/fpm/` resolves to `/etc/php/8.5/fpm/` — not the 8.2 CLAUDE.md claimed. And **T012/T019's `php -i` is wrong**: it reads the CLI ini, not FPM's, so it would report the old values while the web path already served the new ones — use `php-fpm8.5 -i`. Also, the FPM pool is **shared by both environments**, so the PHP half of US9 was never scopeable to one environment alone.
 
 ---
 
@@ -69,11 +83,11 @@ Read that section first — it carries the root-cause analysis these tasks depen
 
 **⚠️ Deploy-invisible server state.** `deploy-vps.sh` does not manage `php.ini`, so this must be applied on the VPS directly and documented, or a rebuild silently reverts it. No application code is expected to change: TASK-16 already derives the ceiling from `ini_get()` at runtime via `App\Support\UploadLimits`, so the forms self-correct the moment the server is raised.
 
-- [ ] T017 [US9] Set `upload_max_filesize = 12M`, `post_max_size = 60M`, `max_file_uploads = 30` in the PHP-FPM ini under `/etc/php/*/fpm/` (was `2M` / `8M` / `20`). `post_max_size` must stay well above `upload_max_filesize` so a 13-document submit fits; 60M covers realistic scan sizes without permitting a 168M request
-- [ ] T018 [US9] Raise nginx `client_max_body_size` from `20M` to `64M` in the API server block so nginx is never the limiting factor (3 places — use `grep -R`)
-- [ ] T019 [US9] Reload both (`systemctl reload php*-fpm nginx`), verify with `php -i`, then smoke-test `GET /api/v1/tenders-public` — the FPM pool is shared by every upload path in the app, not just contractors
+- [x] T017 [US9] Set `upload_max_filesize = 12M`, `post_max_size = 60M`, `max_file_uploads = 30` in the PHP-FPM ini under `/etc/php/*/fpm/` (was `2M` / `8M` / `20`). `post_max_size` must stay well above `upload_max_filesize` so a 13-document submit fits; 60M covers realistic scan sizes without permitting a 168M request
+- [x] T018 [US9] Raise nginx `client_max_body_size` from `20M` to `64M` in the API server block so nginx is never the limiting factor (3 places — use `grep -R`)
+- [x] T019 [US9] Reload both (`systemctl reload php*-fpm nginx`), verify with `php -i`, then smoke-test `GET /api/v1/tenders-public` — the FPM pool is shared by every upload path in the app, not just contractors
 - [ ] T020 [US9] Verify end to end: a 9 MB PDF saves, and a submit carrying all documents at realistic sizes completes. Re-read `items.upload_limits` and confirm the form now advertises 12 MB with no redeploy
-- [ ] T021 [US9] Document the values and the fact that they are not managed by `deploy-vps.sh` in [CLAUDE.md](CLAUDE.md), alongside the existing Reverb/FCM "server state the deploy does not create" notes. Tick TASK-16 T003–T006 as done, or mark them superseded by these
+- [x] T021 [US9] Document the values and the fact that they are not managed by `deploy-vps.sh` in [CLAUDE.md](CLAUDE.md), alongside the existing Reverb/FCM "server state the deploy does not create" notes. Tick TASK-16 T003–T006 as done, or mark them superseded by these
 
 **Checkpoint**: the loudest complaint in two consecutive batches is relieved, with zero code risk.
 

@@ -874,9 +874,15 @@ One small divergence worth considering: login uses `??`, which falls back only o
 
 ---
 
-## TASK-16 — Feedback batch 2026-09-22 — 🔄 STATUS: CODE COMPLETE, awaiting production PHP-FPM limit change (2026-09-22) — ⚠️ four sub-issues re-reported 2026-09-24, carried into TASK-17
+## TASK-16 — Feedback batch 2026-09-22 — 🔄 STATUS: server limits applied 2026-09-24; ⚠️ four sub-issues re-reported and carried into TASK-17
 
-> **2026-09-24**: #2/#3 (upload limits), #4 (document deletion), #5 (preview parity) and #6/#7 (invisible requests) were all re-reported. The pending server change ([TASK-16-tasks.md](TASK-16-tasks.md) T003–T006) is still unexecuted and accounts for #2/#3; #6 and #7's diagnoses turned out to be wrong. See TASK-17 for the corrected analysis. Do not treat this task's summary table as settled.
+> **2026-09-24**: #2/#3 (upload limits), #4 (document deletion), #5 (preview parity) and #6/#7 (invisible requests) were all re-reported. #6 and #7's diagnoses turned out to be wrong. See TASK-17 for the corrected analysis. **Do not treat this task's summary table as settled** — only #2/#3 is closed.
+>
+> **#2/#3 is now closed.** The server change ([TASK-16-tasks.md](TASK-16-tasks.md) T003–T006, identical to TASK-17 T017–T021) was executed on the VPS on 2026-09-24: PHP-FPM `2M/8M/20` → `12M/60M/30` and nginx `client_max_body_size` `20M` → `64M` on **both** API server blocks. Verified end to end — `items.upload_limits` now reports `max_file_mb: 12` on staging *and* production with no redeploy, because `UploadLimits::effectiveMaxKb()` reads `ini_get()` at runtime.
+>
+> Three planning assumptions were wrong, corrected in [TASK-16-tasks.md](TASK-16-tasks.md): the box runs **PHP 8.5**, not 8.2; the **FPM pool is shared by both environments**, so the PHP half was never scopeable to production alone; and the `php -i` verification both task files prescribe reads the **CLI** ini, not FPM's — it would have reported the old values while the web path used the new ones. See the new "Upload size limits" section in [CLAUDE.md](CLAUDE.md) — deploy-invisible state that a server rebuild reverts.
+>
+> TASK-17 Phase 3 live-state checks (T011–T015) were also answered while doing this: the live `dist` on both environments **is** the TASK-16 build (`سيُحذف عند الحفظ` present), and `/var/www/pcuorg/monorepo` is clean at `9113efc`. So US7/US8 are genuine code work, not a stale-deploy artifact.
 
 ### Execution summary (2026-09-22) — first pass
 

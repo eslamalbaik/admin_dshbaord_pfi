@@ -30,10 +30,17 @@ Read that section first — it carries the root-cause analysis these tasks depen
 
 **⚠️ Production server configuration. This is deploy-invisible state — `deploy-vps.sh` does not manage `php.ini`, so it must be applied on the VPS directly and documented, or a server rebuild silently reverts it.**
 
-- [ ] T003 On the production VPS (`srv1962001`), set `upload_max_filesize = 12M`, `post_max_size = 60M`, `max_file_uploads = 30` in the PHP-FPM ini under `/etc/php/*/fpm/` (current values are `2M` / `8M` / `20` — verified 2026-09-22). `post_max_size` must stay comfortably above `upload_max_filesize` so a multi-document submit fits; 60M covers all 14 document fields at realistic scan sizes without permitting a 168M request
-- [ ] T004 Raise nginx `client_max_body_size` from `20M` to `64M` in the API server block so nginx stays above `post_max_size` and is never the limiting factor. Note the setting appears in 3 places — use `grep -R` (not `grep -r`; symlinks under `sites-enabled` hide it from `-r`)
-- [ ] T005 Reload both services (`systemctl reload php*-fpm nginx`) and verify with `php -i | grep -E "upload_max_filesize|post_max_size|max_file_uploads"`, then smoke-test the API with `GET /api/v1/tenders-public` to confirm nothing else broke — PHP-FPM config is shared by every upload path in the app, not just contractors
-- [ ] T006 Document the new limits, their values, and the fact that they are not managed by `deploy-vps.sh` in `CLAUDE.md`, alongside the existing Reverb/FCM "server state the deploy does not create" notes
+> **Applied 2026-09-24.** Three corrections to what was planned on 2026-09-22, two of them caused by the 2026-09-23 staging/production split:
+> - The box runs **PHP 8.5**, not 8.2 — the ini is `/etc/php/8.5/fpm/php.ini` (single version tree).
+> - There is **one FPM pool shared by both environments**, so the PHP half could not be scoped to production; it necessarily applies to staging too. nginx *was* scopeable and was set on **both** `api.pcuorg.cloud` and `api-production.pcuorg.cloud`, per explicit instruction.
+> - T004's "3 places" is 2 live blocks + 1 `.bak-2026-09-20` file. T005's `php -i` check is **wrong** — that reads the CLI ini, not FPM's; verified with `php-fpm8.5 -i` instead.
+>
+> Backups: `php.ini.bak-2026-09-24T09-33-31` and matching `.bak` copies of both nginx blocks. Verified: `nginx -t` OK, both services active, `GET /api/v1/tenders-public` → 200 on both hosts, and a 30 MB POST now reaches Laravel (405 on a GET-only route) instead of dying at nginx with 413.
+
+- [x] T003 On the production VPS (`srv1962001`), set `upload_max_filesize = 12M`, `post_max_size = 60M`, `max_file_uploads = 30` in the PHP-FPM ini under `/etc/php/*/fpm/` (current values are `2M` / `8M` / `20` — verified 2026-09-22). `post_max_size` must stay comfortably above `upload_max_filesize` so a multi-document submit fits; 60M covers all 14 document fields at realistic scan sizes without permitting a 168M request
+- [x] T004 Raise nginx `client_max_body_size` from `20M` to `64M` in the API server block so nginx stays above `post_max_size` and is never the limiting factor. Note the setting appears in 3 places — use `grep -R` (not `grep -r`; symlinks under `sites-enabled` hide it from `-r`)
+- [x] T005 Reload both services (`systemctl reload php*-fpm nginx`) and verify with `php -i | grep -E "upload_max_filesize|post_max_size|max_file_uploads"`, then smoke-test the API with `GET /api/v1/tenders-public` to confirm nothing else broke — PHP-FPM config is shared by every upload path in the app, not just contractors
+- [x] T006 Document the new limits, their values, and the fact that they are not managed by `deploy-vps.sh` in `CLAUDE.md`, alongside the existing Reverb/FCM "server state the deploy does not create" notes
 
 **Checkpoint**: A >2 MB document now reaches Laravel at all. US5's code work is verifiable from here; US1–US4 and US6 do not depend on this phase.
 
