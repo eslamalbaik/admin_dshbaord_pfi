@@ -1,0 +1,1477 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Contractor App API",
+    "description": "API تطبيق المقاول - جميع endpoints المتاحة للمقاول",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Palestinian Contractors Union",
+      "email": "support@pcuorg.cloud"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.pcuorg.cloud/api/v1",
+      "description": "Staging"
+    },
+    {
+      "url": "https://api-production.pcuorg.cloud/api/v1",
+      "description": "Production"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "Token",
+        "description": "Sanctum Token"
+      }
+    },
+    "schemas": {
+      "ApiResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status_code": {
+            "type": "integer"
+          },
+          "items": {
+            "type": "object"
+          },
+          "errors": {
+            "type": "object"
+          }
+        }
+      },
+      "Contractor": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "membership_number": {
+            "type": "string",
+            "example": "928_g"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "suspended", "inactive"]
+          },
+          "is_frozen": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/contractor/auth/login": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "تسجيل دخول المقاول",
+        "operationId": "contractorLogin",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "membership_number": {
+                    "type": "string",
+                    "description": "رقم العضوية (928_g مثلاً)",
+                    "example": "928_g"
+                  },
+                  "password": {
+                    "type": "string"
+                  },
+                  "fcm_token": {
+                    "type": "string",
+                    "description": "Firebase token اختياري"
+                  }
+                },
+                "required": ["membership_number", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "نجح تسجيل الدخول",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "token": {
+                          "type": "string"
+                        },
+                        "contractor": {
+                          "$ref": "#/components/schemas/Contractor"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "بيانات خاطئة"
+          },
+          "403": {
+            "description": "الحساب مجمد"
+          },
+          "404": {
+            "description": "العضوية غير موجودة"
+          }
+        }
+      }
+    },
+    "/contractor/auth/verify-identity": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "التحقق من الهوية (تسجيل جديد)",
+        "operationId": "verifyIdentity",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "membership_number": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  }
+                },
+                "required": ["membership_number", "email"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contractor/auth/verify-otp": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "التحقق من OTP",
+        "operationId": "verifyOtp",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "membership_number": {
+                    "type": "string"
+                  },
+                  "otp": {
+                    "type": "string",
+                    "description": "رمز OTP المرسل"
+                  }
+                },
+                "required": ["membership_number", "otp"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contractor/auth/set-password": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "تعيين كلمة المرور",
+        "operationId": "setPassword",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "membership_number": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "كلمة المرور الجديدة"
+                  },
+                  "password_confirmation": {
+                    "type": "string"
+                  },
+                  "fcm_token": {
+                    "type": "string"
+                  }
+                },
+                "required": ["membership_number", "password", "password_confirmation"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contractor/auth/resend-otp": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "إعادة إرسال OTP",
+        "operationId": "resendOtp",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "membership_number": {
+                    "type": "string"
+                  }
+                },
+                "required": ["membership_number"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contractor/auth/forgot-password/send-otp": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "إرسال OTP لاسترجاع كلمة المرور",
+        "operationId": "forgotPasswordSendOtp",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "membership_number": {
+                    "type": "string"
+                  }
+                },
+                "required": ["membership_number"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contractor/auth/forgot-password/reset": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "استرجاع كلمة المرور",
+        "operationId": "forgotPasswordReset",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "membership_number": {
+                    "type": "string"
+                  },
+                  "otp": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  },
+                  "password_confirmation": {
+                    "type": "string"
+                  }
+                },
+                "required": ["membership_number", "otp", "password", "password_confirmation"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contractor/auth/logout": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "تسجيل الخروج",
+        "operationId": "logout"
+      }
+    },
+    "/contractor/auth/profile": {
+      "get": {
+        "tags": ["Profile"],
+        "summary": "الحصول على الملف الشخصي",
+        "operationId": "getProfile"
+      },
+      "patch": {
+        "tags": ["Profile"],
+        "summary": "تحديث الملف الشخصي",
+        "operationId": "updateProfile",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contractor/auth/profile/update": {
+      "post": {
+        "tags": ["Profile"],
+        "summary": "تحديث الملف الشخصي (شامل)",
+        "operationId": "updateFullProfile",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "phone": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "specialties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contractor/auth/logo": {
+      "post": {
+        "tags": ["Profile"],
+        "summary": "تحديث شعار الشركة",
+        "operationId": "updateLogo",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "logo": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contractor/auth/change-password": {
+      "post": {
+        "tags": ["Profile"],
+        "summary": "تغيير كلمة المرور",
+        "operationId": "changePassword",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "current_password": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  },
+                  "password_confirmation": {
+                    "type": "string"
+                  }
+                },
+                "required": ["current_password", "password", "password_confirmation"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contractor/home": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "الشاشة الرئيسية",
+        "operationId": "contractorHome",
+        "description": "تجميع شامل لكل بيانات الشاشة الرئيسية في نداء واحد"
+      }
+    },
+    "/contractor/home/updates": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "سجل التحديثات",
+        "operationId": "contractorUpdates",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          }
+        ]
+      }
+    },
+    "/contractor/dashboard": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "لوحة التحكم",
+        "operationId": "contractorDashboard"
+      }
+    },
+    "/contractor/memberships": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "قائمة الاشتراكات",
+        "operationId": "membershipsList"
+      }
+    },
+    "/contractor/payments": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "قائمة الدفعات",
+        "operationId": "paymentsList"
+      }
+    },
+    "/contractor/documents": {
+      "get": {
+        "tags": ["Documents"],
+        "summary": "الوثائق",
+        "operationId": "documentsList"
+      },
+      "post": {
+        "tags": ["Documents"],
+        "summary": "رفع وثيقة",
+        "operationId": "uploadDocument",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "title": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contractor/payments/transfer": {
+      "get": {
+        "tags": ["Payments"],
+        "summary": "التحويلات البنكية",
+        "operationId": "myTransfers"
+      },
+      "post": {
+        "tags": ["Payments"],
+        "summary": "رفع إشعار تحويل بنكي",
+        "operationId": "submitTransfer",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "bank_account_id": {
+                    "type": "integer"
+                  },
+                  "amount": {
+                    "type": "number"
+                  },
+                  "receipt_image": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": ["bank_account_id", "amount", "receipt_image"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contractor/payments/{payment}/receipt": {
+      "get": {
+        "tags": ["Payments"],
+        "summary": "تحميل الإيصال",
+        "operationId": "paymentReceipt",
+        "parameters": [
+          {
+            "name": "payment",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/contractor/financial": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "الملف المالي",
+        "operationId": "financialStatus",
+        "description": "ما له وما عليه"
+      }
+    },
+    "/contractor/renewal-eligibility": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "أهلية التجديد",
+        "operationId": "renewalEligibility"
+      }
+    },
+    "/contractor/subscription": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "تفاصيل الاشتراك",
+        "operationId": "subscriptionDetails"
+      }
+    },
+    "/contractor/tenders": {
+      "get": {
+        "tags": ["Tenders"],
+        "summary": "العطاءات",
+        "operationId": "contractorTenders",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["active", "archived"]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/contractor/tenders/bookmarked": {
+      "get": {
+        "tags": ["Tenders"],
+        "summary": "العطاءات المحفوظة",
+        "operationId": "bookmarkedTenders"
+      }
+    },
+    "/contractor/tenders/{tender}": {
+      "get": {
+        "tags": ["Tenders"],
+        "summary": "تفاصيل العطاء",
+        "operationId": "tenderDetails",
+        "parameters": [
+          {
+            "name": "tender",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/contractor/tenders/{tender}/bookmark": {
+      "post": {
+        "tags": ["Tenders"],
+        "summary": "حفظ عطاء",
+        "operationId": "bookmarkTender",
+        "parameters": [
+          {
+            "name": "tender",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "tags": ["Tenders"],
+        "summary": "إلغاء حفظ عطاء",
+        "operationId": "unbookmarkTender",
+        "parameters": [
+          {
+            "name": "tender",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/contractor/events": {
+      "get": {
+        "tags": ["Events"],
+        "summary": "الفعاليات",
+        "operationId": "contractorEvents"
+      }
+    },
+    "/contractor/events/{event}": {
+      "get": {
+        "tags": ["Events"],
+        "summary": "تفاصيل الفعالية",
+        "operationId": "eventDetails",
+        "parameters": [
+          {
+            "name": "event",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/contractor/events/{event}/join": {
+      "post": {
+        "tags": ["Events"],
+        "summary": "الانضمام للفعالية",
+        "operationId": "joinEvent",
+        "parameters": [
+          {
+            "name": "event",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "tags": ["Events"],
+        "summary": "إلغاء الانضمام",
+        "operationId": "leaveEvent",
+        "parameters": [
+          {
+            "name": "event",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/contractor/circulars/pending": {
+      "get": {
+        "tags": ["Announcements"],
+        "summary": "التعميمات المعلقة",
+        "operationId": "pendingCirculars"
+      }
+    },
+    "/contractor/announcements/{announcement}": {
+      "get": {
+        "tags": ["Announcements"],
+        "summary": "تفاصيل التعميم",
+        "operationId": "announcementDetails",
+        "parameters": [
+          {
+            "name": "announcement",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/contractor/circulars/{announcement}/acknowledge": {
+      "post": {
+        "tags": ["Announcements"],
+        "summary": "إقرار التعميم",
+        "operationId": "acknowledgeAnnouncement",
+        "parameters": [
+          {
+            "name": "announcement",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/contractor/equipment": {
+      "get": {
+        "tags": ["Equipment"],
+        "summary": "آلياتي",
+        "operationId": "myEquipment"
+      },
+      "post": {
+        "tags": ["Equipment"],
+        "summary": "إضافة آلية جديدة",
+        "operationId": "createEquipment",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "equipment_type_id": {
+                    "type": "integer"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "images[]": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contractor/equipment/{equipment}": {
+      "patch": {
+        "tags": ["Equipment"],
+        "summary": "تعديل آلية",
+        "operationId": "updateEquipment",
+        "parameters": [
+          {
+            "name": "equipment",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "tags": ["Equipment"],
+        "summary": "حذف آلية",
+        "operationId": "deleteEquipment",
+        "parameters": [
+          {
+            "name": "equipment",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/contractor/equipment/marketplace": {
+      "get": {
+        "tags": ["Equipment"],
+        "summary": "سوق الآليات",
+        "operationId": "equipmentMarketplace",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/contractor/equipment/form-options": {
+      "get": {
+        "tags": ["Equipment"],
+        "summary": "خيارات النموذج",
+        "operationId": "equipmentFormOptions"
+      }
+    },
+    "/contractor/equipment/subscription-status": {
+      "get": {
+        "tags": ["Equipment"],
+        "summary": "حالة الاشتراك",
+        "operationId": "equipmentSubscriptionStatus"
+      }
+    },
+    "/contractor/equipment-packages": {
+      "get": {
+        "tags": ["Equipment"],
+        "summary": "باقات الاشتراك",
+        "operationId": "equipmentPackages"
+      }
+    },
+    "/contractor/equipment/{equipment}/images": {
+      "post": {
+        "tags": ["Equipment"],
+        "summary": "رفع صور الآلية",
+        "operationId": "uploadEquipmentImages",
+        "parameters": [
+          {
+            "name": "equipment",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "images[]": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contractor/equipment/{equipment}/images/{equipmentImage}": {
+      "delete": {
+        "tags": ["Equipment"],
+        "summary": "حذف صورة",
+        "operationId": "deleteEquipmentImage",
+        "parameters": [
+          {
+            "name": "equipment",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "equipmentImage",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/contractor/equipment/{equipment}/images/{equipmentImage}/primary": {
+      "post": {
+        "tags": ["Equipment"],
+        "summary": "تعيين صورة رئيسية",
+        "operationId": "setPrimaryImage",
+        "parameters": [
+          {
+            "name": "equipment",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "equipmentImage",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/contractor/auth/notifications": {
+      "get": {
+        "tags": ["Notifications"],
+        "summary": "الإشعارات",
+        "operationId": "getNotifications",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/contractor/auth/notifications/unread-count": {
+      "get": {
+        "tags": ["Notifications"],
+        "summary": "عدد الإشعارات غير المقروءة",
+        "operationId": "unreadCount"
+      }
+    },
+    "/contractor/auth/notifications/read": {
+      "post": {
+        "tags": ["Notifications"],
+        "summary": "تحديد جميع الإشعارات كمقروءة",
+        "operationId": "markAllRead"
+      }
+    },
+    "/contractor/auth/notifications/{id}/mark-as-read": {
+      "patch": {
+        "tags": ["Notifications"],
+        "summary": "تحديد إشعار كمقروء",
+        "operationId": "markAsRead",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/contractor/app-notifications": {
+      "get": {
+        "tags": ["Notifications"],
+        "summary": "إشعارات التطبيق",
+        "operationId": "appNotifications"
+      }
+    },
+    "/contractor/app-notifications/unread-count": {
+      "get": {
+        "tags": ["Notifications"],
+        "summary": "عدد إشعارات التطبيق غير المقروءة",
+        "operationId": "appUnreadCount"
+      }
+    },
+    "/contractor/support-tickets": {
+      "get": {
+        "tags": ["Support"],
+        "summary": "تذاكري",
+        "operationId": "myTickets"
+      },
+      "post": {
+        "tags": ["Support"],
+        "summary": "فتح تذكرة دعم",
+        "operationId": "createTicket",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "subject": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  }
+                },
+                "required": ["subject", "message"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contractor/support-tickets/{ticket}": {
+      "get": {
+        "tags": ["Support"],
+        "summary": "تفاصيل التذكرة",
+        "operationId": "ticketDetails",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/contractor/support-tickets/{ticket}/reply": {
+      "post": {
+        "tags": ["Support"],
+        "summary": "الرد على التذكرة",
+        "operationId": "replyTicket",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message": {
+                    "type": "string"
+                  }
+                },
+                "required": ["message"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contractor/certificate-requests": {
+      "get": {
+        "tags": ["Certificates"],
+        "summary": "طلبات الشهادات",
+        "operationId": "myCertificates"
+      },
+      "post": {
+        "tags": ["Certificates"],
+        "summary": "طلب شهادة جديدة",
+        "operationId": "requestCertificate",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "quantity": {
+                    "type": "integer",
+                    "default": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contractor/certificates/status": {
+      "get": {
+        "tags": ["Certificates"],
+        "summary": "حالة الشهادات",
+        "operationId": "certificateStatus"
+      }
+    },
+    "/contractor/auth/name-change-request": {
+      "get": {
+        "tags": ["Profile"],
+        "summary": "طلب تعديل الاسم الحالي",
+        "operationId": "nameChangeRequest"
+      },
+      "post": {
+        "tags": ["Profile"],
+        "summary": "طلب تعديل اسم الشركة",
+        "operationId": "createNameChangeRequest",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "new_name": {
+                    "type": "string"
+                  },
+                  "legal_document": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": ["new_name", "legal_document"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contractor/profile-update-requests/mine": {
+      "get": {
+        "tags": ["Profile"],
+        "summary": "طلبات تحديث البيانات",
+        "operationId": "myProfileUpdateRequests"
+      }
+    },
+    "/contractor/profile-update-requests": {
+      "post": {
+        "tags": ["Profile"],
+        "summary": "إرسال طلب تحديث بيانات",
+        "operationId": "createProfileUpdateRequest",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "document": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/news": {
+      "get": {
+        "tags": ["Public - News"],
+        "summary": "قائمة الأخبار",
+        "operationId": "getNews",
+        "security": [],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/news/latest": {
+      "get": {
+        "tags": ["Public - News"],
+        "summary": "أحدث الأخبار",
+        "operationId": "latestNews",
+        "security": []
+      }
+    },
+    "/news/{news}": {
+      "get": {
+        "tags": ["Public - News"],
+        "summary": "تفاصيل الخبر",
+        "operationId": "newsDetails",
+        "security": [],
+        "parameters": [
+          {
+            "name": "news",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/events": {
+      "get": {
+        "tags": ["Public - Events"],
+        "summary": "قائمة الفعاليات",
+        "operationId": "publicEvents",
+        "security": []
+      }
+    },
+    "/events/latest": {
+      "get": {
+        "tags": ["Public - Events"],
+        "summary": "آخر الفعاليات",
+        "operationId": "latestPublicEvents",
+        "security": []
+      }
+    },
+    "/events/{slug}": {
+      "get": {
+        "tags": ["Public - Events"],
+        "summary": "تفاصيل الفعالية",
+        "operationId": "publicEventDetails",
+        "security": [],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/announcements": {
+      "get": {
+        "tags": ["Public - Announcements"],
+        "summary": "قائمة التعميمات",
+        "operationId": "publicAnnouncements",
+        "security": []
+      }
+    },
+    "/announcements/{announcement}": {
+      "get": {
+        "tags": ["Public - Announcements"],
+        "summary": "تفاصيل التعميم",
+        "operationId": "publicAnnouncementDetails",
+        "security": [],
+        "parameters": [
+          {
+            "name": "announcement",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/tenders-public": {
+      "get": {
+        "tags": ["Public - Tenders"],
+        "summary": "العطاءات العامة",
+        "operationId": "publicTenders",
+        "security": []
+      }
+    },
+    "/tenders-public/{tender}": {
+      "get": {
+        "tags": ["Public - Tenders"],
+        "summary": "تفاصيل العطاء",
+        "operationId": "publicTenderDetails",
+        "security": [],
+        "parameters": [
+          {
+            "name": "tender",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/pages/{slug}": {
+      "get": {
+        "tags": ["Public - Pages"],
+        "summary": "صفحة ديناميكية",
+        "operationId": "getPage",
+        "security": [],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/terms": {
+      "get": {
+        "tags": ["Public - Settings"],
+        "summary": "شروط الاستخدام",
+        "operationId": "terms",
+        "security": []
+      }
+    },
+    "/privacy-policy": {
+      "get": {
+        "tags": ["Public - Settings"],
+        "summary": "سياسة الخصوصية",
+        "operationId": "privacyPolicy",
+        "security": []
+      }
+    },
+    "/legal-files": {
+      "get": {
+        "tags": ["Public - Settings"],
+        "summary": "المكتبة القانونية",
+        "operationId": "legalFiles",
+        "security": []
+      }
+    },
+    "/bank-accounts": {
+      "get": {
+        "tags": ["Public - Settings"],
+        "summary": "حسابات الدفع البنكية",
+        "operationId": "bankAccounts",
+        "security": []
+      }
+    },
+    "/app/maintenance": {
+      "get": {
+        "tags": ["Public - Settings"],
+        "summary": "حالة الصيانة",
+        "operationId": "maintenance",
+        "security": []
+      }
+    },
+    "/app/contact": {
+      "get": {
+        "tags": ["Public - Settings"],
+        "summary": "بيانات الاتصال",
+        "operationId": "contact",
+        "security": []
+      }
+    },
+    "/app/about": {
+      "get": {
+        "tags": ["Public - Settings"],
+        "summary": "عن الاتحاد",
+        "operationId": "about",
+        "security": []
+      }
+    },
+    "/app/settings": {
+      "get": {
+        "tags": ["Public - Settings"],
+        "summary": "الإعدادات العامة",
+        "operationId": "appSettings",
+        "security": []
+      }
+    },
+    "/app/governorates": {
+      "get": {
+        "tags": ["Public - Settings"],
+        "summary": "المحافظات والمدن",
+        "operationId": "governorates",
+        "security": []
+      }
+    },
+    "/app/specialties-catalog": {
+      "get": {
+        "tags": ["Public - Settings"],
+        "summary": "كتالوج التخصصات",
+        "operationId": "specialtiesCatalog",
+        "security": []
+      }
+    },
+    "/landing/home": {
+      "get": {
+        "tags": ["Public - Landing"],
+        "summary": "الصفحة الرئيسية",
+        "operationId": "landingHome",
+        "security": []
+      }
+    },
+    "/certificates/verify/{token}": {
+      "get": {
+        "tags": ["Public - Certificates"],
+        "summary": "التحقق من الشهادة (QR)",
+        "operationId": "verifyCertificate",
+        "security": [],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    }
+  }
+}
