@@ -129,9 +129,9 @@ const uploadAvatar = async () => {
               :to="{ name: 'settings-governorates' }"
             />
             <VListItem
-              prepend-icon="tabler-photo"
-              title="صور تصنيفات العطاءات"
-              :to="{ name: 'settings-tender-category-images' }"
+              prepend-icon="tabler-category"
+              title="تصنيفات العطاءات"
+              :to="{ name: 'tenders-categories' }"
             />
           </VList>
         </VCard>

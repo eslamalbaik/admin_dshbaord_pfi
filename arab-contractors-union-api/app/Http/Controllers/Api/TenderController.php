@@ -5,20 +5,25 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\Contractor;
-use App\Models\Setting;
 use App\Models\Tender;
 use App\Models\TenderBookmark;
+use App\Models\TenderCategory;
 use App\Notifications\NewTenderPublishedNotification;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Notification as NotificationFacade;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class TenderController extends Controller
 {
     use ApiResponseTrait;
+
+    /** [اسم التصنيف => رابط صورته] — يُحمَّل مرة واحدة لكل طلب عند تنسيق قائمة عطاءات */
+    private ?array $categoryImages = null;
 
     // GET /api/tenders
     public function index(Request $request)
@@ -114,10 +119,10 @@ class TenderController extends Controller
             'issuing_entity'     => 'nullable|string|max:255',
             'description'        => 'nullable|string',
             'union_notes'        => 'nullable|string',
-            'category'           => ['nullable', Rule::in(Tender::CATEGORIES)],
-            // بتاريخ ووقت معاً (REQ-07 #1/#2)، ولازم يكون بالمستقبل عند الإنشاء — التعديل
-            // يسمح بأي تاريخ حتى لا يُمنع تصحيح حقول أخرى بعطاء انتهى موعده فعلياً.
-            'deadline'           => 'nullable|date|after:now',
+            'category'           => ['nullable', Rule::in(TenderCategory::activeNames())],
+            // بتاريخ ووقت (ساعة ودقيقة) معاً، وأقرب موعد مسموح هو بداية الغد بالتوقيت المحلي
+            // (تاريخ اليوم + 1). التعديل لا يفرضه إلا إذا تغيّر الموعد فعلاً — انظر update().
+            'deadline'           => ['nullable', 'date', 'after_or_equal:' . self::minDeadline()->toDateTimeString()],
             'status'             => 'nullable|in:open,closed,cancelled',
             'submission_types'   => 'nullable|array',
             'submission_types.*' => 'in:email,phone,file',
@@ -126,6 +131,10 @@ class TenderController extends Controller
             'submission_file'    => 'nullable|file|mimes:pdf,doc,docx|max:5120',
             'external_url'       => 'nullable|url|max:500',
         ]);
+
+        if (! empty($validated['deadline'])) {
+            $validated['deadline'] = $this->normalizeDeadline($validated['deadline']);
+        }
 
         if ($request->hasFile('submission_file')) {
             $validated['submission_file'] = $request->file('submission_file')
@@ -176,6 +185,24 @@ class TenderController extends Controller
             ));
     }
 
+    /**
+     * أقرب موعد نهائي مسموح: بداية الغد بالتوقيت المحلي (app.local_timezone) محوَّلاً لتوقيت
+     * التطبيق (UTC) — "بداية الغد" بتوقيت UTC وحده كانت سترفض عطاءً ينتهي غداً فجراً محلياً.
+     */
+    public static function minDeadline(): Carbon
+    {
+        return now(config('app.local_timezone'))->addDay()->startOfDay()->setTimezone(config('app.timezone'));
+    }
+
+    /**
+     * الواجهة ترسل الموعد بصيغة ISO مع المنطقة الزمنية (…Z). عمود datetime يحفظ الساعة كما هي
+     * ويُسقط الإزاحة، فيُحوَّل أولاً لتوقيت التطبيق وإلا انزاحت الساعة المحفوظة بفرق التوقيت.
+     */
+    private function normalizeDeadline(string $value): Carbon
+    {
+        return Carbon::parse($value)->setTimezone(config('app.timezone'));
+    }
+
     /** رقم مرجعي بصيغة TND-<سنة>-<رقم العطاء بـ3 خانات> — يُولَّد مرة واحدة عند الإنشاء */
     private function generateReferenceNumber(Tender $tender): string
     {
@@ -196,7 +223,8 @@ class TenderController extends Controller
             'issuing_entity'     => 'nullable|string|max:255',
             'description'        => 'nullable|string',
             'union_notes'        => 'nullable|string',
-            'category'           => ['nullable', Rule::in(Tender::CATEGORIES)],
+            // التصنيف الحالي للعطاء مقبول حتى لو عُطِّل لاحقاً — وإلا تعذّر حفظ أي حقل آخر فيه
+            'category'           => ['nullable', Rule::in(array_filter([...TenderCategory::activeNames(), $tender->category]))],
             'deadline'           => 'nullable|date',
             'status'             => 'nullable|in:open,closed,cancelled',
             'submission_types'   => 'nullable|array',
@@ -206,6 +234,22 @@ class TenderController extends Controller
             'submission_file'    => 'nullable|file|mimes:pdf,doc,docx|max:5120',
             'external_url'       => 'nullable|url|max:500',
         ]);
+
+        // موعد جديد فعلاً (لا مجرد إعادة إرسال القيمة المحفوظة) يخضع لنفس حدّ الإنشاء
+        if (! empty($validated['deadline'])) {
+            $validated['deadline'] = $this->normalizeDeadline($validated['deadline']);
+        }
+        if (! empty($validated['deadline'])
+            && ! ($tender->deadline && $validated['deadline']->equalTo($tender->deadline))
+            && $validated['deadline']->lt(self::minDeadline())) {
+            throw ValidationException::withMessages([
+                'deadline' => 'يجب أن يكون آخر موعد للتقديم بتاريخ الغد أو بعده.',
+            ]);
+        }
+
+        // الملف المحفوظ لا يُمسّ ما لم يُرفع بديل — غياب submission_file بالطلب يعني "أبقِه"
+        $oldSubmissionFile = $tender->getRawOriginal('submission_file');
+        unset($validated['submission_file']);
 
         if ($request->hasFile('submission_file')) {
             $validated['submission_file'] = $request->file('submission_file')
@@ -217,6 +261,10 @@ class TenderController extends Controller
         }
 
         $tender->update($validated);
+
+        if (isset($validated['submission_file']) && $oldSubmissionFile && ! str_starts_with($oldSubmissionFile, 'http')) {
+            Storage::disk('public')->delete($oldSubmissionFile);
+        }
 
         return $this->success($tender->fresh()->toArray(), 'تم تحديث العطاء بنجاح.');
     }
@@ -340,7 +388,7 @@ class TenderController extends Controller
             'category'            => $t->category,
             // العطاء نفسه بلا صورة خاصة به — صورة تصنيفه الافتراضية (REQ-07 #7) إن وُجدت
             'category_image'      => $t->category
-                ? $this->resolveCategoryImage($t->category)
+                ? ($this->categoryImages ??= TenderCategory::imageMap())[$t->category] ?? null
                 : null,
             'budget'              => $t->budget,
             'deadline'            => $t->deadline?->toIso8601String(),
@@ -410,78 +458,5 @@ class TenderController extends Controller
         $attachment->delete();
 
         return $this->success(message: 'تم حذف المرفق.');
-    }
-
-    // ═════════════════════════════════════════════════════════════════════════
-    //  Admin — صور افتراضية حسب تصنيف العطاء (REQ-07 #7) — العطاء نفسه بلا صورة
-    //  خاصة به إطلاقاً؛ هاي الصور تُعرض بدلاً منها فقط حسب category العطاء.
-    //  تُخزَّن كإعدادات (Setting) بمفتاح لكل تصنيف بدل جدول منفصل — عدد التصنيفات
-    //  ثابت ومحدود (Tender::CATEGORIES) فلا داعي لجدول كامل من أجل صورة واحدة لكل قيمة.
-    // ═════════════════════════════════════════════════════════════════════════
-
-    private static function categoryImageSettingKey(string $category): string
-    {
-        return 'tender_category_image:' . $category;
-    }
-
-    private function resolveCategoryImage(string $category): ?string
-    {
-        $path = Setting::get(self::categoryImageSettingKey($category));
-
-        return $path ? Storage::disk('public')->url($path) : null;
-    }
-
-    /** [category => image_url|null] لكل التصنيفات الثابتة */
-    public function categoryImages()
-    {
-        $images = collect(Tender::CATEGORIES)->mapWithKeys(fn ($category) => [
-            $category => $this->resolveCategoryImage($category),
-        ]);
-
-        return $this->success($images);
-    }
-
-    // POST /api/v1/dashboard/tenders/category-images
-    public function storeCategoryImage(Request $request)
-    {
-        $data = $request->validate([
-            'category' => ['required', Rule::in(Tender::CATEGORIES)],
-            'image'    => 'required|image|mimes:jpg,jpeg,png,webp|max:2048',
-        ]);
-
-        $key = self::categoryImageSettingKey($data['category']);
-        $old = Setting::get($key);
-
-        $path = $request->file('image')->store('tenders/category-images', 'public');
-        Setting::set($key, $path, 'tenders');
-
-        if ($old) {
-            Storage::disk('public')->delete($old);
-        }
-
-        return $this->success(['category' => $data['category'], 'url' => Storage::disk('public')->url($path)], 'تم حفظ صورة التصنيف بنجاح.');
-    }
-
-    // DELETE /api/v1/dashboard/tenders/category-images/{category}
-    public function destroyCategoryImage(string $category)
-    {
-        if (! in_array($category, Tender::CATEGORIES, true)) {
-            return $this->error('تصنيف غير معروف.', 422);
-        }
-
-        $key    = self::categoryImageSettingKey($category);
-        $old    = Setting::get($key);
-        $record = Setting::where('key', $key)->first();
-
-        if ($old) {
-            Storage::disk('public')->delete($old);
-        }
-
-        // حذف الـ model نفسه (لا Setting::where()->delete() المباشر) عمداً — الأخير حذف جماعي
-        // عبر query builder لا يُطلق حدث deleted() فما ينظّف كاش settings.all، فتبقى القيمة
-        // القديمة تُقرأ من الكاش رغم حذف الصف من القاعدة.
-        $record?->delete();
-
-        return $this->success(message: 'تمت إزالة صورة التصنيف — سيُعرض بلا صورة حتى تُرفَع صورة جديدة.');
     }
 }

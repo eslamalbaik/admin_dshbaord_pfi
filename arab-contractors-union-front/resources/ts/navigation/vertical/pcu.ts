@@ -61,7 +61,7 @@ if (!isAccountant) {
     icon: { icon: 'tabler-files' },
     children: [
       { title: 'قائمة العطاءات', to: 'tenders' },
-      { title: 'صور تصنيفات العطاءات', to: 'settings-tender-category-images' },
+      { title: 'تصنيفات العطاءات', to: 'tenders-categories' },
     ],
   })
 

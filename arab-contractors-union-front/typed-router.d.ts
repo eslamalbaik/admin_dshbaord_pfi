@@ -88,10 +88,10 @@ declare module 'vue-router/auto-routes' {
     'settings-legal-library': RouteRecordInfo<'settings-legal-library', '/settings/legal-library', Record<never, never>, Record<never, never>>,
     'settings-pages': RouteRecordInfo<'settings-pages', '/settings/pages', Record<never, never>, Record<never, never>>,
     'settings-privacy-policy': RouteRecordInfo<'settings-privacy-policy', '/settings/privacy-policy', Record<never, never>, Record<never, never>>,
-    'settings-tender-category-images': RouteRecordInfo<'settings-tender-category-images', '/settings/tender-category-images', Record<never, never>, Record<never, never>>,
     'settings-terms': RouteRecordInfo<'settings-terms', '/settings/terms', Record<never, never>, Record<never, never>>,
     'support-tickets': RouteRecordInfo<'support-tickets', '/support-tickets', Record<never, never>, Record<never, never>>,
     'tenders': RouteRecordInfo<'tenders', '/tenders', Record<never, never>, Record<never, never>>,
+    'tenders-categories': RouteRecordInfo<'tenders-categories', '/tenders/categories', Record<never, never>, Record<never, never>>,
     'under-construction': RouteRecordInfo<'under-construction', '/under-construction', Record<never, never>, Record<never, never>>,
   }
 }
