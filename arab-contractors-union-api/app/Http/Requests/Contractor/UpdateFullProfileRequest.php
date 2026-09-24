@@ -17,11 +17,16 @@ class UpdateFullProfileRequest extends FormRequest
 
         return [
             // اسم الشركة لا يُعدَّل مباشرة — فقط عبر طلب تعديل اسم شركة تُوافق عليه الإدارة
+            //
+            // ‼ classification و specialties محذوفان من هنا عن قصد (TASK-17). هما مُدخَلا
+            // MembershipFeeCalculator نفسه (يقرأ $contractor->specialties) ويغذّيان توليد
+            // الشهادات، فكان قبولهما هنا يعني أن المقاول يستطيع من التطبيق تخفيض تصنيفه
+            // بنفسه فيُخفّض الرسم المحتسَب عليه، وتغيير الدرجة المطبوعة على شهادته — بلا
+            // مراجعة ولا أثر. تعديلهما صلاحية إدارية فقط: ContractorController (لوحة الأدمن)،
+            // أو طابور طلبات التعديل بعد إنجاز US11. إعادتهما هنا تُعيد فتح الثغرة.
             'trade'                         => 'nullable|string|max:100',
-            'classification'                => 'nullable|string|max:10',
             'established_year'              => 'nullable|integer|min:1900|max:' . date('Y'),
             'established_date'              => 'nullable|date',
-            'specialties'                   => 'nullable|string',
             'owner_name'                    => 'nullable|string|max:255',
             'email'                         => 'nullable|email|unique:contractors,email,' . $contractorId,
             'phone'                         => 'nullable|string|max:20|unique:contractors,phone,' . $contractorId,

@@ -14,26 +14,57 @@ const statusOptions = [
   { value: 'pending', title: 'قيد المراجعة' },
   { value: 'approved', title: 'مقبول' },
   { value: 'rejected', title: 'مرفوض' },
+  { value: 'superseded', title: 'ألغاه طلب أحدث' },
 ]
 
 const statusColor: Record<string, string> = {
   pending: 'warning',
   approved: 'success',
   rejected: 'error',
+  superseded: 'secondary',
 }
 
-// الحقول المسموح تعديلها محصورة بـ ProfileUpdateRequest::ALLOWED_FIELDS في الـ backend
-// (whitelist صريح عبر array_intersect_key) — فخريطة ثابتة أدقّ من اشتقاق العناوين من المفاتيح.
+// خريطة ثابتة تُقابل ProfileUpdateRequest::REVIEWED_* في الـbackend. توسيع الطابور من خمسة
+// حقول إلى الملف الكامل (TASK-17 US11) يجعل هذه الخريطة حمّالة: أي مفتاح غير مُعرَّف كان
+// سيُعرض بلا عنوان، فيوافق المراجِع على تغيير لا يقرأه. لذلك يظهر المفتاح الخام بعلامة
+// واضحة عند عدم وجود ترجمة، بدل أن يظهر فراغاً.
 const fieldLabels: Record<string, string> = {
-  authorized_person: 'المفوض بالتوقيع',
-  authorized_person_title: 'صفة المفوض',
+  // تواصل
   email: 'البريد الإلكتروني',
   address: 'العنوان التفصيلي',
   phone: 'الجوال',
+  fax: 'الفاكس',
+  district: 'الحي / المنطقة',
+  building: 'البناية',
+  floor: 'الطابق',
+  authorized_person_phone: 'جوال المفوض',
+  authorized_person_whatsapp: 'واتساب المفوض',
+  // هوية الشركة وبياناتها القانونية
+  trade: 'التخصص (نص حر)',
+  established_year: 'سنة التأسيس',
+  established_date: 'تاريخ التأسيس',
+  owner_name: 'اسم المالك',
+  partners: 'الشركاء',
+  capital: 'رأس المال',
+  registration_date: 'تاريخ التسجيل',
+  legal_form: 'الشكل القانوني',
+  company_purposes: 'أغراض الشركة',
+  authorized_person: 'المفوض بالتوقيع',
+  authorized_person_title: 'صفة المفوض',
+  authorized_person_id_number: 'رقم هوية المفوض',
 }
 
+/** مجموعة الحقل — تُستخدم لتقسيم المقارنة؛ قائمة من 25 صفاً غير قابلة للمراجعة. */
+const contactFields = [
+  'email', 'address', 'fax', 'district', 'building', 'floor',
+  'authorized_person_phone', 'authorized_person_whatsapp', 'phone',
+]
+
 // الحقول التي تُعرض LTR حتى لا تتكسّر الأرقام/البريد داخل صفحة RTL
-const ltrFields = ['phone', 'email']
+const ltrFields = [
+  'phone', 'email', 'fax', 'authorized_person_phone', 'authorized_person_whatsapp',
+  'established_year', 'capital', 'authorized_person_id_number',
+]
 
 watch(statusFilter, () => page.value = 1)
 
@@ -77,11 +108,28 @@ const diffRows = computed(() => {
   return Object.keys(proposed).map(key => ({
     key,
     label: fieldLabels[key] ?? key,
+    // بلا ترجمة: يُعرض المفتاح الخام بعلامة بدل فراغ يوافَق عليه على غير بيان
+    unlabelled: !fieldLabels[key],
+    group: contactFields.includes(key) ? 'contact' : 'identity',
     dir: ltrFields.includes(key) ? 'ltr' : undefined,
-    current: current[key] ?? null,
-    proposed: proposed[key] ?? null,
+    current: formatValue(current[key]),
+    proposed: formatValue(proposed[key]),
   }))
 })
+
+/** partners تصل كمصفوفة/كائن — عرضها الخام يُظهر [object Object] بوجه المراجِع. */
+function formatValue(value: any): string | null {
+  if (value === null || value === undefined || value === '') return null
+  if (typeof value === 'object') return JSON.stringify(value, null, 1)
+
+  return String(value)
+}
+
+const identityRows = computed(() => diffRows.value.filter(r => r.group === 'identity'))
+const contactRows = computed(() => diffRows.value.filter(r => r.group === 'contact'))
+
+/** المستندات المقترحة — رابط المقترح مع رابط الحالي للمقارنة قبل الموافقة. */
+const proposedDocuments = computed(() => selected.value?.proposed_documents ?? [])
 
 const refresh = () => {
   queryClient.invalidateQueries({ queryKey: ['profile-update-requests'] })
@@ -225,10 +273,22 @@ function fmtDate(d: string | null) {
             <div><strong>تاريخ الطلب:</strong> {{ fmtDate(selected.created_at) }}</div>
           </div>
 
-          <VCard variant="tonal" color="secondary" class="pa-4 mb-4 rounded-lg">
-            <p class="text-body-2 font-weight-medium mb-3">التعديلات المطلوبة:</p>
-            <div v-for="row in diffRows" :key="row.key" class="mb-3">
-              <p class="text-caption text-medium-emphasis mb-1">{{ row.label }}</p>
+          <!-- مقسّمة إلى مجموعات: الطابور صار يحمل الملف الكامل، وقائمة مسطّحة من 25 صفاً
+               ليست قابلة للمراجعة فعلياً (TASK-17 US11). -->
+          <VCard
+            v-if="identityRows.length"
+            variant="tonal"
+            color="secondary"
+            class="pa-4 mb-4 rounded-lg"
+          >
+            <p class="text-body-2 font-weight-medium mb-3">بيانات الشركة وهويتها القانونية:</p>
+            <div v-for="row in identityRows" :key="row.key" class="mb-3">
+              <p class="text-caption text-medium-emphasis mb-1">
+                {{ row.label }}
+                <VChip v-if="row.unlabelled" size="x-small" color="warning" variant="tonal" class="ms-1">
+                  حقل غير معرَّف بالواجهة
+                </VChip>
+              </p>
               <div class="d-flex align-center flex-wrap gap-2">
                 <span class="text-body-2 text-decoration-line-through text-medium-emphasis" :dir="row.dir">
                   {{ row.current || '—' }}
@@ -237,6 +297,74 @@ function fmtDate(d: string | null) {
                 <span class="text-body-2 font-weight-medium text-success" :dir="row.dir">
                   {{ row.proposed || '—' }}
                 </span>
+              </div>
+            </div>
+          </VCard>
+
+          <VCard
+            v-if="contactRows.length"
+            variant="tonal"
+            color="secondary"
+            class="pa-4 mb-4 rounded-lg"
+          >
+            <p class="text-body-2 font-weight-medium mb-3">بيانات التواصل:</p>
+            <div v-for="row in contactRows" :key="row.key" class="mb-3">
+              <p class="text-caption text-medium-emphasis mb-1">
+                {{ row.label }}
+                <VChip v-if="row.unlabelled" size="x-small" color="warning" variant="tonal" class="ms-1">
+                  حقل غير معرَّف بالواجهة
+                </VChip>
+              </p>
+              <div class="d-flex align-center flex-wrap gap-2">
+                <span class="text-body-2 text-decoration-line-through text-medium-emphasis" :dir="row.dir">
+                  {{ row.current || '—' }}
+                </span>
+                <VIcon icon="tabler-arrow-left" size="16" class="text-medium-emphasis" />
+                <span class="text-body-2 font-weight-medium text-success" :dir="row.dir">
+                  {{ row.proposed || '—' }}
+                </span>
+              </div>
+            </div>
+          </VCard>
+
+          <!-- المستندات المقترحة: المستند الحالي لم يُلمس بعد، والموافقة هي ما ينقل الجديد
+               مكانه. فتح الملفين إلى جانب بعضهما هو الشيء الوحيد الذي يجعل الموافقة مراجعةً
+               لا تخميناً. -->
+          <VCard
+            v-if="proposedDocuments.length"
+            variant="tonal"
+            color="info"
+            class="pa-4 mb-4 rounded-lg"
+          >
+            <p class="text-body-2 font-weight-medium mb-3">
+              مستندات مقترحة ({{ proposedDocuments.length }}) — لم تُطبَّق بعد:
+            </p>
+            <div v-for="doc in proposedDocuments" :key="doc.field" class="mb-3">
+              <p class="text-caption text-medium-emphasis mb-1">{{ doc.label }}</p>
+              <div class="d-flex align-center flex-wrap gap-2">
+                <VBtn
+                  v-if="doc.current_url"
+                  size="x-small"
+                  variant="tonal"
+                  color="secondary"
+                  prepend-icon="tabler-file"
+                  :href="doc.current_url"
+                  target="_blank"
+                >
+                  المستند الحالي
+                </VBtn>
+                <span v-else class="text-caption text-medium-emphasis">لا مستند حالي</span>
+                <VIcon icon="tabler-arrow-left" size="16" class="text-medium-emphasis" />
+                <VBtn
+                  size="x-small"
+                  variant="tonal"
+                  color="success"
+                  prepend-icon="tabler-file-check"
+                  :href="doc.proposed_url"
+                  target="_blank"
+                >
+                  المستند المقترح
+                </VBtn>
               </div>
             </div>
           </VCard>
@@ -260,6 +388,17 @@ function fmtDate(d: string | null) {
           <div v-if="selected.reviewed_by" class="text-caption text-medium-emphasis mb-2">
             تمت المراجعة بواسطة {{ selected.reviewed_by }} — {{ fmtDate(selected.reviewed_at) }}
           </div>
+
+          <VAlert
+            v-if="selected.status === 'superseded'"
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mb-4"
+          >
+            ألغى هذا الطلبَ طلبٌ أحدث من المقاول نفسه — لا إجراء مطلوب عليه.
+            <template v-if="selected.superseded_at"> ({{ fmtDate(selected.superseded_at) }})</template>
+          </VAlert>
 
           <template v-if="selected.status === 'pending'">
             <VDivider class="my-4" />

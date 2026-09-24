@@ -59,6 +59,19 @@ class CertificateEligibilityService
         }
 
         if ($type === 'membership' && ! $this->financialService->isEligibleForMembershipCertificate($contractor)) {
+            // المقاول الذي دفع رسومه من التطبيق تبقى دفعته pending حتى يعتمدها المحاسب،
+            // ولا يتحرّك paid_jod قبل ذلك — فكان الطلب يُرفَض ولا يُنشأ صف إطلاقاً، وتظهر
+            // اللوحة فارغة لمن دفع فعلاً (TASK-17 #5). يُسمح بالتقديم الآن ويُربَط الطلب
+            // بالدفعة، على أن تبقى الموافقة والإصدار موقوفَين حتى تأكيدها.
+            $pendingPayment = $this->pendingMembershipFeePayment($contractor);
+
+            if ($pendingPayment) {
+                return [
+                    'eligible'        => true,
+                    'pending_payment' => $pendingPayment,
+                ];
+            }
+
             return [
                 'eligible' => false,
                 'reason' => "يتبقى لك سداد {$this->financialService->remainingToReach95PercentJod($contractor)} دينار للوصول إلى حد الـ 95% واستخراج شهادتك تلقائياً.",
@@ -81,5 +94,26 @@ class CertificateEligibilityService
         }
 
         return ['eligible' => true];
+    }
+
+    /**
+     * أحدث دفعة رسوم عضوية قدّمها المقاول وما زالت قيد تأكيد المحاسب.
+     *
+     * الشرط مقصود ضيّقاً: وجودها لا يُسقط أي عائق آخر (ملف ناقص، حساب موقوف، غرامات) —
+     * تلك تبقى مانعة للتقديم. ولا يُسقط الحدّ المالي نفسه، بل يُبدّل **توقيته**: الطلب يُرى
+     * ويُراجَع بانتظار الاعتماد، والموافقة والإصدار موقوفان حتى يتحقّق المال فعلاً.
+     *
+     * لا يُشترط أن تغطّي الدفعة الفجوة حتى حدّ الـ95%: amount_jod لا يُحتسب إلا لحظة
+     * الاعتماد (PaymentConfirmationService)، فالدفعة المعلّقة لا تحمل قيمة بالدينار بعد،
+     * وأي تقدير لها هنا سيكون تخميناً بسعر صرف قد لا يوجد. والحساب المالي الحقيقي يُعاد
+     * تطبيقه عند الاعتماد على أي حال، وهو ما يحكم الإصدار.
+     */
+    public function pendingMembershipFeePayment(Contractor $contractor): ?\App\Models\Payment
+    {
+        return $contractor->payments()
+            ->where('type', 'membership_fee')
+            ->where('status', 'pending')
+            ->latest()
+            ->first();
     }
 }

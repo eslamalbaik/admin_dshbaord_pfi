@@ -96,3 +96,10 @@ $alertOnFailure(
     Schedule::command('events:archive')->dailyAt('01:05'),
     'events:archive'
 );
+
+// تنظيف مستندات طلبات تعديل الملف المرحَّلة التي لم تبقَ معلّقة (TASK-17 US11).
+// أسبوعي لا يومي: المسار الطبيعي (موافقة/رفض/إلغاء) ينظّف نفسه، وهذا للحالات الشاذّة وحدها.
+$alertOnFailure(
+    Schedule::command('profile-requests:prune-staged')->weekly(),
+    'profile-requests:prune-staged'
+);

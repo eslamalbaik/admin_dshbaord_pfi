@@ -874,9 +874,15 @@ One small divergence worth considering: login uses `??`, which falls back only o
 
 ---
 
-## TASK-16 — Feedback batch 2026-09-22 — 🔄 STATUS: CODE COMPLETE, awaiting production PHP-FPM limit change (2026-09-22) — ⚠️ four sub-issues re-reported 2026-09-24, carried into TASK-17
+## TASK-16 — Feedback batch 2026-09-22 — 🔄 STATUS: server limits applied 2026-09-24; ⚠️ four sub-issues re-reported and carried into TASK-17
 
-> **2026-09-24**: #2/#3 (upload limits), #4 (document deletion), #5 (preview parity) and #6/#7 (invisible requests) were all re-reported. The pending server change ([TASK-16-tasks.md](TASK-16-tasks.md) T003–T006) is still unexecuted and accounts for #2/#3; #6 and #7's diagnoses turned out to be wrong. See TASK-17 for the corrected analysis. Do not treat this task's summary table as settled.
+> **2026-09-24**: #2/#3 (upload limits), #4 (document deletion), #5 (preview parity) and #6/#7 (invisible requests) were all re-reported. #6 and #7's diagnoses turned out to be wrong. See TASK-17 for the corrected analysis. **Do not treat this task's summary table as settled** — only #2/#3 is closed.
+>
+> **#2/#3 is now closed.** The server change ([TASK-16-tasks.md](TASK-16-tasks.md) T003–T006, identical to TASK-17 T017–T021) was executed on the VPS on 2026-09-24: PHP-FPM `2M/8M/20` → `12M/60M/30` and nginx `client_max_body_size` `20M` → `64M` on **both** API server blocks. Verified end to end — `items.upload_limits` now reports `max_file_mb: 12` on staging *and* production with no redeploy, because `UploadLimits::effectiveMaxKb()` reads `ini_get()` at runtime.
+>
+> Three planning assumptions were wrong, corrected in [TASK-16-tasks.md](TASK-16-tasks.md): the box runs **PHP 8.5**, not 8.2; the **FPM pool is shared by both environments**, so the PHP half was never scopeable to production alone; and the `php -i` verification both task files prescribe reads the **CLI** ini, not FPM's — it would have reported the old values while the web path used the new ones. See the new "Upload size limits" section in [CLAUDE.md](CLAUDE.md) — deploy-invisible state that a server rebuild reverts.
+>
+> TASK-17 Phase 3 live-state checks (T011–T015) were also answered while doing this: the live `dist` on both environments **is** the TASK-16 build (`سيُحذف عند الحفظ` present), and `/var/www/pcuorg/monorepo` is clean at `9113efc`. So US7/US8 are genuine code work, not a stale-deploy artifact.
 
 ### Execution summary (2026-09-22) — first pass
 
@@ -1059,7 +1065,7 @@ Sub-issues #1, #2 and #3 are verbatim repeats of TASK-16 #3, #4 and #5, all thre
 
 **#6 — Company-profile edits. TASK-16's diagnosis was wrong here too.** TASK-16 concluded the Flutter app posts to `contractor/profile-update-requests` and that the only gap was a missing admin page (which it then built). The new report contradicts that: *"تم تعديل ملف الشركة من خلال التطبيق … رغم التحديث"* — **the data was updated**, which the approval queue never does before review (`approve()` is the only writer). The edit therefore went through `POST contractor/auth/profile/update` → `ContractorAuthController::updateFullProfile`, which writes straight to `contractors` and creates no request at all. `PATCH contractor/auth/profile` (`updateProfile`) is a second such path. TASK-16's own cross-cutting note already flagged that two paths exist and behave differently; what it missed is that the app uses the direct one.
 
-**Decision (2026-09-24, with the reporter): close it in the backend — the direct route files a request instead of writing.** This is the largest item in the batch and the only one needing a migration:
+**Decision (2026-09-24, with the reporter): close it in the backend — the direct route files a request instead of writing.** Full design plan, including the app-side contract: **[TASK-17-US11-profile-edit-design.md](TASK-17-US11-profile-edit-design.md)**. **One part of it already shipped ahead of the rest**: the financial-integrity hole that design pass uncovered — the contractor portal accepting `classification` and `specialties`, the membership-fee calculator's own inputs — was closed on 2026-09-24 on the reporter's instruction. See §2 there. This is the largest item in the batch and the only one needing a migration:
 - `ProfileUpdateRequest::ALLOWED_FIELDS` is five keys (`authorized_person`, `authorized_person_title`, `email`, `address`, `phone`); `UpdateFullProfileRequest` accepts ~25 text fields **and 16 document uploads**. `proposed_data` is JSON, so the text fields are free — **the documents have nowhere to go**: `profile_update_requests` has a single `attachment` column, which is the contractor's *evidence* for the request, not the payload.
 - `approve()` does `$contractor->update($proposed_data)` verbatim, so whatever shape staged files take must be safe to splat onto the model, and the old file must be deleted on approval, not on submission.
 - Phone changes must keep the existing OTP pre-verification, which `store()` already enforces and `updateFullProfile` enforces differently (`getVerifiedResult`) — the two must be reconciled, not stacked.
@@ -1136,7 +1142,25 @@ Defects 3 and 4 are the likeliest reason the impact figure is wrong by a differe
 
 **Acceptance criteria**: 🔲 A 9 MB PDF saves, and a 13-document submit fits in one request. 🔲 Every document the system stores — `id_file` included — can be previewed, replaced and deleted from the edit screen. 🔲 The preview dialog matches the add form field-for-field on a freshly created contractor. 🔲 The exported sheet shows المجال/التخصص/الدرجة and التصنيف العام as Arabic labels for a contractor added today. 🔲 A membership-certificate request submitted from the app while its fee payment is pending appears in «طلبات الشهادات» with its payment status visible, and cannot be issued until the payment is confirmed. 🔲 A company-profile edit from the app leaves the contractor record unchanged and appears in «طلبات تعديل البيانات», documents included. 🔲 A past due date is refused unless the backdate override is set. 🔲 A penalty can be registered directly in any of the four statuses, and the penalties list actually renders rows. 🔲 A criteria bulk discount cannot run without a criterion, is scopable to chosen contractors, and previews the same count and impact it then applies. 🔲 Deleting every due leaves the summary cards at 0, and a failed delete says so. 🔲 Every dues and penalty dialog closes on success and shows an outcome. 🔲 Post-deploy verification confirms each fix on staging — not merely "tests green".
 
-**Task breakdown**: to be written as `TASK-17-tasks.md` once Phase 0's answers are in — three sub-issues' scope depends on them.
+**Task breakdown**: granular, executable task list in [TASK-17-tasks.md](TASK-17-tasks.md) — 80 tasks in 14 phases. The live-state checks are Phase 3 there rather than a blocking Phase 0, since the deploy evidence below moved US7/US8 from "probably a stale deploy" to "probably real code work".
+
+### Deploy-history evidence (added 2026-09-24, after reading the Actions log)
+
+Phase 0's framing above was written before the workflow history was checked. It shifts the odds, though it does not remove the need for the checks:
+
+- Run **#17** (`e8b7da8`, 2026-09-22 11:37) was itself the commit that *unblocked* the frontend build. Its message records that `vite build` had been failing since the app-notifications feature landed, so the server kept restoring the last good `dist/` (Sep 21) and **none of the recent frontend work was ever served**.
+- TASK-16's frontend commits (`61f5b71`, `8dfa91c`) are **newer** than that fix, and run **#18** (`927b12a`, 2026-09-23 15:45) carried them and concluded success.
+- This feedback batch is dated **2026-09-24**, i.e. after that deploy.
+
+So TASK-16's frontend work was most likely live when the reporter tested, which makes #2 and #3 **genuine remaining gaps rather than a stale deploy** — and that is exactly what the `id_file` finding independently predicts for #2. Phase 0 is still required, because a front build failure reports success while rolling `dist/` back, so "run succeeded" is not "dist updated"; but plan on writing code for #2, not on redeploying.
+
+### Where this plan lives, and why it is not copied to the production repos (decided 2026-09-24)
+
+Asked to put this plan in the `PcuGaza` production repos as well. **Do not copy it.** Those repos share no git history with this monorepo, so a copy means a `commit-tree` tree-graft for a documentation file; worse, `TASK_PLAN.md` is a monorepo-root planning document while production is split into an api repo and a front repo, so a copy has no natural home in either and becomes a second source of truth that drifts after the first edit here.
+
+Instead, each production repo should carry a short pointer file — no plan content at all, just the canonical location (`eslamalbaik/admin_dshbaord_pfi` → `TASK_PLAN.md`) and a line saying that repo holds production deploy code only. Nothing to drift, and anyone landing in a production repo finds the plan. Write it through the GitHub API rather than a clone, which sidesteps the shared-history problem entirely. Do not touch the two deliberately divergent files there (`deploy-vps.sh`, `.github/workflows/deploy-production.yml`).
+
+**Not executed**: adding the `PcuGaza` repos to the session was refused by the permission layer (classified as a production action). Carried forward.
 
 ---
 ## Cross-cutting notes

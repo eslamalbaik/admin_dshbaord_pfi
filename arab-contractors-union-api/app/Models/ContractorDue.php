@@ -116,6 +116,46 @@ class ContractorDue extends Model
     }
 
     /**
+     * احتساب أثر خصم مقترح على هذه الذمة — **دون** أي كتابة.
+     *
+     * مصدر واحد للحساب يستهلكه applyDiscount() والمعاينة الجماعية على حدّ سواء. قبل ذلك
+     * كانت المعاينة في DuesDiscountService تحسب `original - value` بينما التطبيق الفعلي
+     * يراكم الخصم على الخصم السابق، فكان أثر التطبيق يتجاوز ما عُرض على المستخدم لكل ذمة
+     * سبق خصمها (TASK-17 #10).
+     *
+     * @return array{
+     *     original: float, effective_value: float, new_amount: float,
+     *     discount_amount: float, blocked_reason: ?string
+     * }
+     */
+    public function projectDiscount(string $type, float $value): array
+    {
+        $original = (float) ($this->original_amount_jod ?? $this->amount_jod);
+
+        // خصم إضافي من نفس النوع (نسبة/مبلغ) يتراكم مع الخصم السابق بدل ما يستبدله —
+        // مثلاً 30% ثم 30% تانية = 60% إجمالاً، مش 30% ثابتة
+        $effectiveValue = $this->discount_type === $type
+            ? $value + (float) $this->discount_value
+            : $value;
+
+        $newAmount = $type === 'percent'
+            ? $original * (1 - $effectiveValue / 100)
+            : $original - $effectiveValue;
+
+        $newAmount = round(max(0, $newAmount), 2);
+
+        return [
+            'original'        => $original,
+            'effective_value' => $effectiveValue,
+            'new_amount'      => $newAmount,
+            'discount_amount' => round($original - $newAmount, 2),
+            'blocked_reason'  => $newAmount < (float) $this->paid_jod
+                ? 'الخصم يُنزل المبلغ تحت ما تم سداده فعلياً على هذه الذمة.'
+                : null,
+        ];
+    }
+
+    /**
      * تطبيق خصم إداري (فردي أو جماعي — المادة 37/ت) على مبلغ الذمة.
      * يحفظ original_amount_jod عند أول خصم فقط، ويرفض أي خصم يُنزل amount_jod تحت المسدَّد فعلاً.
      *
@@ -123,37 +163,27 @@ class ContractorDue extends Model
      */
     public function applyDiscount(string $type, float $value, ?string $reason, int $byUserId): void
     {
-        $original = (float) ($this->original_amount_jod ?? $this->amount_jod);
+        $projection = $this->projectDiscount($type, $value);
 
-        // خصم إضافي من نفس النوع (نسبة/مبلغ) يتراكم مع الخصم السابق بدل ما يستبدله —
-        // مثلاً 30% ثم 30% تانية = 60% إجمالاً، مش 30% ثابتة
-        if ($this->discount_type === $type) {
-            $value += (float) $this->discount_value;
+        if ($projection['blocked_reason'] !== null) {
+            throw new \InvalidArgumentException($projection['blocked_reason']);
         }
 
-        $newAmount = $type === 'percent'
-            ? $original * (1 - $value / 100)
-            : $original - $value;
-
-        $newAmount = round(max(0, $newAmount), 2);
-
-        if ($newAmount < (float) $this->paid_jod) {
-            throw new \InvalidArgumentException('الخصم يُنزل المبلغ تحت ما تم سداده فعلياً على هذه الذمة.');
-        }
+        $effectiveValue = $projection['effective_value'];
 
         // تحديث لاحقة "(بعد خصم ...)" بنص البيان لتعكس نسبة/مبلغ الخصم المتراكم الفعلي —
         // بدونه يضل النص القديم (مثلاً 50%) ظاهر حتى بعد ما يصير الخصم الحقيقي 70%.
-        $suffix = $type === 'percent' ? "(بعد خصم {$value}%)" : "(بعد خصم {$value} د.أ)";
+        $suffix = $type === 'percent' ? "(بعد خصم {$effectiveValue}%)" : "(بعد خصم {$effectiveValue} د.أ)";
         $baseDescription = trim(preg_replace('/\s*\(بعد خصم[^)]*\)\s*$/u', '', (string) $this->description));
 
         $this->update([
-            'original_amount_jod' => $original,
+            'original_amount_jod' => $projection['original'],
             'discount_type'       => $type,
-            'discount_value'      => $value,
-            'discount_amount_jod' => round($original - $newAmount, 2),
+            'discount_value'      => $effectiveValue,
+            'discount_amount_jod' => $projection['discount_amount'],
             'discount_reason'     => $reason,
             'discount_by'         => $byUserId,
-            'amount_jod'          => $newAmount,
+            'amount_jod'          => $projection['new_amount'],
             'description'         => "{$baseDescription} {$suffix}",
         ]);
 

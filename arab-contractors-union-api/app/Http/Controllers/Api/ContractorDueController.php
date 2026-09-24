@@ -219,6 +219,11 @@ class ContractorDueController extends Controller
                 ->selectRaw('COALESCE(SUM(paid_jod), 0) as t')->value('t'), 2),
             'contractors_with_dues' => (clone $base)->outstanding()
                 ->distinct('contractor_id')->count('contractor_id'),
+            // عدد الذمم التي تُحتسب منها الأرقام أعلاه — الشاشة مجمّعة حسب المقاول ومقسّمة
+            // على صفحات، فبدون هذا العدد لا سبيل للمستخدم ليوفّق بين بطاقة الإجمالي (على مستوى
+            // النظام) وما يراه بالصفحة، وهو ما قاد لظنّ أن "كل الذمم حُذفت" (TASK-17 #9).
+            'outstanding_dues_count' => (clone $base)->outstanding()->count(),
+            'dues_count'             => (clone $base)->count(),
             'by_year' => (clone $base)
                 ->selectRaw('year, COALESCE(SUM(amount_jod), 0) as total_jod, COALESCE(SUM(amount_jod - paid_jod), 0) as outstanding_jod')
                 ->groupBy('year')
@@ -233,6 +238,16 @@ class ContractorDueController extends Controller
     {
         $data = $request->validated();
 
+        // ليسا عمودين بالجدول — يُستخرجان قبل الإنشاء ويُسجَّلان بسجل المالية وبالملاحظات،
+        // حتى يبقى للتاريخ السابق أثر مكتوب يُسأل عنه لاحقاً (TASK-17 #7).
+        $allowBackdate  = (bool) ($data['allow_backdate'] ?? false);
+        $backdateReason = $data['backdate_reason'] ?? null;
+        unset($data['allow_backdate'], $data['backdate_reason']);
+
+        if ($allowBackdate && $backdateReason) {
+            $data['notes'] = trim(($data['notes'] ?? '') . "\nذمة متأخّرة سابقة — سبب التاريخ السابق: {$backdateReason}");
+        }
+
         $due = ContractorDue::create($data + [
             'status'     => 'unpaid',
             'source'     => 'manual',
@@ -241,9 +256,12 @@ class ContractorDueController extends Controller
         $due->update(['reference_number' => ContractorDue::generateReferenceNumber($due)]);
 
         $this->financeLog('due.created', [
-            'due_id'        => $due->id,
-            'contractor_id' => $due->contractor_id,
-            'amount_jod'    => $due->amount_jod,
+            'due_id'          => $due->id,
+            'contractor_id'   => $due->contractor_id,
+            'amount_jod'      => $due->amount_jod,
+            'due_date'        => $due->due_date?->toDateString(),
+            'backdated'       => $allowBackdate,
+            'backdate_reason' => $allowBackdate ? $backdateReason : null,
         ]);
 
         return $this->success(
@@ -406,7 +424,13 @@ class ContractorDueController extends Controller
 
         if (! $dryRun) {
             $this->financeLog('due.discount_applied_bulk', [
-                'mode' => $data['mode'], 'matched' => $result['matched_count'], 'applied' => $result['applied_count'], 'skipped' => count($result['skipped']),
+                'mode'        => $data['mode'],
+                'criteria'    => $data['mode'] === 'criteria' ? $data['criteria'] : null,
+                'matched'     => $result['matched_count'],
+                'applicable'  => $result['applicable_count'],
+                'contractors' => $result['contractors_count'],
+                'applied'     => $result['applied_count'],
+                'skipped'     => count($result['skipped']),
             ]);
             return $this->success($result, 'تم تطبيق الخصم الجماعي بنجاح.');
         }

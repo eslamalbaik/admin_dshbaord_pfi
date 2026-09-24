@@ -18,6 +18,17 @@ class CertificateRequestResource extends JsonResource
             'type_label'        => $this->type_label,
             'status'            => $this->status,
             'status_label'      => $this->status_label,
+            // الطلب قُدِّم بانتظار اعتماد دفعة الرسوم (TASK-17 #5) — اللوحة تحتاج معرفة ذلك
+            // لتوضّح للأدمن لماذا الموافقة والإصدار موقوفان، بدل أن يكتشفه عبر 422.
+            'awaiting_payment_confirmation' => $this->isAwaitingPaymentConfirmation(),
+            'pending_payment'   => $this->pendingPayment ? [
+                'id'                 => $this->pendingPayment->id,
+                'transaction_number' => $this->pendingPayment->transaction_number,
+                'amount'             => $this->pendingPayment->amount,
+                'currency'           => $this->pendingPayment->currency,
+                'status'             => $this->pendingPayment->status,
+                'submitted_at'       => $this->pendingPayment->submitted_at,
+            ] : null,
             'notes'             => $this->notes,
             'attachment_url'    => $this->attachment_url,
             'reject_reason'     => $this->reject_reason,

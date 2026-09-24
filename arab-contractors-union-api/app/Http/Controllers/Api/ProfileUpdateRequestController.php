@@ -28,7 +28,10 @@ class ProfileUpdateRequestController extends Controller
 {
     use ApiResponseTrait;
 
-    public function __construct(private OtpService $otpService) {}
+    public function __construct(
+        private OtpService $otpService,
+        private \App\Services\ProfileUpdateRequestFiler $requestFiler,
+    ) {}
 
     private function format(ProfileUpdateRequest $r): array
     {
@@ -43,15 +46,46 @@ class ProfileUpdateRequestController extends Controller
             // "الحالي ← المقترح" بدل قائمة قيم مقترحة بلا سياق يُبتّ بها بالموافقة.
             'current_data'      => $this->currentDataFor($r, $contractor),
             'proposed_data'     => $r->proposed_data,
+            // المستندات المقترحة: المراجِع يجب أن يفتح الملف نفسه لا اسم حقله، ومعه رابط
+            // المستند الحالي للمقارنة قبل الموافقة (TASK-17 US11).
+            'proposed_documents' => collect($r->proposed_files ?? [])
+                ->map(fn ($path, $field) => [
+                    'field'        => $field,
+                    'label'        => self::DOCUMENT_LABELS[$field] ?? $field,
+                    'proposed_url' => \Illuminate\Support\Facades\Storage::disk('public')->url($path),
+                    'current_url'  => $contractor?->{$field}
+                        ? \Illuminate\Support\Facades\Storage::disk('public')->url($contractor->{$field})
+                        : null,
+                ])->values()->all(),
             'attachment_url'    => $r->attachment_url,
             'status'            => $r->status,
             'status_label'      => $r->status_label,
             'reject_reason'     => $r->reject_reason,
             'reviewed_by'       => $r->reviewer?->name,
             'reviewed_at'       => $r->reviewed_at,
+            'superseded_at'     => $r->superseded_at,
             'created_at'        => $r->created_at,
         ];
     }
+
+    /** تسميات عربية لحقول المستندات — نفس تسميات نموذج التعديل بلوحة الأدمن. */
+    private const DOCUMENT_LABELS = [
+        'cr_file'                        => 'السجل التجاري',
+        'id_file'                        => 'صورة الهوية',
+        'lease_or_ownership_contract'    => 'عقد الإيجار أو الملكية',
+        'company_approval_letter'        => 'كتاب الموافقة على الانتساب',
+        'municipal_license'              => 'رخصة المهن',
+        'company_register'               => 'مستخرج عن سجل الشركة',
+        'articles_of_association'        => 'عقد تأسيس الشركة',
+        'internal_bylaws'                => 'النظام الداخلي',
+        'bank_dealing_letter'            => 'شهادة تعامل بنك',
+        'secretary_contract'             => 'عقد سكرتير',
+        'full_time_engineer_certificate' => 'شهادة مهندس متفرغ',
+        'accountant_certificate_or_contract' => 'شهادة تفرغ محاسب / عقد مكتب',
+        'partners_ids'                   => 'صور هويات الشركاء',
+        'authorization_letter'           => 'كتاب تفويض المعتمد بالتوقيع',
+        'authorized_signature'           => 'توقيع المفوض',
+    ];
 
     /**
      * القيم الحالية المقابلة لمفاتيح proposed_data. بعد الموافقة تكون قيمة العقد قد
@@ -64,7 +98,10 @@ class ProfileUpdateRequestController extends Controller
             return [];
         }
 
-        $keys = array_intersect(array_keys($r->proposed_data ?? []), ProfileUpdateRequest::ALLOWED_FIELDS);
+        $keys = array_intersect(
+            array_keys($r->proposed_data ?? []),
+            array_merge(ProfileUpdateRequest::ALLOWED_FIELDS, ProfileUpdateRequest::reviewedFields()),
+        );
 
         return collect($keys)
             ->mapWithKeys(fn ($key) => [$key => $contractor->{$key}])
@@ -187,7 +224,14 @@ class ProfileUpdateRequestController extends Controller
         // لا بدّ من تحميل أعمدة ALLOWED_FIELDS أيضاً — format() يبني منها current_data،
         // وقصر الـ select على id,name,membership_number كان يُرجعها null دائماً.
         $query = ProfileUpdateRequest::with([
-            'contractor:id,name,membership_number,' . implode(',', ProfileUpdateRequest::ALLOWED_FIELDS),
+            // كل الأعمدة التي قد تُقارَن بها القيمة المقترحة، نصية ومستندات — قصر الـselect
+            // كان يُرجع null دائماً لكل ما هو خارج القائمة القديمة.
+            'contractor:id,name,membership_number,'
+                . implode(',', array_unique(array_merge(
+                    ProfileUpdateRequest::ALLOWED_FIELDS,
+                    ProfileUpdateRequest::reviewedFields(),
+                    array_keys(ProfileUpdateRequest::documentFields()),
+                ))),
             'reviewer:id,name',
         ]);
 
@@ -213,8 +257,26 @@ class ProfileUpdateRequestController extends Controller
             'reviewed_at' => now(),
         ]);
 
-        // تُطبَّق التغييرات فعلياً على contractors فقط الآن — نفس ضمانة ContractorNameChangeRequest
-        $profileUpdateRequest->contractor?->update($profileUpdateRequest->proposed_data);
+        $contractor = $profileUpdateRequest->contractor;
+
+        if ($contractor) {
+            // المستندات المرحَّلة تُنقل إلى مواضعها النهائية الآن فقط، ويُحذف المستبدَل بعد
+            // نجاح النقل. الحقول النصية محصورة بالمسموح — لا يُكتب عمود من proposed_data
+            // لمجرّد وجوده فيه (TASK-17 US11).
+            $documentPaths = $this->requestFiler->promoteDocuments($profileUpdateRequest, $contractor);
+
+            $allowed = array_merge(
+                ProfileUpdateRequest::ALLOWED_FIELDS,
+                ProfileUpdateRequest::reviewedFields(),
+            );
+
+            $textChanges = array_intersect_key(
+                $profileUpdateRequest->proposed_data ?? [],
+                array_flip($allowed),
+            );
+
+            $contractor->update($textChanges + $documentPaths);
+        }
 
         AuditLogService::record(Auth::user(), 'profile_update_request.approved', $profileUpdateRequest);
         $this->notifyStatusChange($profileUpdateRequest);
@@ -231,8 +293,12 @@ class ProfileUpdateRequestController extends Controller
 
         $data = $request->validate(['reject_reason' => 'nullable|string|max:500']);
 
+        // المستندات المرحَّلة لا قيمة لها بعد الرفض، ومستند المقاول الحالي لم يُلمس أصلاً
+        $profileUpdateRequest->deleteStagedFiles();
+
         $profileUpdateRequest->update([
             'status'        => 'rejected',
+            'proposed_files' => null,
             'reject_reason' => $data['reject_reason'] ?? null,
             'reviewed_by'   => Auth::id(),
             'reviewed_at'   => now(),
