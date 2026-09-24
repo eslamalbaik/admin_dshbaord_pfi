@@ -9,13 +9,16 @@ use Spatie\Browsershot\Browsershot;
  * العملة الأساس ILS (نفس تسعير الاتحاد محلياً)، والمخرَج: كم JOD وكم USD يعادل 1 ILS.
  *
  * ملاحظة هامة: أداة التصدير (wcur.pma.ps/ar/webtools/currency/export) محمية بحقل
- * CSRF عشوائي الاسم/القيمة يتغيّر كل تحميل صفحة (لا يوجد API عام موثّق). التحقق
- * الميداني (تصفح فعلي + إرسال النموذج) أظهر أن الخدمة ترجع HTTP 503 حالياً بشكل
- * دائم — حتى من متصفح حقيقي — أي أن العطل من طرف سلطة النقد نفسها وليس حجب آلي.
- * لذلك: تنسيق الرد الناجح (JSON/CSV/Excel) غير مؤكَّد ولا يمكن اختباره فعلياً الآن.
- * الكود هنا يحاول فعلياً (سيعمل تلقائياً متى عادت الخدمة)، ويتعامل مع JSON/CSV/نص
- * بأمان، ويرفض أي شكل رد غير معروف (مثل ملف Excel ثنائي) صراحة بدل تخمين قراءته —
- * أي فشل هنا يذهب لمسار fallback+تنبيه المطوّر بأمر rates:fetch-pma.
+ * CSRF عشوائي الاسم/القيمة يتغيّر كل تحميل صفحة (لا يوجد API عام موثّق)، ولذلك
+ * يُرسَل النموذج من داخل سياق الصفحة نفسها عبر متصفح حقيقي (Browsershot).
+ *
+ * شكل الرد — مرصود فعلياً بتاريخ 2026-09-24 (كان مجهولاً قبلها لأن الخدمة كانت
+ * ترجع 503 باستمرار): الخدمة تعود بـHTTP 200 وملف **Excel (xlsx)** لا JSON/CSV،
+ * بالأعمدة: التاريخ | العملة | الشراء | البيع | الوسطي، وبأزواج مثل USD/ILS و
+ * USD/JOD. نقرأه بـPhpSpreadsheet ونأخذ عمود "الوسطي".
+ *
+ * يبقى مسار JSON/CSV مدعوماً أيضاً تحسّباً لتغيّر الصيغة مستقبلاً؛ وأي شكل غير
+ * معروف يُرفض صراحة بدل تخمين قراءته، فيذهب لمسار fallback+تنبيه في rates:fetch-pma.
  */
 class PmaRateScraperService
 {
@@ -40,15 +43,17 @@ class PmaRateScraperService
             throw new \RuntimeException('pma_scrape_failed: HTTP ' . ($result['status'] ?? 'unknown'));
         }
 
-        if (empty($result['text'])) {
+        // rates['JOD']/['USD'] هنا = "1 ILS = كم JOD/USD" (نفس صيغة مواصفة REQ-17 الأصلية، الأساس ILS)
+        if (! empty($result['text'])) {
+            $rates = $this->parseRates($result['text'], $today);
+        } elseif (! empty($result['binary'])) {
+            $rates = $this->parseExcelRates(base64_decode($result['binary']), $today);
+        } else {
             throw new \RuntimeException(
-                'pma_scrape_unrecognized_format: نوع محتوى غير نصي (' . ($result['contentType'] ?? 'unknown')
-                . ') — على الأغلب ملف Excel ثنائي، يحتاج تنفيذ قارئ مخصص بعد رصد نموذج رد حقيقي.',
+                'pma_scrape_unrecognized_format: رد فارغ أو بنوع محتوى غير مدعوم ('
+                . ($result['contentType'] ?? 'unknown') . ').',
             );
         }
-
-        // rates['JOD']/['USD'] هنا = "1 ILS = كم JOD/USD" (نفس صيغة مواصفة REQ-17 الأصلية، الأساس ILS)
-        $rates = $this->parseRates($result['text'], $today);
 
         $ilsToJod = $rates['JOD'];
         $usdToJod = $rates['JOD'] / $rates['USD']; // كلاهما نسبةً لـILS، فالقسمة تلغيها وتبقي JOD/USD
@@ -95,11 +100,18 @@ class PmaRateScraperService
 
             const contentType = res.headers.get('content-type') || '';
             let text = null;
+            let binary = null;
             if (contentType.includes('json') || contentType.includes('text') || contentType.includes('csv')) {
                 text = await res.text();
+            } else {
+                // الرد المرصود فعلياً هو xlsx ثنائي — ننقله كـbase64 لأن JSON لا يحمل بايتات خاماً
+                const bytes = new Uint8Array(await res.arrayBuffer());
+                let bin = '';
+                for (let i = 0; i < bytes.length; i++) { bin += String.fromCharCode(bytes[i]); }
+                binary = btoa(bin);
             }
 
-            return JSON.stringify({status: res.status, contentType, text});
+            return JSON.stringify({status: res.status, contentType, text, binary});
         }
         JS;
 
@@ -120,7 +132,72 @@ class PmaRateScraperService
             $browsershot->setChromePath($chromiumPath);
         }
 
-        return $browsershot->evaluate($js);
+        // التغليف بـIIFE ضروري ولا يجوز حذفه: browser.cjs يمرّر النص كما هو إلى
+        // page.evaluate()، وPuppeteer الحديث يُقيّم النص كـ«تعبير» لا كدالة يستدعيها.
+        // فـ"async () => {...}" كتعبير ينتج كائن دالة، والدوال غير قابلة للتسلسل في
+        // JSON فيعود result = {} — ثم ينهار Browsershot بـ:
+        //   Cannot assign array to property ChromiumResult::$result of type string
+        // وهي رسالة لا تشير إطلاقاً إلى السبب. الأقواس + () تجعله يُستدعى فيعود نصاً.
+        return $browsershot->evaluate("({$js})()");
+    }
+
+    /**
+     * يقرأ ملف xlsx الذي تعيده أداة التصدير فعلياً.
+     * الأعمدة المرصودة: 0=التاريخ (yyyy/mm/dd) · 1=العملة (زوج مثل USD/ILS) · 2=الشراء · 3=البيع · 4=الوسطي
+     * الجدول يسعّر كل شيء مقابل الدولار، بينما REQ-17 تحتاج الأساس ILS — فنشتق:
+     *   1 ILS = (USD/JOD) ÷ (USD/ILS) دينار   ·   1 ILS = 1 ÷ (USD/ILS) دولار
+     *
+     * @return array{JOD: float, USD: float, date: string}
+     */
+    private function parseExcelRates(string $bytes, string $expectedDate): array
+    {
+        $tmp = tempnam(sys_get_temp_dir(), 'pma_') . '.xlsx';
+        file_put_contents($tmp, $bytes);
+
+        try {
+            $rows = \PhpOffice\PhpSpreadsheet\IOFactory::load($tmp)
+                ->getActiveSheet()
+                ->toArray(null, true, false, false);
+        } catch (\Throwable $e) {
+            throw new \RuntimeException('pma_scrape_excel_unreadable: تعذّرت قراءة ملف Excel — ' . $e->getMessage());
+        } finally {
+            @unlink($tmp);
+        }
+
+        $pairs = [];
+        $fileDate = null;
+
+        foreach ($rows as $row) {
+            $pair = trim((string) ($row[1] ?? ''));
+            $mid  = $row[4] ?? null;
+
+            if ($pair === '' || ! is_numeric($mid)) {
+                continue; // صف العناوين أو صف فارغ
+            }
+
+            $pairs[strtoupper($pair)] = (float) $mid;
+            $fileDate ??= str_replace('/', '-', trim((string) ($row[0] ?? '')));
+        }
+
+        foreach (['USD/ILS', 'USD/JOD'] as $needed) {
+            if (empty($pairs[$needed])) {
+                throw new \RuntimeException("pma_scrape_excel_missing_pair: الزوج {$needed} غير موجود في ملف التصدير.");
+            }
+        }
+
+        // تاريخ قديم يعني أن سلطة النقد لم تنشر سعر اليوم بعد — نفشل صراحةً بدل
+        // تخزين سعر الأمس على أنه سعر اليوم.
+        if ($fileDate !== null && $fileDate !== $expectedDate) {
+            throw new \RuntimeException(
+                "pma_scrape_stale_date: التاريخ في الملف ({$fileDate}) ليس اليوم ({$expectedDate}).",
+            );
+        }
+
+        return [
+            'JOD'  => $pairs['USD/JOD'] / $pairs['USD/ILS'],
+            'USD'  => 1 / $pairs['USD/ILS'],
+            'date' => $fileDate ?? $expectedDate,
+        ];
     }
 
     /** يحاول قراءة الرد كـJSON أولاً، ثم كـCSV/نص بسيط. */

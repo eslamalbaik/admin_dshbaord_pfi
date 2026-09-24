@@ -259,6 +259,35 @@ sudo -u www-data test -r <مجلد التطبيق>/.env && echo ok || echo 'BROK
 
 **حدود الرفع:** PHP-FPM مضبوط على `upload_max_filesize=2M` و`post_max_size=8M` بينما قواعد Laravel تسمح بـ10M. الرفع الأكبر يفشل برسالة "الحقل مطلوب" مضلّلة. للرفع حتى 10M عدّل `/etc/php/8.5/fpm/php.ini` ثم `systemctl restart php8.5-fpm`.
 
+### ‼ متطلّب خادم لا ينتقل مع أي نشر: Chromium لـBrowsershot
+
+`rates:fetch-pma` (أسعار الصرف الرسمية) و توليد شهادات PDF يعتمدان على **Browsershot → Puppeteer → Chrome**.
+هذا إعداد **على مستوى الخادم**، غير موجود في git، و**لا يُعاد تلقائياً عند إعادة بناء السيرفر**. إن نُسي، يفشل جلب الأسعار يومياً ويصل الأدمن إشعار "تعذّر جلب سعر الصرف اليومي".
+
+شرطان، وكلاهما فشل فعلياً في 2026-09-24:
+
+**١. Chrome في كاش يقرأه `www-data`.** المهام المجدولة تعمل بمستخدم `www-data` وبيته `/var/www`، فيبحث puppeteer في `/var/www/.cache/puppeteer`. تثبيته بـ`root` يضعه في `/root/.cache/puppeteer` الذي **لا يقرأه** `www-data`:
+```bash
+sudo -u www-data npx puppeteer browsers install chrome    # الطريقة الصحيحة
+# أو نقل كاش موجود:
+cp -r /root/.cache/puppeteer /var/www/.cache/puppeteer
+chown -R www-data:www-data /var/www/.cache && chmod -R a+rX /var/www/.cache/puppeteer
+```
+
+**٢. مكتبات النظام التي يحتاجها Chrome.** Ubuntu 26.04 لا تأتي بها، والخطأ يظهر عند التشغيل لا عند التثبيت:
+```bash
+apt-get install -y libasound2t64   # كان الناقص الوحيد هنا
+```
+
+**التحقق** — نفّذه بعد أي إعادة بناء للخادم، بمستخدم `www-data` تحديداً وليس `root`:
+```bash
+BIN=$(find /var/www/.cache/puppeteer -name chrome -type f | head -1)
+sudo -u www-data "$BIN" --version          # يجب أن يطبع رقم الإصدار
+ldd "$BIN" | grep 'not found'              # يجب ألا يطبع شيئاً
+cd /var/www/pcuorg/production/api && sudo -u www-data php artisan rates:fetch-pma
+```
+> **لا تختبر بـ`root`** — الفشل الأصلي كان صلاحيات، و`root` ينجح حيث يفشل `www-data` فيخفي العطل.
+
 ---
 
 ## 10. إثبات أن البيئتين معزولتان
