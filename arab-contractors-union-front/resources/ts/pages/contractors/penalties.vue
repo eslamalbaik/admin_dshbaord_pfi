@@ -9,9 +9,22 @@ const total = ref(0)
 const page = ref(1)
 const search = ref('')
 
+const fetchError = ref('')
+
 const addDialog = ref(false)
 const addLoading = ref(false)
-const newPenalty = ref({ contractor_id: null as number | null, reason: '', amount: '', notes: '' })
+
+// الحالة تُحدَّد عند الإنشاء (TASK-17 #8) — الغرض تسجيل غرامات قائمة على الورق بحالتها
+// الفعلية بخطوة واحدة، بدل إنشائها "غير مسدَّدة" ثم تحديثها بنداء ثانٍ.
+const newPenalty = ref({
+  contractor_id: null as number | null,
+  reason: '',
+  amount: '',
+  notes: '',
+  status: 'unpaid' as 'unpaid' | 'paid' | 'partially_paid' | 'rejected',
+  paid_amount: '',
+  reject_reason: '',
+})
 
 // الحالات الأربع المعتمَدة (REQ-06 #6) — قبل هذا كان النظام يدعم unpaid/paid فقط
 const statusOptions = [
@@ -99,7 +112,7 @@ watch(contractorSearch, q => {
 })
 
 function openAddDialog() {
-  newPenalty.value = { contractor_id: null, reason: '', amount: '', notes: '' }
+  newPenalty.value = { contractor_id: null, reason: '', amount: '', notes: '', status: 'unpaid', paid_amount: '', reject_reason: '' }
   contractorSearch.value = ''
   contractorOptions.value = []
   addDialog.value = true
@@ -114,17 +127,27 @@ const headers = [
   { title: 'إجراءات', key: 'actions', sortable: false },
 ]
 
+const itemsPerPage = ref(15)
+
 const fetchPenalties = async () => {
   loading.value = true
+  fetchError.value = ''
   try {
     const { data } = await api.get('/api/v1/penalties', {
-      params: { search: search.value, page: page.value },
+      params: { search: search.value, page: page.value, per_page: itemsPerPage.value },
     })
-    penalties.value = data.data || data || []
-    total.value = data.total || penalties.value.length
+
+    // ApiResponseTrait::paginated() يُرجع { items, meta } — لا data.data ولا data.total.
+    // القراءة القديمة `data.data || data` كانت تُسند كائن الاستجابة كاملاً (لا مصفوفة) إلى
+    // :items، فلا يُعرض أي صف إطلاقاً بصفحة الغرامات (TASK-17 #8).
+    penalties.value = data.items ?? []
+    total.value = data.meta?.total ?? penalties.value.length
   }
-  catch {
+  catch (err: any) {
+    // الصمت السابق كان يجعل أي فشل طلب يبان كأنه "لا توجد غرامات"
     penalties.value = []
+    total.value = 0
+    fetchError.value = err?.response?.data?.message ?? 'تعذّر تحميل قائمة الغرامات.'
   }
   finally {
     loading.value = false
@@ -134,7 +157,15 @@ const fetchPenalties = async () => {
 const addPenalty = async () => {
   addLoading.value = true
   try {
-    await api.post('/api/v1/penalties', newPenalty.value)
+    await api.post('/api/v1/penalties', {
+      contractor_id: newPenalty.value.contractor_id,
+      reason: newPenalty.value.reason,
+      amount: newPenalty.value.amount,
+      notes: newPenalty.value.notes || undefined,
+      status: newPenalty.value.status,
+      paid_amount: newPenalty.value.status === 'partially_paid' ? newPenalty.value.paid_amount : undefined,
+      reject_reason: newPenalty.value.status === 'rejected' ? (newPenalty.value.reject_reason || undefined) : undefined,
+    })
     addDialog.value = false
     notify('تمت إضافة الغرامة بنجاح.')
     fetchPenalties()
@@ -148,7 +179,8 @@ const addPenalty = async () => {
   }
 }
 
-onMounted(fetchPenalties)
+// لا onMounted: VDataTableServer يُصدر update:options عند التركيب فيجلب الصفحة الأولى،
+// وإضافة نداء ثانٍ هنا كانت ستطلب القائمة مرتين عند كل فتح للصفحة.
 </script>
 
 <template>
@@ -175,12 +207,22 @@ onMounted(fetchPenalties)
         />
       </VCardText>
 
-      <VDataTable
+      <VAlert v-if="fetchError" type="error" variant="tonal" density="compact" class="mx-4 mb-2">
+        {{ fetchError }}
+      </VAlert>
+
+      <!-- خادمية: القائمة مقسَّمة على صفحات بالباك، وقبل هذا لم يكن `page` مربوطاً بأي
+           عنصر تحكّم فلم تُطلب صفحة ثانية أبداً (TASK-17 #8). -->
+      <VDataTableServer
+        v-model:page="page"
+        v-model:items-per-page="itemsPerPage"
         :headers="headers"
         :items="penalties"
+        :items-length="total"
         :loading="loading"
-        :items-per-page="15"
+        :items-per-page-options="[15, 25, 50]"
         mobile-breakpoint="sm"
+        @update:options="fetchPenalties"
       >
         <template #item.contractor_name="{ item }">
           <span style="font-family:Cairo,sans-serif">{{ item.contractor_name || item.contractor?.name || '—' }}</span>
@@ -218,7 +260,7 @@ onMounted(fetchPenalties)
         <template #no-data>
           <div class="text-center pa-6 text-medium-emphasis" style="font-family:Cairo,sans-serif">لا توجد غرامات</div>
         </template>
-      </VDataTable>
+      </VDataTableServer>
     </VCard>
 
     <!-- Add Penalty Dialog -->
@@ -246,6 +288,29 @@ onMounted(fetchPenalties)
               <VTextField v-model="newPenalty.amount" label="المبلغ (₪)" type="number" />
             </VCol>
             <VCol cols="12">
+              <VSelect
+                v-model="newPenalty.status"
+                :items="statusOptions"
+                item-title="title"
+                item-value="value"
+                label="الحالة"
+                hint="لتسجيل غرامة قائمة بحالتها الفعلية دون خطوة تحديث ثانية"
+                persistent-hint
+              />
+            </VCol>
+            <VCol v-if="newPenalty.status === 'partially_paid'" cols="12">
+              <VTextField
+                v-model="newPenalty.paid_amount"
+                label="المبلغ المسدَّد (₪)"
+                type="number"
+                :hint="`يجب أن يكون أقل من مبلغ الغرامة الكامل (₪ ${Number(newPenalty.amount || 0).toLocaleString()})`"
+                persistent-hint
+              />
+            </VCol>
+            <VCol v-if="newPenalty.status === 'rejected'" cols="12">
+              <VTextField v-model="newPenalty.reject_reason" label="سبب الرفض (اختياري)" />
+            </VCol>
+            <VCol cols="12">
               <VTextarea v-model="newPenalty.notes" label="ملاحظات" rows="2" />
             </VCol>
           </VRow>
@@ -256,7 +321,11 @@ onMounted(fetchPenalties)
           <VBtn
             color="primary"
             :loading="addLoading"
-            :disabled="addLoading || !newPenalty.contractor_id || !newPenalty.reason || !newPenalty.amount"
+            :disabled="addLoading
+              || !newPenalty.contractor_id
+              || !newPenalty.reason
+              || !newPenalty.amount
+              || (newPenalty.status === 'partially_paid' && !newPenalty.paid_amount)"
             @click="addPenalty"
           >
             حفظ

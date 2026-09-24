@@ -182,7 +182,13 @@ const dueForm = ref({
   year: '' as string | number,
   due_date: '',
   notes: '',
+  // تاريخ الاستحقاق محصور بتاريخ اليوم أو بعده، إلا بتفعيل هذين صراحةً لتسجيل ذمة
+  // متأخّرة سابقة (TASK-17 #7) — قرار واعٍ بسبب مكتوب، لا تاريخ مكتوب بالخطأ.
+  allow_backdate: false,
+  backdate_reason: '',
 })
+
+const todayIso = new Date().toISOString().slice(0, 10)
 
 const contractorSearch = ref('')
 const contractorOptions = ref<{ id: number; name: string; membership_number: string }[]>([])
@@ -228,6 +234,8 @@ function openCreateDue(c?: ContractorRow) {
     year: '',
     due_date: '',
     notes: '',
+    allow_backdate: false,
+    backdate_reason: '',
   }
   if (c)
     contractorOptions.value = [{ id: c.contractor_id, name: c.name, membership_number: c.membership_number }]
@@ -244,6 +252,10 @@ function openEditDue(d: DueItem) {
     year: d.year ?? '',
     due_date: d.due_date ?? '',
     notes: d.notes ?? '',
+    // التعديل لا يخضع لقاعدة التاريخ (مسار PATCH لا يفرضها): منع تعديل غير متعلّق بالتاريخ
+    // على ذمة قديمة لأن تاريخها ماضٍ يكرّر نمط TASK-01 — قاعدة جديدة تقفل سجلات قائمة.
+    allow_backdate: false,
+    backdate_reason: '',
   }
   dueDialog.value = true
 }
@@ -260,6 +272,10 @@ const saveDueMutation = useMutation({
     if (editingDue.value)
       return (await api.patch(`/api/v1/dashboard/dues/${editingDue.value.id}`, payload)).data
     payload.contractor_id = dueForm.value.contractor_id
+    if (dueForm.value.allow_backdate) {
+      payload.allow_backdate = true
+      payload.backdate_reason = dueForm.value.backdate_reason
+    }
 
     return (await api.post('/api/v1/dashboard/dues', payload)).data
   },
@@ -268,7 +284,13 @@ const saveDueMutation = useMutation({
     flash('تم حفظ الذمة المالية بنجاح.')
     refreshAll()
   },
-  onError: (e: any) => flash(e?.response?.data?.message || 'فشل حفظ الذمة.', true),
+  onError: (e: any) => flash(
+    e?.response?.data?.errors?.due_date?.[0]
+    || e?.response?.data?.errors?.backdate_reason?.[0]
+    || e?.response?.data?.message
+    || 'فشل حفظ الذمة.',
+    true,
+  ),
 })
 
 const deleteDueMutation = useMutation({
@@ -277,6 +299,9 @@ const deleteDueMutation = useMutation({
     flash('تم حذف الذمة.')
     refreshAll()
   },
+  // بدون هذا كان فشل الحذف صامتاً تماماً — وهو تحديداً الشكل الذي يُقنع المستخدم أن
+  // الصفوف حُذفت وأن بطاقات الإجمالي "لم تتحدّث" (TASK-17 #9).
+  onError: (e: any) => flash(e?.response?.data?.message || 'فشل حذف الذمة — لم يُحذف شيء.', true),
 })
 
 const deleteDueDialog = ref(false)
@@ -334,6 +359,7 @@ const importMutation = useMutation({
   onSuccess: (d: any) => {
     importResult.value = d.items
     if (!d.items?.dry_run) {
+      importDialog.value = false
       flash(d.message ?? 'تم الاستيراد بنجاح.')
       refreshAll()
     }
@@ -418,12 +444,17 @@ const bulkGenMutation = useMutation({
     year: bulkGenForm.value.year,
     dry_run: dryRun,
   }, { timeout: 300000 })).data,
-  onSuccess: (d: any) => {
+  onSuccess: (d: any, dryRun: boolean) => {
     bulkGenResult.value = d.items
-    if (d.items?.created_count) {
-      flash(`تم توليد ${d.items.created_count} ذمة رسوم.`)
-      refreshAll()
-    }
+    if (dryRun) return
+
+    // التطبيق الفعلي يُغلق المودل ويُبلّغ نتيجته دائماً — بما فيها "لم يُولَّد شيء". قبل ذلك
+    // كان المودل يبقى مفتوحاً، ولا رسالة إطلاقاً عند created_count = 0 (TASK-17 #11).
+    bulkGenDialog.value = false
+    flash(d.items?.created_count
+      ? `تم توليد ${d.items.created_count} ذمة رسوم.`
+      : 'لم تُولَّد أي ذمة جديدة — الرسوم مولَّدة مسبقاً لهذه السنة.')
+    refreshAll()
   },
   onError: (e: any) => flash(e?.response?.data?.message || 'فشل التوليد الجماعي.', true),
 })
@@ -475,6 +506,7 @@ const applySelectedDiscountMutation = useMutation({
 // ─── خصم جماعي — بمعايير (سنة/حالة/مصدر) عبر كل المقاولين ───
 const criteriaDiscountDialog = ref(false)
 const criteriaForm = ref({
+  contractor_ids: [] as number[],
   year: '' as string | number,
   status: '' as string,
   source: '' as string,
@@ -484,9 +516,52 @@ const criteriaForm = ref({
 })
 const criteriaPreview = ref<any>(null)
 
+// بحث المقاولين لمود المعايير — منفصل عن قائمة نموذج الذمة حتى لا يبتلع أحدهما اختيار الآخر
+const criteriaContractorSearch = ref('')
+const criteriaContractorOptions = ref<{ id: number; name: string; membership_number: string }[]>([])
+let criteriaContractorTimer: ReturnType<typeof setTimeout> | null = null
+
+const contractorLabel = (c: { name: string; membership_number: string }) => `${c.name} (${c.membership_number})`
+
+watch(criteriaContractorSearch, q => {
+  if (criteriaContractorTimer) clearTimeout(criteriaContractorTimer)
+  criteriaContractorTimer = setTimeout(async () => {
+    if (!q || q.length < 2) return
+    try {
+      const r = await api.get('/api/v1/contractors', { params: { search: q, per_page: 10 } })
+      const found = (r.data.items ?? r.data.data ?? []).map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        membership_number: c.membership_number,
+      }))
+
+      // الاختيارات المحدَّدة سابقاً تبقى ضمن items، وإلا اختفت رقائقها (chips) عند كل بحث جديد
+      const kept = criteriaContractorOptions.value.filter(o => criteriaForm.value.contractor_ids.includes(o.id))
+      const merged = [...kept]
+      for (const c of found) {
+        if (!merged.some(m => m.id === c.id)) merged.push(c)
+      }
+      criteriaContractorOptions.value = merged
+    }
+    catch {}
+  }, 350)
+})
+
+// معيار واحد على الأقل إلزامي — الباك يرفض كائن معايير فارغاً (كان يطابق كل ذمم النظام)،
+// والواجهة تمنع الإرسال قبل ذلك بدل ترك المستخدم يصطدم بـ422.
+const criteriaHasAnyFilter = computed(() =>
+  criteriaForm.value.contractor_ids.length > 0
+  || !!criteriaForm.value.year
+  || !!criteriaForm.value.status
+  || !!criteriaForm.value.source)
+
+const criteriaScopedToContractors = computed(() => criteriaForm.value.contractor_ids.length > 0)
+
 function openCriteriaDiscount() {
-  criteriaForm.value = { year: '', status: '', source: '', discount_type: 'percent', discount_value: '', discount_reason: '' }
+  criteriaForm.value = { contractor_ids: [], year: '', status: '', source: '', discount_type: 'percent', discount_value: '', discount_reason: '' }
   criteriaPreview.value = null
+  criteriaContractorSearch.value = ''
+  criteriaContractorOptions.value = []
   criteriaDiscountDialog.value = true
 }
 
@@ -494,6 +569,7 @@ function criteriaPayload() {
   return {
     mode: 'criteria',
     criteria: {
+      contractor_ids: criteriaForm.value.contractor_ids.length ? criteriaForm.value.contractor_ids : undefined,
       year: criteriaForm.value.year || undefined,
       status: criteriaForm.value.status || undefined,
       source: criteriaForm.value.source || undefined,
@@ -518,11 +594,21 @@ const criteriaDiscountMutation = useMutation({
     // ظاهر حتى يعيد المستخدم تحميل الصفحة يدوياً (شكوى الشيت #7).
     criteriaDiscountDialog.value = false
     criteriaPreview.value = null
-    flash(`تم تطبيق الخصم على ${d.items?.applied_count ?? 0} ذمة.`)
+    const skipped = d.items?.skipped?.length ?? 0
+    flash(`تم تطبيق الخصم على ${d.items?.applied_count ?? 0} ذمة`
+      + ` لدى ${d.items?.contractors_count ?? 0} مقاولاً.`
+      + (skipped > 0 ? ` (${skipped} ذمة متخطّاة)` : ''))
     refreshAll()
   },
-  onError: (e: any) => flash(e?.response?.data?.message || 'فشل تطبيق الخصم الجماعي.', true),
+  onError: (e: any) => flash(
+    e?.response?.data?.errors?.criteria?.[0] || e?.response?.data?.message || 'فشل تطبيق الخصم الجماعي.',
+    true,
+  ),
 })
+
+// أي تعديل على المعايير أو قيمة الخصم يُبطل المعاينة — وإلا أمكن معاينة مجموعة ثم تطبيق
+// الخصم على مجموعة أخرى بالأرقام القديمة معروضة على الشاشة.
+watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
 </script>
 
 <template>
@@ -579,6 +665,13 @@ const criteriaDiscountMutation = useMutation({
           <VCardText>
             <p class="text-body-2 text-medium-emphasis mb-1">إجمالي الذمم القائمة</p>
             <h3 class="text-h5">{{ summary?.items?.outstanding_total_jod ?? '—' }} د.أ</h3>
+            <!-- عدد الذمم التي احتُسب منها الرقم: البطاقة على مستوى النظام كله بينما الجدول
+                 مجمّع حسب المقاول ومقسّم على صفحات، فبدون العدد لا سبيل للتوفيق بينهما —
+                 وهو ما قاد لظنّ أن كل الذمم حُذفت والبطاقة "لم تتحدّث" (TASK-17 #9). -->
+            <p class="text-caption text-medium-emphasis mb-0">
+              {{ summary?.items?.outstanding_dues_count ?? 0 }} ذمة قائمة من أصل
+              {{ summary?.items?.dues_count ?? 0 }} في النظام
+            </p>
           </VCardText>
         </VCard>
       </VCol>
@@ -996,8 +1089,35 @@ const criteriaDiscountMutation = useMutation({
               <VTextField v-model="dueForm.year" label="السنة (اختياري)" type="number" dir="ltr" />
             </VCol>
             <VCol cols="12" md="4">
-              <VTextField v-model="dueForm.due_date" label="تاريخ الاستحقاق (اختياري)" type="date" />
+              <VTextField
+                v-model="dueForm.due_date"
+                label="تاريخ الاستحقاق (اختياري)"
+                type="date"
+                :min="!editingDue && !dueForm.allow_backdate ? todayIso : undefined"
+              />
             </VCol>
+
+            <!-- تسجيل ذمة متأخّرة سابقة — حالة مشروعة لكنها تستحق أن تكون قراراً واعياً
+                 بسبب مكتوب، لا تاريخاً ماضياً مرَّ بالخطأ (TASK-17 #7). -->
+            <VCol v-if="!editingDue" cols="12">
+              <VCheckbox
+                v-model="dueForm.allow_backdate"
+                label="ذمة سابقة/متأخّرة — السماح بتاريخ استحقاق قبل اليوم"
+                density="compact"
+                hide-details
+              />
+            </VCol>
+            <VCol v-if="!editingDue && dueForm.allow_backdate" cols="12">
+              <VTextField
+                v-model="dueForm.backdate_reason"
+                label="سبب التاريخ السابق (إلزامي)"
+                dir="rtl"
+                :error="!dueForm.backdate_reason"
+                hint="يُحفظ بملاحظات الذمة وبسجل المالية"
+                persistent-hint
+              />
+            </VCol>
+
             <VCol cols="12">
               <VTextarea v-model="dueForm.notes" label="ملاحظات" rows="2" dir="rtl" />
             </VCol>
@@ -1008,7 +1128,9 @@ const criteriaDiscountMutation = useMutation({
           <VBtn
             color="primary"
             :loading="saveDueMutation.isPending.value"
-            :disabled="saveDueMutation.isPending.value || (!editingDue && !dueForm.contractor_id)"
+            :disabled="saveDueMutation.isPending.value
+              || (!editingDue && !dueForm.contractor_id)
+              || (dueForm.allow_backdate && !dueForm.backdate_reason)"
             @click="saveDueMutation.mutate()"
           >
             حفظ
@@ -1260,21 +1382,53 @@ const criteriaDiscountMutation = useMutation({
 
     <!-- ─── Dialog خصم جماعي بمعايير ─── -->
     <VDialog v-model="criteriaDiscountDialog" max-width="620">
-      <VCard title="خصم جماعي بمعايير (سنة / حالة / مصدر)">
+      <VCard title="خصم جماعي بمعايير (مقاولون / سنة / حالة / مصدر)">
         <VCardText>
-          <VAlert type="warning" variant="tonal" density="compact" class="mb-4">
-            يطبَّق الخصم على كل الذمم المطابقة عبر جميع المقاولين — استخدم "معاينة" أولاً للتأكد من العدد والأثر قبل الالتزام.
+          <VAlert
+            :type="criteriaScopedToContractors ? 'info' : 'warning'"
+            variant="tonal"
+            density="compact"
+            class="mb-4"
+          >
+            <template v-if="criteriaScopedToContractors">
+              الخصم محصور بالمقاولين المحدَّدين أدناه. استخدم "معاينة" للتأكد من العدد والأثر قبل الالتزام.
+            </template>
+            <template v-else>
+              <strong>تنبيه:</strong> بدون تحديد مقاولين، يطبَّق الخصم على كل الذمم المطابقة عبر <strong>جميع</strong> المقاولين.
+              حدِّد المقاولين إن كنت تقصد بعضهم فقط.
+            </template>
           </VAlert>
 
           <VRow dense>
+            <VCol cols="12">
+              <!-- حصر الخصم بمقاولين محدَّدين: قبل إضافته كان مود المعايير يطابق ذمم كل
+                   المقاولين بنفس السنة، فيظهر عدد أكبر بكثير من المقصود (TASK-17 #10). -->
+              <VAutocomplete
+                v-model="criteriaForm.contractor_ids"
+                v-model:search="criteriaContractorSearch"
+                :items="criteriaContractorOptions"
+                :item-title="contractorLabel"
+                item-value="id"
+                label="المقاولون (اختياري — اتركه فارغاً ليشمل الجميع)"
+                multiple
+                chips
+                closable-chips
+                no-filter
+                hide-details="auto"
+                hint="اكتب حرفين على الأقل للبحث"
+                persistent-hint
+              />
+            </VCol>
             <VCol cols="12" md="4">
               <VTextField v-model="criteriaForm.year" label="السنة (اختياري)" type="number" dir="ltr" />
             </VCol>
             <VCol cols="12" md="4">
               <VSelect
                 v-model="criteriaForm.status"
-                :items="[{ title: 'أي حالة', value: '' }, { title: 'غير مسدَّدة', value: 'unpaid' }, { title: 'مسدَّدة جزئياً', value: 'partially_paid' }, { title: 'مسدَّدة', value: 'paid' }]"
+                :items="[{ title: 'أي حالة (غير المسدَّدة بالكامل)', value: '' }, { title: 'غير مسدَّدة', value: 'unpaid' }, { title: 'مسدَّدة جزئياً', value: 'partially_paid' }]"
                 label="الحالة (اختياري)"
+                hint="الذمم المسدَّدة بالكامل مستثناة دائماً — لا خصم يُطبَّق عليها"
+                persistent-hint
               />
             </VCol>
             <VCol cols="12" md="4">
@@ -1304,18 +1458,46 @@ const criteriaDiscountMutation = useMutation({
             </VCol>
           </VRow>
 
+          <VAlert
+            v-if="!criteriaHasAnyFilter"
+            type="error"
+            variant="tonal"
+            density="compact"
+            class="mt-4"
+          >
+            حدِّد معياراً واحداً على الأقل (مقاولون أو سنة أو حالة أو مصدر). الخصم الجماعي بلا معايير يشمل كل ذمم النظام.
+          </VAlert>
+
           <template v-if="criteriaPreview && 'total_discount_impact_jod' in criteriaPreview">
             <VDivider class="my-4" />
             <VRow dense>
-              <VCol cols="6">
-                <p class="text-caption text-medium-emphasis mb-0">عدد الذمم المطابقة</p>
-                <strong>{{ criteriaPreview.matched_count }}</strong>
+              <VCol cols="12" md="4">
+                <p class="text-caption text-medium-emphasis mb-0">القابلة للخصم</p>
+                <strong class="text-success">{{ criteriaPreview.applicable_count }}</strong>
+                <span class="text-caption text-medium-emphasis"> من {{ criteriaPreview.matched_count }} مطابقة</span>
               </VCol>
-              <VCol cols="6">
+              <VCol cols="12" md="4">
+                <p class="text-caption text-medium-emphasis mb-0">عدد المقاولين المتأثّرين</p>
+                <strong>{{ criteriaPreview.contractors_count }}</strong>
+              </VCol>
+              <VCol cols="12" md="4">
                 <p class="text-caption text-medium-emphasis mb-0">إجمالي أثر الخصم (د.أ)</p>
                 <strong class="text-info">{{ criteriaPreview.total_discount_impact_jod }}</strong>
               </VCol>
             </VRow>
+
+            <!-- الذمم التي سيرفضها التطبيق — كانت تُعدّ ضمن "المطابقة" ويُضاف أثرها الكامل
+                 للإجمالي، فيظهر للمستخدم رقم لا يتحقّق أبداً (TASK-17 #10). -->
+            <VAlert
+              v-if="criteriaPreview.skipped?.length"
+              type="warning"
+              variant="tonal"
+              density="compact"
+              class="mt-3"
+            >
+              {{ criteriaPreview.skipped.length }} ذمة لن يُطبَّق عليها الخصم:
+              {{ criteriaPreview.skipped[0].reason }}
+            </VAlert>
           </template>
         </VCardText>
         <VCardActions class="justify-end pb-4 px-6">
@@ -1323,15 +1505,17 @@ const criteriaDiscountMutation = useMutation({
           <VBtn
             variant="tonal"
             color="info"
-            :disabled="!criteriaForm.discount_value"
+            :disabled="!criteriaForm.discount_value || !criteriaHasAnyFilter"
             :loading="criteriaDiscountMutation.isPending.value"
             @click="criteriaDiscountMutation.mutate(true)"
           >
             معاينة (بدون كتابة)
           </VBtn>
+          <!-- المعاينة إلزامية قبل التطبيق في مود المعايير: هذا المسار يقدر يمسّ ذمم كل
+               المقاولين بنداء واحد، فلا يصحّ أن يمرّ بلا رقم يراه المستخدم أولاً. -->
           <VBtn
             color="error"
-            :disabled="!criteriaForm.discount_value"
+            :disabled="!criteriaForm.discount_value || !criteriaHasAnyFilter || !criteriaPreview"
             :loading="criteriaDiscountMutation.isPending.value"
             @click="criteriaDiscountMutation.mutate(false)"
           >

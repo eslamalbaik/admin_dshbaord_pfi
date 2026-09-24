@@ -55,6 +55,7 @@ const form = ref({
   municipal_license: null as File | null,
   company_register: null as File | null,
   cr_file: null as File | null,
+  id_file: null as File | null,
   articles_of_association: null as File | null,
   internal_bylaws: null as File | null,
   bank_dealing_letter: null as File | null,
@@ -187,7 +188,7 @@ const fetchGovernorates = async () => {
 // روابط الملفات المرفوعة مسبقاً — تُعرض للمعاينة/التحميل جنب كل حقل رفع، بدل ما يظهر الحقل فاضي
 const documentKeys = [
   'lease_or_ownership_contract', 'company_approval_letter', 'municipal_license', 'company_register',
-  'cr_file', 'articles_of_association', 'internal_bylaws', 'bank_dealing_letter',
+  'cr_file', 'id_file', 'articles_of_association', 'internal_bylaws', 'bank_dealing_letter',
   'secretary_contract', 'full_time_engineer_certificate', 'accountant_certificate_or_contract',
   'partners_ids', 'authorization_letter',
 ] as const
@@ -204,6 +205,7 @@ const documentLabels: Record<string, string> = {
   municipal_license: 'رخصة المهن',
   company_register: 'مستخرج عن سجل الشركة',
   cr_file: 'السجل التجاري',
+  id_file: 'صورة الهوية',
   articles_of_association: 'عقد تأسيس الشركة',
   internal_bylaws: 'النظام الداخلي',
   bank_dealing_letter: 'شهادة تعامل بنك',
@@ -715,6 +717,35 @@ const submit = async () => {
               placeholder="انقر هنا لاختيار الملف أو سحبه"
               :color="form.cr_file ? 'success' : ''"
               :prepend-icon="form.cr_file ? 'tabler-circle-check' : 'tabler-cloud-upload'"
+            />
+          </VCol>
+          <VCol cols="12" md="6">
+            <div v-if="existingFiles.id_file && !form.id_file" class="d-flex align-center gap-2 mb-1">
+              <template v-if="documentsToRemove.includes('id_file')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('id_file')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.id_file!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('id_file')" />
+              </template>
+            </div>
+            <VFileInput
+              v-model="form.id_file"
+              label="صورة الهوية (للتحديث)"
+              :error-messages="validationErrors.id_file"
+              accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
+              class="custom-file-input"
+              persistent-placeholder
+              placeholder="انقر هنا لاختيار الملف أو سحبه"
+              :color="form.id_file ? 'success' : ''"
+              :prepend-icon="form.id_file ? 'tabler-circle-check' : 'tabler-cloud-upload'"
             />
           </VCol>
           <VCol cols="12" md="6">

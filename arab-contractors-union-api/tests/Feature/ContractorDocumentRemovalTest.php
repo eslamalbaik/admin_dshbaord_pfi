@@ -92,6 +92,33 @@ class ContractorDocumentRemovalTest extends TestCase
         Storage::disk('public')->assertExists($licensePath);
     }
 
+    /**
+     * TASK-17 #2 — id_file كان مقبولاً بالباك (ضمن FILE_FIELDS) وغائباً كلياً عن نموذج
+     * التعديل بالواجهة: لا معاينة ولا استبدال ولا حذف. فبالنسبة لهذا المستند وحده لم تكن
+     * شكوى «لا يسمح إلا بالاستبدال» دقيقة — لم يكن الاستبدال متاحاً أصلاً.
+     */
+    public function test_the_id_document_can_be_removed_like_any_other(): void
+    {
+        $contractor = $this->createContractorWithDocuments();
+        $idPath = UploadedFile::fake()->create('id.pdf', 10, 'application/pdf')->store('contractors/id', 'public');
+        $contractor->update(['id_file' => $idPath]);
+
+        Storage::disk('public')->assertExists($idPath);
+
+        $this->actingAsAdmin();
+
+        $this->putJson("/api/v1/contractors/{$contractor->id}", $this->payload($contractor, [
+            'remove_documents' => ['id_file'],
+        ]))->assertStatus(200);
+
+        $fresh = $contractor->fresh();
+        $this->assertNull($fresh->id_file);
+        Storage::disk('public')->assertMissing($idPath);
+        // بقية المستندات كما هي — الحذف محصور بما سُمّي صراحةً
+        $this->assertNotNull($fresh->cr_file);
+        $this->assertNotNull($fresh->municipal_license);
+    }
+
     public function test_remove_documents_can_remove_several_at_once(): void
     {
         $contractor = $this->createContractorWithDocuments();

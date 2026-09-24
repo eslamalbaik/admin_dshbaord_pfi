@@ -79,16 +79,60 @@ const exportContractors = async () => {
     })
     const rows: any[] = data.items || []
 
-    const headerRow = ['اسم المنشأة', 'رقم العضوية', 'رقم السجل التجاري', 'التخصص', 'التصنيف', 'المفوض بالتوقيع', 'رقم الجوال', 'البريد الإلكتروني', 'المدينة', 'الحالة', 'تاريخ الانضمام']
+    // التصنيفات والتخصصات يخزّنها نموذج الإضافة في specialties[] (عمود JSON)، لا في
+    // trade/classification — فكان التصدير يُخرج عمودين فارغين لكل مقاول أُضيف بالنموذج
+    // الحالي (TASK-17 #4). تُقرأ الآن من نفس المصدر الذي يعرضه مودل المعاينة، وتُترجم
+    // أكوادها إلى تسميات عربية بدل إخراج الكود الخام.
+    const specialtiesOf = (c: any) => {
+      try {
+        return getSpecialtiesList(c) ?? []
+      }
+      catch {
+        return []
+      }
+    }
+
+    const fieldsColumn = (c: any) => specialtiesOf(c)
+      .map((s: any) => getFieldTitle(s.field_lk_type))
+      .filter((v: any) => v && v !== '—')
+      .join(' / ')
+
+    const specializationsColumn = (c: any) => specialtiesOf(c)
+      .map((s: any) => getSpecializationTitle(s.specialization_lk_type))
+      .filter((v: any) => v && v !== '—')
+      .join(' / ')
+
+    // «المجال: التخصص (الدرجة)» لكل صف تصنيف — أدقّ من ثلاثة أعمدة متوازية لأن الدرجة
+    // تخصّ مجالها لا المقاول ككل.
+    const classificationsColumn = (c: any) => specialtiesOf(c)
+      .map((s: any) => {
+        const field = getFieldTitle(s.field_lk_type)
+        const spec = getSpecializationTitle(s.specialization_lk_type)
+        const grade = getGradeTitle(s.classification)
+
+        return `${field}: ${spec}${grade && grade !== '—' ? ` (${grade})` : ''}`
+      })
+      .join(' | ')
+
+    const headerRow = [
+      'اسم المنشأة', 'رقم العضوية', 'رقم السجل التجاري',
+      'المجالات', 'التخصصات', 'التصنيفات التفصيلية', 'التصنيف العام', 'التخصص (نص حر)',
+      'المفوض بالتوقيع', 'رقم هوية المفوض', 'رقم الجوال', 'البريد الإلكتروني', 'المدينة', 'الحالة', 'تاريخ الانضمام',
+    ]
     const csvRows = [
       headerRow,
       ...rows.map(c => [
         c.name ?? '',
         c.membership_number ?? '',
         c.commercial_register ?? '',
+        fieldsColumn(c),
+        specializationsColumn(c),
+        classificationsColumn(c),
+        getGradeTitle(c.classification),
+        // يبقى عموداً مستقلاً: مقاولون قدامى بياناتهم في trade وحده ولا specialties لهم
         c.trade ?? '',
-        c.classification ?? '',
         c.authorized_person ?? '',
+        c.authorized_person_id_number ?? '',
         c.phone ?? '',
         c.email ?? '',
         c.city ?? '',
