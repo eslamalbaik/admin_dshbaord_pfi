@@ -73,7 +73,6 @@ const form = ref({
   address: '',
   building: '',
   floor: '',
-  trade: '',
   specialties: [
     { field_lk_type: null as number | null, specialization_lk_type: null as number | null, classification: '' }
   ] as Array<{ field_lk_type: number | null, specialization_lk_type: number | null, classification: string }>,

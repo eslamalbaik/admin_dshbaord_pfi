@@ -46,14 +46,14 @@ class UnionSeeder extends Seeder
         // 3. Demo Contractors
         // ===========================
         $contractorsData = [
-            ['name' => 'شركة المدار للمقاولات العامة',  'trade' => 'إنشاءات عامة',  'classification' => 'أ', 'status' => 'active',   'city' => 'غزة',    'phone' => '0599-100001', 'license_number' => 'LIC-001'],
-            ['name' => 'مؤسسة النور للإنشاءات',          'trade' => 'كهرباء',         'classification' => 'ب', 'status' => 'active',   'city' => 'رفح',    'phone' => '0599-100002', 'license_number' => 'LIC-002'],
-            ['name' => 'شركة الفارابي للطرق والمدنية',   'trade' => 'طرق ومدنية',     'classification' => 'أ', 'status' => 'active',   'city' => 'خانيونس','phone' => '0599-100003', 'license_number' => 'LIC-003'],
-            ['name' => 'مقاولات عمر خليل',               'trade' => 'سباكة',          'classification' => 'ج', 'status' => 'pending',  'city' => 'بيت لحم','phone' => '0599-100004', 'license_number' => 'LIC-004'],
-            ['name' => 'شركة الأمل للتشطيبات',           'trade' => 'تشطيبات',        'classification' => 'ب', 'status' => 'active',   'city' => 'نابلس',  'phone' => '0599-100005', 'license_number' => 'LIC-005'],
-            ['name' => 'مؤسسة البناء الحديث',            'trade' => 'إنشاءات عامة',  'classification' => 'ب', 'status' => 'expired',  'city' => 'رام الله','phone' => '0599-100006', 'license_number' => 'LIC-006'],
-            ['name' => 'شركة التقنية للاتصالات',         'trade' => 'اتصالات',        'classification' => 'ج', 'status' => 'active',   'city' => 'جنين',   'phone' => '0599-100007', 'license_number' => 'LIC-007'],
-            ['name' => 'مقاولات سارة المحمد',            'trade' => 'ميكانيكا',       'classification' => 'د', 'status' => 'pending',  'city' => 'طولكرم', 'phone' => '0599-100008', 'license_number' => 'LIC-008'],
+            ['name' => 'شركة المدار للمقاولات العامة',  'classification' => 'أ', 'status' => 'active',   'city' => 'غزة',    'phone' => '0599-100001', 'license_number' => 'LIC-001'],
+            ['name' => 'مؤسسة النور للإنشاءات',          'classification' => 'ب', 'status' => 'active',   'city' => 'رفح',    'phone' => '0599-100002', 'license_number' => 'LIC-002'],
+            ['name' => 'شركة الفارابي للطرق والمدنية',   'classification' => 'أ', 'status' => 'active',   'city' => 'خانيونس','phone' => '0599-100003', 'license_number' => 'LIC-003'],
+            ['name' => 'مقاولات عمر خليل',               'classification' => 'ج', 'status' => 'pending',  'city' => 'بيت لحم','phone' => '0599-100004', 'license_number' => 'LIC-004'],
+            ['name' => 'شركة الأمل للتشطيبات',           'classification' => 'ب', 'status' => 'active',   'city' => 'نابلس',  'phone' => '0599-100005', 'license_number' => 'LIC-005'],
+            ['name' => 'مؤسسة البناء الحديث',            'classification' => 'ب', 'status' => 'expired',  'city' => 'رام الله','phone' => '0599-100006', 'license_number' => 'LIC-006'],
+            ['name' => 'شركة التقنية للاتصالات',         'classification' => 'ج', 'status' => 'active',   'city' => 'جنين',   'phone' => '0599-100007', 'license_number' => 'LIC-007'],
+            ['name' => 'مقاولات سارة المحمد',            'classification' => 'د', 'status' => 'pending',  'city' => 'طولكرم', 'phone' => '0599-100008', 'license_number' => 'LIC-008'],
         ];
 
         $contractors = [];

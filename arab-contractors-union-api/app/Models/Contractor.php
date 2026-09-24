@@ -28,7 +28,7 @@ class Contractor extends Authenticatable
         'membership_number', 'name', 'authorized_person', 'authorized_person_title',
         'authorized_person_id_number', 'authorized_person_phone', 'authorized_person_whatsapp',
         'commercial_register',
-        'license_number', 'trade', 'classification', 'established_year', 'owner_name',
+        'license_number', 'classification', 'established_year', 'owner_name',
         'email', 'phone', 'phone_verified_at', 'city', 'governorate_id', 'city_id', 'district', 'address',
         'classification_decision_number', 'classification_decision_date',
         'status', 'is_frozen', 'profile_completed', 'profile_approved_by',

@@ -24,7 +24,6 @@ class UpdateFullProfileRequest extends FormRequest
             // بنفسه فيُخفّض الرسم المحتسَب عليه، وتغيير الدرجة المطبوعة على شهادته — بلا
             // مراجعة ولا أثر. تعديلهما صلاحية إدارية فقط: ContractorController (لوحة الأدمن)،
             // أو طابور طلبات التعديل بعد إنجاز US11. إعادتهما هنا تُعيد فتح الثغرة.
-            'trade'                         => 'nullable|string|max:100',
             'established_year'              => 'nullable|integer|min:1900|max:' . date('Y'),
             'established_date'              => 'nullable|date',
             'owner_name'                    => 'nullable|string|max:255',

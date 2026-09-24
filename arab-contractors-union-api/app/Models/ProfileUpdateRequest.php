@@ -47,7 +47,7 @@ class ProfileUpdateRequest extends Model
      * صلاحية لوحة الأدمن وحدها.
      */
     public const REVIEWED_IDENTITY_FIELDS = [
-        'trade', 'established_year', 'established_date', 'owner_name', 'partners',
+        'established_year', 'established_date', 'owner_name', 'partners',
         'capital', 'registration_date', 'legal_form', 'company_purposes',
         'authorized_person', 'authorized_person_title', 'authorized_person_id_number',
     ];

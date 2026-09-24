@@ -40,7 +40,6 @@ const fieldLabels: Record<string, string> = {
   authorized_person_phone: 'جوال المفوض',
   authorized_person_whatsapp: 'واتساب المفوض',
   // هوية الشركة وبياناتها القانونية
-  trade: 'التخصص (نص حر)',
   established_year: 'سنة التأسيس',
   established_date: 'تاريخ التأسيس',
   owner_name: 'اسم المالك',

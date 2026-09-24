@@ -127,7 +127,6 @@ class LegacyDuesImporter
                             'membership_number'   => $company['membership_number'] !== '' ? $company['membership_number'] : null,
                             'authorized_person'   => $company['authorized_person'] ?? null,
                             'commercial_register' => $company['licensed_number'] ?? null,
-                            'trade'               => $company['first_trade'] ?? null,
                             'classification'      => $company['first_grade'] ?? null,
                             'status'              => 'active',
                         ]);

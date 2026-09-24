@@ -20,7 +20,6 @@ class ContractorRegisterFlowTest extends TestCase
             'status'             => 'active',
             'is_frozen'          => false,
             'commercial_register'=> 'CR-1001',
-            'trade'              => 'مقاولات عامة',
             'classification'     => 'أ',
         ], $attrs));
     }
@@ -213,7 +212,6 @@ class ContractorRegisterFlowTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonPath('items.user.membership_number', '905_g')
             ->assertJsonPath('items.user.commercial_register', 'CR-1001')
-            ->assertJsonPath('items.user.trade', 'مقاولات عامة')
             ->assertJsonPath('items.user.classification', 'أ');
         $this->assertNotEmpty($response->json('items.token'));
     }

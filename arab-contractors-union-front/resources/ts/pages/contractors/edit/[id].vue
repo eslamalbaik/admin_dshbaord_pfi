@@ -41,7 +41,6 @@ const form = ref({
   address: '',
   building: '',
   floor: '',
-  trade: '',
   specialties: [
     { field_lk_type: null as number | null, specialization_lk_type: null as number | null, classification: '' }
   ] as Array<{ field_lk_type: number | null, specialization_lk_type: number | null, classification: string }>,
@@ -247,7 +246,7 @@ const fetchContractor = async () => {
       'legal_form', 'company_purposes', 'owner_name', 'authorized_person',
       'authorized_person_id_number', 'authorized_person_phone', 'authorized_person_whatsapp',
       'phone', 'fax', 'email', 'governorate_id', 'city_id', 'district', 'building', 'floor',
-      'address', 'trade', 'established_date', 'license_number', 'classification', 'notes'
+      'address', 'established_date', 'license_number', 'classification', 'notes'
     ]
     
     const dateFields = ['established_date']

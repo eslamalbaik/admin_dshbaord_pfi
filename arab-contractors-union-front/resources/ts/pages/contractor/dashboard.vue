@@ -38,7 +38,7 @@ interface Contractor {
   id: number; name: string; membership_number: string
   commercial_register: string; authorized_person: string
   authorized_person_id_number: string; authorized_person_phone: string; authorized_person_whatsapp: string
-  trade: string; classification: string
+  classification: string
   email: string; phone: string; city: string; address: string
   status: string; is_frozen: boolean
 }
@@ -915,10 +915,6 @@ async function deleteTenderDocument(id: number) {
               <div class="md-input-group">
                 <label>رقم رخصة البلدية</label>
                 <div class="md-input-read">{{ profileExtra?.license_number || '—' }}</div>
-              </div>
-              <div class="md-input-group">
-                <label>التخصص</label>
-                <div class="md-input-read">{{ contractor.trade || '—' }}</div>
               </div>
               <div class="md-input-group">
                 <label>المحافظة / المدينة</label>

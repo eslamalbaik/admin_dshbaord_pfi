@@ -40,7 +40,6 @@ class Bulk40DemoSeeder extends Seeder
     {
         $companyWords  = ['المدار', 'النور', 'الأمل', 'البناء الحديث', 'الفارابي', 'التقنية', 'الرواد', 'الإعمار', 'المستقبل', 'الوفاء'];
         $companyKinds  = ['شركة', 'مؤسسة', 'مقاولات'];
-        $trades        = ['إنشاءات عامة', 'كهرباء', 'طرق ومدنية', 'سباكة', 'تشطيبات', 'اتصالات', 'ميكانيكا', 'حفريات'];
         $cities        = ['غزة', 'رفح', 'خانيونس', 'الوسطى', 'شمال غزة', 'رام الله', 'نابلس', 'جنين', 'بيت لحم', 'الخليل'];
         $classes       = ['أ', 'ب', 'ج', 'د'];
         $statuses      = ['active', 'active', 'active', 'pending', 'expired'];
@@ -51,7 +50,6 @@ class Bulk40DemoSeeder extends Seeder
             $seq       = str_pad((string) $i, 3, '0', STR_PAD_LEFT);
             $kind      = $companyKinds[$i % count($companyKinds)];
             $word      = $companyWords[$i % count($companyWords)];
-            $trade     = $trades[$i % count($trades)];
 
             $contractor = Contractor::updateOrCreate(
                 ['license_number' => "DEMO-LIC-{$seq}"],
@@ -60,7 +58,6 @@ class Bulk40DemoSeeder extends Seeder
                     'name'              => "{$kind} {$word} للمقاولات ({$seq})",
                     'authorized_person' => 'المفوّض بالتوقيع ' . $seq,
                     'commercial_register' => "DEMO-CR-{$seq}",
-                    'trade'             => $trade,
                     'classification'    => $classes[$i % count($classes)],
                     'established_year'  => rand(1995, 2020),
                     'owner_name'        => "صاحب {$kind} {$word}",

@@ -33,7 +33,6 @@ const headers = [
   { title: 'المقاول', key: 'name', sortable: true },
   { title: 'رقم العضوية', key: 'membership_number' },
   { title: 'رقم السجل', key: 'commercial_register' },
-  { title: 'التخصص', key: 'trade' },
   { title: 'الحالة', key: 'status' },
   { title: 'حالة الحساب', key: 'has_app_account', sortable: false },
   { title: 'تاريخ الانضمام', key: 'created_at' },
@@ -129,8 +128,7 @@ const exportContractors = async () => {
         specializationsColumn(c),
         classificationsColumn(c),
         getGradeTitle(c.classification),
-        // يبقى عموداً مستقلاً: مقاولون قدامى بياناتهم في trade وحده ولا specialties لهم
-        c.trade ?? '',
+        '',  // حقل مستبدل — trade لم يعد مستخدماً
         c.authorized_person ?? '',
         c.authorized_person_id_number ?? '',
         c.phone ?? '',
@@ -441,7 +439,6 @@ const activityRows = computed(() => {
   const t = detailsTarget.value
   if (!t) return []
   return [
-    { label: 'التخصص العام', value: t.trade || '—', icon: 'tabler-briefcase' },
     { label: 'التصنيف العام', value: getGradeTitle(t.classification), icon: 'tabler-award' },
     { label: 'رقم رخصة البلدية', value: t.license_number || '—', icon: 'tabler-license' },
     { label: 'تاريخ التأسيس', value: t.established_date ? String(t.established_date).substring(0, 10) : '—', icon: 'tabler-calendar-star' },

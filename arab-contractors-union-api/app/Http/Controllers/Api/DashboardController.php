@@ -33,7 +33,7 @@ class DashboardController extends Controller
         $latestContractors = Cache::remember('union_latest_contractors', 60, function () {
             return Contractor::latest()
                 ->limit(6)
-                ->get(['id', 'name', 'email', 'trade', 'status', 'created_at'])
+                ->get(['id', 'name', 'email', 'status', 'created_at'])
                 ->toArray();
         });
 

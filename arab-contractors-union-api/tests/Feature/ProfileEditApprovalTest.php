@@ -124,11 +124,11 @@ class ProfileEditApprovalTest extends TestCase
         $this->actingAsContractor($contractor);
 
         $this->postJson('/api/v1/contractor/auth/profile/update', [
-            'trade' => 'مقاولات عامة',
+            'owner_name' => 'مالك جديد',
         ])->assertOk();
 
-        // trade مُراجَع، فلا يُكتب — لكن لا يجوز أن يمنع ذلك كتابة الفوري بنفس الطلب
-        $this->assertNull($contractor->fresh()->trade);
+        // owner_name مُراجَع، فلا يُكتب — لكن لا يجوز أن يمنع ذلك كتابة الفوري بنفس الطلب
+        $this->assertNull($contractor->fresh()->owner_name);
     }
 
     /**

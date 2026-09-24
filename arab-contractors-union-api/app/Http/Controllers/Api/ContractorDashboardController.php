@@ -36,7 +36,6 @@ class ContractorDashboardController extends Controller
                 'authorized_person_id_number' => $contractor->authorized_person_id_number,
                 'authorized_person_phone'     => $contractor->authorized_person_phone,
                 'authorized_person_whatsapp'  => $contractor->authorized_person_whatsapp,
-                'trade'             => $contractor->trade,
                 'classification'    => $contractor->classification,
                 'email'             => $contractor->email,
                 'phone'             => $contractor->phone,
