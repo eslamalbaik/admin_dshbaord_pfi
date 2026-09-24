@@ -1138,6 +1138,24 @@ Defects 3 and 4 are the likeliest reason the impact figure is wrong by a differe
 
 **Task breakdown**: to be written as `TASK-17-tasks.md` once Phase 0's answers are in — three sub-issues' scope depends on them.
 
+### Deploy-history evidence (added 2026-09-24, after reading the Actions log)
+
+Phase 0's framing above was written before the workflow history was checked. It shifts the odds, though it does not remove the need for the checks:
+
+- Run **#17** (`e8b7da8`, 2026-09-22 11:37) was itself the commit that *unblocked* the frontend build. Its message records that `vite build` had been failing since the app-notifications feature landed, so the server kept restoring the last good `dist/` (Sep 21) and **none of the recent frontend work was ever served**.
+- TASK-16's frontend commits (`61f5b71`, `8dfa91c`) are **newer** than that fix, and run **#18** (`927b12a`, 2026-09-23 15:45) carried them and concluded success.
+- This feedback batch is dated **2026-09-24**, i.e. after that deploy.
+
+So TASK-16's frontend work was most likely live when the reporter tested, which makes #2 and #3 **genuine remaining gaps rather than a stale deploy** — and that is exactly what the `id_file` finding independently predicts for #2. Phase 0 is still required, because a front build failure reports success while rolling `dist/` back, so "run succeeded" is not "dist updated"; but plan on writing code for #2, not on redeploying.
+
+### Where this plan lives, and why it is not copied to the production repos (decided 2026-09-24)
+
+Asked to put this plan in the `PcuGaza` production repos as well. **Do not copy it.** Those repos share no git history with this monorepo, so a copy means a `commit-tree` tree-graft for a documentation file; worse, `TASK_PLAN.md` is a monorepo-root planning document while production is split into an api repo and a front repo, so a copy has no natural home in either and becomes a second source of truth that drifts after the first edit here.
+
+Instead, each production repo should carry a short pointer file — no plan content at all, just the canonical location (`eslamalbaik/admin_dshbaord_pfi` → `TASK_PLAN.md`) and a line saying that repo holds production deploy code only. Nothing to drift, and anyone landing in a production repo finds the plan. Write it through the GitHub API rather than a clone, which sidesteps the shared-history problem entirely. Do not touch the two deliberately divergent files there (`deploy-vps.sh`, `.github/workflows/deploy-production.yml`).
+
+**Not executed**: adding the `PcuGaza` repos to the session was refused by the permission layer (classified as a production action). Carried forward.
+
 ---
 ## Cross-cutting notes
 
