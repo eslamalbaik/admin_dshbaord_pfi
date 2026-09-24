@@ -33,6 +33,13 @@ return [
     'scheduling' => [
         'grace_period_reminder_hour' => env('GRACE_PERIOD_REMINDER_HOUR', 8),
         'renewal_reminder_hour' => env('RENEWAL_REMINDER_HOUR', 9),
+
+        /**
+         * Where to email the output of a scheduled task that exits non-zero.
+         * Unset (the default) = log-only alerting; set it once a real MAIL_MAILER is
+         * configured, since the default 'log' mailer would just swallow the alert.
+         */
+        'alert_email' => env('SCHEDULE_ALERT_EMAIL'),
     ],
 
     /**

@@ -34,29 +34,30 @@ class SendRenewalReminders extends Command
 
     public function handle(): int
     {
+        $runDate = $this->option('date') ? date('Y-m-d', strtotime($this->option('date'))) : today()->toDateString();
+        $today = Carbon::parse($runDate);
+
+        Log::info('Starting renewal reminder job', ['run_date' => $runDate]);
+        $this->info("Starting renewal reminders for {$runDate}");
+
+        // تخطٍّ فقط إذا اكتمل تشغيل اليوم فعلاً — التشغيل الفاشل/المتوقف يُعاد تشغيله
+        if ($this->idempotencyService->completedRunExists(JobName::RENEWAL, $runDate)) {
+            Log::info('Renewal run already completed for date', ['run_date' => $runDate]);
+            $this->warn("Renewal reminder already ran for {$runDate}. Skipping to prevent duplicates.");
+            return self::SUCCESS;
+        }
+
+        // Create notification run
+        $run = $this->idempotencyService->getOrCreateRun(JobName::RENEWAL, $runDate);
+
         try {
-            $runDate = $this->option('date') ? date('Y-m-d', strtotime($this->option('date'))) : today()->toDateString();
-            $today = Carbon::parse($runDate);
-
-            Log::info('Starting renewal reminder job', ['run_date' => $runDate]);
-            $this->info("Starting renewal reminders for {$runDate}");
-
-            // Check if run already exists (idempotency for app notifications)
-            if ($this->idempotencyService->runAlreadyExists(JobName::RENEWAL, $runDate)) {
-                Log::info('Renewal run already exists for date', ['run_date' => $runDate]);
-                $this->warn("Renewal reminder already ran for {$runDate}. Skipping to prevent duplicates.");
-                return 0;
-            }
-
-            // Create notification run
-            $run = $this->idempotencyService->getOrCreateRun(JobName::RENEWAL, $runDate);
-
             $milestones = collect(explode(',', $this->option('days')))
                 ->map(fn ($d) => (int) trim($d))
                 ->filter(fn ($d) => $d > 0);
 
             $membershipSent = 0;
             $membershipSkipped = 0;
+            $membershipFailed = 0;
 
             // ============================================================
             // Existing Membership Renewal Reminders
@@ -68,31 +69,42 @@ class SendRenewalReminders extends Command
                     ->get();
 
                 foreach ($memberships as $membership) {
-                    $contractor = $membership->contractor;
+                    // فشل مقاول واحد لا يُسقِط التشغيل كله — يُسجَّل ويُعدّ ثم نكمل
+                    try {
+                        $contractor = $membership->contractor;
 
-                    if (! $contractor || $contractor->status === 'suspended') {
-                        continue;
+                        if (! $contractor || $contractor->status === 'suspended') {
+                            continue;
+                        }
+
+                        // من لديه دفعة تجديد قيد المراجعة لا يُذكَّر
+                        $hasPendingRenewal = $contractor->payments()
+                            ->where('type', 'membership_fee')
+                            ->where('status', 'pending')
+                            ->exists();
+
+                        if ($hasPendingRenewal) {
+                            $membershipSkipped++;
+                            continue;
+                        }
+
+                        // حماية من التكرار عند إعادة التشغيل يدوياً في نفس اليوم
+                        $dedupeKey = "renewal_reminder.{$membership->id}.{$days}." . $today->toDateString();
+                        if (! Cache::add($dedupeKey, true, now()->addDay())) {
+                            continue;
+                        }
+
+                        $contractor->notify(new MembershipExpiryReminderNotification($membership, $days));
+                        $membershipSent++;
+                    } catch (\Throwable $e) {
+                        $membershipFailed++;
+                        Log::channel('reminders')->error('renewal_reminders.membership_failed', [
+                            'membership_id' => $membership->id,
+                            'milestone_days' => $days,
+                            'error' => $e->getMessage(),
+                        ]);
+                        $this->error("Failed to send membership reminder for membership {$membership->id}: {$e->getMessage()}");
                     }
-
-                    // من لديه دفعة تجديد قيد المراجعة لا يُذكَّر
-                    $hasPendingRenewal = $contractor->payments()
-                        ->where('type', 'membership_fee')
-                        ->where('status', 'pending')
-                        ->exists();
-
-                    if ($hasPendingRenewal) {
-                        $membershipSkipped++;
-                        continue;
-                    }
-
-                    // حماية من التكرار عند إعادة التشغيل يدوياً في نفس اليوم
-                    $dedupeKey = "renewal_reminder.{$membership->id}.{$days}." . $today->toDateString();
-                    if (! Cache::add($dedupeKey, true, now()->addDay())) {
-                        continue;
-                    }
-
-                    $contractor->notify(new MembershipExpiryReminderNotification($membership, $days));
-                    $membershipSent++;
                 }
             }
 
@@ -124,11 +136,14 @@ class SendRenewalReminders extends Command
                         continue;
                     }
 
-                    // مصدر تاريخ الانتهاء هو العضوية الفعّالة — getContractorsApproachingRenewal
-                    // تحمّلها مسبقاً، والشرط يضمن وجودها، لكن نحرس تفادياً لسباق تحديث.
+                    // تاريخ الانتهاء يأتي من العضوية النشطة — لا يوجد عمود على contractors
                     $expiryDate = $contractor->activeMembership?->expires_at;
 
                     if (! $expiryDate) {
+                        Log::channel('reminders')->warning('renewal_reminders.contractor_without_active_membership', [
+                            'contractor_id' => $contractor->id,
+                            'run_id' => $run->id,
+                        ]);
                         continue;
                     }
 
@@ -153,10 +168,11 @@ class SendRenewalReminders extends Command
                         'expiry_date' => $expiryDate,
                         'run_id' => $run->id,
                     ]);
-                } catch (\Exception $e) {
+                } catch (\Throwable $e) {
                     $expiryReminderFailed++;
-                    Log::error('Failed to send expiry reminder', [
+                    Log::channel('reminders')->error('renewal_reminders.contractor_failed', [
                         'contractor_id' => $contractor->id,
+                        'run_id' => $run->id,
                         'error' => $e->getMessage(),
                     ]);
                     $this->error("Failed to send reminder to contractor {$contractor->id}: {$e->getMessage()}");
@@ -166,9 +182,13 @@ class SendRenewalReminders extends Command
             // Mark app notification run as completed
             $this->idempotencyService->markRunComplete($run, $expiryReminderSent);
 
-            Log::channel('reminders')->info('renewal_reminders.run', [
+            $totalSent = $membershipSent + $expiryReminderSent;
+            $totalFailed = $membershipFailed + $expiryReminderFailed;
+
+            Log::channel('reminders')->log($totalFailed > 0 ? 'error' : 'info', 'renewal_reminders.run', [
                 'membership_sent'    => $membershipSent,
                 'membership_skipped_pending_payment' => $membershipSkipped,
+                'membership_failed' => $membershipFailed,
                 'expiry_reminder_sent' => $expiryReminderSent,
                 'expiry_reminder_failed' => $expiryReminderFailed,
                 'run_id' => $run->id,
@@ -177,18 +197,47 @@ class SendRenewalReminders extends Command
 
             $this->info("Membership reminders: {$membershipSent} sent, {$membershipSkipped} skipped");
             $this->info("Expiry reminders: {$expiryReminderSent} sent");
-            if ($expiryReminderFailed > 0) {
-                $this->warn("Failed to send {$expiryReminderFailed} expiry reminders");
+            if ($totalFailed > 0) {
+                $this->warn("Failed to send {$totalFailed} reminders ({$membershipFailed} membership, {$expiryReminderFailed} expiry)");
+            }
+
+            // كل محاولة إرسال فشلت = عطل عام (لا مجرد مقاول واحد سيّئ) — أخرج بكود فشل
+            // لتعمل onFailure في routes/console.php. فشل جزئي يبقى SUCCESS تفادياً لإنذار يومي كاذب.
+            if ($totalFailed > 0 && $totalSent === 0) {
+                Log::channel('reminders')->critical('renewal_reminders.all_sends_failed', [
+                    'run_id' => $run->id,
+                    'run_date' => $runDate,
+                    'failed' => $totalFailed,
+                ]);
+
+                return self::FAILURE;
             }
 
             return self::SUCCESS;
-        } catch (\Exception $e) {
-            Log::error('Error in renewal reminder job', [
+        } catch (\Throwable $e) {
+            // فشل إعداد/استعلام (لا فشل مقاول واحد): يُسجَّل بمستوى critical على قناة reminders
+            // ثم يُعاد رميه — الأمر يخرج بكود غير صفري فتُشغَّل onFailure في routes/console.php.
+            // لا تبتلع هذا الاستثناء: ابتلاعه سابقاً أخفى أعطال أعمدة SQL شهوراً.
+            Log::channel('reminders')->critical('renewal_reminders.failed', [
+                'run_id' => $run->id,
+                'run_date' => $runDate,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
             $this->error("Error: {$e->getMessage()}");
-            return 1;
+
+            // وسم التشغيل كفاشل يلمس قاعدة البيانات — وقد تكون هي العطل نفسه.
+            // فشله هنا يجب ألا يحجب الاستثناء الأصلي.
+            try {
+                $this->idempotencyService->markRunFailed($run, $e->getMessage());
+            } catch (\Throwable $markFailed) {
+                Log::channel('reminders')->critical('renewal_reminders.mark_failed_errored', [
+                    'run_id' => $run->id,
+                    'error' => $markFailed->getMessage(),
+                ]);
+            }
+
+            throw $e;
         }
     }
 }

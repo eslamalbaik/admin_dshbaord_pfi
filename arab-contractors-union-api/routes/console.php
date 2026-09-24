@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Console\Scheduling\Event;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
@@ -9,10 +10,35 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
+/**
+ * تنبيه موحَّد لفشل أي مهمة مجدولة.
+ *
+ * كل أمر يخرج بكود غير صفري (أو يرمي استثناءً غير ملتقط) يُسجَّل بمستوى critical — لا error —
+ * حتى يبرز وسط السطور الروتينية في نفس السجل، ويُرسَل بريد بمخرجاته إن ضُبط
+ * notifications.scheduling.alert_email.
+ *
+ * هذا نصف المعادلة فقط: الأمر نفسه يجب ألا يبتلع استثناءاته ويعيد 0، وإلا لن يُستدعى onFailure
+ * إطلاقاً — وهو ما أخفى عطلَي أعمدة SQL في أوامر التذكير شهوراً (راجع e21a8a9).
+ */
+$alertOnFailure = function (Event $event, string $task, string $channel = 'reminders'): Event {
+    $event->onFailure(fn () => Log::channel($channel)->critical("schedule: {$task} failed", [
+        'task' => $task,
+        'hint' => 'scheduled task exited non-zero — check the matching *.failed entry for the trace',
+    ]));
+
+    if ($alertEmail = config('notifications.scheduling.alert_email')) {
+        $event->emailOutputOnFailure($alertEmail);
+    }
+
+    return $event;
+};
+
 // جلب أسعار صرف ILS/USD مقابل الدينار يومياً (مصدر عام احتياطي مبكر)
-Schedule::command('rates:fetch')
-    ->dailyAt('06:00')
-    ->onFailure(fn () => Log::channel('finance')->error('schedule: rates:fetch failed'));
+$alertOnFailure(
+    Schedule::command('rates:fetch')->dailyAt('06:00'),
+    'rates:fetch',
+    'finance'
+);
 
 // جلب أسعار سلطة النقد الرسمية (PMA) — أيام العمل فقط، بعد صدور النشرة الرسمية.
 // تُشغَّل بعد rates:fetch عمداً: لو نجحت تصبح "الأحدث" فتُستخدم بدل السعر العام (REQ-17).
@@ -25,41 +51,48 @@ Schedule::command('rates:fetch')
 // وتُطلق إشعار "تعذّر جلب سعر الصرف" للأدمن يومياً بلا سبب حقيقي.
 // 11:00 بتوقيت غزة تترك هامشاً مريحاً بعد النشر. التطبيق لا يتأثر بالتأخير لأن
 // rates:fetch الساعة 06:00 يضمن وجود سعر صالح دائماً؛ المتأخر هو تسجيل السعر الرسمي فقط.
-Schedule::command('rates:fetch-pma')
-    ->weekdays()
-    ->timezone('Asia/Gaza')
-    ->at('11:00')
-    ->onFailure(fn () => Log::channel('finance')->error('schedule: rates:fetch-pma failed'));
+$alertOnFailure(
+    Schedule::command('rates:fetch-pma')->weekdays()->timezone('Asia/Gaza')->at('11:00'),
+    'rates:fetch-pma',
+    'finance'
+);
 
 // تذكيرات تجديد العضوية (بريد + SMS + إشعار) على محطات 30/14/7/3/1 يوم
-Schedule::command('memberships:send-renewal-reminders')
-    ->dailyAt('08:00')
-    ->onFailure(fn () => Log::channel('reminders')->error('schedule: renewal reminders failed'));
+$alertOnFailure(
+    Schedule::command('memberships:send-renewal-reminders')->dailyAt('08:00'),
+    'renewal reminders'
+);
 
 // تذكيرات فترة السماح بعد انتهاء العضوية (بداية/منتصف/نهاية الفترة) — الوصول للتطبيق يبقى مسموحاً خلالها
-Schedule::command('memberships:send-grace-period-reminders')
-    ->dailyAt('08:05')
-    ->onFailure(fn () => Log::channel('reminders')->error('schedule: grace period reminders failed'));
+$alertOnFailure(
+    Schedule::command('memberships:send-grace-period-reminders')->dailyAt('08:05'),
+    'grace period reminders'
+);
 
 // نسخة احتياطية يومية لقاعدة البيانات وملفات storage/app/public + تنظيف النسخ القديمة أسبوعياً
-Schedule::command('backup:run')
-    ->dailyAt('02:00')
-    ->onFailure(fn () => Log::channel('reminders')->error('schedule: backup:run failed'));
+$alertOnFailure(
+    Schedule::command('backup:run')->dailyAt('02:00'),
+    'backup:run'
+);
 
-Schedule::command('backup:clean')
-    ->weekly()
-    ->onFailure(fn () => Log::channel('reminders')->error('schedule: backup:clean failed'));
+$alertOnFailure(
+    Schedule::command('backup:clean')->weekly(),
+    'backup:clean'
+);
 
 // أرشفة العطاءات المنتهية يومياً (REQ-09) + حذف المؤرشف منذ أكثر من 12 شهراً أسبوعياً (REQ-10)
-Schedule::command('tenders:archive')
-    ->dailyAt('01:00')
-    ->onFailure(fn () => Log::channel('reminders')->error('schedule: tenders:archive failed'));
+$alertOnFailure(
+    Schedule::command('tenders:archive')->dailyAt('01:00'),
+    'tenders:archive'
+);
 
-Schedule::command('tenders:purge')
-    ->weekly()
-    ->onFailure(fn () => Log::channel('reminders')->error('schedule: tenders:purge failed'));
+$alertOnFailure(
+    Schedule::command('tenders:purge')->weekly(),
+    'tenders:purge'
+);
 
 // أرشفة الفعاليات المنتهية يومياً — نفس نمط tenders:archive
-Schedule::command('events:archive')
-    ->dailyAt('01:05')
-    ->onFailure(fn () => Log::channel('reminders')->error('schedule: events:archive failed'));
+$alertOnFailure(
+    Schedule::command('events:archive')->dailyAt('01:05'),
+    'events:archive'
+);
