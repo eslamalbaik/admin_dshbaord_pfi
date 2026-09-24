@@ -3,13 +3,19 @@
 namespace Tests\Feature;
 
 use App\Enums\NotificationType;
-use App\Models\Notification;
 use App\Notifications\SubscriptionExpiryReminderNotification;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Notification as NotificationFacade;
 
+/**
+ * تذكير قرب انتهاء الاشتراك — يمرّ عبر أمر memberships:send-renewal-reminders،
+ * وهو الجهة التي تنشئ سجلّ app_notifications (notify() وحده لا ينشئه).
+ * نافذة التذكير الافتراضية 7 أيام (config/notifications.renewal_warning_window_days).
+ */
 class ExpiryReminderTest extends NotificationTestCase
 {
+    private const COMMAND = 'memberships:send-renewal-reminders';
+
     /**
      * Test: Contractor within renewal window receives expiry reminder with correct date.
      */
@@ -17,20 +23,15 @@ class ExpiryReminderTest extends NotificationTestCase
     {
         NotificationFacade::fake();
 
-        // Create contractor with expiry within 7 days (renewal window)
         $expiryDate = Carbon::now()->addDays(5);
-        $contractor = $this->createTestContractor([
-            'membership_expires_at' => $expiryDate,
-        ]);
+        $contractor = $this->createTestContractor();
+        $this->giveMembershipExpiring($contractor, $expiryDate);
         $this->setupFcmToken($contractor);
 
-        // Send expiry reminder
-        $contractor->notify(new SubscriptionExpiryReminderNotification($contractor, $expiryDate));
+        $this->runReminderJob(self::COMMAND);
 
-        // Verify notification was sent
         NotificationFacade::assertSentTo($contractor, SubscriptionExpiryReminderNotification::class);
 
-        // Verify notification record was created
         $notification = $this->getLatestNotification($contractor, NotificationType::EXPIRY_REMINDER);
         $this->assertNotNull($notification);
         $this->assertStringContainsString($expiryDate->format('Y-m-d'), $notification->body);
@@ -43,83 +44,61 @@ class ExpiryReminderTest extends NotificationTestCase
     {
         NotificationFacade::fake();
 
-        // Create contractor with expiry far in the future (30 days)
-        $expiryDate = Carbon::now()->addDays(30);
-        $contractor = $this->createTestContractor([
-            'membership_expires_at' => $expiryDate,
-        ]);
+        // 20 يوماً: خارج نافذة الـ7 أيام وليست محطة تذكير (30/14/7/3/1).
+        $contractor = $this->createTestContractor();
+        $this->giveMembershipExpiring($contractor, Carbon::now()->addDays(20));
         $this->setupFcmToken($contractor);
 
-        // Reminder would not be sent by job since contractor is outside 7-day window
+        $this->runReminderJob(self::COMMAND);
+
         NotificationFacade::assertNotSentTo($contractor, SubscriptionExpiryReminderNotification::class);
+        $this->assertNotificationNotCreated($contractor, NotificationType::EXPIRY_REMINDER);
     }
 
     /**
-     * Test: Renewed contractor does not receive duplicate expiry reminder.
+     * Test: Renewed contractor does not receive a further expiry reminder.
      */
     public function test_renewed_contractor_does_not_receive_duplicate_expiry_reminder(): void
     {
         NotificationFacade::fake();
 
-        // Create contractor with expiry within 7 days
-        $expiryDate = Carbon::now()->addDays(5);
-        $contractor = $this->createTestContractor([
-            'membership_expires_at' => $expiryDate,
-        ]);
+        $contractor = $this->createTestContractor();
+        $membership = $this->giveMembershipExpiring($contractor, Carbon::now()->addDays(5));
         $this->setupFcmToken($contractor);
 
-        // Send first reminder
-        $contractor->notify(new SubscriptionExpiryReminderNotification($contractor, $expiryDate));
+        // التشغيل الأول: داخل النافذة → تذكير واحد.
+        $this->runReminderJob(self::COMMAND);
+        $this->assertSame(1, $this->countNotificationsToday($contractor, NotificationType::EXPIRY_REMINDER));
 
-        $notificationCount = Notification::where('contractor_id', $contractor->id)
-            ->where('type', NotificationType::EXPIRY_REMINDER)
-            ->count();
+        // التجديد يدفع تاريخ الانتهاء خارج النافذة.
+        $membership->update(['expires_at' => Carbon::now()->addMonths(12)]);
 
-        // Renew membership (push expiry to future)
-        $newExpiryDate = Carbon::now()->addMonths(12);
-        $contractor->update(['membership_expires_at' => $newExpiryDate]);
+        // تشغيل بتاريخ آخر لتجاوز حارس "الرن موجود مسبقاً" — لا تذكير جديد.
+        $this->runReminderJob(self::COMMAND, ['--date' => Carbon::now()->addDay()->toDateString()]);
 
-        // Job should not send reminder for renewed contractor
-        NotificationFacade::reset();
-        NotificationFacade::fake();
-
-        // Verify no new reminder is sent (contractor is outside window)
-        NotificationFacade::assertNotSentTo($contractor, SubscriptionExpiryReminderNotification::class);
+        $this->assertSame(1, $this->countNotificationsToday($contractor, NotificationType::EXPIRY_REMINDER));
     }
 
     /**
-     * Test: Expiry reminder is idempotent (same day = no duplicate via run tracking).
+     * Test: Expiry reminder is idempotent (same run date = no duplicate).
      */
     public function test_expiry_reminder_is_idempotent_same_day(): void
     {
         NotificationFacade::fake();
 
-        $expiryDate = Carbon::now()->addDays(5);
-        $contractor = $this->createTestContractor([
-            'membership_expires_at' => $expiryDate,
-        ]);
+        $contractor = $this->createTestContractor();
+        $this->giveMembershipExpiring($contractor, Carbon::now()->addDays(5));
         $this->setupFcmToken($contractor);
 
-        // Send first reminder
-        $contractor->notify(new SubscriptionExpiryReminderNotification($contractor, $expiryDate));
+        $this->runReminderJob(self::COMMAND);
+        $countAfterFirstRun = $this->countNotificationsToday($contractor, NotificationType::EXPIRY_REMINDER);
 
-        $countBefore = Notification::where('contractor_id', $contractor->id)
-            ->where('type', NotificationType::EXPIRY_REMINDER)
-            ->whereDate('created_at', today())
-            ->count();
+        // إعادة التشغيل بنفس التاريخ تُتخطّى عبر NotificationRun الموجود.
+        $this->runReminderJob(self::COMMAND);
+        $countAfterSecondRun = $this->countNotificationsToday($contractor, NotificationType::EXPIRY_REMINDER);
 
-        // Send second reminder (simulating job run again same day)
-        NotificationFacade::reset();
-        NotificationFacade::fake();
-        $contractor->notify(new SubscriptionExpiryReminderNotification($contractor, $expiryDate));
-
-        $countAfter = Notification::where('contractor_id', $contractor->id)
-            ->where('type', NotificationType::EXPIRY_REMINDER)
-            ->whereDate('created_at', today())
-            ->count();
-
-        // Verify counts match (job level tracking prevents duplicates)
-        $this->assertTrue($countAfter >= $countBefore);
+        $this->assertSame(1, $countAfterFirstRun);
+        $this->assertSame($countAfterFirstRun, $countAfterSecondRun);
     }
 
     /**
@@ -129,15 +108,14 @@ class ExpiryReminderTest extends NotificationTestCase
     {
         NotificationFacade::fake();
 
-        $expiryDate = Carbon::now()->addDays(5);
-        $contractor = $this->createTestContractor([
-            'is_frozen' => true,
-            'membership_expires_at' => $expiryDate,
-        ]);
+        $contractor = $this->createTestContractor(['is_frozen' => true]);
+        $this->giveMembershipExpiring($contractor, Carbon::now()->addDays(5));
         $this->setupFcmToken($contractor);
 
-        // Notification would not be sent by job since frozen contractors are filtered
+        $this->runReminderJob(self::COMMAND);
+
         NotificationFacade::assertNotSentTo($contractor, SubscriptionExpiryReminderNotification::class);
+        $this->assertNotificationNotCreated($contractor, NotificationType::EXPIRY_REMINDER);
     }
 
     /**
@@ -148,19 +126,17 @@ class ExpiryReminderTest extends NotificationTestCase
         NotificationFacade::fake();
 
         $expiryDate = Carbon::now()->addDays(3)->startOfDay();
-        $contractor = $this->createTestContractor([
-            'membership_expires_at' => $expiryDate,
-        ]);
+        $contractor = $this->createTestContractor();
+        $this->giveMembershipExpiring($contractor, $expiryDate);
         $this->setupFcmToken($contractor);
 
-        $contractor->notify(new SubscriptionExpiryReminderNotification($contractor, $expiryDate));
+        $this->runReminderJob(self::COMMAND);
 
         $notification = $this->getLatestNotification($contractor, NotificationType::EXPIRY_REMINDER);
         $this->assertNotNull($notification);
-
-        // Verify expiry date is in body
-        $this->assertStringContainsString('ينتهي', $notification->body); // Arabic for "expires"
+        $this->assertStringContainsString('ينتهي', $notification->body);
         $this->assertStringContainsString($expiryDate->format('Y-m-d'), $notification->body);
+        $this->assertSame('/contractor/renewal', $notification->action_url);
     }
 
     /**
@@ -171,14 +147,22 @@ class ExpiryReminderTest extends NotificationTestCase
         NotificationFacade::fake();
 
         $expiryDate = Carbon::now()->addDays(5);
-        $contractor = $this->createTestContractor([
-            'membership_expires_at' => $expiryDate,
-        ]);
-        // Don't set FCM token
+        $contractor = $this->createTestContractor();
+        $this->giveMembershipExpiring($contractor, $expiryDate);
+        // بدون fcm_token
 
-        $contractor->notify(new SubscriptionExpiryReminderNotification($contractor, $expiryDate));
+        $this->runReminderJob(self::COMMAND);
 
-        // Verify in-app notification was created
+        // السجلّ داخل التطبيق يُنشأ بغضّ النظر عن وجود رمز الجهاز.
         $this->assertNotificationCreated($contractor, NotificationType::EXPIRY_REMINDER);
+
+        // ولا تُستخدم قناة fcm لمن لا يملك رمز جهاز.
+        NotificationFacade::assertSentTo(
+            $contractor,
+            SubscriptionExpiryReminderNotification::class,
+            function (SubscriptionExpiryReminderNotification $notification) use ($contractor) {
+                return ! in_array('fcm', $notification->via($contractor), true);
+            }
+        );
     }
 }
