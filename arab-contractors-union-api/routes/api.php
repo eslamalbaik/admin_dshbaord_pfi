@@ -426,15 +426,17 @@ Route::prefix('v1')->group(function () {
         //  Certificate Requests — Admin (طلبات شهادات العضوية)
         // --------------------------------------------------------
         // المسارات الثابتة قبل {certificateRequest} حتى لا تُلتقط كمعرّف
-        Route::get('dashboard/certificate-requests',                                  [CertificateRequestController::class, 'adminIndex']);
-        Route::post('dashboard/certificate-requests/issue-membership',                [CertificateRequestController::class, 'adminIssueMembership']);
-        Route::post('dashboard/certificate-requests/bulk-delete',                     [CertificateRequestController::class, 'bulkDestroy']);
-        Route::get('dashboard/certificate-requests/{certificateRequest}',             [CertificateRequestController::class, 'show']);
-        Route::post('dashboard/certificate-requests/{certificateRequest}/approve',    [CertificateRequestController::class, 'approve']);
-        Route::post('dashboard/certificate-requests/{certificateRequest}/reject',     [CertificateRequestController::class, 'reject']);
-        Route::post('dashboard/certificate-requests/{certificateRequest}/issue',      [CertificateRequestController::class, 'issue']);
-        Route::post('dashboard/certificate-requests/{certificateRequest}/regenerate', [CertificateRequestController::class, 'regenerate']);
-        Route::delete('dashboard/certificate-requests/{certificateRequest}',          [CertificateRequestController::class, 'destroy']);
+        Route::middleware('role:admin')->group(function () {
+            Route::get('dashboard/certificate-requests',                                  [CertificateRequestController::class, 'adminIndex']);
+            Route::post('dashboard/certificate-requests/issue-membership',                [CertificateRequestController::class, 'adminIssueMembership']);
+            Route::post('dashboard/certificate-requests/bulk-delete',                     [CertificateRequestController::class, 'bulkDestroy']);
+            Route::get('dashboard/certificate-requests/{certificateRequest}',             [CertificateRequestController::class, 'show']);
+            Route::post('dashboard/certificate-requests/{certificateRequest}/approve',    [CertificateRequestController::class, 'approve']);
+            Route::post('dashboard/certificate-requests/{certificateRequest}/reject',     [CertificateRequestController::class, 'reject']);
+            Route::post('dashboard/certificate-requests/{certificateRequest}/issue',      [CertificateRequestController::class, 'issue']);
+            Route::post('dashboard/certificate-requests/{certificateRequest}/regenerate', [CertificateRequestController::class, 'regenerate']);
+            Route::delete('dashboard/certificate-requests/{certificateRequest}',          [CertificateRequestController::class, 'destroy']);
+        });
 
         // --------------------------------------------------------
         //  Support Tickets — Admin (الدعم الفني، أُعيد تفعيلها بتصميم جديد)
