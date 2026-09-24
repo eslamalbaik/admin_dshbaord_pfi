@@ -254,7 +254,7 @@ const addPenalty = async () => {
         </template>
 
         <template #item.amount="{ item }">
-          <span class="font-weight-semibold">₪ {{ Number(item.amount || 0).toLocaleString() }}</span>
+          <span class="font-weight-semibold">{{ Number(item.amount || 0).toLocaleString() }} د.أ</span>
         </template>
 
         <template #item.status="{ item }">
@@ -267,7 +267,7 @@ const addPenalty = async () => {
             {{ item.status_label ?? item.status }}
           </VChip>
           <div v-if="item.status === 'partially_paid'" class="text-caption text-medium-emphasis mt-1">
-            مسدَّد: ₪ {{ Number(item.paid_amount || 0).toLocaleString() }}
+            مسدَّد: {{ Number(item.paid_amount || 0).toLocaleString() }} د.أ
           </div>
           <div v-if="item.status === 'rejected' && item.reject_reason" class="text-caption text-medium-emphasis mt-1">
             {{ item.reject_reason }}
@@ -311,7 +311,7 @@ const addPenalty = async () => {
               <VTextField v-model="newPenalty.reason" label="سبب الغرامة" />
             </VCol>
             <VCol cols="12">
-              <VTextField v-model="newPenalty.amount" label="المبلغ (₪)" type="number" />
+              <VTextField v-model="newPenalty.amount" label="المبلغ (د.أ)" type="number" />
             </VCol>
             <VCol cols="12">
               <VSelect
@@ -327,9 +327,9 @@ const addPenalty = async () => {
             <VCol v-if="newPenalty.status === 'partially_paid'" cols="12">
               <VTextField
                 v-model="newPenalty.paid_amount"
-                label="المبلغ المسدَّد (₪)"
+                label="المبلغ المسدَّد (د.أ)"
                 type="number"
-                :hint="`يجب أن يكون أقل من مبلغ الغرامة الكامل (₪ ${Number(newPenalty.amount || 0).toLocaleString()})`"
+                :hint="`يجب أن يكون أقل من مبلغ الغرامة الكامل (${Number(newPenalty.amount || 0).toLocaleString()} د.أ)`"
                 persistent-hint
               />
             </VCol>
@@ -378,9 +378,9 @@ const addPenalty = async () => {
             <VCol v-if="statusForm.status === 'partially_paid'" cols="12">
               <VTextField
                 v-model="statusForm.paid_amount"
-                label="المبلغ المسدَّد (₪)"
+                label="المبلغ المسدَّد (د.أ)"
                 type="number"
-                :hint="`يجب أن يكون أقل من مبلغ الغرامة الكامل (₪ ${Number(statusTarget?.amount || 0).toLocaleString()})`"
+                :hint="`يجب أن يكون أقل من مبلغ الغرامة الكامل (${Number(statusTarget?.amount || 0).toLocaleString()} د.أ)`"
                 persistent-hint
               />
             </VCol>

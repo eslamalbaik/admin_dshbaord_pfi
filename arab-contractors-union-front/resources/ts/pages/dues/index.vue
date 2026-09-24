@@ -12,6 +12,8 @@ interface ContractorRow {
   name: string
   membership_number: string
   dues_count: number
+  penalties_count: number
+  penalties_remaining_jod: number
   total_jod: number
   paid_jod: number
   remaining_jod: number
@@ -229,6 +231,41 @@ watch(contractorSearch, q => {
     catch {}
   }, 350)
 })
+
+// ─── إضافة غرامة من صفحة الذمم ───
+const penaltyDialog = ref(false)
+const penaltySaving = ref(false)
+const penaltyTarget = ref<ContractorRow | null>(null)
+const penaltyForm = ref({ reason: '', amount: '', notes: '' })
+
+function openAddPenalty(c: ContractorRow) {
+  penaltyTarget.value = c
+  penaltyForm.value = { reason: '', amount: '', notes: '' }
+  penaltyDialog.value = true
+}
+
+async function savePenalty() {
+  if (!penaltyTarget.value)
+    return
+  penaltySaving.value = true
+  try {
+    await api.post('/api/v1/penalties', {
+      contractor_id: penaltyTarget.value.contractor_id,
+      reason: penaltyForm.value.reason,
+      amount: penaltyForm.value.amount,
+      notes: penaltyForm.value.notes || undefined,
+    })
+    penaltyDialog.value = false
+    flash('تمت إضافة الغرامة وستظهر ضمن ذمم المقاول.')
+    refreshAll()
+  }
+  catch (e: any) {
+    flash(e?.response?.data?.message || 'فشل إضافة الغرامة.', true)
+  }
+  finally {
+    penaltySaving.value = false
+  }
+}
 
 function openCreateDue(c?: ContractorRow) {
   editingDue.value = null
@@ -476,8 +513,8 @@ function toggleSelectAllDues() {
   selectedDueIds.value = allDuesSelected.value ? [] : expandedDues.value.map(d => d.id)
 }
 
-// ذمم ما قبل 2025 لكل مقاول تُعرض كسطر واحد "إجمالي الرسوم المتراكمة" بدون تفصيل بالسنة
-const ACCUMULATED_BEFORE_YEAR = 2025
+// ذمم 2025 وما قبلها لكل مقاول تُعرض كسطر واحد "إجمالي الرسوم المتراكمة" بدون تفصيل بالسنة
+const ACCUMULATED_BEFORE_YEAR = 2026
 
 const accumulatedDues = computed(() =>
   expandedDues.value.filter(d => d.year !== null && d.year < ACCUMULATED_BEFORE_YEAR))
@@ -804,7 +841,12 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
               </td>
               <td class="font-weight-medium">{{ c.name }}</td>
               <td dir="ltr">{{ c.membership_number }}</td>
-              <td>{{ c.dues_count }}</td>
+              <td>
+                {{ c.dues_count }}
+                <VChip v-if="c.penalties_count" size="x-small" color="error" variant="tonal" class="ms-1">
+                  + {{ c.penalties_count }} غرامة
+                </VChip>
+              </td>
               <td>{{ c.total_jod }}</td>
               <td class="text-success">{{ c.paid_jod }}</td>
               <td :class="c.remaining_jod > 0 ? 'text-error font-weight-bold' : 'text-success'">
@@ -812,7 +854,7 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
               </td>
               <td class="text-end text-no-wrap" @click.stop>
                 <VBtn
-                  v-if="c.remaining_jod > 0"
+                  v-if="c.remaining_jod - (c.penalties_remaining_jod ?? 0) > 0"
                   size="small"
                   color="success"
                   variant="tonal"
@@ -835,6 +877,14 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
                   icon="tabler-plus"
                   title="إضافة ذمة لهذه الشركة"
                   @click="openCreateDue(c)"
+                />
+                <VBtn
+                  size="small"
+                  variant="text"
+                  color="error"
+                  icon="tabler-alert-triangle"
+                  title="إضافة غرامة لهذه الشركة"
+                  @click="openAddPenalty(c)"
                 />
               </td>
             </tr>
@@ -867,7 +917,7 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
                   <tbody>
                     <tr v-if="accumulatedRow" style="background: rgba(var(--v-theme-warning), 0.06);">
                       <td><VCheckboxBtn :model-value="accumulatedSelected" @update:model-value="toggleAccumulated" /></td>
-                      <td>قبل 2025</td>
+                      <td>2025 وما قبل</td>
                       <td class="font-weight-medium">إجمالي الرسوم المتراكمة</td>
                       <td>{{ accumulatedRow.amount_jod }}</td>
                       <td>{{ accumulatedRow.paid_jod }}</td>
@@ -1610,6 +1660,29 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
             @click="criteriaDiscountMutation.mutate(false)"
           >
             تطبيق فعلياً
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- ─── إضافة غرامة ─── -->
+    <VDialog v-model="penaltyDialog" max-width="480">
+      <VCard :title="`إضافة غرامة — ${penaltyTarget?.name ?? ''}`">
+        <VCardText>
+          <VTextField v-model="penaltyForm.reason" label="سبب الغرامة" class="mb-4" />
+          <VTextField v-model="penaltyForm.amount" label="المبلغ (د.أ)" type="number" class="mb-4" />
+          <VTextarea v-model="penaltyForm.notes" label="ملاحظات" rows="2" />
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" @click="penaltyDialog = false">إلغاء</VBtn>
+          <VBtn
+            color="error"
+            :loading="penaltySaving"
+            :disabled="penaltySaving || !penaltyForm.reason || !penaltyForm.amount"
+            @click="savePenalty"
+          >
+            حفظ
           </VBtn>
         </VCardActions>
       </VCard>

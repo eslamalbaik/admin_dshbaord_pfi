@@ -78,11 +78,18 @@ class ContractorDueController extends Controller
     /** GET /api/v1/dashboard/dues/by-contractor */
     public function byContractor(Request $request)
     {
+        // الغرامات تُحتسَب ضمن الذمم بنفس قاعدة ContractorFinancialService::totalObligations():
+        // المرفوضة مستبعَدة كلياً، والباقي يُحتسَب بمبلغه وما سُدِّد منه.
+        $activePenalties = fn ($q) => $q->where('status', '!=', 'rejected');
+
         $query = Contractor::query()
-            ->whereHas('dues')
+            ->where(fn ($w) => $w->whereHas('dues')->orWhereHas('penalties', $activePenalties))
             ->withCount('dues')
+            ->withCount(['penalties as penalties_count' => $activePenalties])
             ->withSum('dues as dues_total_jod', 'amount_jod')
-            ->withSum('dues as dues_paid_jod', 'paid_jod');
+            ->withSum('dues as dues_paid_jod', 'paid_jod')
+            ->withSum(['penalties as penalties_total' => $activePenalties], 'amount')
+            ->withSum(['penalties as penalties_paid' => $activePenalties], 'paid_amount');
 
         if ($request->filled('search')) {
             $q = $request->search;
@@ -92,21 +99,30 @@ class ContractorDueController extends Controller
         }
 
         if ($request->boolean('outstanding_only')) {
-            $query->whereHas('dues', fn ($d) => $d->where('status', '!=', 'paid'));
+            $query->where(fn ($w) => $w
+                ->whereHas('dues', fn ($d) => $d->where('status', '!=', 'paid'))
+                ->orWhereHas('penalties', fn ($p) => $p->whereIn('status', ['unpaid', 'partially_paid'])));
         }
 
         $paginator = $query
-            ->orderByRaw('(COALESCE(dues_total_jod,0) - COALESCE(dues_paid_jod,0)) desc')
+            ->orderByRaw('(COALESCE(dues_total_jod,0) - COALESCE(dues_paid_jod,0) + COALESCE(penalties_total,0) - COALESCE(penalties_paid,0)) desc')
             ->paginate(min($request->integer('per_page', 15), 100))
-            ->through(fn ($c) => [
-                'contractor_id'     => $c->id,
-                'name'              => $c->name,
-                'membership_number' => $c->membership_number,
-                'dues_count'        => $c->dues_count,
-                'total_jod'         => round((float) $c->dues_total_jod, 2),
-                'paid_jod'          => round((float) $c->dues_paid_jod, 2),
-                'remaining_jod'     => round((float) $c->dues_total_jod - (float) $c->dues_paid_jod, 2),
-            ]);
+            ->through(function ($c) {
+                $total = (float) $c->dues_total_jod + (float) $c->penalties_total;
+                $paid  = (float) $c->dues_paid_jod + (float) $c->penalties_paid;
+
+                return [
+                    'contractor_id'          => $c->id,
+                    'name'                   => $c->name,
+                    'membership_number'      => $c->membership_number,
+                    'dues_count'             => $c->dues_count,
+                    'penalties_count'        => $c->penalties_count,
+                    'penalties_remaining_jod'=> round((float) $c->penalties_total - (float) $c->penalties_paid, 2),
+                    'total_jod'              => round($total, 2),
+                    'paid_jod'               => round($paid, 2),
+                    'remaining_jod'          => round($total - $paid, 2),
+                ];
+            });
 
         return $this->paginated($paginator);
     }
