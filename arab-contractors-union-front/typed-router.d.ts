@@ -83,6 +83,7 @@ declare module 'vue-router/auto-routes' {
     'settings-bank-accounts': RouteRecordInfo<'settings-bank-accounts', '/settings/bank-accounts', Record<never, never>, Record<never, never>>,
     'settings-contractor-lookups': RouteRecordInfo<'settings-contractor-lookups', '/settings/contractor-lookups', Record<never, never>, Record<never, never>>,
     'settings-exchange-rates': RouteRecordInfo<'settings-exchange-rates', '/settings/exchange-rates', Record<never, never>, Record<never, never>>,
+    'settings-governorates': RouteRecordInfo<'settings-governorates', '/settings/governorates', Record<never, never>, Record<never, never>>,
     'settings-grade-fees': RouteRecordInfo<'settings-grade-fees', '/settings/grade-fees', Record<never, never>, Record<never, never>>,
     'settings-legal-library': RouteRecordInfo<'settings-legal-library', '/settings/legal-library', Record<never, never>, Record<never, never>>,
     'settings-pages': RouteRecordInfo<'settings-pages', '/settings/pages', Record<never, never>, Record<never, never>>,

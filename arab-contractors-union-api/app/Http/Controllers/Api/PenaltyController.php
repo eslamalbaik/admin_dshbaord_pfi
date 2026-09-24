@@ -16,10 +16,15 @@ class PenaltyController extends Controller
     {
         $query = Penalty::with('contractor');
 
+        if ($request->filled('contractor_id')) {
+            $query->where('contractor_id', $request->integer('contractor_id'));
+        }
+
         if ($request->filled('search')) {
             $q = $request->search;
-            $query->where('reason', 'like', "%{$q}%")
-                  ->orWhereHas('contractor', fn($qb) => $qb->where('name', 'like', "%{$q}%"));
+            $query->where(fn ($w) => $w
+                ->where('reason', 'like', "%{$q}%")
+                ->orWhereHas('contractor', fn($qb) => $qb->where('name', 'like', "%{$q}%")));
         }
 
         $paginator = $query->latest()->paginate(min($request->integer('per_page', 15), 100))->through(fn($p) => [

@@ -90,13 +90,18 @@ async function toggleExpand(c: ContractorRow) {
   await loadDues(c.contractor_id)
 }
 
+const expandedPenalties = ref<any[]>([])
+const penaltyStatusColor: Record<string, string> = { unpaid: 'error', partially_paid: 'warning', paid: 'success', rejected: 'secondary' }
+
 async function loadDues(contractorId: number) {
   expandedLoading.value = true
   try {
-    const r = await api.get('/api/v1/dashboard/dues', {
-      params: { contractor_id: contractorId, per_page: 100 },
-    })
+    const [r, p] = await Promise.all([
+      api.get('/api/v1/dashboard/dues', { params: { contractor_id: contractorId, per_page: 100 } }),
+      api.get('/api/v1/penalties', { params: { contractor_id: contractorId, per_page: 100 } }).catch(() => null),
+    ])
     expandedDues.value = (r.data.items ?? []).sort((a: DueItem, b: DueItem) => (a.year ?? 0) - (b.year ?? 0))
+    expandedPenalties.value = p?.data?.items ?? []
   }
   finally {
     expandedLoading.value = false
@@ -471,6 +476,45 @@ function toggleSelectAllDues() {
   selectedDueIds.value = allDuesSelected.value ? [] : expandedDues.value.map(d => d.id)
 }
 
+// ذمم ما قبل 2025 لكل مقاول تُعرض كسطر واحد "إجمالي الرسوم المتراكمة" بدون تفصيل بالسنة
+const ACCUMULATED_BEFORE_YEAR = 2025
+
+const accumulatedDues = computed(() =>
+  expandedDues.value.filter(d => d.year !== null && d.year < ACCUMULATED_BEFORE_YEAR))
+
+const accumulatedRow = computed(() => {
+  const items = accumulatedDues.value
+  if (!items.length)
+    return null
+  const amount = items.reduce((s, d) => s + Number(d.amount_jod || 0), 0)
+  const paid = items.reduce((s, d) => s + Number(d.paid_jod || 0), 0)
+  const remaining = items.reduce((s, d) => s + Number(d.remaining_jod || 0), 0)
+  const status = remaining <= 0 ? 'paid' : paid > 0 ? 'partially_paid' : 'unpaid'
+  const statusLabels: Record<string, string> = { paid: 'مسدَّدة', partially_paid: 'مسدَّدة جزئياً', unpaid: 'غير مسدَّدة' }
+
+  return {
+    ids: items.map(d => d.id),
+    amount_jod: amount.toFixed(2),
+    paid_jod: paid.toFixed(2),
+    remaining_jod: remaining.toFixed(2),
+    status,
+    status_label: statusLabels[status],
+  }
+})
+
+const detailedDues = computed(() =>
+  expandedDues.value.filter(d => d.year === null || d.year >= ACCUMULATED_BEFORE_YEAR))
+
+const accumulatedSelected = computed(() =>
+  !!accumulatedRow.value && accumulatedRow.value.ids.every(id => selectedDueIds.value.includes(id)))
+
+function toggleAccumulated() {
+  const ids = accumulatedRow.value?.ids ?? []
+  selectedDueIds.value = accumulatedSelected.value
+    ? selectedDueIds.value.filter(id => !ids.includes(id))
+    : [...new Set([...selectedDueIds.value, ...ids])]
+}
+
 const selectedDiscountDialog = ref(false)
 const selectedDiscountForm = ref({ discount_type: 'percent' as 'percent' | 'fixed', discount_value: '', discount_reason: '' })
 const selectedDiscountPreview = ref<any>(null)
@@ -713,28 +757,6 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
       </VCol>
     </VRow>
 
-    <!-- ─── توزيع الذمم حسب السنة ─── -->
-    <VCard v-if="summary?.items?.by_year?.length" class="mb-6">
-      <VCardTitle>توزيع الذمم حسب السنة</VCardTitle>
-      <VCardText>
-        <VRow>
-          <VCol v-for="year in summary.items.by_year" :key="year.year ?? 'accumulated'" cols="12" sm="6" md="4" lg="3">
-            <VCard variant="outlined">
-              <VCardText class="text-center">
-                <p class="text-caption text-medium-emphasis mb-2">
-                  {{ year.year ? `سنة ${year.year}` : 'رسوم متراكمة (قبل 2025)' }}
-                </p>
-                <p class="text-h6 mb-1">{{ Number(year.total_jod).toFixed(2) }} د.أ</p>
-                <p class="text-caption" :class="year.outstanding_jod > 0 ? 'text-error' : 'text-success'">
-                  متبقي: {{ Number(year.outstanding_jod).toFixed(2) }} د.أ
-                </p>
-              </VCardText>
-            </VCard>
-          </VCol>
-        </VRow>
-      </VCardText>
-    </VCard>
-
     <VCard>
       <VCardText class="d-flex gap-4 flex-wrap align-center">
         <VTextField
@@ -843,7 +865,21 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="d in expandedDues" :key="d.id">
+                    <tr v-if="accumulatedRow" style="background: rgba(var(--v-theme-warning), 0.06);">
+                      <td><VCheckboxBtn :model-value="accumulatedSelected" @update:model-value="toggleAccumulated" /></td>
+                      <td>قبل 2025</td>
+                      <td class="font-weight-medium">إجمالي الرسوم المتراكمة</td>
+                      <td>{{ accumulatedRow.amount_jod }}</td>
+                      <td>{{ accumulatedRow.paid_jod }}</td>
+                      <td>{{ accumulatedRow.remaining_jod }}</td>
+                      <td>
+                        <VChip :color="statusColor[accumulatedRow.status]" size="small">
+                          {{ accumulatedRow.status_label }}
+                        </VChip>
+                      </td>
+                      <td />
+                    </tr>
+                    <tr v-for="d in detailedDues" :key="d.id">
                       <td><VCheckboxBtn v-model="selectedDueIds" :value="d.id" /></td>
                       <td>{{ d.year ?? '—' }}</td>
                       <td>
@@ -874,6 +910,38 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
                     </tr>
                   </tbody>
                 </VTable>
+                </div>
+                <div v-if="expandedPenalties.length" class="pa-3">
+                  <div class="text-subtitle-2 mb-2">
+                    الغرامات
+                    <RouterLink :to="{ name: 'contractors-penalties' }" class="text-caption ms-2">إدارة الغرامات</RouterLink>
+                  </div>
+                  <VTable density="compact" style="background: transparent;">
+                    <thead>
+                      <tr>
+                        <th>السبب</th>
+                        <th>المبلغ</th>
+                        <th>المسدَّد</th>
+                        <th>المتبقي</th>
+                        <th>الحالة</th>
+                        <th>التاريخ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="p in expandedPenalties" :key="p.id">
+                        <td>{{ p.reason }}</td>
+                        <td>{{ Number(p.amount || 0).toFixed(2) }}</td>
+                        <td>{{ Number(p.paid_amount || 0).toFixed(2) }}</td>
+                        <td>{{ p.status === 'rejected' ? '0.00' : (Number(p.amount || 0) - Number(p.paid_amount || 0)).toFixed(2) }}</td>
+                        <td>
+                          <VChip :color="penaltyStatusColor[p.status]" size="small">
+                            {{ p.status_label }}
+                          </VChip>
+                        </td>
+                        <td>{{ p.created_at ? new Date(p.created_at).toLocaleDateString('ar-PS') : '—' }}</td>
+                      </tr>
+                    </tbody>
+                  </VTable>
                 </div>
                 </template>
               </td>

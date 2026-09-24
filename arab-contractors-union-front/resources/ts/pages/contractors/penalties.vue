@@ -71,6 +71,31 @@ const updateStatus = async () => {
   }
 }
 
+const deleteDialog = ref(false)
+const deleteLoading = ref(false)
+const deleteTarget = ref<any>(null)
+
+function openDeleteDialog(item: any) {
+  deleteTarget.value = item
+  deleteDialog.value = true
+}
+
+const deletePenalty = async () => {
+  deleteLoading.value = true
+  try {
+    await api.delete(`/api/v1/penalties/${deleteTarget.value.id}`)
+    deleteDialog.value = false
+    notify('تم حذف الغرامة بنجاح.')
+    fetchPenalties()
+  }
+  catch (err: any) {
+    notify(err?.response?.data?.message || 'فشل حذف الغرامة.', 'error')
+  }
+  finally {
+    deleteLoading.value = false
+  }
+}
+
 // ── Snackbar ──────────────────────────────────────
 const snackbar = ref(false)
 const snackbarText = ref('')
@@ -255,6 +280,7 @@ const addPenalty = async () => {
 
         <template #item.actions="{ item }">
           <VBtn size="small" variant="text" icon="tabler-edit" title="تحديث الحالة" @click="openStatusDialog(item)" />
+          <VBtn size="small" variant="text" color="error" icon="tabler-trash" title="حذف الغرامة" @click="openDeleteDialog(item)" />
         </template>
 
         <template #no-data>
@@ -374,6 +400,21 @@ const addPenalty = async () => {
           >
             حفظ
           </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- Delete Confirm Dialog -->
+    <VDialog v-model="deleteDialog" max-width="420">
+      <VCard>
+        <VCardTitle style="font-family:Cairo,sans-serif">حذف الغرامة</VCardTitle>
+        <VCardText style="font-family:Cairo,sans-serif">
+          هل أنت متأكد من حذف غرامة "{{ deleteTarget?.reason }}" على {{ deleteTarget?.contractor_name }}؟ لا يمكن التراجع عن هذا الإجراء.
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" @click="deleteDialog = false">إلغاء</VBtn>
+          <VBtn color="error" :loading="deleteLoading" @click="deletePenalty">حذف</VBtn>
         </VCardActions>
       </VCard>
     </VDialog>

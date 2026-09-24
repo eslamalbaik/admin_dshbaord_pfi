@@ -550,12 +550,12 @@ Route::prefix('v1')->group(function () {
         // --------------------------------------------------------
         //  Penalties — Admin (الغرامات المالية)
         // --------------------------------------------------------
-        Route::middleware('role:admin')->group(function () {
-            Route::get('dashboard/penalties',                    [PenaltyController::class, 'index']);
-            Route::post('dashboard/penalties',                   [PenaltyController::class, 'store']);
-            Route::get('dashboard/penalties/{penalty}',          [PenaltyController::class, 'show']);
-            Route::patch('dashboard/penalties/{penalty}/status', [PenaltyController::class, 'updateStatus']);
-            Route::delete('dashboard/penalties/{penalty}',       [PenaltyController::class, 'destroy']);
+        Route::middleware('role:admin,accountant')->group(function () {
+            Route::get('penalties',                    [PenaltyController::class, 'index']);
+            Route::post('penalties',                   [PenaltyController::class, 'store']);
+            Route::get('penalties/{penalty}',          [PenaltyController::class, 'show']);
+            Route::patch('penalties/{penalty}/status', [PenaltyController::class, 'updateStatus']);
+            Route::delete('penalties/{penalty}',       [PenaltyController::class, 'destroy']);
         });
 
         // --------------------------------------------------------
