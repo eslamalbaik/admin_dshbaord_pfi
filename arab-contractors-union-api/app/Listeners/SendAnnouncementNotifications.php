@@ -33,6 +33,17 @@ class SendAnnouncementNotifications
 
             $announcement = $event->announcement;
 
+            // حارس دفاعي: المتحكّم لا يطلق الحدث إلا عند النشر فعلاً، لكن الإعلان
+            // قد يكون مسودة أو مجدولاً لتاريخ مستقبلي — لا نوزّع إشعارات في الحالتين.
+            if ($announcement->effective_status !== 'published') {
+                Log::info('Skipping announcement notifications — announcement is not published', [
+                    'announcement_id' => $announcement->id,
+                    'effective_status' => $announcement->effective_status,
+                ]);
+
+                return;
+            }
+
             // Get eligible contractors
             $contractors = NotificationHelper::getEligibleContractorsForAnnouncement($announcement);
 

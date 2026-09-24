@@ -124,7 +124,13 @@ class SendRenewalReminders extends Command
                         continue;
                     }
 
-                    $expiryDate = $contractor->membership_expires_at;
+                    // مصدر تاريخ الانتهاء هو العضوية الفعّالة — getContractorsApproachingRenewal
+                    // تحمّلها مسبقاً، والشرط يضمن وجودها، لكن نحرس تفادياً لسباق تحديث.
+                    $expiryDate = $contractor->activeMembership?->expires_at;
+
+                    if (! $expiryDate) {
+                        continue;
+                    }
 
                     // Send notification
                     $contractor->notify(new SubscriptionExpiryReminderNotification($contractor, $expiryDate));

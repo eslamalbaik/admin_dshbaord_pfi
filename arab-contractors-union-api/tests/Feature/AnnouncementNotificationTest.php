@@ -5,12 +5,19 @@ namespace Tests\Feature;
 use App\Enums\NotificationType;
 use App\Events\AnnouncementPublished;
 use App\Models\Announcement;
-use App\Models\Contractor;
-use App\Models\Notification;
+use App\Models\User;
 use App\Notifications\AnnouncementNotification;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification as NotificationFacade;
+use Laravel\Sanctum\Sanctum;
 
+/**
+ * توزيع إشعارات التعاميم عبر مستمع SendAnnouncementNotifications.
+ *
+ * لا نستخدم Event::fake() في الاختبارات التي تتحقق من أثر المستمع — تزييف ناقل
+ * الأحداث يمنع تشغيله أصلاً. نزيّف ناقل الإشعارات فقط (سجلّ app_notifications
+ * ينشئه المستمع مباشرة، فلا يتأثر بالتزييف).
+ */
 class AnnouncementNotificationTest extends NotificationTestCase
 {
     /**
@@ -19,20 +26,16 @@ class AnnouncementNotificationTest extends NotificationTestCase
     public function test_published_announcement_sends_notification_to_eligible_contractor(): void
     {
         NotificationFacade::fake();
-        Event::fake();
 
         $contractor = $this->createTestContractor();
         $this->setupFcmToken($contractor);
 
         $announcement = $this->publishAnnouncement();
 
-        // Dispatch the event
         event(new AnnouncementPublished($announcement));
 
-        // Verify notification was sent
         NotificationFacade::assertSentTo($contractor, AnnouncementNotification::class);
 
-        // Verify notification record was created in database
         $this->assertNotificationCreated($contractor, NotificationType::ANNOUNCEMENT, [
             'reference_id' => $announcement->id,
         ]);
@@ -44,50 +47,54 @@ class AnnouncementNotificationTest extends NotificationTestCase
     public function test_draft_announcement_does_not_send_notification(): void
     {
         NotificationFacade::fake();
-        Event::fake();
 
         $contractor = $this->createTestContractor();
         $this->setupFcmToken($contractor);
 
-        // Create draft announcement (status != published)
-        $announcement = Announcement::factory()->create([
-            'status' => 'draft',
-        ]);
+        // مسودة: is_published = false (الحالة الافتراضية للمصنع).
+        $announcement = Announcement::factory()->create();
 
-        // Dispatch event (in real code, this would only fire on status change to published)
+        // حتى لو أُطلق الحدث خطأً، الحارس في المستمع يمنع التوزيع.
         event(new AnnouncementPublished($announcement));
 
-        // Verify notification was NOT sent
         NotificationFacade::assertNotSentTo($contractor, AnnouncementNotification::class);
-
-        // Verify no notification record
         $this->assertNotificationNotCreated($contractor, NotificationType::ANNOUNCEMENT);
     }
 
     /**
-     * Test: Editing a published announcement does not resend notification.
+     * Test: Scheduled (future) announcement does not send notification yet.
+     */
+    public function test_scheduled_announcement_does_not_send_notification_yet(): void
+    {
+        NotificationFacade::fake();
+
+        $contractor = $this->createTestContractor();
+        $announcement = Announcement::factory()->scheduled()->create();
+
+        event(new AnnouncementPublished($announcement));
+
+        NotificationFacade::assertNotSentTo($contractor, AnnouncementNotification::class);
+        $this->assertNotificationNotCreated($contractor, NotificationType::ANNOUNCEMENT);
+    }
+
+    /**
+     * Test: Editing an already-published announcement does not re-dispatch the event.
      */
     public function test_editing_published_announcement_does_not_resend_notification(): void
     {
-        NotificationFacade::fake();
-        Event::fake();
+        Event::fake([AnnouncementPublished::class]);
 
-        $contractor = $this->createTestContractor();
-        $this->setupFcmToken($contractor);
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']), ['*']);
 
-        // Create and publish announcement
         $announcement = $this->publishAnnouncement();
-        event(new AnnouncementPublished($announcement));
 
-        // Clear notifications
-        Notification::truncate();
-        NotificationFacade::reset();
+        $this->putJson("/api/v1/admin/announcements/{$announcement->id}", [
+            'title'        => 'عنوان مُحدَّث',
+            'is_published' => true,
+        ])->assertOk();
 
-        // Edit the announcement (event should NOT fire)
-        $announcement->update(['title' => 'Updated Title']);
-
-        // Verify no new notification was sent
-        NotificationFacade::assertNothingSent();
+        // published_at موجود مسبقاً ⇒ ليس نشراً جديداً ⇒ لا حدث توزيع.
+        Event::assertNotDispatched(AnnouncementPublished::class);
     }
 
     /**
@@ -96,25 +103,18 @@ class AnnouncementNotificationTest extends NotificationTestCase
     public function test_announcement_notification_deep_link_opens_correct_announcement(): void
     {
         NotificationFacade::fake();
-        Event::fake();
 
         $contractor = $this->createTestContractor();
         $announcement = $this->publishAnnouncement();
 
         event(new AnnouncementPublished($announcement));
 
-        // Get the notification record
         $notification = $this->getLatestNotification($contractor, NotificationType::ANNOUNCEMENT);
+        $this->assertNotNull($notification);
 
-        // Verify action_url points to correct announcement
-        $this->assertEquals(
-            "/contractor/announcements/{$announcement->id}",
-            $notification->action_url
-        );
-
-        // Verify reference_id matches announcement
-        $this->assertEquals($announcement->id, $notification->reference_id);
-        $this->assertEquals('announcement', $notification->reference_type);
+        $this->assertSame("/contractor/announcements/{$announcement->id}", $notification->action_url);
+        $this->assertSame($announcement->id, $notification->reference_id);
+        $this->assertSame('announcement', $notification->reference_type);
     }
 
     /**
@@ -123,7 +123,6 @@ class AnnouncementNotificationTest extends NotificationTestCase
     public function test_contractor_can_mark_announcement_notification_as_read(): void
     {
         NotificationFacade::fake();
-        Event::fake();
 
         $contractor = $this->createTestContractor();
         $announcement = $this->publishAnnouncement();
@@ -131,12 +130,11 @@ class AnnouncementNotificationTest extends NotificationTestCase
         event(new AnnouncementPublished($announcement));
 
         $notification = $this->getLatestNotification($contractor, NotificationType::ANNOUNCEMENT);
+        $this->assertNotNull($notification);
         $this->assertNull($notification->read_at);
 
-        // Mark as read
         $notification->markAsRead();
 
-        // Verify it's marked as read
         $this->assertNotificationMarkedAsRead($notification);
     }
 
@@ -146,7 +144,6 @@ class AnnouncementNotificationTest extends NotificationTestCase
     public function test_frozen_contractor_does_not_receive_announcement_notification(): void
     {
         NotificationFacade::fake();
-        Event::fake();
 
         $contractor = $this->createTestContractor(['is_frozen' => true]);
         $this->setupFcmToken($contractor);
@@ -155,10 +152,7 @@ class AnnouncementNotificationTest extends NotificationTestCase
 
         event(new AnnouncementPublished($announcement));
 
-        // Verify notification was NOT sent
         NotificationFacade::assertNotSentTo($contractor, AnnouncementNotification::class);
-
-        // Verify no notification record
         $this->assertNotificationNotCreated($contractor, NotificationType::ANNOUNCEMENT);
     }
 
@@ -168,23 +162,24 @@ class AnnouncementNotificationTest extends NotificationTestCase
     public function test_contractor_without_device_token_still_gets_in_app_notification(): void
     {
         NotificationFacade::fake();
-        Event::fake();
 
         $contractor = $this->createTestContractor();
-        // Don't set FCM token
+        // بدون fcm_token
 
         $announcement = $this->publishAnnouncement();
 
         event(new AnnouncementPublished($announcement));
 
-        // Verify notification record was created (in-app)
         $this->assertNotificationCreated($contractor, NotificationType::ANNOUNCEMENT, [
             'reference_id' => $announcement->id,
         ]);
 
-        // Verify no push was sent (since there's no device token)
-        NotificationFacade::assertNotSentTo($contractor, AnnouncementNotification::class, function ($notification) {
-            return in_array('fcm', $notification->via($contractor));
-        });
+        NotificationFacade::assertSentTo(
+            $contractor,
+            AnnouncementNotification::class,
+            function (AnnouncementNotification $notification) use ($contractor) {
+                return ! in_array('fcm', $notification->via($contractor), true);
+            }
+        );
     }
 }

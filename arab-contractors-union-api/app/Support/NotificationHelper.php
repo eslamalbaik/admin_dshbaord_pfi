@@ -34,7 +34,9 @@ class NotificationHelper
         return Contractor::where('is_frozen', false)
             ->whereIn('status', ['active', 'suspended'])
             ->whereHas('dues', function ($query) {
-                $query->whereRaw('paid_amount < amount');
+                // أعمدة الذمم هي amount_jod/paid_jod/status — لا amount/paid_amount
+                // (هذه للمخالفات penalties). partially_paid تُعامل كغير مسدَّدة.
+                $query->whereIn('status', ['unpaid', 'partially_paid']);
             })
             ->distinct('id')
             ->get();
@@ -43,6 +45,10 @@ class NotificationHelper
     /**
      * Get contractors approaching renewal (within the reminder window).
      * Criteria: active or suspended, not frozen, membership expires within window_days.
+     *
+     * تاريخ الانتهاء مصدره memberships.expires_at للعضوية الفعّالة — لا يوجد عمود
+     * membership_expires_at على جدول contractors (نفس المصدر الذي يستخدمه
+     * SendRenewalReminders في كتلة تذكيرات المحطات).
      *
      * @param  int  $windowDays
      * @return Collection
@@ -54,7 +60,12 @@ class NotificationHelper
 
         return Contractor::where('is_frozen', false)
             ->whereIn('status', ['active', 'suspended'])
-            ->whereBetween('membership_expires_at', [$now, $windowEnd])
+            ->whereHas('memberships', function ($query) use ($now, $windowEnd) {
+                // expires_at عمود date — نقارن بالتاريخ فقط حتى لا تسقط عضوية تنتهي اليوم.
+                $query->where('status', 'active')
+                    ->whereBetween('expires_at', [$now->toDateString(), $windowEnd->toDateString()]);
+            })
+            ->with('activeMembership')
             ->get();
     }
 

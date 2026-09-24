@@ -3,13 +3,18 @@
 namespace Tests\Feature;
 
 use App\Enums\NotificationType;
-use App\Models\ContractorDue;
-use App\Models\Notification;
 use App\Notifications\SubscriptionPaymentReminderNotification;
 use Illuminate\Support\Facades\Notification as NotificationFacade;
 
+/**
+ * تذكير سداد الاشتراك — يمرّ عبر أمر memberships:send-grace-period-reminders،
+ * وهو الجهة التي تنشئ سجلّ app_notifications (notify() وحده لا ينشئه).
+ * الاستحقاق يُقرأ من contractor_dues.status (unpaid/partially_paid = مستحقة).
+ */
 class PaymentReminderTest extends NotificationTestCase
 {
+    private const COMMAND = 'memberships:send-grace-period-reminders';
+
     /**
      * Test: Contractor with outstanding payment receives reminder.
      */
@@ -19,22 +24,27 @@ class PaymentReminderTest extends NotificationTestCase
 
         $contractor = $this->createTestContractor();
         $this->setupFcmToken($contractor);
+        $this->giveDue($contractor, 'unpaid');
 
-        // Create a due with unpaid amount
-        ContractorDue::create([
-            'contractor_id' => $contractor->id,
-            'amount' => 1000,
-            'paid_amount' => 500,
-            'is_paid' => false,
-        ]);
+        $this->runReminderJob(self::COMMAND);
 
-        // Simulate triggering grace period reminder
-        $contractor->notify(new SubscriptionPaymentReminderNotification($contractor));
-
-        // Verify notification was sent
         NotificationFacade::assertSentTo($contractor, SubscriptionPaymentReminderNotification::class);
+        $this->assertNotificationCreated($contractor, NotificationType::PAYMENT_REMINDER);
+    }
 
-        // Verify notification record was created
+    /**
+     * Test: Contractor with a partially paid due is still reminded.
+     */
+    public function test_partially_paid_contractor_receives_reminder(): void
+    {
+        NotificationFacade::fake();
+
+        $contractor = $this->createTestContractor();
+        $this->setupFcmToken($contractor);
+        $this->giveDue($contractor, 'partially_paid');
+
+        $this->runReminderJob(self::COMMAND);
+
         $this->assertNotificationCreated($contractor, NotificationType::PAYMENT_REMINDER);
     }
 
@@ -47,22 +57,16 @@ class PaymentReminderTest extends NotificationTestCase
 
         $contractor = $this->createTestContractor();
         $this->setupFcmToken($contractor);
+        $this->giveDue($contractor, 'paid');
 
-        // Create a due that is fully paid
-        ContractorDue::create([
-            'contractor_id' => $contractor->id,
-            'amount' => 1000,
-            'paid_amount' => 1000,
-            'is_paid' => true,
-        ]);
+        $this->runReminderJob(self::COMMAND);
 
-        // In real job, this contractor would be filtered out
-        // Just verify notification was not sent
         NotificationFacade::assertNotSentTo($contractor, SubscriptionPaymentReminderNotification::class);
+        $this->assertNotificationNotCreated($contractor, NotificationType::PAYMENT_REMINDER);
     }
 
     /**
-     * Test: Payment reminder is idempotent (same day = no duplicate).
+     * Test: Payment reminder is idempotent (same run date = no duplicate).
      */
     public function test_payment_reminder_is_idempotent_same_day(): void
     {
@@ -70,34 +74,17 @@ class PaymentReminderTest extends NotificationTestCase
 
         $contractor = $this->createTestContractor();
         $this->setupFcmToken($contractor);
+        $this->giveDue($contractor, 'unpaid');
 
-        // Create outstanding payment
-        ContractorDue::create([
-            'contractor_id' => $contractor->id,
-            'amount' => 1000,
-            'paid_amount' => 500,
-            'is_paid' => false,
-        ]);
+        $this->runReminderJob(self::COMMAND);
+        $countAfterFirstRun = $this->countNotificationsToday($contractor, NotificationType::PAYMENT_REMINDER);
 
-        // Send first reminder
-        $contractor->notify(new SubscriptionPaymentReminderNotification($contractor));
+        // إعادة التشغيل بنفس التاريخ تُتخطّى عبر NotificationRun الموجود.
+        $this->runReminderJob(self::COMMAND);
+        $countAfterSecondRun = $this->countNotificationsToday($contractor, NotificationType::PAYMENT_REMINDER);
 
-        // Get count of notifications sent today
-        $countBefore = Notification::where('contractor_id', $contractor->id)
-            ->where('type', NotificationType::PAYMENT_REMINDER)
-            ->whereDate('created_at', today())
-            ->count();
-
-        // Send second reminder (simulating job run again same day)
-        $contractor->notify(new SubscriptionPaymentReminderNotification($contractor));
-
-        $countAfter = Notification::where('contractor_id', $contractor->id)
-            ->where('type', NotificationType::PAYMENT_REMINDER)
-            ->whereDate('created_at', today())
-            ->count();
-
-        // Verify both were sent (application doesn't filter, job level filters via run tracking)
-        $this->assertTrue($countAfter >= $countBefore);
+        $this->assertSame(1, $countAfterFirstRun);
+        $this->assertSame($countAfterFirstRun, $countAfterSecondRun);
     }
 
     /**
@@ -109,17 +96,12 @@ class PaymentReminderTest extends NotificationTestCase
 
         $contractor = $this->createTestContractor(['is_frozen' => true]);
         $this->setupFcmToken($contractor);
+        $this->giveDue($contractor, 'unpaid');
 
-        // Create outstanding payment
-        ContractorDue::create([
-            'contractor_id' => $contractor->id,
-            'amount' => 1000,
-            'paid_amount' => 500,
-            'is_paid' => false,
-        ]);
+        $this->runReminderJob(self::COMMAND);
 
-        // Notification would not be sent by job since frozen contractors are filtered
         NotificationFacade::assertNotSentTo($contractor, SubscriptionPaymentReminderNotification::class);
+        $this->assertNotificationNotCreated($contractor, NotificationType::PAYMENT_REMINDER);
     }
 
     /**
@@ -130,20 +112,20 @@ class PaymentReminderTest extends NotificationTestCase
         NotificationFacade::fake();
 
         $contractor = $this->createTestContractor();
-        // Don't set FCM token
+        // بدون fcm_token
+        $this->giveDue($contractor, 'unpaid');
 
-        // Create outstanding payment
-        ContractorDue::create([
-            'contractor_id' => $contractor->id,
-            'amount' => 1000,
-            'paid_amount' => 500,
-            'is_paid' => false,
-        ]);
+        $this->runReminderJob(self::COMMAND);
 
-        $contractor->notify(new SubscriptionPaymentReminderNotification($contractor));
-
-        // Verify in-app notification was created (via database channel)
         $this->assertNotificationCreated($contractor, NotificationType::PAYMENT_REMINDER);
+
+        NotificationFacade::assertSentTo(
+            $contractor,
+            SubscriptionPaymentReminderNotification::class,
+            function (SubscriptionPaymentReminderNotification $notification) use ($contractor) {
+                return ! in_array('fcm', $notification->via($contractor), true);
+            }
+        );
     }
 
     /**
@@ -155,21 +137,12 @@ class PaymentReminderTest extends NotificationTestCase
 
         $contractor = $this->createTestContractor();
         $this->setupFcmToken($contractor);
+        $this->giveDue($contractor, 'unpaid');
 
-        // Create outstanding payment
-        ContractorDue::create([
-            'contractor_id' => $contractor->id,
-            'amount' => 1000,
-            'paid_amount' => 500,
-            'is_paid' => false,
-        ]);
+        $this->runReminderJob(self::COMMAND);
 
-        $contractor->notify(new SubscriptionPaymentReminderNotification($contractor));
-
-        // Get the notification record
         $notification = $this->getLatestNotification($contractor, NotificationType::PAYMENT_REMINDER);
-
-        // Verify action_url points to payment page
-        $this->assertEquals('/contractor/payment', $notification->action_url);
+        $this->assertNotNull($notification);
+        $this->assertSame('/contractor/payment', $notification->action_url);
     }
 }
