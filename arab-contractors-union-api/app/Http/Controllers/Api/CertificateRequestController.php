@@ -142,6 +142,8 @@ class CertificateRequestController extends Controller
             'notes'      => $data['notes'] ?? null,
             'attachment' => $attachmentPath,
             'status'     => 'pending',
+            // يُملأ فقط إن سُمح بالتقديم بانتظار اعتماد دفعة الرسوم (TASK-17 #5)
+            'pending_payment_id' => $eligibility['pending_payment']->id ?? null,
         ]);
 
         $admins = User::where('role', 'admin')->get();
@@ -151,7 +153,9 @@ class CertificateRequestController extends Controller
 
         return $this->success(
             new CertificateRequestResource($certRequest),
-            'تم تقديم طلب الشهادة بنجاح، وسيتم إشعارك عند إصدارها.',
+            $certRequest->pending_payment_id
+                ? 'تم تقديم طلب الشهادة بنجاح. الطلب بانتظار اعتماد دفعة الرسوم، وسيتم إشعارك عند إصدار الشهادة.'
+                : 'تم تقديم طلب الشهادة بنجاح، وسيتم إشعارك عند إصدارها.',
             201,
         );
     }
@@ -163,7 +167,7 @@ class CertificateRequestController extends Controller
     /** GET /api/v1/dashboard/certificate-requests */
     public function adminIndex(Request $request)
     {
-        $query = CertificateRequest::with(['contractor:id,name,membership_number', 'reviewedBy:id,name']);
+        $query = CertificateRequest::with(['contractor:id,name,membership_number', 'reviewedBy:id,name', 'pendingPayment']);
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -189,7 +193,7 @@ class CertificateRequestController extends Controller
     /** GET /api/v1/dashboard/certificate-requests/{certificateRequest} */
     public function show(CertificateRequest $certificateRequest)
     {
-        $certificateRequest->load(['contractor', 'reviewedBy:id,name']);
+        $certificateRequest->load(['contractor', 'reviewedBy:id,name', 'pendingPayment']);
 
         $data = (new CertificateRequestResource($certificateRequest))->resolve();
         $data['requirement_issues'] = $certificateRequest->contractor
@@ -199,9 +203,30 @@ class CertificateRequestController extends Controller
         return $this->success($data);
     }
 
+    /**
+     * لا موافقة ولا إصدار مقابل مال غير مؤكَّد (TASK-17 #5). الطلب المرتبط بدفعة قيد
+     * التأكيد يُرى ويُراجَع باللوحة، لكن الشهادة لا تُصدر حتى يعتمد المحاسب الدفعة.
+     */
+    private function blockedByUnconfirmedPayment(CertificateRequest $certificateRequest): ?\Illuminate\Http\JsonResponse
+    {
+        if (! $certificateRequest->loadMissing('pendingPayment')->isAwaitingPaymentConfirmation()) {
+            return null;
+        }
+
+        return $this->error(
+            'دفعة رسوم هذا الطلب لم تُعتمد بعد — يجب تأكيد الدفعة من سجل المدفوعات قبل الموافقة أو الإصدار.',
+            422,
+            ['pending_payment_id' => $certificateRequest->pending_payment_id],
+            'payment_unconfirmed',
+        );
+    }
+
     /** POST /api/v1/dashboard/certificate-requests/{certificateRequest}/approve */
     public function approve(CertificateRequest $certificateRequest)
     {
+        if ($blocked = $this->blockedByUnconfirmedPayment($certificateRequest)) {
+            return $blocked;
+        }
         $certificateRequest->update([
             'status'        => 'approved',
             'reject_reason' => null,
@@ -238,6 +263,10 @@ class CertificateRequestController extends Controller
     /** POST /api/v1/dashboard/certificate-requests/{certificateRequest}/issue */
     public function issue(IssueCertificateRequestRequest $request, CertificateRequest $certificateRequest)
     {
+        if ($blocked = $this->blockedByUnconfirmedPayment($certificateRequest)) {
+            return $blocked;
+        }
+
         if ($certificateRequest->certificate_path) {
             Storage::disk('public')->delete($certificateRequest->certificate_path);
         }
