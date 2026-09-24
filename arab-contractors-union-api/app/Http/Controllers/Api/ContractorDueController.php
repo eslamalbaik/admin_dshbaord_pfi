@@ -212,6 +212,33 @@ class ContractorDueController extends Controller
     {
         $base = ContractorDue::query();
 
+        // ذمم سنة 2024 وما قبل تُجمّع تحت "رسوم متراكمة" بدون تفصيل بالسنة
+        $byYear = (clone $base)
+            ->selectRaw('year, COALESCE(SUM(amount_jod), 0) as total_jod, COALESCE(SUM(amount_jod - paid_jod), 0) as outstanding_jod')
+            ->groupBy('year')
+            ->where(function ($q) {
+                $q->where('year', '>=', 2025)->orWhereNull('year');
+            })
+            ->orderBy('year')
+            ->get()
+            ->toArray();
+
+        // إجمالي ذمم ما قبل 2025
+        $preBefore2025 = (clone $base)
+            ->where(function ($q) {
+                $q->where('year', '<', 2025)->whereNotNull('year');
+            })
+            ->selectRaw('COALESCE(SUM(amount_jod), 0) as total_jod, COALESCE(SUM(amount_jod - paid_jod), 0) as outstanding_jod')
+            ->first();
+
+        if ($preBefore2025 && ($preBefore2025->total_jod > 0 || $preBefore2025->outstanding_jod > 0)) {
+            array_unshift($byYear, [
+                'year' => null,
+                'total_jod' => (float) $preBefore2025->total_jod,
+                'outstanding_jod' => (float) $preBefore2025->outstanding_jod,
+            ]);
+        }
+
         return $this->success([
             'outstanding_total_jod' => round((float) (clone $base)->outstanding()
                 ->selectRaw('COALESCE(SUM(amount_jod - paid_jod), 0) as t')->value('t'), 2),
@@ -219,16 +246,9 @@ class ContractorDueController extends Controller
                 ->selectRaw('COALESCE(SUM(paid_jod), 0) as t')->value('t'), 2),
             'contractors_with_dues' => (clone $base)->outstanding()
                 ->distinct('contractor_id')->count('contractor_id'),
-            // عدد الذمم التي تُحتسب منها الأرقام أعلاه — الشاشة مجمّعة حسب المقاول ومقسّمة
-            // على صفحات، فبدون هذا العدد لا سبيل للمستخدم ليوفّق بين بطاقة الإجمالي (على مستوى
-            // النظام) وما يراه بالصفحة، وهو ما قاد لظنّ أن "كل الذمم حُذفت" (TASK-17 #9).
             'outstanding_dues_count' => (clone $base)->outstanding()->count(),
             'dues_count'             => (clone $base)->count(),
-            'by_year' => (clone $base)
-                ->selectRaw('year, COALESCE(SUM(amount_jod), 0) as total_jod, COALESCE(SUM(amount_jod - paid_jod), 0) as outstanding_jod')
-                ->groupBy('year')
-                ->orderBy('year')
-                ->get(),
+            'by_year' => $byYear,
             'registration_fees' => ContractorDue::registrationFeesSummary(),
         ]);
     }

@@ -84,8 +84,14 @@ class PenaltyController extends Controller
         );
     }
 
+    // GET /api/dashboard/penalties/{penalty}
+    public function show(Penalty $penalty)
+    {
+        return $this->success($penalty->load('contractor')->toArray());
+    }
+
     /**
-     * PATCH /api/penalties/{id}/status
+     * PATCH /api/dashboard/penalties/{id}/status
      * تحديث حالة الغرامة إلى إحدى الحالات الأربع المعتمَدة (REQ-06 #6) — يحل محل
      * markPaid السابقة التي كانت تدعم "مدفوع" فقط.
      */
@@ -109,5 +115,12 @@ class PenaltyController extends Controller
         ));
 
         return $this->success($penalty->fresh('contractor')->toArray(), 'تم تحديث حالة الغرامة بنجاح.');
+    }
+
+    // DELETE /api/dashboard/penalties/{penalty}
+    public function destroy(Penalty $penalty)
+    {
+        $penalty->delete();
+        return $this->success(message: 'تم حذف الغرامة بنجاح.');
     }
 }
