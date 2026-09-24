@@ -205,7 +205,9 @@ Most Eloquent models sit flat in `app/Models/`, but `ContractorDone` lives one l
 
 Routes are generated from the file tree under `resources/ts/pages/` (unplugin-vue-router) — there is no manual route table to edit; adding a `.vue` file there creates the route. Contractor-portal-facing pages live under `pages/contractor/` (`dashboard.vue`, `support.vue`, etc.); everything else under `pages/` (`dues/`, `contractors/`, `tenders/`, `certificates/`, ...) is the internal admin dashboard. Route names are auto-converted from PascalCase to kebab-case in [vite.config.ts](arab-contractors-union-front/vite.config.ts).
 
-The `landing/` page directory is React (`.tsx`), not Vue — [vite.config.ts](arab-contractors-union-front/vite.config.ts) has a dedicated `force-react-compiler` transform that special-cases any file under `/landing/` ending in `.tsx`/`.jsx`. Don't assume the whole frontend is Vue-only when touching landing-page code.
+**The frontend is Vue-only — including `landing/`.** Earlier revisions of this file claimed `landing/` was a React (`.tsx`) micro-frontend compiled by a dedicated `force-react-compiler` transform in [vite.config.ts](arab-contractors-union-front/vite.config.ts). That was never true of this repo: the directory has never held a single `.tsx`/`.jsx` file, and `react` was imported into the Vite config but never invoked as a plugin. The whole scaffolding — the `react`, `react-dom`, `framer-motion` and `lucide-react` dependencies, the transform, and the `vendor_react_landing` manual chunk — was dead and was removed on 2026-09-24. Proof that it was genuinely dead: the built asset hashes are byte-identical before and after the removal.
+
+The only `.tsx` in the frontend is [VNodeRenderer.tsx](arab-contractors-union-front/resources/ts/@layouts/components/VNodeRenderer.tsx), which is **Vue** JSX handled by `vueJsx()`. Don't confuse the widely used `lucide-vue-next` (27 files) with the removed `lucide-react` — the names differ by one word.
 
 ### Legacy artifacts to be aware of
 

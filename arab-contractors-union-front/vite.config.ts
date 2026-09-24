@@ -1,8 +1,6 @@
 import { fileURLToPath } from 'node:url'
-import { transform } from 'esbuild'
 import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
 import tailwindcss from '@tailwindcss/vite'
-import react from '@vitejs/plugin-react'
 import vue from '@vitejs/plugin-vue'
 import vueJsx from '@vitejs/plugin-vue-jsx'
 import AutoImport from 'unplugin-auto-import/vite'
@@ -30,28 +28,6 @@ export default defineConfig({
       },
       routesFolder: 'resources/ts/pages',
     }),
-    // --- الحل الجذري والنهائي لملفات React ---
-    {
-      name: 'force-react-compiler',
-      enforce: 'pre',
-      async transform(code, id) {
-        // نستهدف فقط مجلد landing وأي ملف داخله ينتهي بـ tsx أو jsx
-        const cleanId = id.split('?')[0] // Clean query params like ?t=123
-        if (cleanId.includes('/landing/') && (cleanId.endsWith('.tsx') || cleanId.endsWith('.jsx'))) {
-          const result = await transform(code, {
-            loader: cleanId.endsWith('.tsx') ? 'tsx' : 'jsx',
-            jsx: 'automatic',
-            sourcemap: true
-          })
-          return {
-            code: result.code,
-            map: result.map || null
-          }
-        }
-      }
-    },
-    // ------------------------------------------
-
     vue({
       template: {
         transformAssetUrls: {
@@ -60,10 +36,7 @@ export default defineConfig({
         },
       },
     }),
-    // 1. نجعل Vue تتجاهل مجلد صفحة الهبوط تماماً
-    vueJsx({
-      exclude: [/resources\/ts\/landing\/.*/],
-    }),
+    vueJsx(),
     vuetify({
       autoImport: true,
       styles: {
@@ -145,8 +118,6 @@ export default defineConfig({
               return 'vendor_charts'
             if (id.includes('@intlify') || id.includes('vue-i18n'))
               return 'vendor_i18n'
-            if (id.includes('react') || id.includes('framer-motion') || id.includes('lucide-react'))
-              return 'vendor_react_landing'
             return 'vendor_core'
           }
         }
@@ -208,8 +179,8 @@ export default defineConfig({
       'vuetify/labs/VVideo',
       'vuetify/locale/adapters/vue-i18n',
     ],
-    // Only crawl Vue source for dep discovery — exclude the React landing
-    // micro-frontend so React/framer-motion aren't pulled into the admin scan.
+    // Only crawl .vue files for dep discovery — the include list above already
+    // names every heavy dependency, so a wider crawl only slows cold start.
     entries: [
       './resources/ts/**/*.vue',
     ],
