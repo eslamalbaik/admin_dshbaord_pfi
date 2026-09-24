@@ -356,18 +356,22 @@ Route::prefix('v1')->group(function () {
         // --------------------------------------------------------
         //  Terms & Conditions — Admin CRUD
         // --------------------------------------------------------
-        Route::get('dashboard/terms',          [TermsController::class, 'index']);
-        Route::post('dashboard/terms',         [TermsController::class, 'store']);
-        Route::put('dashboard/terms/{term}',   [TermsController::class, 'update']);
-        Route::delete('dashboard/terms/{term}',[TermsController::class, 'destroy']);
+        Route::middleware('role:admin')->group(function () {
+            Route::get('dashboard/terms',          [TermsController::class, 'index']);
+            Route::post('dashboard/terms',         [TermsController::class, 'store']);
+            Route::put('dashboard/terms/{term}',   [TermsController::class, 'update']);
+            Route::delete('dashboard/terms/{term}',[TermsController::class, 'destroy']);
+        });
 
         // --------------------------------------------------------
         //  Legal Library — Admin CRUD
         // --------------------------------------------------------
-        Route::get('dashboard/legal-files',                  [LegalFileController::class, 'index']);
-        Route::post('dashboard/legal-files',                 [LegalFileController::class, 'store']);
-        Route::post('dashboard/legal-files/{legalFile}',     [LegalFileController::class, 'update']);
-        Route::delete('dashboard/legal-files/{legalFile}',   [LegalFileController::class, 'destroy']);
+        Route::middleware('role:admin')->group(function () {
+            Route::get('dashboard/legal-files',                  [LegalFileController::class, 'index']);
+            Route::post('dashboard/legal-files',                 [LegalFileController::class, 'store']);
+            Route::post('dashboard/legal-files/{legalFile}',     [LegalFileController::class, 'update']);
+            Route::delete('dashboard/legal-files/{legalFile}',   [LegalFileController::class, 'destroy']);
+        });
 
         // --------------------------------------------------------
         //  Contractors
@@ -401,26 +405,32 @@ Route::prefix('v1')->group(function () {
         // --------------------------------------------------------
         //  Bank Accounts — Admin CRUD (شاشة الدفع)
         // --------------------------------------------------------
-        Route::get('dashboard/bank-accounts',                [BankAccountController::class, 'index']);
-        Route::post('dashboard/bank-accounts',               [BankAccountController::class, 'store']);
-        Route::post('dashboard/bank-accounts/{bankAccount}', [BankAccountController::class, 'update']);
-        Route::delete('dashboard/bank-accounts/{bankAccount}',[BankAccountController::class, 'destroy']);
+        Route::middleware('role:admin')->group(function () {
+            Route::get('dashboard/bank-accounts',                [BankAccountController::class, 'index']);
+            Route::post('dashboard/bank-accounts',               [BankAccountController::class, 'store']);
+            Route::post('dashboard/bank-accounts/{bankAccount}', [BankAccountController::class, 'update']);
+            Route::delete('dashboard/bank-accounts/{bankAccount}',[BankAccountController::class, 'destroy']);
+        });
 
         // --------------------------------------------------------
         //  App Settings — Admin (واتساب/بريد الدعم، بيانات الاتحاد، السوشال ميديا)
         // --------------------------------------------------------
-        Route::get('dashboard/settings',       [SettingController::class, 'index']);
-        Route::put('dashboard/settings',       [SettingController::class, 'update']);
-        Route::post('dashboard/settings/logo', [SettingController::class, 'uploadLogo']);
-        Route::post('dashboard/settings/cover-image', [SettingController::class, 'uploadCoverImage']);
+        Route::middleware('role:admin')->group(function () {
+            Route::get('dashboard/settings',       [SettingController::class, 'index']);
+            Route::put('dashboard/settings',       [SettingController::class, 'update']);
+            Route::post('dashboard/settings/logo', [SettingController::class, 'uploadLogo']);
+            Route::post('dashboard/settings/cover-image', [SettingController::class, 'uploadCoverImage']);
+        });
 
         // --------------------------------------------------------
         //  Dynamic Pages — Admin CRUD
         // --------------------------------------------------------
-        Route::get('dashboard/pages',           [\App\Http\Controllers\Api\PageController::class, 'index']);
-        Route::post('dashboard/pages',          [\App\Http\Controllers\Api\PageController::class, 'store']);
-        Route::put('dashboard/pages/{page}',    [\App\Http\Controllers\Api\PageController::class, 'update']);
-        Route::delete('dashboard/pages/{page}', [\App\Http\Controllers\Api\PageController::class, 'destroy']);
+        Route::middleware('role:admin')->group(function () {
+            Route::get('dashboard/pages',           [\App\Http\Controllers\Api\PageController::class, 'index']);
+            Route::post('dashboard/pages',          [\App\Http\Controllers\Api\PageController::class, 'store']);
+            Route::put('dashboard/pages/{page}',    [\App\Http\Controllers\Api\PageController::class, 'update']);
+            Route::delete('dashboard/pages/{page}', [\App\Http\Controllers\Api\PageController::class, 'destroy']);
+        });
 
         // --------------------------------------------------------
         //  Certificate Requests — Admin (طلبات شهادات العضوية)
@@ -441,22 +451,28 @@ Route::prefix('v1')->group(function () {
         // --------------------------------------------------------
         //  Support Tickets — Admin (الدعم الفني، أُعيد تفعيلها بتصميم جديد)
         // --------------------------------------------------------
-        Route::get('dashboard/support-tickets',                     [SupportTicketController::class, 'index']);
-        Route::get('dashboard/support-tickets/{ticket}',             [SupportTicketController::class, 'show']);
-        Route::post('dashboard/support-tickets/{ticket}/reply',      [SupportTicketController::class, 'reply']);
-        Route::patch('dashboard/support-tickets/{ticket}/status',    [SupportTicketController::class, 'updateStatus']);
-        Route::delete('dashboard/support-tickets/{ticket}',          [SupportTicketController::class, 'destroy']);
+        Route::middleware('role:admin')->group(function () {
+            Route::get('dashboard/support-tickets',                     [SupportTicketController::class, 'index']);
+            Route::get('dashboard/support-tickets/{ticket}',             [SupportTicketController::class, 'show']);
+            Route::post('dashboard/support-tickets/{ticket}/reply',      [SupportTicketController::class, 'reply']);
+            Route::patch('dashboard/support-tickets/{ticket}/status',    [SupportTicketController::class, 'updateStatus']);
+            Route::delete('dashboard/support-tickets/{ticket}',          [SupportTicketController::class, 'destroy']);
+        });
 
         // --------------------------------------------------------
         //  طلبات تعديل اسم الشركة — Admin
         // --------------------------------------------------------
-        Route::get('dashboard/name-change-requests',                                    [ContractorNameChangeRequestController::class, 'index']);
-        Route::post('dashboard/name-change-requests/{nameChangeRequest}/approve',        [ContractorNameChangeRequestController::class, 'approve']);
-        Route::post('dashboard/name-change-requests/{nameChangeRequest}/reject',         [ContractorNameChangeRequestController::class, 'reject']);
+        Route::middleware('role:admin')->group(function () {
+            Route::get('dashboard/name-change-requests',                                    [ContractorNameChangeRequestController::class, 'index']);
+            Route::post('dashboard/name-change-requests/{nameChangeRequest}/approve',        [ContractorNameChangeRequestController::class, 'approve']);
+            Route::post('dashboard/name-change-requests/{nameChangeRequest}/reject',         [ContractorNameChangeRequestController::class, 'reject']);
+        });
 
-        Route::get('dashboard/profile-update-requests',                                       [\App\Http\Controllers\Api\ProfileUpdateRequestController::class, 'index']);
-        Route::post('dashboard/profile-update-requests/{profileUpdateRequest}/approve',        [\App\Http\Controllers\Api\ProfileUpdateRequestController::class, 'approve']);
-        Route::post('dashboard/profile-update-requests/{profileUpdateRequest}/reject',         [\App\Http\Controllers\Api\ProfileUpdateRequestController::class, 'reject']);
+        Route::middleware('role:admin')->group(function () {
+            Route::get('dashboard/profile-update-requests',                                       [\App\Http\Controllers\Api\ProfileUpdateRequestController::class, 'index']);
+            Route::post('dashboard/profile-update-requests/{profileUpdateRequest}/approve',        [\App\Http\Controllers\Api\ProfileUpdateRequestController::class, 'approve']);
+            Route::post('dashboard/profile-update-requests/{profileUpdateRequest}/reject',         [\App\Http\Controllers\Api\ProfileUpdateRequestController::class, 'reject']);
+        });
 
         // --------------------------------------------------------
         //  Contractor Dues — الذمم المالية (أدمن + محاسب)
