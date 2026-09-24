@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\MembershipController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PenaltyController;
 use App\Http\Controllers\Api\TenderController;
+use App\Http\Controllers\Api\TenderCategoryController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ContractorAuthController;
@@ -174,6 +175,7 @@ Route::prefix('v1')->group(function () {
     // --------------------------------------------------------
     Route::get('tenders-public',          [TenderController::class, 'publicIndex']);
     Route::get('tenders-public/{tender}', [TenderController::class, 'publicShow']);
+    Route::get('tender-categories-public', [TenderCategoryController::class, 'publicIndex']);
 
     // --------------------------------------------------------
     //  News — Public (no auth)
@@ -561,11 +563,11 @@ Route::prefix('v1')->group(function () {
         // --------------------------------------------------------
         //  Tenders
         // --------------------------------------------------------
-        // قبل apiResource عمداً: وإلا {tender} بمسار show/apiResource يحاول يفسّر
-        // "category-images" كـ id عطاء ويرجّع 404 model-not-found بدل الوصول للميثودز هون.
-        Route::get('tenders/category-images',              [TenderController::class, 'categoryImages']);
-        Route::post('tenders/category-images',              [TenderController::class, 'storeCategoryImage']);
-        Route::delete('tenders/category-images/{category}', [TenderController::class, 'destroyCategoryImage']);
+        // تصنيفات العطاءات + صورة افتراضية لكل تصنيف (بدل tenders/category-images السابقة)
+        Route::get('tender-categories',                     [TenderCategoryController::class, 'index']);
+        Route::post('tender-categories',                    [TenderCategoryController::class, 'store']);
+        Route::patch('tender-categories/{tenderCategory}',  [TenderCategoryController::class, 'update']);
+        Route::delete('tender-categories/{tenderCategory}', [TenderCategoryController::class, 'destroy']);
         Route::apiResource('tenders', TenderController::class);
         Route::post('tenders/{tender}/attachments', [TenderController::class, 'storeAttachment']);
         Route::delete('tenders/{tender}/attachments/{attachment}', [TenderController::class, 'destroyAttachment']);
