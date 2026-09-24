@@ -6,7 +6,28 @@ Design plan for sub-issue #6 of [TASK_PLAN.md](TASK_PLAN.md) § `TASK-17`:
 Read this before writing code. It carries six decisions that are cheaper to settle now than to
 unpick later, and one finding that is more serious than the bug that was reported.
 
-**Status**: planned, not started. Task list: [TASK-17-tasks.md](TASK-17-tasks.md) Phase 13 (T064–T073).
+**Status**: ✅ **implemented 2026-09-24, shipped behind `PROFILE_EDITS_REQUIRE_APPROVAL` (default off)**.
+Task list: [TASK-17-tasks.md](TASK-17-tasks.md) Phase 13 (T064–T073).
+
+All six decisions were implemented as recommended. Two things changed during the work:
+
+- **§2's finding was closed first**, separately and ahead of everything else, on the reporter's
+  instruction. `classification` and `specialties` are now rejected by the portal entirely rather
+  than routed through review.
+- **D2's staging revealed a bug the design did not anticipate.** The first implementation split
+  request fields into instant vs reviewed by name, and document fields — being in neither text list
+  — fell into *instant*, so `$contractor->update()` wrote the raw PHP temp path (`/tmp/php…`) into
+  the document column, destroying the live document. `partition()` now excludes document fields from
+  **both** sides; their only route is `stageDocuments()`. Caught by
+  `test_a_document_is_staged_and_the_live_document_is_untouched`.
+
+Also worth recording: the enum widening needed the driver-split pattern from
+`2026_09_19_000003_expand_penalty_statuses` — tests run on SQLite, which has no `MODIFY COLUMN` and
+emulates `enum()` with a CHECK constraint that cannot be altered without `doctrine/dbal`. The
+migration rebuilds the table on SQLite and uses `ALTER MODIFY` on MariaDB.
+
+**Before enabling on production**: the app must read `pending_review` (§5), or a contractor sees
+«تم الحفظ» on an edit that is actually awaiting review.
 
 ---
 

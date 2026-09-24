@@ -63,3 +63,9 @@ Schedule::command('tenders:purge')
 Schedule::command('events:archive')
     ->dailyAt('01:05')
     ->onFailure(fn () => Log::channel('reminders')->error('schedule: events:archive failed'));
+
+// تنظيف مستندات طلبات تعديل الملف المرحَّلة التي لم تبقَ معلّقة (TASK-17 US11).
+// أسبوعي لا يومي: المسار الطبيعي (موافقة/رفض/إلغاء) ينظّف نفسه، وهذا للحالات الشاذّة وحدها.
+Schedule::command('profile-requests:prune-staged')
+    ->weekly()
+    ->onFailure(fn () => Log::channel('reminders')->error('schedule: profile-requests:prune-staged failed'));

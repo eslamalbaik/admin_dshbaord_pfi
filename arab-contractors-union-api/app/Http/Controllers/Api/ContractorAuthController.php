@@ -16,6 +16,7 @@ use App\Services\ContractorFileService;
 use App\Services\ContractorProfilePdfService;
 use App\Services\ContractorProfileService;
 use App\Services\OtpService;
+use App\Services\ProfileUpdateRequestFiler;
 use App\Support\ApiMessages;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -31,6 +32,7 @@ class ContractorAuthController extends Controller
         private ContractorFileService       $fileService,
         private OtpService                  $otpService,
         private ContractorProfilePdfService $pdfService,
+        private ProfileUpdateRequestFiler   $requestFiler,
     ) {
     }
 
@@ -123,7 +125,14 @@ class ContractorAuthController extends Controller
             'activeEquipmentSubscription.package',
         ]);
 
-        return $this->success($this->profileService->fullResource($contractor), 'تم جلب الملف الشخصي بنجاح');
+        $pending = $contractor->profileUpdateRequests()->where('status', 'pending')->latest()->first();
+
+        return $this->success(
+            $this->profileService->fullResource($contractor) + [
+                'pending_profile_update' => $pending ? $this->pendingRequestPayload($pending) : null,
+            ],
+            'تم جلب الملف الشخصي بنجاح',
+        );
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -152,6 +161,28 @@ class ContractorAuthController extends Controller
     {
         $contractor = $request->user('contractor');
         $validated = $request->validated();
+
+        // هذا المسار الثاني للكتابة المباشرة: إغلاق profile/update وحده يجعله طريق التفادي
+        // (TASK-17 US11). من حقوله `address` وحده مُراجَع، والباقي (جوال/محافظة/مدينة/رمز
+        // الجهاز) فوري بطبيعته.
+        if ($this->requestFiler->isEnabled()) {
+            ['instant' => $instant, 'reviewed' => $reviewed] = $this->requestFiler->partition($validated);
+
+            $this->profileService->applyLocation($instant, $contractor);
+            $contractor->update($instant);
+
+            $profileRequest = $this->requestFiler->file($request, $contractor, $reviewed);
+
+            return $this->success(
+                $this->profileService->fullResource($contractor->fresh()) + [
+                    'pending_review'  => $profileRequest !== null,
+                    'pending_request' => $profileRequest ? $this->pendingRequestPayload($profileRequest) : null,
+                ],
+                $profileRequest
+                    ? 'تم إرسال طلب تعديل البيانات، وستبقى بياناتك الحالية سارية لحين المراجعة.'
+                    : 'تم تحديث الملف الشخصي بنجاح.',
+            );
+        }
 
         $this->profileService->applyLocation($validated, $contractor);
         $contractor->update($validated);
@@ -285,9 +316,6 @@ class ContractorAuthController extends Controller
 
         $this->rejectFeeRelevantFields($request, $contractor);
 
-        $this->profileService->applyLocation($validated, $contractor);
-        $this->fileService->uploadProfileFiles($request, $validated, $contractor);
-
         if (isset($validated['partners']) && is_string($validated['partners'])) {
             $decodedPartners = json_decode($validated['partners'], true);
             if (is_array($decodedPartners)) {
@@ -295,9 +323,51 @@ class ContractorAuthController extends Controller
             }
         }
 
+        // ── مسار المراجعة (TASK-17 US11) ──
+        // الحقول المُراجَعة والمستندات تُحفَظ كطلب معلّق ولا تُكتب على contractors، وتبقى
+        // الحقول الفورية (جوال/محافظة/مدينة/رمز الجهاز) تُحفظ كما اليوم. مطفأ افتراضياً،
+        // فسلوك الإنتاج لا يتغيّر حتى يُشعَل المفتاح.
+        if ($this->requestFiler->isEnabled()) {
+            ['instant' => $instant, 'reviewed' => $reviewed] = $this->requestFiler->partition($validated);
+
+            $this->profileService->applyLocation($instant, $contractor);
+            $contractor->update($instant);
+
+            $profileRequest = $this->requestFiler->file($request, $contractor, $reviewed);
+
+            // 200 لا 202، والملف الشخصي يُعاد بقيمه **الحالية غير المعدَّلة**: تطبيق لم
+            // يُحدَّث بعد يُظهر القيم القديمة ورسالة نجاح — مزعج، لا معطَّل. أما 202 فكان
+            // سيكسر أي عميل يتحقّق من 200، ونحن لا نملك موعد إصدار التطبيق.
+            return $this->success(
+                $this->profileService->fullResource($contractor->fresh()) + [
+                    'pending_review'   => $profileRequest !== null,
+                    'pending_request'  => $profileRequest ? $this->pendingRequestPayload($profileRequest) : null,
+                ],
+                $profileRequest
+                    ? 'تم إرسال طلب تعديل البيانات، وستبقى بياناتك الحالية سارية لحين المراجعة.'
+                    : 'تم تحديث الملف الشخصي بنجاح.',
+            );
+        }
+
+        $this->profileService->applyLocation($validated, $contractor);
+        $this->fileService->uploadProfileFiles($request, $validated, $contractor);
+
         $contractor->update($validated);
 
         return $this->success($this->profileService->fullResource($contractor), 'تم تحديث الملف الشخصي والملفات المرفقة بنجاح.');
+    }
+
+    /** الحمولة التي يقرأها التطبيق ليعرض «قيد المراجعة» بدل «تم الحفظ». */
+    private function pendingRequestPayload(\App\Models\ProfileUpdateRequest $profileRequest): array
+    {
+        return [
+            'id'             => $profileRequest->id,
+            'status'         => $profileRequest->status,
+            'status_label'   => $profileRequest->status_label,
+            'proposed_data'  => $profileRequest->proposed_data,
+            'proposed_files' => array_keys($profileRequest->proposed_files ?? []),
+            'created_at'     => $profileRequest->created_at,
+        ];
     }
 
     // ─────────────────────────────────────────────────────────────────────────
