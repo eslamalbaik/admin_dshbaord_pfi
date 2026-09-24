@@ -2,13 +2,18 @@
 	"info": {
 		"name": "Contractor App API",
 		"_postman_id": "arab-contractors-union-contractor-app-2026",
-		"description": "# Palestinian Contractors Union API v1\n\n## نموذج الاستجابة الموحد (Unified Response)\nكل الاستجابات — نجاح أو خطأ بما فيها 401/404/422/429/500 — تعود بالهيكل:\n```json\n{\n  \"status\": true,          // false عند أي خطأ\n  \"message\": \"رسالة واضحة بالعربية\",\n  \"status_code\": 200,\n  \"items\": { },            // البيانات (عند النجاح فقط)\n  \"errors\": { }            // تفاصيل أخطاء الحقول (عند 422 فقط)\n}\n```\n\n## هيكلية رقم العضوية المعتمدة\n- **الأعضاء القدامى:** رقم فقط من `1` إلى `927`\n- **الأعضاء الجدد:** رقم يليه `_g` بدءاً من `928_g` (مثال: `930_g`)\n- أي صيغة أخرى مرفوضة.\n\n## إرسال البيانات\nكل طلبات POST تستقبل **Form-Data** (وليس Raw JSON).\n\n## رسائل أخطاء تسجيل الدخول\n| الحالة | الكود | الرسالة |\n|---|---|---|\n| رقم عضوية غير موجود | 404 | لا توجد لديك عضوية في الاتحاد |\n| كلمة مرور خاطئة | 401 | بيانات الاعتماد غير صحيحة |\n| حساب مجمد/معلق | 403 | رسالة مخصصة |\n| جوال غير مفعّل | 403 | لم يتم تفعيل رقم جوالك بعد... |",
+		"description": "# Palestinian Contractors Union API v1\n\n## البيئتان\n\n| | Base URL | البيانات |\n|---|---|---|\n| **Staging** (للتطوير) | `https://api.pcuorg.cloud/api/v1` | بيانات اختبار كاملة |\n| **Production** | `https://api-production.pcuorg.cloud/api/v1` | حقيقية |\n\nالمتغيّر `base_url` مضبوط على **Staging** — استخدمه للتطوير.\nللإنتاج بدّل قيمة `base_url` إلى قيمة `base_url_production`.\n\n> ⚠️ **طوّر على Staging.** البيئتان معزولتان تماماً (قاعدتا بيانات منفصلتان، `APP_KEY` مختلف)،\n> والتوكن الصادر من إحداهما **مرفوض** في الأخرى.\n\n## إشعارات Push (FCM)\n- **Staging:** الإشعارات **لا تصل لأي جهاز** — تُكتب في اللوج فقط. هذا مقصود، لحماية هواتف\n  الأعضاء الحقيقيين. لن ترى إشعاراً على جهازك مهما فعلت.\n- **Production:** الإشعارات حقيقية وتصل فعلاً.\n- أرسل `fcm_token` في `set-password` و`login` و`PATCH profile` — يُقبل ويُخزَّن في البيئتين.\n\n## نموذج الاستجابة الموحد\nكل الاستجابات — نجاح أو خطأ بما فيها 401/404/422/429/500 — تعود بالهيكل:\n```json\n{\n  \"status\": true,\n  \"message\": \"رسالة واضحة بالعربية\",\n  \"status_code\": 200,\n  \"items\": { },\n  \"errors\": { }\n}\n```\n\n## رقم العضوية\n- **القدامى:** رقم فقط من `1` إلى `927`\n- **الجدد:** رقم يليه `_g` بدءاً من `928_g` (مثال: `930_g`)\n- أي صيغة أخرى مرفوضة.\n\n## إرسال البيانات\nطلبات POST تستقبل **Form-Data**. رفع الملفات `multipart/form-data`.\n\n> **حد الرفع على السيرفر:** 2MB للملف الواحد و8MB للطلب كاملاً (PHP-FPM).\n> تجاوزها يُسقط جسم الطلب فيعود خطأ `422` مضلّل بأن الحقول مطلوبة.\n\n## التوثيق\n`Authorization: Bearer {{contractor_token}}`\n\n## رسائل أخطاء تسجيل الدخول\n| الحالة | الكود | الرسالة |\n|---|---|---|\n| رقم عضوية غير موجود | 404 | لا توجد لديك عضوية في الاتحاد |\n| كلمة مرور خاطئة | 401 | بيانات الاعتماد غير صحيحة |\n| حساب مجمد/معلق | 403 | رسالة مخصصة |\n| جوال غير مفعّل | 403 | لم يتم تفعيل رقم جوالك بعد... |\n",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"variable": [
 		{
 			"key": "base_url",
 			"value": "https://api.pcuorg.cloud/api/v1",
+			"type": "string"
+		},
+		{
+			"key": "base_url_production",
+			"value": "https://api-production.pcuorg.cloud/api/v1",
 			"type": "string"
 		},
 		{
@@ -171,6 +176,21 @@
 		{
 			"key": "certificate_token",
 			"value": ""
+		},
+		{
+			"key": "image_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "reservation_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "file_field",
+			"value": "cr_file",
+			"type": "string"
 		}
 	],
 	"item": [
@@ -672,7 +692,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{base_url}}/contractor/auth/profile/download-file/cr_file",
+							"raw": "{{base_url}}/contractor/auth/profile/download-file/{{file_field}}",
 							"host": [
 								"{{base_url}}"
 							],
@@ -681,10 +701,10 @@
 								"auth",
 								"profile",
 								"download-file",
-								"cr_file"
+								"{{file_field}}"
 							]
 						},
-						"description": "**GET** `/api/v1/contractor/auth/profile/download-file/{field}`\n\nتحميل ملف مرفق من الملف الشخصي. استبدل `cr_file` باسم الحقل المطلوب (مثل: `id_file`, `municipal_license`, `company_register`...)."
+						"description": "تنزيل ملف مرفق من ملف المقاول. الحقل يُمرَّر في المسار.\n\nالقيم المقبولة (أي قيمة أخرى ترجع 404):\n  • cr_file\n  • id_file\n  • lease_or_ownership_contract\n  • company_approval_letter\n  • municipal_license\n  • company_register\n  • articles_of_association\n  • internal_bylaws\n  • bank_dealing_letter\n  • secretary_contract\n  • full_time_engineer_certificate\n  • accountant_certificate_or_contract\n  • partners_ids\n  • authorization_letter"
 					}
 				},
 				{
@@ -718,7 +738,7 @@
 				{
 					"name": "Update Profile",
 					"request": {
-						"method": "POST",
+						"method": "PATCH",
 						"header": [
 							{
 								"key": "Accept",
@@ -776,7 +796,7 @@
 								"profile"
 							]
 						},
-						"description": "**PATCH** `/api/v1/contractor/auth/profile`\n\n**ملاحظة:** هذا الطلب PATCH يبقى JSON لأن PHP لا يدعم multipart مع PATCH. للتحديث الكامل مع الملفات استخدم **Update Full Profile (POST)**."
+						"description": "تحديث حقول محددة من الملف الشخصي.\n\n⚠️ كان هذا الطلب POST في النسخة السابقة وهو خطأ — المسار الحي هو PATCH.\nلتحديث الملف كاملاً (مع ملفات) استخدم POST /contractor/auth/profile/update.\n\nالحقول: phone, governorate_id, city_id, address, fcm_token — كلها sometimes/nullable."
 					}
 				},
 				{
@@ -3922,6 +3942,386 @@
 							]
 						},
 						"description": "List of governorates"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "App Notifications (إشعارات التطبيق)",
+			"description": "جدول app_notifications — منفصل عن جدول notifications الخاص بـLaravel. أُضيف 2026-09-22.",
+			"item": [
+				{
+					"name": "List app notifications",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/auth/app-notifications",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"auth",
+								"app-notifications"
+							]
+						},
+						"description": "قائمة إشعارات التطبيق للمقاول الحالي."
+					},
+					"response": []
+				},
+				{
+					"name": "Unread count",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/auth/app-notifications/unread-count",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"auth",
+								"app-notifications",
+								"unread-count"
+							]
+						},
+						"description": "عدد الإشعارات غير المقروءة — للشارة (badge)."
+					},
+					"response": []
+				},
+				{
+					"name": "Mark as read",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/auth/app-notifications/{{notification_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"auth",
+								"app-notifications",
+								"{{notification_id}}"
+							]
+						},
+						"description": "تعليم إشعار واحد كمقروء."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Equipment — Images & Reservations",
+			"description": "رفع صور المعدات وحجزها من السوق. أُضيف 2026-09-19.",
+			"item": [
+				{
+					"name": "Upload equipment images",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/equipment/{{equipment_id}}/images",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"equipment",
+								"{{equipment_id}}",
+								"images"
+							]
+						},
+						"description": "رفع صور للمعدة. حد أقصى 8 صور للمعدة الواحدة، و2MB للصورة (حد PHP-FPM).",
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "images[]",
+									"value": "",
+									"type": "file",
+									"description": "مطلوب — صورة أو أكثر (array, min:1)"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Set primary image",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/equipment/{{equipment_id}}/images/{{image_id}}/primary",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"equipment",
+								"{{equipment_id}}",
+								"images",
+								"{{image_id}}",
+								"primary"
+							]
+						},
+						"description": "تعيين صورة كصورة رئيسية للمعدة."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete equipment image",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/equipment/{{equipment_id}}/images/{{image_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"equipment",
+								"{{equipment_id}}",
+								"images",
+								"{{image_id}}"
+							]
+						},
+						"description": "حذف صورة من المعدة."
+					},
+					"response": []
+				},
+				{
+					"name": "Check availability",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/equipment/marketplace/{{equipment_id}}/availability",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"equipment",
+								"marketplace",
+								"{{equipment_id}}",
+								"availability"
+							]
+						},
+						"description": "التواريخ المحجوزة للمعدة — لعرض التقويم قبل الحجز."
+					},
+					"response": []
+				},
+				{
+					"name": "Create reservation",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/equipment/{{equipment_id}}/reservations",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"equipment",
+								"{{equipment_id}}",
+								"reservations"
+							]
+						},
+						"description": "حجز معدة من السوق. الحالة تُنشأ confirmed.",
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "start_date",
+									"value": "2026-10-01",
+									"type": "text",
+									"description": "مطلوب — date، اليوم أو بعده"
+								},
+								{
+									"key": "end_date",
+									"value": "2026-10-05",
+									"type": "text",
+									"description": "مطلوب — date، بعد start_date أو يساويه"
+								},
+								{
+									"key": "notes",
+									"value": "",
+									"type": "text",
+									"description": "اختياري — نص حتى 500 حرف"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "My reservations",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/my-equipment-reservations",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"my-equipment-reservations"
+							]
+						},
+						"description": "حجوزاتي على معدات الآخرين."
+					},
+					"response": []
+				},
+				{
+					"name": "Cancel reservation",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/equipment-reservations/{{reservation_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"equipment-reservations",
+								"{{reservation_id}}"
+							]
+						},
+						"description": "إلغاء حجز — يضع الحالة cancelled ولا يحذف السجل."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Announcements (الإعلانات)",
+			"item": [
+				{
+					"name": "Announcement details",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/announcements/{{announcement_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"announcements",
+								"{{announcement_id}}"
+							]
+						},
+						"description": "تفاصيل إعلان واحد."
 					},
 					"response": []
 				}

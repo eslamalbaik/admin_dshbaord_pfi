@@ -2,6 +2,21 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⛔ ALWAYS ASK BEFORE ANY PUSH: staging or production?
+
+**Never run `git push` in this project — or in the PcuGaza repos — without first asking the user, explicitly, which environment it is meant to reach, and waiting for an answer.** Ask even when it looks obvious, even when the user already said "push", and even when you asked earlier in the same session. This is a standing instruction added by the user on 2026-09-23 and it overrides any inference you would otherwise make from the branch name.
+
+Why it matters: a push is not a local action here — it *is* a deployment trigger, and the two environments have different blast radii.
+
+| You push to | Reaches | Effect |
+|---|---|---|
+| `admin_dshbaord_pfi` @ `feature/arab-contractors-union` | **STAGING** | deploys automatically within ~2 min, runs `migrate --force` on `pcuorg` |
+| `PcuGaza/*` @ `main` | **PRODUCTION** | does *not* auto-deploy, but stages the code that the next manual run ships to real users |
+
+Phrase the question concretely — name the repo, the branch, and what will actually happen — rather than asking "staging or production?" in the abstract. If the answer is production, restate what the user is about to affect (real contractor data, real FCM pushes to real phones) and get a second confirmation before running the deploy workflow.
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for the full picture.
+
 ## Repository overview
 
 Two independent apps in one monorepo, working branch `feature/arab-contractors-union`:
