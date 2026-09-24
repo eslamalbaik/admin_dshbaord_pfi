@@ -24,6 +24,22 @@ and the direct route accepts about twenty-five fields plus sixteen documents.
 
 ## 2. ⚠️ Finding: this is also a financial-integrity hole, not only a missing request
 
+> **✅ CLOSED 2026-09-24, ahead of the rest of this plan, on the reporter's instruction («لا اجعله لا يستطيع»).**
+> `classification` and `specialties` were removed from `UpdateFullProfileRequest`, so the contractor
+> portal can no longer write either. Editing them is an administrative action only:
+> `ContractorController` (admin dashboard), or the approval queue once US11 lands. An attempt to
+> change them from the app is ignored and recorded in the finance log
+> (`contractor.fee_field_change_rejected`, with the contractor's membership number and both values),
+> which is the audit trail that was missing. Covered by `tests/Feature/ContractorFeeFieldLockTest.php`.
+>
+> The rejection is deliberately **silent rather than a 422**: the app's profile form submits all its
+> fields on every save, so refusing the request would have broken every profile edit in production
+> instead of closing one hole. Moamen should stop sending the two fields, but nothing breaks until
+> he does.
+>
+> The rest of this section is kept as the record of what the hole was, and §11 question 3 still
+> stands: closing it does not tell you whether it was already used.
+
 `UpdateFullProfileRequest` accepts `classification` and `specialties`, and `updateFullProfile()`
 writes both directly to `contractors`. Those two columns are the **inputs to the membership fee
 calculation** — `MembershipFeeCalculator` reads `$contractor->specialties`

@@ -19,6 +19,7 @@ use App\Services\OtpService;
 use App\Support\ApiMessages;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class ContractorAuthController extends Controller
@@ -214,6 +215,43 @@ class ContractorAuthController extends Controller
         return $this->success(['phone' => $cached['phone']], 'تم التحقق من رقم الجوال بنجاح.');
     }
 
+    /**
+     * تسجيل أي محاولة لتعديل حقلَي الرسوم من بوابة المقاول (TASK-17).
+     *
+     * classification و specialties لم يبقيا مقبولَين بـUpdateFullProfileRequest، فقيمتهما
+     * تُهمَل تلقائياً ولا تصل قاعدة البيانات. لكن الإهمال الصامت يخفي المحاولة نفسها، وهي
+     * الأثر الذي كان مفقوداً أصلاً: المقاول كان يستطيع تخفيض تصنيفه فيُخفّض رسمه المحتسَب،
+     * ولا سجلّ يُرجَع إليه. فتُقيَّد المحاولة هنا بسجل المالية عندما تختلف القيمة المُرسَلة
+     * عن المخزَّنة.
+     *
+     * الرفض صامت لا بـ422 عن قصد: نموذج الملف بالتطبيق يرسل حقوله كاملة في كل حفظ، فرفض
+     * الطلب كان سيُعطّل كل تعديل ملف شخصي في الإنتاج فوراً بدل أن يُغلق ثغرة واحدة.
+     */
+    private function rejectFeeRelevantFields(Request $request, Contractor $contractor): void
+    {
+        foreach (['classification', 'specialties'] as $field) {
+            if (! $request->has($field)) {
+                continue;
+            }
+
+            $submitted = $request->input($field);
+            $current   = $field === 'specialties' ? $contractor->specialties : $contractor->classification;
+
+            // المقارنة بالنص: specialties تصل كـJSON مُسلسَل من التطبيق
+            if (json_encode($submitted) === json_encode($current)) {
+                continue;
+            }
+
+            Log::channel('finance')->warning('contractor.fee_field_change_rejected', [
+                'contractor_id'     => $contractor->id,
+                'membership_number' => $contractor->membership_number,
+                'field'             => $field,
+                'submitted'         => $submitted,
+                'current'           => $current,
+            ]);
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     //  POST /api/v1/contractor/auth/profile/update
     //  تحديث الملف الشخصي الكامل مع الملفات المرفقة
@@ -245,12 +283,10 @@ class ContractorAuthController extends Controller
             $validated['phone_verified_at'] = now();
         }
 
+        $this->rejectFeeRelevantFields($request, $contractor);
+
         $this->profileService->applyLocation($validated, $contractor);
         $this->fileService->uploadProfileFiles($request, $validated, $contractor);
-
-        if (isset($validated['specialties']) && is_string($validated['specialties'])) {
-            $validated['specialties'] = json_decode($validated['specialties'], true);
-        }
 
         if (isset($validated['partners']) && is_string($validated['partners'])) {
             $decodedPartners = json_decode($validated['partners'], true);
