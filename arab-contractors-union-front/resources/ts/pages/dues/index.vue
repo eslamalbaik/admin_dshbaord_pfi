@@ -713,6 +713,28 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
       </VCol>
     </VRow>
 
+    <!-- ─── توزيع الذمم حسب السنة ─── -->
+    <VCard v-if="summary?.items?.by_year?.length" class="mb-6">
+      <VCardTitle>توزيع الذمم حسب السنة</VCardTitle>
+      <VCardText>
+        <VRow>
+          <VCol v-for="year in summary.items.by_year" :key="year.year ?? 'accumulated'" cols="12" sm="6" md="4" lg="3">
+            <VCard variant="outlined">
+              <VCardText class="text-center">
+                <p class="text-caption text-medium-emphasis mb-2">
+                  {{ year.year ? `سنة ${year.year}` : 'رسوم متراكمة (قبل 2025)' }}
+                </p>
+                <p class="text-h6 mb-1">{{ Number(year.total_jod).toFixed(2) }} د.أ</p>
+                <p class="text-caption" :class="year.outstanding_jod > 0 ? 'text-error' : 'text-success'">
+                  متبقي: {{ Number(year.outstanding_jod).toFixed(2) }} د.أ
+                </p>
+              </VCardText>
+            </VCard>
+          </VCol>
+        </VRow>
+      </VCardText>
+    </VCard>
+
     <VCard>
       <VCardText class="d-flex gap-4 flex-wrap align-center">
         <VTextField
