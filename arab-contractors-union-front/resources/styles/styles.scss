@@ -24,3 +24,18 @@ body,
 .status-pending  { color: #F59E0B !important; }
 .status-expired  { color: #FF4C51 !important; }
 .status-inactive { color: #9E9E9E !important; }
+
+// Internal scroll for every VDataTable / VDataTableServer / VTable — the body
+// scrolls in place with a sticky header instead of growing the whole page.
+// Pagination footer sits outside .v-table__wrapper so it stays put below it.
+.v-table > .v-table__wrapper {
+  max-height: 65vh;
+  overflow-y: auto;
+
+  > table > thead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: rgb(var(--v-theme-surface));
+  }
+}
