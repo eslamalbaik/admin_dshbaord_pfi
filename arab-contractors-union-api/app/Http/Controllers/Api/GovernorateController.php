@@ -29,7 +29,15 @@ class GovernorateController extends Controller
     {
         $rows = Governorate::withCount('cities')->orderBy('sort')->orderBy('id')->get();
 
-        return $this->success($rows, 'تم جلب المحافظات بنجاح');
+        $items = $rows->map(fn ($g) => [
+            'id' => $g->id,
+            'name' => $g->name,
+            'sort' => $g->sort,
+            'is_active' => $g->is_active,
+            'cities_count' => $g->cities_count,
+        ]);
+
+        return $this->success(['items' => $items], 'تم جلب المحافظات بنجاح');
     }
 
     public function governoratesStore(Request $request)
@@ -74,7 +82,16 @@ class GovernorateController extends Controller
     {
         $rows = City::with('governorate:id,name')->orderBy('governorate_id')->orderBy('sort')->orderBy('id')->get();
 
-        return $this->success($rows, 'تم جلب المدن بنجاح');
+        $items = $rows->map(fn ($c) => [
+            'id' => $c->id,
+            'name' => $c->name,
+            'sort' => $c->sort,
+            'is_active' => $c->is_active,
+            'governorate' => $c->governorate,
+            'governorate_id' => $c->governorate_id,
+        ]);
+
+        return $this->success(['items' => $items], 'تم جلب المدن بنجاح');
     }
 
     public function citiesStore(Request $request)
