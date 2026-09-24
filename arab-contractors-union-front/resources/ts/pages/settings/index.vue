@@ -124,6 +124,11 @@ const uploadAvatar = async () => {
               :to="{ name: 'settings-contractor-lookups' }"
             />
             <VListItem
+              prepend-icon="tabler-map-2"
+              title="المحافظات والمدن"
+              :to="{ name: 'settings-governorates' }"
+            />
+            <VListItem
               prepend-icon="tabler-photo"
               title="صور تصنيفات العطاءات"
               :to="{ name: 'settings-tender-category-images' }"

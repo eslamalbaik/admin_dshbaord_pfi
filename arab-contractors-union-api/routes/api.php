@@ -514,6 +514,22 @@ Route::prefix('v1')->group(function () {
         });
 
         // --------------------------------------------------------
+        //  Governorates & Cities — إدارة المحافظات والمدن (صلاحية أدمن فقط: هذه الأكواد
+        //  تغذّي contractors.governorate_id/city_id وGET /api/v1/app/governorates العام)
+        // --------------------------------------------------------
+        Route::middleware('role:admin')->group(function () {
+            Route::get('dashboard/governorates',          [\App\Http\Controllers\Api\GovernorateController::class, 'governoratesIndex']);
+            Route::post('dashboard/governorates',         [\App\Http\Controllers\Api\GovernorateController::class, 'governoratesStore']);
+            Route::patch('dashboard/governorates/{governorate}',  [\App\Http\Controllers\Api\GovernorateController::class, 'governoratesUpdate']);
+            Route::delete('dashboard/governorates/{governorate}', [\App\Http\Controllers\Api\GovernorateController::class, 'governoratesDestroy']);
+
+            Route::get('dashboard/cities',          [\App\Http\Controllers\Api\GovernorateController::class, 'citiesIndex']);
+            Route::post('dashboard/cities',         [\App\Http\Controllers\Api\GovernorateController::class, 'citiesStore']);
+            Route::patch('dashboard/cities/{city}',  [\App\Http\Controllers\Api\GovernorateController::class, 'citiesUpdate']);
+            Route::delete('dashboard/cities/{city}', [\App\Http\Controllers\Api\GovernorateController::class, 'citiesDestroy']);
+        });
+
+        // --------------------------------------------------------
         //  Penalties
         // --------------------------------------------------------
         Route::get('penalties',                    [PenaltyController::class, 'index']);

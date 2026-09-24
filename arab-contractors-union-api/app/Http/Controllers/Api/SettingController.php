@@ -183,7 +183,8 @@ class SettingController extends Controller
      */
     public function governorates()
     {
-        $governorates = Governorate::with('cities')
+        $governorates = Governorate::where('is_active', true)
+            ->with(['cities' => fn ($query) => $query->where('is_active', true)])
             ->orderBy('sort')->orderBy('id')
             ->get()
             ->map(fn ($governorate) => [

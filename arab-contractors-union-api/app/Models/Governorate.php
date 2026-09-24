@@ -6,7 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class Governorate extends Model
 {
-    protected $fillable = ['name', 'sort'];
+    protected $fillable = ['name', 'sort', 'is_active'];
+
+    protected $casts = [
+        'is_active' => 'boolean',
+    ];
 
     public function cities()
     {

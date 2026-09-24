@@ -87,7 +87,8 @@ class ContractorEquipmentController extends Controller
                 'Caterpillar', 'Komatsu', 'Volvo', 'JCB', 'Hitachi',
                 'Liebherr', 'Hyundai', 'Case', 'Bobcat', 'John Deere',
             ],
-            'governorates' => Governorate::with('cities')
+            'governorates' => Governorate::where('is_active', true)
+                ->with(['cities' => fn ($query) => $query->where('is_active', true)])
                 ->orderBy('sort')->orderBy('id')
                 ->get()
                 ->map(fn ($g) => [
