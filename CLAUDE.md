@@ -2,6 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## لغة الردود: عربي، من اليمين لليسار
+
+**اكتب كل ردودك للمستخدم بالعربي**، حتى لو كانت رسالة سابقة بالإنجليزي أو السياق التقني إنجليزي. تعليمات ثابتة من المستخدم بتاريخ 2026-09-26.
+
+- **ابدأ كل سطر وكل بند بكلمة عربية**، لأن اتجاه الفقرة بيتحدد من أول حرف فيها. السطر اللي بيبدأ بكلمة إنجليزية أو بـ`code` بيتعرض من اليسار لليمين ويتلخبط ترتيبه.
+- **الأوامر والمسارات وأسماء الملفات والفروع** بتضل كما هي بالإنجليزي، جوّا backticks أو code blocks، وفي نص الجملة مش في أولها.
+- **الكود والتعليقات ورسائل الـcommit** ما بتتغير: بتضل على العرف الموجود بالمستودع.
+
 ## ⛔ ALWAYS ASK BEFORE ANY PUSH: staging or production?
 
 **Never run `git push` in this project — or in the PcuGaza repos — without first asking the user, explicitly, which environment it is meant to reach, and waiting for an answer.** Ask even when it looks obvious, even when the user already said "push", and even when you asked earlier in the same session. This is a standing instruction added by the user on 2026-09-23 and it overrides any inference you would otherwise make from the branch name.
