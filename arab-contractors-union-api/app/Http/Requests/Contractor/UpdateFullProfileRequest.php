@@ -16,17 +16,18 @@ class UpdateFullProfileRequest extends FormRequest
         $contractorId = $this->user('contractor')->id;
 
         return [
-            // اسم الشركة لا يُعدَّل مباشرة — فقط عبر طلب تعديل اسم شركة تُوافق عليه الإدارة
+            // حقول مقفلة عن قصد ولا تظهر هنا إطلاقاً — تعديلها صلاحية لوحة الأدمن فقط:
+            // name, membership_number, commercial_register, owner_name, authorized_person,
+            // authorized_person_id_number, authorized_person_phone, authorized_person_whatsapp,
+            // partners, specialties, classification.
             //
-            // ‼ classification و specialties محذوفان من هنا عن قصد (TASK-17). هما مُدخَلا
+            // ‼ classification و specialties تحديداً محذوفان لأنهما مُدخَلا
             // MembershipFeeCalculator نفسه (يقرأ $contractor->specialties) ويغذّيان توليد
             // الشهادات، فكان قبولهما هنا يعني أن المقاول يستطيع من التطبيق تخفيض تصنيفه
             // بنفسه فيُخفّض الرسم المحتسَب عليه، وتغيير الدرجة المطبوعة على شهادته — بلا
-            // مراجعة ولا أثر. تعديلهما صلاحية إدارية فقط: ContractorController (لوحة الأدمن)،
-            // أو طابور طلبات التعديل بعد إنجاز US11. إعادتهما هنا تُعيد فتح الثغرة.
+            // مراجعة ولا أثر. إعادتهما هنا تُعيد فتح الثغرة.
             'established_year'              => 'nullable|integer|min:1900|max:' . date('Y'),
             'established_date'              => 'nullable|date',
-            'owner_name'                    => 'nullable|string|max:255',
             'email'                         => 'nullable|email|unique:contractors,email,' . $contractorId,
             'phone'                         => 'nullable|string|max:20|unique:contractors,phone,' . $contractorId,
             'governorate_id'                => 'nullable|integer|exists:governorates,id',
@@ -35,7 +36,6 @@ class UpdateFullProfileRequest extends FormRequest
             'notes'                         => 'nullable|string',
 
             // Text fields
-            'partners'                      => 'nullable|string',
             'fax'                           => 'nullable|string|max:50',
             'district'                      => 'nullable|string|max:100',
             'building'                      => 'nullable|string|max:100',
@@ -44,12 +44,10 @@ class UpdateFullProfileRequest extends FormRequest
             'registration_date'             => 'nullable|date',
             'legal_form'                    => 'nullable|string|max:100',
             'company_purposes'              => 'nullable|string',
-            'authorized_person'             => 'nullable|string|max:255',
-            'authorized_person_id_number'   => 'nullable|string|max:50',
-            'authorized_person_phone'       => 'nullable|string|max:20',
-            'authorized_person_whatsapp'    => 'nullable|string|max:20',
+            'license_number'                => 'nullable|string|max:100',
 
-            // Files
+            // Files — كل المستندات قابلة للرفع/الاستبدال المباشر، بما فيها partners_ids رغم
+            // أن حقل partners النصي نفسه مقفل.
             'cr_file'                       => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
             'id_file'                       => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
             'lease_or_ownership_contract'   => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',

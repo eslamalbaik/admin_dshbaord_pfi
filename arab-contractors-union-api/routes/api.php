@@ -163,11 +163,6 @@ Route::prefix('v1')->group(function () {
         Route::post('equipment/{equipment}/images',                          [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'uploadImages']);
         Route::delete('equipment/{equipment}/images/{equipmentImage}',       [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'deleteImage']);
         Route::post('equipment/{equipment}/images/{equipmentImage}/primary', [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'setPrimaryImage']);
-
-        // طلبات تعديل بيانات البروفايل الثانوية (REQ-26)
-        Route::get('profile-update-requests/mine',          [\App\Http\Controllers\Api\ProfileUpdateRequestController::class, 'mine']);
-        Route::post('profile-update-requests/send-phone-otp', [\App\Http\Controllers\Api\ProfileUpdateRequestController::class, 'sendPhoneOtp']);
-        Route::post('profile-update-requests',               [\App\Http\Controllers\Api\ProfileUpdateRequestController::class, 'store']);
     });
 
     // --------------------------------------------------------
@@ -468,12 +463,6 @@ Route::prefix('v1')->group(function () {
             Route::get('dashboard/name-change-requests',                                    [ContractorNameChangeRequestController::class, 'index']);
             Route::post('dashboard/name-change-requests/{nameChangeRequest}/approve',        [ContractorNameChangeRequestController::class, 'approve']);
             Route::post('dashboard/name-change-requests/{nameChangeRequest}/reject',         [ContractorNameChangeRequestController::class, 'reject']);
-        });
-
-        Route::middleware('role:admin')->group(function () {
-            Route::get('dashboard/profile-update-requests',                                       [\App\Http\Controllers\Api\ProfileUpdateRequestController::class, 'index']);
-            Route::post('dashboard/profile-update-requests/{profileUpdateRequest}/approve',        [\App\Http\Controllers\Api\ProfileUpdateRequestController::class, 'approve']);
-            Route::post('dashboard/profile-update-requests/{profileUpdateRequest}/reject',         [\App\Http\Controllers\Api\ProfileUpdateRequestController::class, 'reject']);
         });
 
         // --------------------------------------------------------
