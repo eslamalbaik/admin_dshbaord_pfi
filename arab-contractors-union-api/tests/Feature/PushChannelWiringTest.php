@@ -7,7 +7,6 @@ use App\Models\Contractor;
 use App\Models\ContractorNameChangeRequest;
 use App\Models\Membership;
 use App\Models\Payment;
-use App\Models\ProfileUpdateRequest;
 use App\Models\SupportTicket;
 use App\Models\Tender;
 use App\Notifications\AdminBroadcastNotification;
@@ -20,7 +19,6 @@ use App\Notifications\NameChangeRequestStatusNotification;
 use App\Notifications\NewTenderPublishedNotification;
 use App\Notifications\PaymentConfirmedNotification;
 use App\Notifications\PaymentRejectedNotification;
-use App\Notifications\ProfileUpdateRequestStatusNotification;
 use App\Notifications\SupportTicketRepliedNotification;
 use App\Services\Push\LogPushSender;
 use App\Services\Push\PushSenderInterface;
@@ -56,7 +54,6 @@ class PushChannelWiringTest extends TestCase
             'name change status' => [fn () => new NameChangeRequestStatusNotification(new ContractorNameChangeRequest(['status' => 'approved']))],
             'expiry reminder'    => [fn () => new MembershipExpiryReminderNotification(new Membership(), 7)],
             'grace reminder'     => [fn () => new MembershipGracePeriodReminderNotification(new Membership(), 'start', now())],
-            'profile update status' => [fn () => new ProfileUpdateRequestStatusNotification(new ProfileUpdateRequest(['status' => 'approved']))],
             'admin broadcast'       => [fn () => new AdminBroadcastNotification('عنوان', 'نص')],
             'new tender published'  => [fn () => new NewTenderPublishedNotification(new Tender(['title' => 'عطاء اختبار']))],
         ];

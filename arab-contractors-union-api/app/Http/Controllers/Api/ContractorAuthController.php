@@ -12,15 +12,17 @@ use App\Http\Requests\Contractor\UpdateProfileRequest;
 use App\Http\Requests\Contractor\VerifyPhoneChangeOtpRequest;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\Contractor;
+use App\Models\User;
+use App\Notifications\ContractorProfileUpdatedNotification;
 use App\Services\ContractorFileService;
 use App\Services\ContractorProfilePdfService;
 use App\Services\ContractorProfileService;
 use App\Services\OtpService;
-use App\Services\ProfileUpdateRequestFiler;
 use App\Support\ApiMessages;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 
 class ContractorAuthController extends Controller
@@ -32,7 +34,6 @@ class ContractorAuthController extends Controller
         private ContractorFileService       $fileService,
         private OtpService                  $otpService,
         private ContractorProfilePdfService $pdfService,
-        private ProfileUpdateRequestFiler   $requestFiler,
     ) {
     }
 
@@ -125,12 +126,8 @@ class ContractorAuthController extends Controller
             'activeEquipmentSubscription.package',
         ]);
 
-        $pending = $contractor->profileUpdateRequests()->where('status', 'pending')->latest()->first();
-
         return $this->success(
-            $this->profileService->fullResource($contractor) + [
-                'pending_profile_update' => $pending ? $this->pendingRequestPayload($pending) : null,
-            ],
+            $this->profileService->fullResource($contractor),
             'تم جلب الملف الشخصي بنجاح',
         );
     }
@@ -162,30 +159,12 @@ class ContractorAuthController extends Controller
         $contractor = $request->user('contractor');
         $validated = $request->validated();
 
-        // هذا المسار الثاني للكتابة المباشرة: إغلاق profile/update وحده يجعله طريق التفادي
-        // (TASK-17 US11). من حقوله `address` وحده مُراجَع، والباقي (جوال/محافظة/مدينة/رمز
-        // الجهاز) فوري بطبيعته.
-        if ($this->requestFiler->isEnabled()) {
-            ['instant' => $instant, 'reviewed' => $reviewed] = $this->requestFiler->partition($validated);
-
-            $this->profileService->applyLocation($instant, $contractor);
-            $contractor->update($instant);
-
-            $profileRequest = $this->requestFiler->file($request, $contractor, $reviewed);
-
-            return $this->success(
-                $this->profileService->fullResource($contractor->fresh()) + [
-                    'pending_review'  => $profileRequest !== null,
-                    'pending_request' => $profileRequest ? $this->pendingRequestPayload($profileRequest) : null,
-                ],
-                $profileRequest
-                    ? 'تم إرسال طلب تعديل البيانات، وستبقى بياناتك الحالية سارية لحين المراجعة.'
-                    : 'تم تحديث الملف الشخصي بنجاح.',
-            );
-        }
+        $before = $contractor->only(array_keys($validated));
 
         $this->profileService->applyLocation($validated, $contractor);
         $contractor->update($validated);
+
+        $this->notifyAdminsOfProfileChange($contractor, $before, $validated);
 
         return $this->success($this->profileService->fullResource($contractor), 'تم تحديث الملف الشخصي بنجاح.');
     }
@@ -316,58 +295,49 @@ class ContractorAuthController extends Controller
 
         $this->rejectFeeRelevantFields($request, $contractor);
 
-        if (isset($validated['partners']) && is_string($validated['partners'])) {
-            $decodedPartners = json_decode($validated['partners'], true);
-            if (is_array($decodedPartners)) {
-                $validated['partners'] = $decodedPartners;
-            }
-        }
-
-        // ── مسار المراجعة (TASK-17 US11) ──
-        // الحقول المُراجَعة والمستندات تُحفَظ كطلب معلّق ولا تُكتب على contractors، وتبقى
-        // الحقول الفورية (جوال/محافظة/مدينة/رمز الجهاز) تُحفظ كما اليوم. مطفأ افتراضياً،
-        // فسلوك الإنتاج لا يتغيّر حتى يُشعَل المفتاح.
-        if ($this->requestFiler->isEnabled()) {
-            ['instant' => $instant, 'reviewed' => $reviewed] = $this->requestFiler->partition($validated);
-
-            $this->profileService->applyLocation($instant, $contractor);
-            $contractor->update($instant);
-
-            $profileRequest = $this->requestFiler->file($request, $contractor, $reviewed);
-
-            // 200 لا 202، والملف الشخصي يُعاد بقيمه **الحالية غير المعدَّلة**: تطبيق لم
-            // يُحدَّث بعد يُظهر القيم القديمة ورسالة نجاح — مزعج، لا معطَّل. أما 202 فكان
-            // سيكسر أي عميل يتحقّق من 200، ونحن لا نملك موعد إصدار التطبيق.
-            return $this->success(
-                $this->profileService->fullResource($contractor->fresh()) + [
-                    'pending_review'   => $profileRequest !== null,
-                    'pending_request'  => $profileRequest ? $this->pendingRequestPayload($profileRequest) : null,
-                ],
-                $profileRequest
-                    ? 'تم إرسال طلب تعديل البيانات، وستبقى بياناتك الحالية سارية لحين المراجعة.'
-                    : 'تم تحديث الملف الشخصي بنجاح.',
-            );
-        }
+        // الحقول المقفلة (name, membership_number, commercial_register, owner_name,
+        // authorized_person*, partners, specialties, classification) أصلاً غير موجودة في
+        // UpdateFullProfileRequest::rules() فلا تصل هنا إطلاقاً. الباقي يُكتب مباشرة على
+        // contractors فور التحقق، والإدارة تُبلَّغ بما تغيّر بدل انتظار موافقتها المسبقة.
+        $textFields = collect($validated)->reject(fn ($v, $key) => $request->hasFile($key))->toArray();
+        $before = $contractor->only(array_keys($textFields));
 
         $this->profileService->applyLocation($validated, $contractor);
         $this->fileService->uploadProfileFiles($request, $validated, $contractor);
 
         $contractor->update($validated);
 
+        $this->notifyAdminsOfProfileChange($contractor, $before, $textFields);
+
         return $this->success($this->profileService->fullResource($contractor), 'تم تحديث الملف الشخصي والملفات المرفقة بنجاح.');
     }
 
-    /** الحمولة التي يقرأها التطبيق ليعرض «قيد المراجعة» بدل «تم الحفظ». */
-    private function pendingRequestPayload(\App\Models\ProfileUpdateRequest $profileRequest): array
+    /**
+     * يقارن القيم قبل/بعد التحديث ويُبلّغ الإدارة بالحقول التي تغيّرت فعلاً — لا يُرسَل
+     * شيء إن لم يتغيّر شيء (تحديث أعاد نفس القيم مثلاً).
+     */
+    private function notifyAdminsOfProfileChange(Contractor $contractor, array $before, array $submitted): void
     {
-        return [
-            'id'             => $profileRequest->id,
-            'status'         => $profileRequest->status,
-            'status_label'   => $profileRequest->status_label,
-            'proposed_data'  => $profileRequest->proposed_data,
-            'proposed_files' => array_keys($profileRequest->proposed_files ?? []),
-            'created_at'     => $profileRequest->created_at,
-        ];
+        $contractor->refresh();
+
+        $changes = [];
+        foreach (array_keys($submitted) as $key) {
+            $old = $before[$key] ?? null;
+            $new = $contractor->{$key};
+
+            if (json_encode($old) !== json_encode($new)) {
+                $changes[$key] = ['old' => $old, 'new' => $new];
+            }
+        }
+
+        if (empty($changes)) {
+            return;
+        }
+
+        $admins = User::where('role', 'admin')->get();
+        if ($admins->isNotEmpty()) {
+            Notification::send($admins, new ContractorProfileUpdatedNotification($contractor, $changes));
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
