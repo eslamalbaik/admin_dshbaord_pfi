@@ -10,6 +10,11 @@
 # السيرفر يبني من المصدر: يسحب المونوريبو ثم ينفّذ npm run build محلياً،
 # والناتج في dist/ هو ما يُقدَّم للزوار.
 #
+# ⚠ لا تشغّل هذا السكربت يدوياً بالتوازي مع push على feature/arab-contractors-union
+#   — كلاهما يكتب على نفس $MONOREPO_DIR و$APP_DIR، وتشغيلهما معاً يتسابقان على
+#   git reset/rsync/build وقد ينتج بناءً مختلطاً غير متوقَّع. الـworkflow نفسه
+#   محمي الآن بـ concurrency group.
+#
 set -euo pipefail
 
 APP_DIR="/var/www/pcuorg/front"

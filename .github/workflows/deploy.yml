@@ -19,6 +19,14 @@ on:
       - arab-contractors-union-api/**
       - arab-contractors-union-front/**
 
+# Deploys share /var/www/pcuorg/{api,front} and the monorepo checkout on the
+# VPS; two runs overlapping there race each other's git reset/rsync/build and
+# can silently ship a mixed or stale build. Serialize them per branch instead
+# of cancelling — a deploy must finish, not be interrupted mid-rsync.
+concurrency:
+  group: deploy-staging-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   deploy:
     name: Deploy to staging
