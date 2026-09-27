@@ -415,6 +415,14 @@ Route::prefix('v1')->group(function () {
         });
 
         // --------------------------------------------------------
+        //  Activity Log — سجل النشاط الإداري (Admin only، للمساءلة والمراجعة)
+        // --------------------------------------------------------
+        Route::middleware('role:admin')->group(function () {
+            Route::get('dashboard/activity-logs',         [\App\Http\Controllers\Api\ActivityLogController::class, 'index']);
+            Route::get('dashboard/activity-logs/actions',  [\App\Http\Controllers\Api\ActivityLogController::class, 'actions']);
+        });
+
+        // --------------------------------------------------------
         //  Dynamic Pages — Admin CRUD
         // --------------------------------------------------------
         Route::middleware('role:admin')->group(function () {

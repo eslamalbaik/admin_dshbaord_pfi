@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\BankAccount;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 
 class BankAccountController extends Controller
@@ -101,6 +103,8 @@ class BankAccountController extends Controller
 
         $account = BankAccount::create($data);
 
+        AuditLogService::record(Auth::user(), 'bank_account.created', $account, ['bank_name' => $account->bank_name, 'currency' => $account->currency]);
+
         return $this->success($this->format($account), 'تم إضافة الحساب البنكي بنجاح.', 201);
     }
 
@@ -131,12 +135,16 @@ class BankAccountController extends Controller
 
         $bankAccount->update($data);
 
+        AuditLogService::record(Auth::user(), 'bank_account.updated', $bankAccount, ['bank_name' => $bankAccount->bank_name]);
+
         return $this->success($this->format($bankAccount->fresh()), 'تم تحديث الحساب البنكي بنجاح.');
     }
 
     /** DELETE /api/v1/dashboard/bank-accounts/{bankAccount} */
     public function destroy(BankAccount $bankAccount)
     {
+        AuditLogService::record(Auth::user(), 'bank_account.deleted', $bankAccount, ['bank_name' => $bankAccount->bank_name]);
+
         if ($bankAccount->logo_path) {
             Storage::disk('public')->delete($bankAccount->logo_path);
         }

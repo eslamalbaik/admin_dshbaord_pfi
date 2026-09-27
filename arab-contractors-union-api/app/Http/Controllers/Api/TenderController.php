@@ -9,6 +9,7 @@ use App\Models\Tender;
 use App\Models\TenderBookmark;
 use App\Models\TenderCategory;
 use App\Notifications\NewTenderPublishedNotification;
+use App\Services\AuditLogService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -153,6 +154,8 @@ class TenderController extends Controller
 
         $tender->refresh();
 
+        AuditLogService::record(Auth::user(), 'tender.created', $tender, ['title' => $tender->title]);
+
         return $this->success($tender->toArray(), 'تم إضافة العطاء بنجاح.', 201);
     }
 
@@ -266,12 +269,16 @@ class TenderController extends Controller
             Storage::disk('public')->delete($oldSubmissionFile);
         }
 
+        AuditLogService::record(Auth::user(), 'tender.updated', $tender, ['title' => $tender->title]);
+
         return $this->success($tender->fresh()->toArray(), 'تم تحديث العطاء بنجاح.');
     }
 
     // DELETE /api/tenders/{id}
     public function destroy(Tender $tender)
     {
+        AuditLogService::record(Auth::user(), 'tender.deleted', $tender, ['title' => $tender->title]);
+
         $tender->delete();
 
         return $this->success(message: 'تم حذف العطاء بنجاح.');
@@ -439,6 +446,8 @@ class TenderController extends Controller
             'label'     => $data['label'] ?? null,
         ]);
 
+        AuditLogService::record(Auth::user(), 'tender.attachment_added', $tender, ['label' => $attachment->label]);
+
         return $this->success([
             'id'       => $attachment->id,
             'label'    => $attachment->label,
@@ -456,6 +465,8 @@ class TenderController extends Controller
 
         Storage::disk('public')->delete($attachment->file_path);
         $attachment->delete();
+
+        AuditLogService::record(Auth::user(), 'tender.attachment_deleted', $tender, ['label' => $attachment->label]);
 
         return $this->success(message: 'تم حذف المرفق.');
     }

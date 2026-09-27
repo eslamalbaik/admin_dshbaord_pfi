@@ -3,44 +3,53 @@ import { useDashboardStore } from '@/stores/dashboardStore'
 
 const dashboardStore = useDashboardStore()
 
+// نسبة التغيّر الفعلية (آخر 30 يوم مقابل الـ30 يوم اللي قبلها) بدل الأرقام الثابتة
+// اللي كانت من قالب Vuexy الأصلي — القيم جايّة من DashboardController::percentChange.
+const changeChip = (pct: number) => ({
+  change: pct ? `${pct > 0 ? '+' : ''}${pct}%` : '',
+  changeType: (pct > 0 ? 'positive' : pct < 0 ? 'negative' : 'neutral') as 'positive' | 'negative' | 'neutral',
+})
+
 const stats = computed(() => [
   {
     title: 'إجمالي المقاولين',
     value: dashboardStore.stats.total_contractors,
-    change: '+5.2%',
-    changeType: 'positive' as const,
+    ...changeChip(dashboardStore.stats.changes.total_contractors),
     icon: 'tabler-building-factory-2',
     color: 'primary',
   },
   {
     title: 'عضويات نشطة',
     value: dashboardStore.stats.active_memberships,
-    change: '+3.1%',
-    changeType: 'positive' as const,
+    ...changeChip(dashboardStore.stats.changes.active_memberships),
     icon: 'tabler-id-badge-2',
     color: 'success',
   },
   {
+    title: 'مستخدمو التطبيق',
+    value: dashboardStore.stats.app_users,
+    ...changeChip(dashboardStore.stats.changes.app_users),
+    icon: 'tabler-device-mobile-check',
+    color: 'secondary',
+  },
+  {
     title: 'طلبات معلّقة',
     value: dashboardStore.stats.pending_requests,
-    change: '',
-    changeType: 'neutral' as const,
+    ...changeChip(dashboardStore.stats.changes.pending_requests),
     icon: 'tabler-clock-hour-4',
     color: 'warning',
   },
   {
     title: 'إجمالي الإيرادات',
     value: '₪ ' + (dashboardStore.stats.total_revenue || 0).toLocaleString(),
-    change: '+8.3%',
-    changeType: 'positive' as const,
+    ...changeChip(dashboardStore.stats.changes.total_revenue),
     icon: 'tabler-cash',
     color: 'info',
   },
   {
     title: 'تنتهي قريباً',
     value: dashboardStore.stats.expiring_soon,
-    change: '',
-    changeType: 'negative' as const,
+    ...changeChip(dashboardStore.stats.changes.expiring_soon),
     icon: 'tabler-calendar-exclamation',
     color: 'error',
   },

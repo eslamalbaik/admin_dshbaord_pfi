@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\Contractor;
 use App\Models\Document;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -81,6 +82,8 @@ class DocumentController extends Controller
             'uploaded_by'   => Auth::id(),
         ]);
 
+        AuditLogService::record(Auth::user(), 'document.created', $document, ['title' => $document->title, 'contractor_id' => $document->contractor_id]);
+
         return $this->success(
             $document->load('contractor')->toArray(),
             'تم رفع الوثيقة بنجاح.',
@@ -91,6 +94,8 @@ class DocumentController extends Controller
     // DELETE /api/documents/{id}
     public function destroy(Document $document)
     {
+        AuditLogService::record(Auth::user(), 'document.deleted', $document, ['title' => $document->title, 'contractor_id' => $document->contractor_id]);
+
         Storage::disk($document->disk)->delete($document->url);
         $document->delete();
 

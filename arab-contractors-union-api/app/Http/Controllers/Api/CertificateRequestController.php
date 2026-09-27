@@ -285,6 +285,8 @@ class CertificateRequestController extends Controller
             new CertificateRequestStatusNotification($certificateRequest)
         );
 
+        AuditLogService::record(Auth::user(), 'certificate.issued', $certificateRequest, ['contractor_id' => $certificateRequest->contractor_id]);
+
         return $this->success(new CertificateRequestResource($certificateRequest->fresh()), 'تم إصدار الشهادة بنجاح.');
     }
 
@@ -294,6 +296,8 @@ class CertificateRequestController extends Controller
         if ($certificateRequest->certificate_path) {
             Storage::disk('public')->delete($certificateRequest->certificate_path);
         }
+
+        AuditLogService::record(Auth::user(), 'certificate.deleted', $certificateRequest, ['contractor_id' => $certificateRequest->contractor_id]);
 
         $certificateRequest->delete();
 

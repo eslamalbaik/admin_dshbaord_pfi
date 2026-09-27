@@ -21,6 +21,7 @@ use App\Services\DuesPaymentService;
 use App\Services\DuesDiscountService;
 use App\Services\DuesGenerationService;
 use App\Services\LegacyDuesImporter;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -144,6 +145,8 @@ class ContractorDueController extends Controller
             'applied'       => $result['applied'],
         ]);
 
+        AuditLogService::record(Auth::user(), 'due.contractor_payment', $contractor, ['amount' => $data['amount'], 'amount_jod' => $result['amount_jod']]);
+
         return $this->success(
             $result + ['remaining_total_jod' => $this->financialService->outstandingDuesTotal($contractor)],
             'تم تسجيل الدفعة وتوزيعها على الذمم بنجاح.',
@@ -192,6 +195,7 @@ class ContractorDueController extends Controller
                 'unmatched'           => count($analysis['unmatched']),
                 'force'               => $force,
             ]);
+            AuditLogService::record(Auth::user(), 'due.excel_imported', null, ['imported' => $imported['dues'], 'contractors_created' => $imported['contractors_created']]);
         }
 
         $importer->logReport($analysis, $dryRun, Auth::id());
@@ -300,6 +304,8 @@ class ContractorDueController extends Controller
             'backdate_reason' => $allowBackdate ? $backdateReason : null,
         ]);
 
+        AuditLogService::record(Auth::user(), 'due.created', $due, ['contractor_id' => $due->contractor_id, 'amount_jod' => $due->amount_jod]);
+
         return $this->success(
             new ContractorDueResource($due->load('contractor:id,name,membership_number')),
             'تمت إضافة الذمة المالية بنجاح.',
@@ -323,6 +329,7 @@ class ContractorDueController extends Controller
         $due->applyPayment(0); // إعادة احتساب الحالة إن تغيّر المبلغ
 
         $this->financeLog('due.updated', ['due_id' => $due->id, 'changes' => $data]);
+        AuditLogService::record(Auth::user(), 'due.updated', $due, ['contractor_id' => $due->contractor_id]);
 
         return $this->success(new ContractorDueResource($due->fresh(['contractor:id,name,membership_number'])), 'تم تحديث الذمة.');
     }
@@ -373,6 +380,7 @@ class ContractorDueController extends Controller
             'payment_id' => $data['payment_id'] ?? null,
             'new_status' => $due->status,
         ]);
+        AuditLogService::record(Auth::user(), 'due.settled', $due, ['contractor_id' => $due->contractor_id, 'amount_jod' => $amount]);
 
         return $this->success(new ContractorDueResource($due->fresh(['contractor:id,name,membership_number'])), 'تمت تسوية الذمة بنجاح.');
     }
@@ -380,9 +388,12 @@ class ContractorDueController extends Controller
     /** DELETE /api/v1/dashboard/dues/{due} */
     public function destroy(ContractorDue $due)
     {
+        $contractorId = $due->contractor_id;
+
         $due->delete();
 
-        $this->financeLog('due.deleted', ['due_id' => $due->id, 'contractor_id' => $due->contractor_id]);
+        $this->financeLog('due.deleted', ['due_id' => $due->id, 'contractor_id' => $contractorId]);
+        AuditLogService::record(Auth::user(), 'due.deleted', null, ['due_id' => $due->id, 'contractor_id' => $contractorId]);
 
         return $this->success(message: 'تم حذف الذمة.');
     }
@@ -409,6 +420,7 @@ class ContractorDueController extends Controller
         try {
             $result = $this->generationService->generateFee($contractor, $data['year'], $data, $force, Auth::id());
             $this->financeLog('due.fee_generated', ['due_id' => $result['due']->id, 'contractor_id' => $contractor->id, 'year' => $data['year'], 'force' => $force]);
+            AuditLogService::record(Auth::user(), 'due.fee_generated', $result['due'], ['contractor_id' => $contractor->id, 'year' => $data['year']]);
 
             return $this->success([
                 'due'     => new ContractorDueResource($result['due']),
@@ -428,6 +440,9 @@ class ContractorDueController extends Controller
         $result = $this->generationService->generateFeeBulk($data['contractor_ids'] ?? [], $data['year'], $dryRun, Auth::id());
 
         $this->financeLog('due.fee_generated_bulk', ['year' => $data['year'], 'created' => $result['created_count'], 'dry_run' => $dryRun]);
+        if (! $dryRun) {
+            AuditLogService::record(Auth::user(), 'due.fee_generated_bulk', null, ['year' => $data['year'], 'created' => $result['created_count']]);
+        }
 
         return $this->success($result);
     }
@@ -446,6 +461,7 @@ class ContractorDueController extends Controller
         $this->financeLog('due.discount_applied', [
             'due_id' => $due->id, 'discount_type' => $data['discount_type'], 'discount_value' => $data['discount_value'],
         ]);
+        AuditLogService::record(Auth::user(), 'due.discount_applied', $due, ['discount_type' => $data['discount_type'], 'discount_value' => $data['discount_value']]);
 
         return $this->success(new ContractorDueResource($due->fresh(['contractor:id,name,membership_number'])), 'تم تطبيق الخصم بنجاح.');
     }
@@ -468,6 +484,7 @@ class ContractorDueController extends Controller
                 'applied'     => $result['applied_count'],
                 'skipped'     => count($result['skipped']),
             ]);
+            AuditLogService::record(Auth::user(), 'due.discount_applied_bulk', null, ['mode' => $data['mode'], 'applied' => $result['applied_count']]);
             return $this->success($result, 'تم تطبيق الخصم الجماعي بنجاح.');
         }
 

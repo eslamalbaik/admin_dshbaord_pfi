@@ -10,6 +10,7 @@ use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\User;
 use App\Notifications\EventJoinedNotification;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -291,6 +292,8 @@ class EventController extends Controller
 
         $event = Event::create($validated);
 
+        AuditLogService::record($request->user(), 'event.created', $event, ['title' => $event->title]);
+
         if ($event->is_published) {
             \App\Jobs\SendPushToContractorsJob::dispatch(
                 Contractor::whereNotNull('fcm_token')->pluck('id')->all(),
@@ -327,6 +330,8 @@ class EventController extends Controller
 
         $event->update($validated);
 
+        AuditLogService::record($request->user(), 'event.updated', $event, ['title' => $event->title]);
+
         if ($newlyPublished) {
             \App\Jobs\SendPushToContractorsJob::dispatch(
                 Contractor::whereNotNull('fcm_token')->pluck('id')->all(),
@@ -340,8 +345,10 @@ class EventController extends Controller
     }
 
     // DELETE /api/v1/admin/events/{id}
-    public function destroy(Event $event)
+    public function destroy(Request $request, Event $event)
     {
+        AuditLogService::record($request->user(), 'event.deleted', $event, ['title' => $event->title]);
+
         $event->delete();
 
         return $this->success(message: 'تم حذف الفعالية بنجاح.');

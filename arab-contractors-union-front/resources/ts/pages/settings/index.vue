@@ -133,6 +133,14 @@ const uploadAvatar = async () => {
               title="تصنيفات العطاءات"
               :to="{ name: 'tenders-categories' }"
             />
+
+            <VDivider class="my-2" />
+
+            <VListItem
+              prepend-icon="tabler-history"
+              title="سجل النشاط"
+              :to="{ name: 'settings-activity-log' }"
+            />
           </VList>
         </VCard>
       </VCol>

@@ -246,6 +246,8 @@ class PaymentController extends Controller
 
         $payment = Payment::create($paymentData);
 
+        AuditLogService::record($request->user(), 'payment.created', $payment, ['contractor_id' => $payment->contractor_id, 'amount' => $payment->amount, 'currency' => $payment->currency]);
+
         return $this->success($payment->toArray(), 'تم تسجيل المعاملة بنجاح.', 201);
     }
 

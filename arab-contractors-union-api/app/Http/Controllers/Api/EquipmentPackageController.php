@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\EquipmentPackage;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 
 /** باقات اشتراك سوق الآليات — CRUD إداري (REQ-06). */
@@ -32,6 +33,8 @@ class EquipmentPackageController extends Controller
 
         $package = EquipmentPackage::create($data);
 
+        AuditLogService::record($request->user(), 'equipment_package.created', $package, ['name' => $package->name]);
+
         return $this->success($package, 'تمت إضافة الباقة بنجاح.', 201);
     }
 
@@ -49,12 +52,16 @@ class EquipmentPackageController extends Controller
 
         $equipmentPackage->update($data);
 
+        AuditLogService::record($request->user(), 'equipment_package.updated', $equipmentPackage, $data);
+
         return $this->success($equipmentPackage->fresh(), 'تم تحديث الباقة.');
     }
 
     // DELETE /api/v1/dashboard/equipment-packages/{equipmentPackage}
-    public function destroy(EquipmentPackage $equipmentPackage)
+    public function destroy(Request $request, EquipmentPackage $equipmentPackage)
     {
+        AuditLogService::record($request->user(), 'equipment_package.deleted', $equipmentPackage, ['name' => $equipmentPackage->name]);
+
         $equipmentPackage->delete();
 
         return $this->success(message: 'تم حذف الباقة.');

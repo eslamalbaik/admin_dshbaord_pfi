@@ -7,7 +7,9 @@ use App\Http\Traits\ApiResponseTrait;
 use App\Models\BankAccount;
 use App\Models\Governorate;
 use App\Models\Setting;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 
 class SettingController extends Controller
@@ -256,6 +258,8 @@ class SettingController extends Controller
         // الإعدادات تدخل في استجابة الصفحة الرئيسية المخزّنة
         \Illuminate\Support\Facades\Cache::forget('landing_home');
 
+        AuditLogService::record(Auth::user(), 'settings.updated', null, ['keys' => array_column($data['settings'], 'key')]);
+
         return $this->success(['settings' => Setting::all(['key', 'value', 'group'])], 'تم حفظ الإعدادات بنجاح.');
     }
 
@@ -277,6 +281,8 @@ class SettingController extends Controller
         $path = $request->file('logo')->store('union', 'public');
         Setting::set('union_logo', $path, 'about');
 
+        AuditLogService::record(Auth::user(), 'settings.logo_uploaded');
+
         return $this->success(['logo_url' => Storage::disk('public')->url($path)], 'تم رفع الشعار بنجاح.');
     }
 
@@ -297,6 +303,8 @@ class SettingController extends Controller
 
         $path = $request->file('cover_image')->store('union', 'public');
         Setting::set('union_cover_image', $path, 'about');
+
+        AuditLogService::record(Auth::user(), 'settings.cover_image_uploaded');
 
         return $this->success(['cover_image_url' => Storage::disk('public')->url($path)], 'تم رفع صورة الغلاف بنجاح.');
     }
