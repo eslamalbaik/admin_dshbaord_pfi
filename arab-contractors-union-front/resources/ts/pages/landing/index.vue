@@ -230,7 +230,7 @@ const degrees = [
         <div class="hero-visual">
           <div class="hero-card-wrap">
             <div class="hero-main-card">
-              <img src="https://images.unsplash.com/photo-1541888946425-d81bb19240f5?q=80&w=800" alt="إنشاءات" class="hero-bg-img" />
+              <img src="/images/landing/hero-gaza-construction.webp" alt="إعادة إعمار قطاع غزة" class="hero-bg-img" />
               <div class="hero-img-overlay" />
               <img src="/logo.png" alt="شعار اتحاد المقاولين الفلسطينيين" class="hero-logo" />
               <div class="hero-ring hero-ring-1" />
