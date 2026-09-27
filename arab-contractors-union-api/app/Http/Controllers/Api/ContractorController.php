@@ -318,6 +318,8 @@ class ContractorController extends Controller
 
         $contractor = Contractor::create($validated);
 
+        \App\Services\AuditLogService::record($request->user(), 'contractor.created', $contractor, ['name' => $contractor->name, 'membership_number' => $contractor->membership_number]);
+
         return $this->success($contractor->toArray(), 'تم إضافة المقاول بنجاح.', 201);
     }
 
@@ -343,11 +345,13 @@ class ContractorController extends Controller
         $contractor->update($validated);
         $contractor->withFileUrls = true;
 
+        \App\Services\AuditLogService::record($request->user(), 'contractor.updated', $contractor, ['name' => $contractor->name]);
+
         return $this->success($contractor->toArray(), 'تم تحديث بيانات المقاول بنجاح.');
     }
 
     // DELETE /api/contractors/{id}
-    public function destroy(Contractor $contractor)
+    public function destroy(Request $request, Contractor $contractor)
     {
         // الأعمدة الفريدة (phone, email, license_number, commercial_register, membership_number)
         // تبقى بجدول contractors بعد الحذف الناعم وتصطدم بقيد unique عند إعادة تسجيل نفس البيانات —
@@ -357,8 +361,12 @@ class ContractorController extends Controller
             ->mapWithKeys(fn ($field) => [$field => $contractor->{$field} ? $contractor->{$field} . $suffix : null])
             ->all();
 
+        $name = $contractor->name;
+
         $contractor->update($mangled);
         $contractor->delete();
+
+        \App\Services\AuditLogService::record($request->user(), 'contractor.deleted', $contractor, ['name' => $name]);
 
         return $this->success(message: 'تم حذف المقاول بنجاح.');
     }
@@ -370,7 +378,11 @@ class ContractorController extends Controller
             'status' => 'required|in:active,pending,expired,suspended',
         ]);
 
+        $oldStatus = $contractor->status;
+
         $contractor->update($validated);
+
+        \App\Services\AuditLogService::record($request->user(), 'contractor.status_changed', $contractor, ['old_status' => $oldStatus, 'new_status' => $contractor->status]);
 
         return $this->success($contractor->fresh()->toArray(), 'تم تحديث حالة المقاول بنجاح.');
     }
@@ -422,6 +434,8 @@ class ContractorController extends Controller
         ], $this->getValidationMessages());
 
         $contractor->update($validated);
+
+        \App\Services\AuditLogService::record($request->user(), 'contractor.contact_updated', $contractor);
 
         return $this->success($contractor->fresh()->toArray(), 'تم تحديث بيانات التواصل بنجاح.');
     }

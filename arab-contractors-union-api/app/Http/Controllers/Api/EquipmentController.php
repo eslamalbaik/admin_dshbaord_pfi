@@ -7,7 +7,9 @@ use App\Models\Equipment;
 use App\Models\EquipmentBlockedDate;
 use App\Models\EquipmentImage;
 use App\Models\EquipmentReservation;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 
 class EquipmentController extends Controller
@@ -100,6 +102,8 @@ class EquipmentController extends Controller
             ]);
         }
 
+        AuditLogService::record(Auth::user(), 'equipment.created', $equipment, ['name' => $equipment->name]);
+
         return response()->json($equipment->load(['type', 'contractor', 'images']), 201);
     }
 
@@ -135,6 +139,8 @@ class EquipmentController extends Controller
 
         $equipment->update($validated);
 
+        AuditLogService::record(Auth::user(), 'equipment.updated', $equipment, ['name' => $equipment->name]);
+
         return response()->json($equipment->load(['type', 'contractor', 'images']));
     }
 
@@ -152,6 +158,8 @@ class EquipmentController extends Controller
         foreach ($equipment->images as $img) {
             Storage::disk('public')->delete($img->path);
         }
+
+        AuditLogService::record(Auth::user(), 'equipment.deleted', $equipment, ['name' => $equipment->name]);
 
         $equipment->delete();
 

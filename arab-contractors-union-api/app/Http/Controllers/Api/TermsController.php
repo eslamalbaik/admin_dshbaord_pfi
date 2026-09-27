@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Term;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -61,7 +62,7 @@ class TermsController extends Controller
         $data = $request->validate($this->rules);
         $data['type'] = $data['type'] ?? 'terms';
 
-        return DB::transaction(function () use ($data) {
+        return DB::transaction(function () use ($data, $request) {
             // لو رقم الترتيب المطلوب محجوز مسبقاً، نزحزح كل من بعده للأسفل ليُفسح مكاناً (بدل تكرار الرقم)
             if (isset($data['sort'])) {
                 Term::where('type', $data['type'])
@@ -69,7 +70,10 @@ class TermsController extends Controller
                     ->increment('sort');
             }
 
-            return response()->json(Term::create($data), 201);
+            $term = Term::create($data);
+            AuditLogService::record($request->user(), 'term.created', $term, ['type' => $term->type, 'title' => $term->title]);
+
+            return response()->json($term, 201);
         });
     }
 
@@ -104,12 +108,16 @@ class TermsController extends Controller
             $term->update($data);
         }
 
+        AuditLogService::record($request->user(), 'term.updated', $term, ['type' => $term->type, 'title' => $term->title]);
+
         return response()->json($term->fresh());
     }
 
     /** DELETE /api/v1/dashboard/terms/{term} */
-    public function destroy(Term $term)
+    public function destroy(Request $request, Term $term)
     {
+        AuditLogService::record($request->user(), 'term.deleted', $term, ['type' => $term->type, 'title' => $term->title]);
+
         $term->delete();
 
         return response()->json(['message' => 'Term deleted']);

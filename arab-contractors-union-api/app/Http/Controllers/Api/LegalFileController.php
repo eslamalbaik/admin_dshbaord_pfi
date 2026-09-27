@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\LegalFile;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -150,6 +151,8 @@ class LegalFileController extends Controller
             'uploaded_by'    => Auth::id(),
         ]);
 
+        AuditLogService::record(Auth::user(), 'legal_file.created', $legalFile, ['title' => $legalFile->title, 'category' => $legalFile->category]);
+
         return $this->success($this->format($legalFile), 'تم رفع الملف بنجاح.', 201);
     }
 
@@ -189,12 +192,16 @@ class LegalFileController extends Controller
             'is_featured'    => $data['is_featured'] ?? $legalFile->is_featured,
         ]);
 
+        AuditLogService::record(Auth::user(), 'legal_file.updated', $legalFile, ['title' => $legalFile->title]);
+
         return $this->success($this->format($legalFile->fresh()), 'تم تحديث الملف بنجاح.');
     }
 
     /** DELETE /api/v1/dashboard/legal-files/{legalFile} */
     public function destroy(LegalFile $legalFile)
     {
+        AuditLogService::record(Auth::user(), 'legal_file.deleted', $legalFile, ['title' => $legalFile->title]);
+
         Storage::disk($legalFile->disk)->delete($legalFile->file_path);
         $legalFile->delete();
 

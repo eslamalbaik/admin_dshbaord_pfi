@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AnnouncementCategory;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 
 class AnnouncementCategoryController extends Controller
@@ -31,6 +32,8 @@ class AnnouncementCategoryController extends Controller
 
         $category = AnnouncementCategory::create($validated);
 
+        AuditLogService::record($request->user(), 'announcement_category.created', $category);
+
         return response()->json($category, 201);
     }
 
@@ -44,17 +47,21 @@ class AnnouncementCategoryController extends Controller
 
         $announcementCategory->update($validated);
 
+        AuditLogService::record($request->user(), 'announcement_category.updated', $announcementCategory, $validated);
+
         return response()->json($announcementCategory);
     }
 
     // DELETE /api/v1/announcement-categories/{announcementCategory}
-    public function destroy(AnnouncementCategory $announcementCategory)
+    public function destroy(Request $request, AnnouncementCategory $announcementCategory)
     {
         if ($announcementCategory->announcements()->count() > 0) {
             return response()->json([
                 'message' => 'لا يمكن حذف هذا التصنيف لأنه مرتبط بتعميمات موجودة.',
             ], 422);
         }
+
+        AuditLogService::record($request->user(), 'announcement_category.deleted', $announcementCategory);
 
         $announcementCategory->delete();
 

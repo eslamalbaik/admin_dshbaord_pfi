@@ -81,8 +81,119 @@ const actionLabels: Record<string, string> = {
   'payment.confirmed': 'اعتماد دفعة',
   'payment.rejected': 'رفض دفعة',
   'payment.receipt_image_uploaded': 'رفع إيصال دفعة',
+  'payment.created': 'تسجيل معاملة دفع',
   'notifications.broadcast': 'إرسال إشعار جماعي',
   'security.unauthorized_access_attempt': 'محاولة وصول غير مصرّح بها',
+
+  // المقاولون
+  'contractor.created': 'إضافة مقاول',
+  'contractor.updated': 'تعديل بيانات مقاول',
+  'contractor.deleted': 'حذف مقاول',
+  'contractor.status_changed': 'تغيير حالة مقاول',
+  'contractor.contact_updated': 'تعديل بيانات تواصل مقاول',
+
+  // الأخبار
+  'news.created': 'نشر خبر',
+  'news.updated': 'تعديل خبر',
+  'news.deleted': 'حذف خبر',
+
+  // الفعاليات
+  'event.created': 'إضافة فعالية',
+  'event.updated': 'تعديل فعالية',
+  'event.deleted': 'حذف فعالية',
+
+  // التعميمات
+  'announcement.created': 'نشر تعميم',
+  'announcement.updated': 'تعديل تعميم',
+  'announcement.deleted': 'حذف تعميم',
+  'announcement_category.created': 'إضافة تصنيف تعميمات',
+  'announcement_category.updated': 'تعديل تصنيف تعميمات',
+  'announcement_category.deleted': 'حذف تصنيف تعميمات',
+
+  // الشروط والأحكام
+  'term.created': 'إضافة نص شروط',
+  'term.updated': 'تعديل نص شروط',
+  'term.deleted': 'حذف نص شروط',
+
+  // المكتبة القانونية
+  'legal_file.created': 'رفع ملف قانوني',
+  'legal_file.updated': 'تعديل ملف قانوني',
+  'legal_file.deleted': 'حذف ملف قانوني',
+
+  // الحسابات البنكية
+  'bank_account.created': 'إضافة حساب بنكي',
+  'bank_account.updated': 'تعديل حساب بنكي',
+  'bank_account.deleted': 'حذف حساب بنكي',
+
+  // الصفحات الديناميكية
+  'page.created': 'إضافة صفحة',
+  'page.updated': 'تعديل صفحة',
+  'page.deleted': 'حذف صفحة',
+
+  // إعدادات النظام
+  'settings.updated': 'تعديل الإعدادات العامة',
+  'settings.logo_uploaded': 'رفع شعار الاتحاد',
+  'settings.cover_image_uploaded': 'رفع صورة الغلاف',
+
+  // العضويات
+  'membership.created': 'إنشاء طلب عضوية',
+  'membership.approved': 'الموافقة على عضوية',
+  'membership.rejected': 'رفض طلب عضوية',
+
+  // شهادات العضوية
+  'certificate.issued': 'إصدار شهادة',
+  'certificate.deleted': 'حذف طلب شهادة',
+
+  // تذاكر الدعم الفني
+  'support_ticket.replied': 'الرد على تذكرة دعم',
+  'support_ticket.status_changed': 'تغيير حالة تذكرة دعم',
+  'support_ticket.deleted': 'حذف تذكرة دعم',
+
+  // الغرامات
+  'penalty.created': 'إضافة غرامة',
+  'penalty.status_changed': 'تغيير حالة غرامة',
+  'penalty.deleted': 'حذف غرامة',
+
+  // العطاءات
+  'tender.created': 'إضافة عطاء',
+  'tender.updated': 'تعديل عطاء',
+  'tender.deleted': 'حذف عطاء',
+  'tender.attachment_added': 'إضافة مرفق عطاء',
+  'tender.attachment_deleted': 'حذف مرفق عطاء',
+  'tender_category.created': 'إضافة تصنيف عطاءات',
+  'tender_category.updated': 'تعديل تصنيف عطاءات',
+  'tender_category.deleted': 'حذف تصنيف عطاءات',
+
+  // الوثائق
+  'document.created': 'رفع وثيقة',
+  'document.deleted': 'حذف وثيقة',
+
+  // الذمم المالية
+  'due.created': 'إضافة ذمة مالية',
+  'due.updated': 'تعديل ذمة مالية',
+  'due.settled': 'تسوية ذمة مالية',
+  'due.deleted': 'حذف ذمة مالية',
+  'due.contractor_payment': 'تسجيل دفعة ذمم لمقاول',
+  'due.excel_imported': 'استيراد ذمم من ملف Excel',
+  'due.fee_generated': 'توليد ذمة رسوم عضوية',
+  'due.fee_generated_bulk': 'توليد ذمم رسوم بالجملة',
+  'due.discount_applied': 'تطبيق خصم على ذمة',
+  'due.discount_applied_bulk': 'تطبيق خصم جماعي على الذمم',
+
+  // سوق الآليات
+  'equipment.created': 'إضافة آلية',
+  'equipment.updated': 'تعديل آلية',
+  'equipment.deleted': 'حذف آلية',
+  'equipment_type.created': 'إضافة نوع آلية',
+  'equipment_type.updated': 'تعديل نوع آلية',
+  'equipment_type.deleted': 'حذف نوع آلية',
+  'equipment_package.created': 'إضافة باقة اشتراك',
+  'equipment_package.updated': 'تعديل باقة اشتراك',
+  'equipment_package.deleted': 'حذف باقة اشتراك',
+  'equipment_report.status_changed': 'تحديث حالة بلاغ آلية',
+
+  // أسعار الصرف
+  'exchange_rate.manual_override': 'تحديد سعر صرف يدوي',
 }
 
 const actionLabel = (action: string) => actionLabels[action] ?? action

@@ -9,6 +9,7 @@ use App\Models\Announcement;
 use App\Models\AnnouncementAcknowledgement;
 use App\Models\AnnouncementCategory;
 use App\Models\Contractor;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -205,6 +206,8 @@ class AnnouncementController extends Controller
 
         $announcement = Announcement::create($validated);
 
+        AuditLogService::record($request->user(), 'announcement.created', $announcement, ['title' => $announcement->title]);
+
         if ($announcement->is_published) {
             // Dispatch event to trigger announcement notification listener
             event(new AnnouncementPublished($announcement));
@@ -256,6 +259,8 @@ class AnnouncementController extends Controller
 
         $announcement->update($validated);
 
+        AuditLogService::record($request->user(), 'announcement.updated', $announcement, ['title' => $announcement->title]);
+
         if ($newlyPublished) {
             // Dispatch event to trigger announcement notification listener
             event(new AnnouncementPublished($announcement));
@@ -273,8 +278,10 @@ class AnnouncementController extends Controller
     }
 
     // DELETE /api/v1/admin/announcements/{announcement}
-    public function destroy(Announcement $announcement)
+    public function destroy(Request $request, Announcement $announcement)
     {
+        AuditLogService::record($request->user(), 'announcement.deleted', $announcement, ['title' => $announcement->title]);
+
         $announcement->delete();
 
         return $this->success(message: 'تم حذف الإعلان بنجاح.');

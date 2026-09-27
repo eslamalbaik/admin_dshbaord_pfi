@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\Membership;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -56,6 +57,8 @@ class MembershipController extends Controller
 
         $membership = Membership::create($validated);
 
+        AuditLogService::record(Auth::user(), 'membership.created', $membership, ['contractor_id' => $membership->contractor_id, 'type' => $membership->type]);
+
         return $this->success($membership->toArray(), 'تم إنشاء طلب العضوية بنجاح.', 201);
     }
 
@@ -66,6 +69,8 @@ class MembershipController extends Controller
         // حتى لا ينزاح "موعد الاستحقاق" كل مرة تتأخر فيها المعالجة الإدارية.
         // مثال: عضوية بدأت 1/1/2020 → تنتهي 1/1/2021 → تجديدها يبدأ من 1/1/2021 وينتهي 1/1/2022... وهكذا.
         $renewal->applyRenewal($membership, Auth::id());
+
+        AuditLogService::record(Auth::user(), 'membership.approved', $membership, ['contractor_id' => $membership->contractor_id]);
 
         return $this->success(message: 'تمت الموافقة على العضوية.');
     }
@@ -78,6 +83,8 @@ class MembershipController extends Controller
             'reviewed_by' => Auth::id(),
             'reviewed_at' => now(),
         ]);
+
+        AuditLogService::record(Auth::user(), 'membership.rejected', $membership, ['contractor_id' => $membership->contractor_id]);
 
         return $this->success(message: 'تم رفض طلب العضوية.');
     }

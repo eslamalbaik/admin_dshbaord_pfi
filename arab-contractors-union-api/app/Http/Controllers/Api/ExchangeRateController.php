@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\ExchangeRate;
+use App\Services\AuditLogService;
 use App\Services\ExchangeRateService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -49,6 +50,8 @@ class ExchangeRateController extends Controller
             'currency'    => $rate->currency,
             'rate_to_jod' => $rate->rate_to_jod,
         ]);
+
+        AuditLogService::record(Auth::user(), 'exchange_rate.manual_override', $rate, ['currency' => $rate->currency, 'rate_to_jod' => $rate->rate_to_jod]);
 
         return $this->success($rate->toArray(), 'تم اعتماد سعر الصرف اليدوي.', 201);
     }

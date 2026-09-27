@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\Penalty;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class PenaltyController extends Controller
 {
@@ -82,6 +84,8 @@ class PenaltyController extends Controller
         // في الكائن بالذاكرة تلقائياً — refresh() يضمن أن الاستجابة تعكس الصف الفعلي بالقاعدة.
         $penalty->refresh();
 
+        AuditLogService::record(Auth::user(), 'penalty.created', $penalty, ['contractor_id' => $penalty->contractor_id, 'amount' => $penalty->amount]);
+
         return $this->success(
             $penalty->load('contractor')->toArray(),
             'تم إضافة الغرامة بنجاح.',
@@ -112,6 +116,8 @@ class PenaltyController extends Controller
             return $this->error('المبلغ المسدَّد جزئياً يجب أن يكون أقل من مبلغ الغرامة الكامل — استخدم حالة "مسدَّدة" بدلاً من ذلك.', 422);
         }
 
+        $oldStatus = $penalty->status;
+
         $penalty->update(Penalty::attributesForStatus(
             $data['status'],
             (float) $penalty->amount,
@@ -119,12 +125,16 @@ class PenaltyController extends Controller
             $data['reject_reason'] ?? null,
         ));
 
+        AuditLogService::record(Auth::user(), 'penalty.status_changed', $penalty, ['old_status' => $oldStatus, 'new_status' => $data['status']]);
+
         return $this->success($penalty->fresh('contractor')->toArray(), 'تم تحديث حالة الغرامة بنجاح.');
     }
 
     // DELETE /api/dashboard/penalties/{penalty}
     public function destroy(Penalty $penalty)
     {
+        AuditLogService::record(Auth::user(), 'penalty.deleted', $penalty, ['contractor_id' => $penalty->contractor_id]);
+
         $penalty->delete();
         return $this->success(message: 'تم حذف الغرامة بنجاح.');
     }

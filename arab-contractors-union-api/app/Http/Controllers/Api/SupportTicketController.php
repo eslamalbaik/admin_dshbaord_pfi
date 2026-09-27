@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Notifications\SupportTicketContractorRepliedNotification;
 use App\Notifications\SupportTicketCreatedNotification;
 use App\Notifications\SupportTicketRepliedNotification;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -243,6 +244,8 @@ class SupportTicketController extends Controller
             }
         }
 
+        AuditLogService::record(Auth::user(), 'support_ticket.replied', $ticket);
+
         return $this->success(
             $this->format($ticket->fresh(['contractor:id,name', 'repliedBy:id,name', 'messages'])),
             'تم إرسال الرد بنجاح.',
@@ -305,7 +308,11 @@ class SupportTicketController extends Controller
             'status' => 'required|in:open,in_progress,answered,closed',
         ]);
 
+        $oldStatus = $ticket->getOriginal('status');
+
         $ticket->update(['status' => $data['status']]);
+
+        AuditLogService::record(Auth::user(), 'support_ticket.status_changed', $ticket, ['old_status' => $oldStatus, 'new_status' => $data['status']]);
 
         return $this->success($this->format($ticket), 'تم تحديث حالة الطلب.');
     }
@@ -313,6 +320,8 @@ class SupportTicketController extends Controller
     /** DELETE /api/v1/dashboard/support-tickets/{ticket} */
     public function destroy(SupportTicket $ticket)
     {
+        AuditLogService::record(Auth::user(), 'support_ticket.deleted', $ticket);
+
         $ticket->delete();
 
         return $this->success(message: 'تم حذف الطلب.');

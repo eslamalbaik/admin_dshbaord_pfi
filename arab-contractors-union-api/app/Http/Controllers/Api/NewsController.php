@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Http\Traits\HandlesMediaUploads;
 use App\Models\News;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 
 class NewsController extends Controller
@@ -96,6 +97,8 @@ class NewsController extends Controller
 
         $news = News::create($validated);
 
+        AuditLogService::record($request->user(), 'news.created', $news, ['title' => $news->title]);
+
         return $this->success($news->toArray(), 'تم نشر الخبر بنجاح.', 201);
     }
 
@@ -135,12 +138,16 @@ class NewsController extends Controller
 
         $news->update($validated);
 
+        AuditLogService::record($request->user(), 'news.updated', $news, ['title' => $news->title]);
+
         return $this->success($news->fresh()->toArray(), 'تم تحديث الخبر بنجاح.');
     }
 
     // DELETE /api/v1/admin/news/{id}
-    public function destroy(News $news)
+    public function destroy(Request $request, News $news)
     {
+        AuditLogService::record($request->user(), 'news.deleted', $news, ['title' => $news->title]);
+
         $news->delete();
 
         return $this->success(message: 'تم حذف الخبر بنجاح.');

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\EquipmentType;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 
 class EquipmentTypeController extends Controller
@@ -33,6 +34,8 @@ class EquipmentTypeController extends Controller
 
         $type = EquipmentType::create($validated);
 
+        AuditLogService::record($request->user(), 'equipment_type.created', $type);
+
         return response()->json($type, 201);
     }
 
@@ -48,17 +51,21 @@ class EquipmentTypeController extends Controller
 
         $equipmentType->update($validated);
 
+        AuditLogService::record($request->user(), 'equipment_type.updated', $equipmentType, $validated);
+
         return response()->json($equipmentType);
     }
 
     // DELETE /api/equipment-types/{type}
-    public function destroy(EquipmentType $equipmentType)
+    public function destroy(Request $request, EquipmentType $equipmentType)
     {
         if ($equipmentType->equipment()->count() > 0) {
             return response()->json([
                 'message' => 'لا يمكن حذف هذا النوع لأنه مرتبط بآليات موجودة.',
             ], 422);
         }
+
+        AuditLogService::record($request->user(), 'equipment_type.deleted', $equipmentType);
 
         $equipmentType->delete();
 

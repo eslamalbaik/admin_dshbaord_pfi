@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\Tender;
 use App\Models\TenderCategory;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -62,6 +64,8 @@ class TenderCategoryController extends Controller
             'sort_order' => $data['sort_order'] ?? ((int) TenderCategory::max('sort_order') + 1),
         ]);
 
+        AuditLogService::record(Auth::user(), 'tender_category.created', $category, ['name' => $category->name]);
+
         return $this->success($category->loadCount('tenders'), 'تمت إضافة التصنيف بنجاح.', 201);
     }
 
@@ -113,6 +117,8 @@ class TenderCategoryController extends Controller
             Storage::disk('public')->delete($oldImage);
         }
 
+        AuditLogService::record(Auth::user(), 'tender_category.updated', $tenderCategory, ['name' => $tenderCategory->name]);
+
         return $this->success($tenderCategory->fresh()->loadCount('tenders'), 'تم تحديث التصنيف بنجاح.');
     }
 
@@ -126,6 +132,8 @@ class TenderCategoryController extends Controller
         if ($tenderCategory->image_path) {
             Storage::disk('public')->delete($tenderCategory->image_path);
         }
+
+        AuditLogService::record(Auth::user(), 'tender_category.deleted', $tenderCategory, ['name' => $tenderCategory->name]);
 
         $tenderCategory->delete();
 
