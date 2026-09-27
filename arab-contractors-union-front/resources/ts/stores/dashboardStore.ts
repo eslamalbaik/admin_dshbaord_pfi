@@ -9,6 +9,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     pending_requests: 0,
     total_revenue: 0,
     expiring_soon: 0,
+    app_users: 0,
   })
 
   const latestContractors = shallowRef<any[]>([])
@@ -36,6 +37,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
         pending_requests: 0,
         total_revenue: 0,
         expiring_soon: 0,
+        app_users: 0,
           }
 
       latestContractors.value = data?.latestContractors?.length ? data.latestContractors : []
@@ -48,7 +50,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
       error.value = err?.message || 'Failed to fetch dashboard data'
       console.error('Error fetching dashboard data:', err)
 
-      stats.value = { total_contractors: 0, active_memberships: 0, pending_requests: 0, total_revenue: 0, expiring_soon: 0 }
+      stats.value = { total_contractors: 0, active_memberships: 0, pending_requests: 0, total_revenue: 0, expiring_soon: 0, app_users: 0 }
       latestContractors.value = []
       latestPayments.value = []
       revenueChart.value = []

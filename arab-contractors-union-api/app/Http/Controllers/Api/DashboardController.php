@@ -27,6 +27,11 @@ class DashboardController extends Controller
                 'expiring_soon'      => Membership::where('status', 'active')
                                             ->whereBetween('expires_at', [now(), now()->addDays(30)])
                                             ->count(),
+                // نفس شرط Contractor::getHasAppAccountAttribute — عدد المقاولين اللي فعلاً
+                // فاتحوا حساب على تطبيق الموبايل (أكملوا التحقق وضبطوا كلمة مرور).
+                'app_users'          => Contractor::whereNotNull('password')
+                                            ->whereNotNull('phone_verified_at')
+                                            ->count(),
             ];
         });
 

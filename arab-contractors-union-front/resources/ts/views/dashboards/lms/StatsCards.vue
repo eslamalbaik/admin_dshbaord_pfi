@@ -21,6 +21,14 @@ const stats = computed(() => [
     color: 'success',
   },
   {
+    title: 'مستخدمو التطبيق',
+    value: dashboardStore.stats.app_users,
+    change: '',
+    changeType: 'neutral' as const,
+    icon: 'tabler-device-mobile-check',
+    color: 'secondary',
+  },
+  {
     title: 'طلبات معلّقة',
     value: dashboardStore.stats.pending_requests,
     change: '',
