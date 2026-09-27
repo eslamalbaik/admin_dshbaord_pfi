@@ -8,7 +8,6 @@ use App\Models\Announcement;
 use App\Models\AnnouncementAcknowledgement;
 use App\Models\CertificateRequest;
 use App\Models\Contractor;
-use App\Models\ContractorNameChangeRequest;
 use App\Models\Event;
 use App\Models\Membership;
 use App\Models\News;
@@ -330,22 +329,6 @@ class ContractorHomeController extends Controller
                 'rejected'     => $c->status === 'rejected',
             ]);
 
-        $nameChanges = ContractorNameChangeRequest::where('contractor_id', $contractor->id)
-            ->latest('updated_at')
-            ->limit(self::FEED_POOL_LIMIT)
-            ->get()
-            ->map(fn (ContractorNameChangeRequest $r) => [
-                'type'         => 'member',
-                'reference_id' => $r->id,
-                'title'        => 'طلب تغيير الاسم',
-                'subtitle'     => $r->status_label,
-                'has_attachment' => (bool) $r->supporting_document,
-                'is_new'       => $r->updated_at->gt(now()->subHours(self::NEW_BADGE_HOURS)),
-                'priority'     => $r->status === 'rejected' ? 'high' : 'normal',
-                'created_at'   => $r->updated_at,
-                'rejected'     => $r->status === 'rejected',
-            ]);
-
-        return $memberships->concat($certificates)->concat($nameChanges);
+        return $memberships->concat($certificates);
     }
 }
