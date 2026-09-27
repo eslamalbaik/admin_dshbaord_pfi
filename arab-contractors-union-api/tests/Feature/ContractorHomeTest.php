@@ -6,7 +6,6 @@ use App\Models\Announcement;
 use App\Models\CertificateRequest;
 use App\Models\Contractor;
 use App\Models\ContractorDue;
-use App\Models\ContractorNameChangeRequest;
 use App\Models\Equipment;
 use App\Models\EquipmentType;
 use App\Models\Event;
@@ -440,25 +439,6 @@ class ContractorHomeTest extends TestCase
         $updates = $this->getJson('/api/v1/contractor/home')->json('items.latest_updates');
 
         $this->assertFalse(collect($updates)->contains('title', 'ذمة تخص مقاول آخر'));
-    }
-
-    public function test_name_change_request_rejected_flags_member_update(): void
-    {
-        $contractor = $this->createContractor();
-        ContractorNameChangeRequest::create([
-            'contractor_id'        => $contractor->id,
-            'current_name'         => 'اسم قديم',
-            'requested_name'       => 'اسم جديد',
-            'supporting_document'  => 'docs/name-change.pdf',
-            'status'               => 'rejected',
-        ]);
-
-        Sanctum::actingAs($contractor, ['*']);
-        $updates = collect($this->getJson('/api/v1/contractor/home')->json('items.latest_updates'));
-
-        $item = $updates->firstWhere('title', 'طلب تغيير الاسم');
-        $this->assertNotNull($item);
-        $this->assertContains('مرفوض', $item['badges']);
     }
 
     // ─────────────────────────────────────────────────────────────────────

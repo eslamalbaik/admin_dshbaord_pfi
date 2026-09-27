@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\CertificateRequest;
 use App\Models\Contractor;
-use App\Models\ContractorNameChangeRequest;
 use App\Models\Membership;
 use App\Models\Payment;
 use App\Models\SupportTicket;
@@ -15,7 +14,6 @@ use App\Notifications\Channels\FcmChannel;
 use App\Notifications\CompleteProfileNotification;
 use App\Notifications\MembershipExpiryReminderNotification;
 use App\Notifications\MembershipGracePeriodReminderNotification;
-use App\Notifications\NameChangeRequestStatusNotification;
 use App\Notifications\NewTenderPublishedNotification;
 use App\Notifications\PaymentConfirmedNotification;
 use App\Notifications\PaymentRejectedNotification;
@@ -51,7 +49,6 @@ class PushChannelWiringTest extends TestCase
             'complete profile'   => [fn () => new CompleteProfileNotification()],
             'support replied'    => [fn () => new SupportTicketRepliedNotification(new SupportTicket(['subject' => 'س']))],
             'certificate status' => [fn () => new CertificateRequestStatusNotification(new CertificateRequest(['status' => 'issued']))],
-            'name change status' => [fn () => new NameChangeRequestStatusNotification(new ContractorNameChangeRequest(['status' => 'approved']))],
             'expiry reminder'    => [fn () => new MembershipExpiryReminderNotification(new Membership(), 7)],
             'grace reminder'     => [fn () => new MembershipGracePeriodReminderNotification(new Membership(), 'start', now())],
             'admin broadcast'       => [fn () => new AdminBroadcastNotification('عنوان', 'نص')],

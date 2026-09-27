@@ -18,7 +18,6 @@ export default [
       { title: 'قائمة المقاولين', to: 'contractors' },
       { title: 'تسجيل مقاول جديد', to: 'contractors-create' },
       { title: 'طلبات الانتساب', to: 'contractors-memberships' },
-      { title: 'طلبات تعديل اسم الشركة', to: 'contractors-name-change-requests' },
     ],
   },
   {

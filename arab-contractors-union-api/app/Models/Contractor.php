@@ -154,11 +154,6 @@ class Contractor extends Authenticatable
         return $this->hasMany(CertificateRequest::class);
     }
 
-    public function nameChangeRequests()
-    {
-        return $this->hasMany(ContractorNameChangeRequest::class);
-    }
-
     public function dues()
     {
         return $this->hasMany(ContractorDue::class);

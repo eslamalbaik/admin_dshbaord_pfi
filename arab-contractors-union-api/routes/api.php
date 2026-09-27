@@ -25,7 +25,6 @@ use App\Http\Controllers\Api\BankAccountController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\CertificateRequestController;
 use App\Http\Controllers\Api\SupportTicketController;
-use App\Http\Controllers\Api\ContractorNameChangeRequestController;
 use App\Http\Controllers\Api\ContractorHomeController;
 
 // ============================================================
@@ -65,10 +64,6 @@ Route::prefix('v1')->group(function () {
         Route::get('profile/pdf',      [ContractorAuthController::class, 'exportPdf']);
         Route::get('profile/download-file/{field}', [ContractorAuthController::class, 'downloadFile']);
         Route::post('change-password', [ContractorAuthController::class, 'changePassword']);
-
-        // طلب تعديل اسم الشركة (يتطلب موافقة الإدارة + وثيقة رسمية)
-        Route::get('name-change-request',  [ContractorNameChangeRequestController::class, 'show']);
-        Route::post('name-change-request', [ContractorNameChangeRequestController::class, 'store']);
 
         // إشعارات المقاول (صندوق الوارد) — نظام الإشعارات القديم (Laravel notifications)
         Route::get('notifications',                    [NotificationController::class, 'index']);
@@ -454,15 +449,6 @@ Route::prefix('v1')->group(function () {
             Route::post('dashboard/support-tickets/{ticket}/reply',      [SupportTicketController::class, 'reply']);
             Route::patch('dashboard/support-tickets/{ticket}/status',    [SupportTicketController::class, 'updateStatus']);
             Route::delete('dashboard/support-tickets/{ticket}',          [SupportTicketController::class, 'destroy']);
-        });
-
-        // --------------------------------------------------------
-        //  طلبات تعديل اسم الشركة — Admin
-        // --------------------------------------------------------
-        Route::middleware('role:admin')->group(function () {
-            Route::get('dashboard/name-change-requests',                                    [ContractorNameChangeRequestController::class, 'index']);
-            Route::post('dashboard/name-change-requests/{nameChangeRequest}/approve',        [ContractorNameChangeRequestController::class, 'approve']);
-            Route::post('dashboard/name-change-requests/{nameChangeRequest}/reject',         [ContractorNameChangeRequestController::class, 'reject']);
         });
 
         // --------------------------------------------------------

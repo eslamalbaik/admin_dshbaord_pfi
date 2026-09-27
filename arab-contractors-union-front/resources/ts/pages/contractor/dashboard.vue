@@ -6,7 +6,7 @@ import PublicNavbar from '@/components/PublicNavbar.vue'
 import {
   User, ClipboardList, CreditCard, FileText,
   Award, Phone, Mail, Building2,
-  CalendarDays, CheckCircle, AlertCircle, Clock,
+  CalendarDays, CheckCircle, AlertCircle,
   Download, RefreshCw, ChevronRight, Wallet,
   FileCheck, FileClock, MessageSquare, Truck, HelpCircle, Camera,
   Pencil, X, UploadCloud, Save, Paperclip, Check,
@@ -446,18 +446,6 @@ async function saveProfile() {
   }
 }
 
-// ─── Name Change Request — تعديل اسم الشركة يتطلب موافقة الإدارة ───
-interface NameChangeRequest {
-  id: number; status: 'pending' | 'approved' | 'rejected'; requested_name: string
-  reject_reason: string | null; created_at: string
-}
-const nameChangeRequest = ref<NameChangeRequest | null>(null)
-const showNameChangeForm = ref(false)
-const nameChangeForm = ref({ requested_name: '', file: null as File | null })
-const nameChangeError = ref('')
-const isSubmittingNameChange = ref(false)
-const nameChangeUploadProgress = ref(0)
-
 const isDownloadingCompanyFile = ref(false)
 
 async function downloadCompanyFile() {
@@ -476,46 +464,6 @@ async function downloadCompanyFile() {
   } catch {}
   finally {
     isDownloadingCompanyFile.value = false
-  }
-}
-
-async function fetchNameChangeRequest() {
-  try {
-    const r = await axios.get(`${BASE}/api/v1/contractor/auth/name-change-request`, { headers: apiHeaders() })
-    nameChangeRequest.value = r.data.items ?? null
-  } catch {}
-}
-
-function onNameChangeFileChange(e: Event) {
-  nameChangeForm.value.file = (e.target as HTMLInputElement).files?.[0] ?? null
-}
-
-async function submitNameChangeRequest() {
-  nameChangeError.value = ''
-  if (!nameChangeForm.value.requested_name || !nameChangeForm.value.file) {
-    nameChangeError.value = 'يرجى تعبئة الاسم الجديد وإرفاق الكتاب الرسمي.'
-    return
-  }
-  isSubmittingNameChange.value = true
-  nameChangeUploadProgress.value = 0
-  try {
-    const fd = new FormData()
-    fd.append('requested_name', nameChangeForm.value.requested_name)
-    fd.append('supporting_document', nameChangeForm.value.file)
-    const r = await axios.post(`${BASE}/api/v1/contractor/auth/name-change-request`, fd, {
-      // لا نحدّد Content-Type يدوياً: المتصفح يضبط multipart/form-data مع الـ boundary تلقائياً
-      headers: apiHeaders(),
-      onUploadProgress: (evt) => {
-        if (evt.total) nameChangeUploadProgress.value = Math.round((evt.loaded / evt.total) * 100)
-      },
-    })
-    nameChangeRequest.value = r.data.items
-    showNameChangeForm.value = false
-    nameChangeForm.value = { requested_name: '', file: null }
-  } catch (e: any) {
-    nameChangeError.value = e?.response?.data?.message || 'تعذّر إرسال الطلب، حاول مرة أخرى.'
-  } finally {
-    isSubmittingNameChange.value = false
   }
 }
 
@@ -581,7 +529,6 @@ onMounted(async () => {
   fetchPublicFeeds()
   fetchFinancial()
   fetchProfile()
-  fetchNameChangeRequest()
   await fetchDashboard()
   const requestedTab = new URLSearchParams(window.location.search).get('tab')
   if (requestedTab && tabs.some(t => t.id === requestedTab))
@@ -805,7 +752,7 @@ async function deleteTenderDocument(id: number) {
               </div>
             </div>
 
-            <!-- اسم الشركة — تعديله يتطلب موافقة الإدارة -->
+            <!-- اسم الشركة — حقل مقفل، لا يُعدَّل من بوابة المقاول إطلاقاً -->
             <div class="page-title-area">
               <h2>اسم الشركة</h2>
             </div>
@@ -824,50 +771,6 @@ async function deleteTenderDocument(id: number) {
                   <Download :size="16" /> {{ isDownloadingCompanyFile ? 'جاري التحميل...' : 'تحميل ملف الشركة' }}
                 </button>
               </div>
-
-              <div v-if="nameChangeRequest?.status === 'pending'" class="name-change-banner pending">
-                <Clock :size="16" />
-                <span>طلبك لتعديل الاسم إلى "{{ nameChangeRequest.requested_name }}" قيد المراجعة من الإدارة.</span>
-              </div>
-              <div v-else-if="nameChangeRequest?.status === 'rejected'" class="name-change-banner rejected">
-                <AlertCircle :size="16" />
-                <span>تم رفض طلب تعديل الاسم السابق{{ nameChangeRequest.reject_reason ? `: ${nameChangeRequest.reject_reason}` : '.' }}</span>
-              </div>
-
-              <button
-                v-if="!showNameChangeForm && nameChangeRequest?.status !== 'pending'"
-                class="md-action-btn outline name-change-toggle"
-                @click="showNameChangeForm = true"
-              >
-                <Pencil :size="15" /> تقديم طلب تعديل اسم الشركة
-              </button>
-
-              <form v-if="showNameChangeForm" class="md-edit-form name-change-form" @submit.prevent="submitNameChangeRequest">
-                <p class="docs-hint">يتطلب تعديل اسم الشركة إرفاق كتاب رسمي من وزارة الاقتصاد الوطني/التجارة يثبت تغيير الاسم.</p>
-                <div v-if="nameChangeError" class="md-form-err"><AlertCircle :size="16" /> {{ nameChangeError }}</div>
-                <div class="md-input-group">
-                  <label>الاسم الجديد المطلوب *</label>
-                  <input v-model="nameChangeForm.requested_name" type="text" class="md-fi" required />
-                </div>
-                <div class="md-input-group">
-                  <label>الكتاب الرسمي المثبت للتغيير *</label>
-                  <label class="md-doc-upload name-change-file">
-                    <UploadCloud :size="15" />
-                    {{ nameChangeForm.file ? nameChangeForm.file.name : 'اختر ملف (PDF أو صورة)' }}
-                    <input type="file" accept=".pdf,image/*" hidden required @change="onNameChangeFileChange" />
-                  </label>
-                </div>
-                <div v-if="isSubmittingNameChange" class="upload-progress-wrap">
-                  <div class="upload-progress-bar"><div class="upload-progress-fill" :style="{ width: nameChangeUploadProgress + '%' }" /></div>
-                  <span>{{ nameChangeUploadProgress }}%</span>
-                </div>
-                <div class="md-form-actions">
-                  <button type="button" class="md-action-btn outline" @click="showNameChangeForm = false"><X :size="16" /> إلغاء</button>
-                  <button type="submit" class="md-action-btn" :disabled="isSubmittingNameChange">
-                    <Save :size="16" /> {{ isSubmittingNameChange ? 'جاري الإرسال...' : 'إرسال الطلب' }}
-                  </button>
-                </div>
-              </form>
             </div>
 
             <!-- Account Details Form-like display -->
