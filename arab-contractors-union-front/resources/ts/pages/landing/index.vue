@@ -12,7 +12,7 @@ import {
   ShieldCheck, Users, Globe, Lightbulb, TrendingUp, Star,
   Zap, FileText, MessageSquare, PlayCircle, GraduationCap,
   Truck, Droplets, Flame, Factory, Home, TreePine,
-  ArrowLeft, ArrowRight,
+  ArrowLeft, ArrowRight, Download,
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -265,6 +265,48 @@ const degrees = [
         <svg viewBox="0 0 1440 80" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M0,40 C360,80 1080,0 1440,40 L1440,80 L0,80 Z" fill="#f5f7ff" />
         </svg>
+      </div>
+    </section>
+
+    <!-- ══ VERIFIED MEMBERSHIP / QUICK SERVICES ══ -->
+    <section id="verified-membership" class="section qs-section">
+      <div class="container">
+        <div class="sec-label">بوابة الخدمات</div>
+        <h2 class="sec-heading">خدمات أساسية بخطوات رقمية قصيرة</h2>
+
+        <div class="qs-grid">
+          <div class="qs-card qs-orange">
+            <div class="qs-top">
+              <span class="qs-pill qs-pill-orange"><span class="qs-dot" />1-3 أيام</span>
+              <div class="qs-icon-box qs-icon-orange">
+                <Award :size="26" />
+              </div>
+            </div>
+            <h3 class="qs-title">طلب شهادة تصنيف</h3>
+            <p class="qs-desc">تقييم واعتماد القدرات الفنية والمالية للشركات، لتحديد الدرجة والتخصص المستحق للمناقصات والمشاريع.</p>
+            <div class="qs-chips">
+              <span class="qs-chip qs-chip-orange"><Check :size="14" /> تحديد الدرجات والمجالات</span>
+              <span class="qs-chip qs-chip-orange"><Check :size="14" /> تقييم شامل معتمد</span>
+            </div>
+            <button class="qs-btn qs-btn-orange" @click="goToRegister">طلب استخراج شهادة تصنيف</button>
+          </div>
+
+          <div class="qs-card qs-navy">
+            <div class="qs-top">
+              <span class="qs-pill qs-pill-green"><span class="qs-dot" />فوري</span>
+              <div class="qs-icon-box qs-icon-navy">
+                <ShieldCheck :size="26" />
+              </div>
+            </div>
+            <h3 class="qs-title">طلب شهادة عضوية</h3>
+            <p class="qs-desc">إصدار وتجديد العضوية الرسمية المعتمدة مع إمكانية التحقق الفوري.</p>
+            <div class="qs-chips">
+              <span class="qs-chip qs-chip-navy"><FileText :size="14" /> تحميل صيغة PDF</span>
+              <span class="qs-chip qs-chip-navy"><Download :size="14" /> ختم معتمد ورقمي</span>
+            </div>
+            <button class="qs-btn qs-btn-navy" @click="goToRegister">طلب استخراج شهادة عضوية</button>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -997,6 +1039,66 @@ const degrees = [
 .sec-heading.center { text-align: center; }
 .sec-heading.center::after { right: 50%; transform: translateX(50%); }
 .sec-sub { font-size: .95rem; color: var(--text-m); line-height: 1.8; max-width: 600px; }
+
+/* ─── Verified Membership / Quick Services ──────────────────────────────────── */
+.qs-section { padding-top: 4.5rem; }
+.qs-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1.75rem;
+  margin-top: 2.5rem;
+}
+.qs-card {
+  background: #fff; border-radius: 22px; border: 1.5px solid var(--border);
+  padding: 2rem; box-shadow: var(--shadow-sm);
+  display: flex; flex-direction: column; transition: box-shadow .25s, transform .25s;
+}
+.qs-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-3px); }
+.qs-card.qs-orange { border-color: #fde3b8; }
+.qs-card.qs-navy { border-color: #c5cae9; }
+
+.qs-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+
+.qs-pill {
+  display: inline-flex; align-items: center; gap: .4rem;
+  border-radius: 50px; padding: .35rem 1rem; font-size: .8rem; font-weight: 700;
+}
+.qs-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.qs-pill-orange { background: var(--gold-light); color: var(--gold-dark); }
+.qs-pill-green { background: var(--green-light); color: var(--green); }
+
+.qs-icon-box {
+  width: 52px; height: 52px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.qs-icon-orange { background: var(--gold-light); color: var(--gold-dark); }
+.qs-icon-navy { background: var(--navy-light); color: var(--navy-mid); }
+
+.qs-title { font-size: 1.3rem; font-weight: 800; color: var(--text-h); margin-bottom: .6rem; }
+.qs-desc { font-size: .9rem; color: var(--text-m); line-height: 1.8; margin-bottom: 1.25rem; }
+
+.qs-chips { display: flex; flex-wrap: wrap; gap: .6rem; margin-bottom: 1.5rem; }
+.qs-chip {
+  display: inline-flex; align-items: center; gap: .4rem;
+  border: 1px solid var(--border); border-radius: 9px;
+  padding: .5rem .85rem; font-size: .8rem; font-weight: 600; color: var(--text-b);
+  background: #fafafa;
+}
+.qs-chip-orange svg { color: var(--gold-dark); }
+.qs-chip-navy svg { color: var(--navy-mid); }
+
+.qs-btn {
+  margin-top: auto; border: none; border-radius: 11px; padding: .9rem 1.5rem;
+  font-size: .95rem; font-weight: 800; color: #fff; cursor: pointer;
+  font-family: inherit; transition: all .25s;
+}
+.qs-btn-orange { background: linear-gradient(135deg, var(--gold), var(--gold-dark)); }
+.qs-btn-orange:hover { filter: brightness(1.05); transform: translateY(-2px); }
+.qs-btn-navy { background: linear-gradient(135deg, var(--navy-mid), var(--navy)); }
+.qs-btn-navy:hover { filter: brightness(1.1); transform: translateY(-2px); }
+
+@media (max-width: 800px) {
+  .qs-grid { grid-template-columns: 1fr; }
+}
+
 .sec-header-c { text-align: center; margin-bottom: 3rem; }
 .sec-header-c .sec-sub { margin: .75rem auto 0; }
 .sec-header-split { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 2.75rem; flex-wrap: wrap; gap: 1rem; }
