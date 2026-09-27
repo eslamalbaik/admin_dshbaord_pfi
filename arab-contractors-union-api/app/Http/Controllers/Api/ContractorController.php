@@ -36,6 +36,16 @@ class ContractorController extends Controller
             $query->where('status', $request->status);
         }
 
+        // فلترة "حالة الحساب" (فاتح حساب / لم يفتح بعد) — نفس شرط getHasAppAccountAttribute،
+        // لازم يبقيا متطابقين لأن الفلتر لازم يطابق العمود المعروض بالجدول.
+        if ($request->filled('has_app_account')) {
+            $hasAccount = filter_var($request->has_app_account, FILTER_VALIDATE_BOOLEAN);
+            $query->when($hasAccount,
+                fn ($qb) => $qb->whereNotNull('password')->whereNotNull('phone_verified_at'),
+                fn ($qb) => $qb->where(fn ($w) => $w->whereNull('password')->orWhereNull('phone_verified_at')),
+            );
+        }
+
         $perPage = (int) $request->get('per_page', 10);
 
         return $this->paginated($query->latest()->paginate($perPage));

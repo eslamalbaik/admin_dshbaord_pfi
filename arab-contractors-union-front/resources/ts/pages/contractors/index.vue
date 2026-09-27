@@ -5,6 +5,7 @@ definePage({ meta: { requiresAdmin: true, adminOnly: true } })
 
 const search = ref('')
 const statusFilter = ref('')
+const accountStatusFilter = ref('')
 const page = ref(1)
 const itemsPerPage = ref(10)
 const total = ref(0)
@@ -46,12 +47,18 @@ const statusOptions = [
   { title: 'موقوف', value: 'suspended' },
 ]
 
+const accountStatusOptions = [
+  { title: 'الكل', value: '' },
+  { title: 'فاتح حساب', value: '1' },
+  { title: 'لم يفتح بعد', value: '0' },
+]
+
 const fetchContractors = async () => {
   loading.value = true
   fetchError.value = ''
   try {
     const { data } = await api.get('/api/v1/contractors', {
-      params: { search: search.value, status: statusFilter.value, page: page.value, per_page: itemsPerPage.value },
+      params: { search: search.value, status: statusFilter.value, has_app_account: accountStatusFilter.value, page: page.value, per_page: itemsPerPage.value },
     })
     contractors.value = data.items || []
     total.value = data.meta?.total || contractors.value.length
@@ -74,7 +81,7 @@ const exportContractors = async () => {
   exporting.value = true
   try {
     const { data } = await api.get('/api/v1/contractors', {
-      params: { search: search.value, status: statusFilter.value, per_page: 10000 },
+      params: { search: search.value, status: statusFilter.value, has_app_account: accountStatusFilter.value, per_page: 10000 },
     })
     const rows: any[] = data.items || []
 
@@ -499,6 +506,16 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
           label="الحالة"
           density="compact"
           style="max-width:160px"
+          @update:model-value="page = 1; fetchContractors()"
+        />
+        <VSelect
+          v-model="accountStatusFilter"
+          :items="accountStatusOptions"
+          item-title="title"
+          item-value="value"
+          label="حالة الحساب"
+          density="compact"
+          style="max-width:170px"
           @update:model-value="page = 1; fetchContractors()"
         />
       </VCardText>
