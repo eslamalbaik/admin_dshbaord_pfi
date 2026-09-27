@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Menu, X, HardHat, Phone, ChevronDown, LayoutDashboard, User, LogOut, Bell } from 'lucide-vue-next'
+import { Menu, X, HardHat, Smartphone, ChevronDown, LayoutDashboard, User, LogOut, Bell } from 'lucide-vue-next'
 import api from '@/plugins/axios'
 import axios from 'axios'
 
@@ -22,31 +22,38 @@ onMounted(() => window.addEventListener('scroll', onScroll, { passive: true }))
 onUnmounted(() => window.removeEventListener('scroll', onScroll))
 
 const navLinks = [
-  { label: 'الرئيسية',         href: '/landing' },
-  { label: 'عن الاتحاد',       href: '/landing/about' },
+  { label: 'الرئيسية', href: '/landing' },
   {
-    label: 'الاتحاد', href: '#',
+    label: 'الخدمات الالكترونية', href: '#',
     children: [
-      { label: 'مجلس الإدارة',   href: '/landing/board' },
+      { label: 'خدمات الاتحاد', href: '/landing/services' },
+      { label: 'بوابة العطاءات', href: '/landing/public-tenders' },
+      { label: 'التدريب', href: '/landing/training-center' },
+      { label: 'التشريعات', href: '/landing/legislation' },
+      { label: 'مكتبة الملفات', href: '/landing/library' },
+    ],
+  },
+  {
+    label: 'عن الاتحاد', href: '#',
+    children: [
+      { label: 'عن الاتحاد', href: '/landing/about' },
+      { label: 'مجلس الإدارة', href: '/landing/board' },
       { label: 'اللجان والفروع', href: '/landing/committees' },
       { label: 'أعضاء الاتحاد', href: '/landing/members' },
     ],
   },
   {
-    label: 'الخدمات', href: '#',
+    label: 'المركز الاعلامي', href: '#',
     children: [
-      { label: 'خدمات الاتحاد',  href: '/landing/services' },
-      { label: 'العطاءات',        href: '/landing/public-tenders' },
-      { label: 'مكتبة الملفات',  href: '/landing/library' },
+      { label: 'الأخبار', href: '/landing/news' },
+      { label: 'الفعاليات', href: '/landing/events' },
+      { label: 'المشاريع والمعارض', href: '/landing/projects' },
     ],
   },
-  { label: 'الأخبار',           href: '/landing/news' },
-  { label: 'الفعاليات',         href: '/landing/events' },
-  { label: 'المشاريع والمعارض', href: '/landing/projects' },
-  { label: 'التدريب',           href: '/landing/training-center' },
-  { label: 'التشريعات',         href: '/landing/legislation' },
-  { label: 'تواصل معنا',        href: '/landing/contact-us' },
+  { label: 'تواصل معنا', href: '/landing/contact-us' },
 ]
+
+const initials = (name?: string) => (name ?? '').trim().charAt(0)
 
 const openDropdown = ref<string | null>(null)
 const showUserMenu = ref(false)
@@ -153,15 +160,21 @@ onMounted(() => {
     <div class="pub-top-bar">
       <div class="pub-container pub-tb-inner">
         <div class="pub-tb-contacts">
-          <a href="tel:+97020000000" class="pub-tb-link">
-            <Phone :size="12" /> 2-000-0000 (970+)
+          <a href="tel:+970592373805" class="pub-tb-link" dir="ltr">
+            (970) 0592373805 <Smartphone :size="15" />
           </a>
           <a href="mailto:info@pcu.ps" class="pub-tb-link">info@pcu.ps</a>
         </div>
         <div class="pub-tb-social">
-          <a href="#" class="pub-tb-soc" aria-label="Facebook">f</a>
-          <a href="#" class="pub-tb-soc" aria-label="Twitter">𝕏</a>
-          <a href="#" class="pub-tb-soc" aria-label="LinkedIn">in</a>
+          <a href="#" class="pub-tb-soc" aria-label="Facebook">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M14 8V6.5c0-.8.2-1.3 1.4-1.3H17V2.2C16.7 2.1 15.7 2 14.6 2 12.2 2 10.6 3.5 10.6 6.1V8H8v3.3h2.6V22H14V11.3h2.7L17.1 8z" /></svg>
+          </a>
+          <a href="#" class="pub-tb-soc" aria-label="Instagram">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r=".8" fill="currentColor" /></svg>
+          </a>
+          <a href="#" class="pub-tb-soc" aria-label="X">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.8 3h3.1l-6.8 7.7L22 21h-6.2l-4.9-6.3L5.3 21H2.2l7.2-8.3L2 3h6.3l4.4 5.8zm-1.1 16.2h1.7L7.4 4.7H5.6z" /></svg>
+          </a>
         </div>
       </div>
     </div>
@@ -171,10 +184,6 @@ onMounted(() => {
       <div class="pub-container pub-nb-inner">
         <RouterLink to="/landing" class="pub-brand">
           <img src="/logo.png" alt="اتحاد المقاولين الفلسطينيين" class="pub-brand-logo" />
-          <div class="pub-brand-text">
-            <span class="pub-brand-ar">اتحاد المقاولين الفلسطينيين</span>
-            <span class="pub-brand-en">Palestinian Contractors Union</span>
-          </div>
         </RouterLink>
 
         <div class="pub-nav-links">
@@ -197,10 +206,11 @@ onMounted(() => {
 
         <div class="pub-nb-actions">
           <button v-if="!localProfile" class="pub-btn-register" @click="handleRegisterClick">
-            <HardHat :size="15" /> تسجيل العضوية
+            <HardHat :size="15" /> تسجيل الدخول
           </button>
+          <span v-if="localProfile?.status === 'active'" class="pub-member-pill"><i />عضوية سارية</span>
           <div v-if="localProfile" class="pub-nb-notif" @click.stop="toggleNotifDropdown">
-            <Bell :size="19" />
+            <Bell :size="24" fill="currentColor" />
             <span v-if="unreadCount > 0" class="pub-nb-notif-badge">{{ unreadCount > 9 ? '9+' : unreadCount }}</span>
             <div v-if="showNotifDropdown" class="pub-dropdown pub-notif-dropdown" @click.stop>
               <div class="pub-dd-header">الإشعارات</div>
@@ -216,9 +226,8 @@ onMounted(() => {
             </div>
           </div>
           <div v-if="localProfile" class="pub-nb-user" @click.stop="toggleUserMenu">
-            <div class="pub-nb-avatar">{{ localProfile.name.charAt(0) }}</div>
-            <span class="pub-nb-name">{{ localProfile.name }}</span>
-            <ChevronDown :size="13" class="pub-nav-chevron" :class="{ open: showUserMenu }" />
+            <div class="pub-nb-avatar">{{ initials(localProfile.name) }}</div>
+            <ChevronDown :size="16" class="pub-nav-chevron" :class="{ open: showUserMenu }" />
             <div v-if="showUserMenu" class="pub-dropdown pub-user-dropdown" @click.stop>
               <div class="pub-dd-header">{{ localProfile.name }}</div>
               <button class="pub-dd-link pub-dd-btn" @click="goToDashboard">
@@ -259,7 +268,7 @@ onMounted(() => {
           </button>
           <div v-else class="pub-mob-user-wrap">
             <div class="pub-mob-user">
-              <div class="pub-nb-avatar">{{ localProfile.name.charAt(0) }}</div>
+              <div class="pub-nb-avatar">{{ initials(localProfile.name) }}</div>
               <span class="pub-nb-name">{{ localProfile.name }}</span>
             </div>
             <button class="pub-mob-link" @click="goToDashboard">
@@ -283,47 +292,47 @@ onMounted(() => {
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap');
 @import url('https://fonts.cdnfonts.com/css/dubai');
 
-div { font-family: 'Dubai', 'Neo Sans Arabic', 'Tajawal', 'Neo Sans Arabic', 'Cairo', sans-serif; }
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
 
-.pub-top-bar {
-  background: #0d1b4b; padding: .4rem 0;
-  border-bottom: 1px solid rgba(255,255,255,.08);
-}
-.pub-container { max-width: 1240px; margin: 0 auto; padding: 0 1.5rem; }
+div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
+
+.pub-top-bar { background: linear-gradient(90deg, #000080, #0000c8); padding: .35rem 0; }
+.pub-container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
 .pub-tb-inner { display: flex; align-items: center; justify-content: space-between; }
-.pub-tb-contacts { display: flex; gap: 1.25rem; }
-.pub-tb-link { color: rgba(255,255,255,.75); font-size: .76rem; text-decoration: none; font-weight: 500; display: flex; align-items: center; gap: .3rem; transition: color .2s; }
-.pub-tb-link:hover { color: #f9a825; }
-.pub-tb-social { display: flex; gap: .35rem; }
-.pub-tb-soc { width: 22px; height: 22px; border-radius: 4px; background: rgba(255,255,255,.1); color: rgba(255,255,255,.7); display: flex; align-items: center; justify-content: center; font-size: .7rem; text-decoration: none; border: 1px solid rgba(255,255,255,.12); transition: all .2s; }
-.pub-tb-soc:hover { background: #f9a825; color: #0d1b4b; }
+.pub-tb-contacts { display: flex; gap: 1.75rem; }
+.pub-tb-link { color: #fff; font-size: .9rem; text-decoration: none; font-weight: 700; display: flex; align-items: center; gap: .4rem; }
+.pub-tb-link:hover { color: #ffbe1a; }
+.pub-tb-social { display: flex; gap: .6rem; }
+.pub-tb-soc { width: 22px; height: 22px; border-radius: 5px; background: rgba(255,255,255,.12); color: #fff; display: flex; align-items: center; justify-content: center; text-decoration: none; border: 1px solid rgba(255,255,255,.35); transition: all .2s; }
+.pub-tb-soc:hover { background: #d67a00; border-color: #d67a00; }
 
 .pub-navbar {
   position: sticky; top: 0; z-index: 200;
-  background: rgba(255,255,255,.96); backdrop-filter: blur(14px);
-  border-bottom: 1px solid #e5e7eb; padding: .6rem 0;
+  background: #fff; padding: .45rem 0;
   transition: box-shadow .3s;
 }
-.pub-navbar.scrolled { box-shadow: 0 4px 24px rgba(13,27,75,.1); }
+.pub-navbar.scrolled { box-shadow: 0 4px 24px rgba(0,0,80,.1); }
 .pub-nb-inner { display: flex; align-items: center; gap: 1rem; }
 
-.pub-brand { display: flex; align-items: center; gap: .6rem; text-decoration: none; flex-shrink: 0; }
-.pub-brand-logo { height: 50px; width: auto; object-fit: contain; }
-.pub-brand-text { display: flex; flex-direction: column; line-height: 1.25; }
-.pub-brand-ar { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: .85rem; font-weight: 900; color: #0d1b4b; }
-.pub-brand-en { font-size: .62rem; color: #6b7280; letter-spacing: .03em; }
+.pub-brand { display: flex; align-items: center; text-decoration: none; flex-shrink: 0; }
+.pub-brand-logo { height: 70px; width: auto; object-fit: contain; }
 
-.pub-nav-links { display: flex; gap: 0; margin-inline-start: auto; margin-inline-end: .5rem; }
+.pub-nav-links { display: flex; gap: 1.6rem; margin-inline-start: 2.4rem; margin-inline-end: auto; }
 .pub-nav-item { position: relative; }
 .pub-nav-link {
-  display: flex; align-items: center; gap: .25rem;
-  padding: .42rem .75rem; color: #374151; font-size: .82rem;
-  font-weight: 600; text-decoration: none; border-radius: 7px;
-  transition: all .2s; white-space: nowrap; background: none; border: none;
-  cursor: pointer; font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif;
+  display: flex; align-items: center; gap: .35rem;
+  padding: .45rem 0; color: #5b6474; font-size: 1rem;
+  font-weight: 500; text-decoration: none;
+  transition: color .2s; white-space: nowrap; background: none; border: none;
+  cursor: pointer;
 }
-.pub-nav-link:hover, .router-link-active.pub-nav-link { color: #1a237e; background: #e8eaf6; }
-.pub-nav-btn { font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif; }
+.pub-nav-link:hover, .router-link-exact-active.pub-nav-link { color: #000090; }
+.router-link-exact-active.pub-nav-link { font-weight: 700; }
+.pub-member-pill {
+  display: inline-flex; align-items: center; gap: .5rem; background: #e3f6e8; color: #11903a;
+  border-radius: 14px; padding: .6rem 1.1rem; font-size: .95rem; font-weight: 600; white-space: nowrap;
+}
+.pub-member-pill i { width: 9px; height: 9px; border-radius: 50%; background: #11903a; }
 .pub-nav-chevron { transition: transform .25s; flex-shrink: 0; }
 .pub-nav-chevron.open { transform: rotate(-180deg); }
 
@@ -343,7 +352,7 @@ div { font-family: 'Dubai', 'Neo Sans Arabic', 'Tajawal', 'Neo Sans Arabic', 'Ca
 
 .pub-btn-register {
   display: flex; align-items: center; gap: .4rem;
-  background: linear-gradient(135deg, #1a237e, #0d1b4b);
+  background: linear-gradient(90deg, #000080, #0000e0);
   color: #fff; border: none; border-radius: 9px;
   padding: .5rem 1.2rem; font-size: .82rem; font-weight: 700;
   cursor: pointer; font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif; white-space: nowrap;
@@ -370,8 +379,8 @@ div { font-family: 'Dubai', 'Neo Sans Arabic', 'Tajawal', 'Neo Sans Arabic', 'Ca
 .pub-mob-sub-link:hover { background: #e8eaf6; color: #1a237e; }
 .pub-mob-cta { width: 100%; justify-content: center; margin-top: .75rem; border-radius: 9px; padding: .65rem 1.5rem; }
 
-.pub-nb-actions { display: flex; align-items: center; gap: .5rem; flex-shrink: 0; }
-.pub-nb-notif { position: relative; display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; color: #374151; transition: background .2s; }
+.pub-nb-actions { display: flex; align-items: center; gap: 1.4rem; flex-shrink: 0; }
+.pub-nb-notif { position: relative; display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; color: #9aa1ad; transition: background .2s; }
 .pub-nb-notif:hover { background: #f3f4f6; }
 .pub-nb-notif-badge {
   position: absolute; top: 2px; inset-inline-end: 2px;
@@ -392,7 +401,7 @@ div { font-family: 'Dubai', 'Neo Sans Arabic', 'Tajawal', 'Neo Sans Arabic', 'Ca
 .pub-notif-item span { font-size: .72rem; color: #9ca3af; }
 .pub-nb-user { display: flex; align-items: center; gap: .6rem; position: relative; cursor: pointer; padding: .3rem .5rem; border-radius: 9px; transition: background .2s; }
 .pub-nb-user:hover { background: #f3f4f6; }
-.pub-nb-avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, #1a237e, #0d1b4b); color: #fff; display: flex; align-items: center; justify-content: center; font-size: .85rem; font-weight: 800; font-family: 'Neo Sans Arabic', 'Cairo', 'Dubai', sans-serif; flex-shrink: 0; }
+.pub-nb-avatar { width: 46px; height: 46px; border-radius: 50%; background: #00006e; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; font-weight: 700; flex-shrink: 0; }
 .pub-nb-name { font-size: .8rem; font-weight: 700; color: #0d1b4b; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pub-nb-logout { background: transparent; border: 1.5px solid #e5e7eb; border-radius: 7px; padding: .3rem .75rem; font-size: .75rem; color: #6b7280; cursor: pointer; font-family: inherit; transition: all .2s; }
 .pub-nb-logout:hover { border-color: #c62828; color: #c62828; }
