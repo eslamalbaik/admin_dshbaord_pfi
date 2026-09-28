@@ -227,6 +227,11 @@ class AnnouncementController extends Controller
     // PUT /api/v1/admin/announcements/{announcement}
     public function update(Request $request, Announcement $announcement)
     {
+        // published_at لازم يكون اليوم أو بعده فقط لو فعليًا اتغيّر عن القيمة المخزّنة — حتى لا نمنع حفظ تعديلات
+        // على تعميم قديم بدون لمس التاريخ (نفس منطق store()، REQ-12 #1).
+        $currentDate = $announcement->published_at?->toDateString();
+        $isDateChanged = $request->filled('published_at') && $request->date('published_at')->toDateString() !== $currentDate;
+
         $validated = $request->validate([
             'title'        => 'sometimes|string|max:255',
             'number'       => 'nullable|string|max:100',
@@ -237,7 +242,7 @@ class AnnouncementController extends Controller
             'attachment'   => 'nullable|file|mimes:pdf,doc,docx|max:10240',
             'is_published' => 'boolean',
             'is_pinned'    => 'boolean',
-            'published_at' => 'nullable|date',
+            'published_at' => $isDateChanged ? 'nullable|date|after_or_equal:today' : 'nullable|date',
         ]);
 
         if (array_key_exists('category_id', $validated) && $validated['category_id']) {
