@@ -106,20 +106,23 @@ onMounted(async () => {
 })
 
 // ─── Image selection ─────────────────────────────────────────────────────────
+const MAX_IMAGES   = 5
+const MAX_IMAGE_MB = 5
+
 const onFilesSelected = (e: Event) => {
   const input = e.target as HTMLInputElement
   if (!input.files) return
   imageErrors.value = ''
   const files = Array.from(input.files)
   for (const f of files) {
-    if (f.size > 3 * 1024 * 1024) {
-      imageErrors.value = 'حجم الصورة يجب ألا يتجاوز 3 ميغابايت'
+    if (f.size > MAX_IMAGE_MB * 1024 * 1024) {
+      imageErrors.value = `حجم الصورة "${f.name}" (${(f.size / 1024 / 1024).toFixed(1)} ميغابايت) يتجاوز الحد الأقصى ${MAX_IMAGE_MB} ميغابايت — فشل رفعها.`
       return
     }
   }
-  if (files.length > 8)
-    imageErrors.value = `الحد الأقصى 8 صور — تم اختيار أول 8 من أصل ${files.length}.`
-  newImages.value = files.slice(0, 8)
+  if (files.length > MAX_IMAGES)
+    imageErrors.value = `الحد الأقصى ${MAX_IMAGES} صور — تم اختيار أول ${MAX_IMAGES} من أصل ${files.length}.`
+  newImages.value = files.slice(0, MAX_IMAGES)
 }
 
 // ─── Submit ───────────────────────────────────────────────────────────────────
@@ -260,7 +263,9 @@ const contractTypeOptions = [
           <VCol cols="12" md="6">
             <VTextField
               v-model="form.owner_phone"
-              label="رقم هاتف المالك"
+              label="رقم واتساب المالك"
+              hint="يُستخدم للتواصل المباشر عبر واتساب من شاشة تفاصيل الآلية"
+              persistent-hint
               placeholder="0599-XXXXXX"
               variant="outlined"
               density="compact"
@@ -270,11 +275,11 @@ const contractTypeOptions = [
           <VCol cols="12">
             <VTextarea
               v-model="form.description"
-              label="وصف الآلية"
+              label="وصف الحالة الفنية للآلية"
               variant="outlined"
               density="compact"
               rows="3"
-              maxlength="2000"
+              maxlength="250"
               counter
               style="font-family:Cairo,sans-serif"
             />
@@ -335,11 +340,12 @@ const contractTypeOptions = [
 
           <VDivider class="my-2" />
 
-          <!-- Section: الموقع والسعر -->
+          <!-- Section: الموقع — لا يوجد حقل سعر للآلية أصلاً؛ نوع العقد (يومي/أسبوعي/شهري) أعلاه
+               هو فقط مدة التأجير، والتسعير الفعلي يتم خارج المنصة بين المالك والمستأجر مباشرة -->
           <VCol cols="12">
             <p class="text-subtitle-1 font-weight-bold mb-3" style="font-family:Cairo,sans-serif;color:#000269">
               <VIcon icon="tabler-map-pin" size="18" class="me-1" />
-              الموقع والسعر
+              الموقع
             </p>
           </VCol>
 
@@ -415,7 +421,7 @@ const contractTypeOptions = [
             <VCol cols="12">
               <p class="text-subtitle-1 font-weight-bold mb-3" style="font-family:Cairo,sans-serif;color:#000269">
                 <VIcon icon="tabler-photo" size="18" class="me-1" />
-                صور الآلية (حتى 8 صور)
+                صور الآلية (حتى {{ MAX_IMAGES }} صور)
               </p>
               <VFileInput
                 label="اختر الصور"
@@ -429,7 +435,7 @@ const contractTypeOptions = [
                 @change="onFilesSelected"
               />
               <p class="text-caption text-medium-emphasis mt-1" style="font-family:Cairo,sans-serif">
-                JPG، PNG، WebP — الحد الأقصى 3 ميغابايت للصورة الواحدة. يمكنك إضافة المزيد من الصور لاحقاً.
+                JPG، PNG، WebP — الحد الأقصى {{ MAX_IMAGES }} صور، وحتى {{ MAX_IMAGE_MB }} ميغابايت للصورة الواحدة. يمكنك إضافة المزيد من الصور لاحقاً.
               </p>
             </VCol>
           </template>
