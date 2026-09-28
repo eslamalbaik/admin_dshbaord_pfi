@@ -340,7 +340,10 @@ const submit = async () => {
       // المستخدم للملف أصلاً، وهو سبب الخطأ المُبلَّغ عنه بعد فشل التحديث وحذف كل المرفقات (REQ-01 #4).
       if (Array.isArray(v) && v.length === 0 && k !== 'partners' && k !== 'specialties')
         return
-      if (v !== null) {
+      // v-model لحقل ملف مُفرَّغ (زر X) قد يصير undefined لا null فقط — v !== null وحدها
+      // كانت تسمح بمرور undefined فيُرسَل كنص "undefined" حرفياً فيرفضه الخادم (سبب
+      // ظهور الحقل "مطلوب" رغم أن المستخدم لم يقصد تعديل هذا المستند أصلاً).
+      if (v != null) {
         if (k === 'partners' && Array.isArray(v)) {
           fd.append(k, v.join(','))
         } else if (k === 'specialties' && Array.isArray(v)) {

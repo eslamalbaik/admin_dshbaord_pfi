@@ -350,9 +350,18 @@ class TenderController extends Controller
         }
 
         // فلترة "مجالاتي" (REQ-13) — فقط ضمن سياق مقاول موثَّق
+        //
+        // Contractor.specialties مصفوفة كائنات {field_lk_type, specialization_lk_type, classification}
+        // وليست أسماء تصنيفات — لازم تُحوَّل لأسماء المجالات (نفس نصوص tenders.category) قبل المقارنة،
+        // وإلا whereIn() يقارن عمود نصي بمصفوفة كائنات فلا يطابق أي عطاء أبداً.
         if ($request->input('scope') === 'my_specialties' && $request->user() instanceof Contractor) {
-            $specialties = $request->user()->specialties ?? [];
-            $query->whereIn('category', $specialties ?: ['__none__']);
+            $fieldNames = collect($request->user()->specialties ?? [])
+                ->map(fn ($spec) => \App\Support\ContractorLookups::fieldName($spec['field_lk_type'] ?? null))
+                ->filter(fn ($name) => $name && $name !== 'غير محدد')
+                ->unique()
+                ->values();
+
+            $query->whereIn('category', $fieldNames->isNotEmpty() ? $fieldNames : ['__none__']);
         }
 
         // toggle "العطاءات المهتم بها فقط" بمودال التصفية — بديل داخل applyFilters لمسار bookmarked المخصَّص
