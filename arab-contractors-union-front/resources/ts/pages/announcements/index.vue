@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import api from '@/plugins/axios'
-import { firstFile, type SingleFileModel } from '@/utils/files'
 
 definePage({ meta: { requiresAdmin: true, adminOnly: true } })
 
@@ -80,20 +79,15 @@ const emptyForm = () => ({
   is_published: false,
   is_pinned: false,
   published_at: '',
-  attachmentName: '' as string,
 })
 
 const formDialog = ref(false)
 const formLoading = ref(false)
 const isEditing = ref(false)
 const form = ref(emptyForm())
-const imageFile = ref<SingleFileModel>(null)
-const attachmentFile = ref<SingleFileModel>(null)
 
 const openCreate = () => {
   form.value = emptyForm()
-  imageFile.value = null
-  attachmentFile.value = null
   isEditing.value = false
   formDialog.value = true
 }
@@ -108,10 +102,7 @@ const openEdit = (item: any) => {
     is_published: !!item.is_published,
     is_pinned: !!item.is_pinned,
     published_at: item.published_at ? item.published_at.substring(0, 10) : '',
-    attachmentName: item.attachment ? item.attachment.split('/').pop() : '',
   }
-  imageFile.value = null
-  attachmentFile.value = null
   isEditing.value = true
   formDialog.value = true
 }
@@ -141,11 +132,6 @@ const saveAnnouncement = async () => {
     if (isEditing.value && form.value.number) fd.append('number', form.value.number)
     if (form.value.category_id) fd.append('category_id', String(form.value.category_id))
     if (form.value.published_at) fd.append('published_at', form.value.published_at)
-    const image = firstFile(imageFile.value)
-    const attachment = firstFile(attachmentFile.value)
-
-    if (image) fd.append('image', image)
-    if (attachment) fd.append('attachment', attachment)
 
     if (isEditing.value) {
       fd.append('_method', 'PUT')
@@ -326,17 +312,15 @@ const deleteAnnouncement = async () => {
             <VCol cols="12" md="8">
               <VTextField v-model="form.title" label="عنوان التعميم" style="font-family:Cairo,sans-serif" />
             </VCol>
-            <VCol cols="12" md="4">
+            <VCol v-if="isEditing" cols="12" md="4">
               <VTextField
                 v-model="form.number"
-                :label="isEditing ? 'رقم التعميم' : 'رقم التعميم (يُولَّد تلقائياً)'"
-                :readonly="!isEditing"
-                :placeholder="isEditing ? '' : 'سيُحدَّد تلقائياً عند الحفظ'"
+                label="رقم التعميم"
                 dir="ltr"
                 style="font-family:Cairo,sans-serif"
               />
             </VCol>
-            <VCol cols="12" md="6">
+            <VCol cols="12" :md="isEditing ? 6 : 8">
               <VSelect
                 v-model="form.category_id"
                 :items="managedCategories"
@@ -352,33 +336,12 @@ const deleteAnnouncement = async () => {
                 v-model="form.published_at"
                 label="تاريخ النشر (اختياري — الآن افتراضياً)"
                 type="date"
-                :min="isEditing ? undefined : new Date().toISOString().slice(0, 10)"
+                :min="new Date().toISOString().slice(0, 10)"
                 style="font-family:Cairo,sans-serif"
               />
             </VCol>
             <VCol cols="12">
               <VTextarea v-model="form.body" label="نص التعميم" rows="6" style="font-family:Cairo,sans-serif" />
-            </VCol>
-
-            <VCol cols="12" md="6">
-              <VFileInput
-                v-model="imageFile"
-                label="صورة التعميم (اختياري)"
-                prepend-inner-icon="tabler-photo"
-                prepend-icon=""
-                accept="image/*"
-                style="font-family:Cairo,sans-serif"
-              />
-            </VCol>
-            <VCol cols="12" md="6">
-              <VFileInput
-                v-model="attachmentFile"
-                :label="isEditing && form.attachmentName ? `استبدال المرفق (الحالي: ${form.attachmentName})` : 'مرفق PDF/Word (اختياري)'"
-                prepend-inner-icon="tabler-paperclip"
-                prepend-icon=""
-                accept=".pdf,.doc,.docx"
-                style="font-family:Cairo,sans-serif"
-              />
             </VCol>
 
             <VCol cols="12" md="6" class="d-flex align-center">
