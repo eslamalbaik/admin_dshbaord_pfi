@@ -170,8 +170,8 @@ const saveEvent = async () => {
     notify('العنوان والمحتوى مطلوبان', 'error')
     return
   }
-  if (form.value.event_format === 'onsite' && !form.value.event_location) {
-    notify('مكان الفعالية مطلوب لأن نوع الحضور وجاهي', 'error')
+  if ((form.value.event_format === 'onsite' || form.value.event_format === 'hybrid') && !form.value.event_location) {
+    notify('مكان الفعالية مطلوب لأن نوع الحضور وجاهي أو وجاهي + أونلاين', 'error')
     return
   }
   formLoading.value = true
@@ -486,7 +486,7 @@ const deleteEvent = async () => {
                 v-model="form.event_location"
                 label="مكان الفعالية *"
                 prepend-inner-icon="tabler-map-pin"
-                :rules="[v => !!v || 'مطلوب لأن نوع الحضور وجاهي']"
+                :rules="[v => !!v || 'مطلوب لأن نوع الحضور وجاهي أو وجاهي + أونلاين']"
                 style="font-family:Cairo,sans-serif"
               />
             </VCol>
