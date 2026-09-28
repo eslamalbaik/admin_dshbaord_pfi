@@ -39,6 +39,10 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
+          # القيمة الافتراضية (30s) قصيرة لما يبدأ هالران فوراً بعد ما ران سابق
+          # بنفس مجموعة concurrency لسا خلّص build/npm تقيل عالسيرفر المشترك —
+          # السيرفر بيضل مشغول شوي فبيفوت وقت الـ dial قبل ما يقدر يرد على SSH.
+          timeout: 90s
           script_stop: true
           script: |
             cd /var/www/pcuorg/api && ./deploy-vps.sh
