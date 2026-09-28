@@ -85,6 +85,11 @@ class NewsController extends Controller
             // لازم اليوم أو بعده عند الإنشاء (REQ-10 #2) — التعديل يبقى بلا قيد (نفس نمط
             // Tenders/Announcement/Event) حتى لا يُمنع تصحيح خبر قديم تاريخ نشره بالماضي فعلياً.
             'published_at' => 'nullable|date|after_or_equal:today',
+        ], [
+            'image.max'          => 'حجم الصورة الرئيسية يتجاوز الحد الأقصى 5 ميجابايت.',
+            'gallery.max'        => 'الحد الأقصى 5 صور للمعرض.',
+            'gallery.*.max'      => 'حجم إحدى صور المعرض يتجاوز الحد الأقصى 5 ميجابايت.',
+            'published_at.after_or_equal' => 'يجب أن يكون تاريخ النشر اليوم أو بعده.',
         ]);
 
         $this->handleMediaUploads($request, $validated);
@@ -118,6 +123,9 @@ class NewsController extends Controller
             'remove_gallery.*' => 'string',
             'is_published'     => 'boolean',
             'published_at'     => 'nullable|date',
+        ], [
+            'image.max'     => 'حجم الصورة الرئيسية يتجاوز الحد الأقصى 5 ميجابايت.',
+            'gallery.*.max' => 'حجم إحدى صور المعرض يتجاوز الحد الأقصى 5 ميجابايت.',
         ]);
 
         $this->handleMediaUploads($request, $validated, $news);

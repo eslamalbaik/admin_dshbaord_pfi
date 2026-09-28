@@ -109,6 +109,53 @@ const galleryOverLimitMessage = computed(() =>
   galleryTotalCount.value > 5 ? [`تجاوزت الحد الأقصى (${galleryTotalCount.value}/5) — احذف صور قبل الإضافة`] : [],
 )
 
+const MAX_IMAGE_MB = 5
+
+// معاينات الصور المُختارة حديثاً (لسه ما انرفعت) — تُبنى من كائنات File مباشرة، وتُحرَّر
+// (revokeObjectURL) عند تغيّر القائمة لمنع تسريب الذاكرة
+const newGalleryPreviews = ref<string[]>([])
+
+watch(() => form.value.gallery, files => {
+  newGalleryPreviews.value.forEach(url => URL.revokeObjectURL(url))
+  newGalleryPreviews.value = files.map(f => URL.createObjectURL(f))
+}, { immediate: true })
+
+const removeNewGalleryFile = (index: number) => {
+  form.value.gallery = form.value.gallery.filter((_, i) => i !== index)
+}
+
+/** يرفض أي ملف أكبر من الحد المسموح قبل إضافته للفورم، ويعرض السبب — بدل الانتظار لرفض الخادم بعد الرفع بالكامل */
+const rejectOversizedFiles = (files: File[]): File[] => {
+  const oversized = files.filter(f => f.size > MAX_IMAGE_MB * 1024 * 1024)
+  if (oversized.length) {
+    notify(
+      `فشل رفع ${oversized.length > 1 ? 'الصور التالية' : 'الصورة'}: ${oversized.map(f => `"${f.name}" (${(f.size / 1024 / 1024).toFixed(1)} ميجابايت)`).join('، ')} — `
+      + `يتجاوز الحد الأقصى ${MAX_IMAGE_MB} ميجابايت للصورة الواحدة.`,
+      'error',
+    )
+  }
+  return files.filter(f => f.size <= MAX_IMAGE_MB * 1024 * 1024)
+}
+
+const onGalleryFilesSelected = (files: File[]) => {
+  form.value.gallery = rejectOversizedFiles(files)
+}
+
+const onMainImageSelected = (value: SingleFileModel) => {
+  const file = firstFile(value)
+  if (file && rejectOversizedFiles([file]).length === 0) {
+    mainImageFile.value = null
+    return
+  }
+  mainImageFile.value = value
+}
+
+// اختيار تاريخ لاحق يحوّل معنى المفتاح من "نشر مباشرة" إلى "جدولة نشر" — is_published يبقى
+// شرط تفعيل النشر بالحالتين (مباشر أو مؤجَّل)، لأن scopePublished بالموديل يتطلبه بغض النظر
+// عن published_at، فإخفاؤه أو تعطيله كان سيعطّل آلية الجدولة بالكامل
+const todayStr = () => new Date().toISOString().slice(0, 10)
+const isScheduledForLater = computed(() => !!form.value.published_at && form.value.published_at !== todayStr())
+
 const openCreate = () => {
   form.value = emptyForm()
   mainImageFile.value = null
@@ -179,7 +226,11 @@ const saveNews = async () => {
     fetchNews()
   } catch (err: any) {
     console.error(err)
-    notify(err?.response?.data?.message || 'تعذّر حفظ الخبر', 'error')
+    // الخادم يرجّع رسالة عامة بـmessage ("البيانات المدخلة غير صحيحة") وتفاصيل السبب الفعلي
+    // (حجم صورة، تاريخ نشر...) بمفتاح errors — عرض message وحدها كان يُخفي السبب عن الأدمن
+    const fieldErrors = err?.response?.data?.errors
+    const reason = fieldErrors ? Object.values(fieldErrors).flat().join(' — ') : null
+    notify(reason || err?.response?.data?.message || 'تعذّر حفظ الخبر', 'error')
   } finally {
     formLoading.value = false
   }
@@ -318,8 +369,11 @@ const deleteNews = async () => {
                 prepend-inner-icon="tabler-photo"
                 prepend-icon=""
                 accept="image/*"
+                :hint="`الحد الأقصى ${MAX_IMAGE_MB} ميجابايت`"
+                persistent-hint
                 style="font-family:Cairo,sans-serif"
-                v-model="mainImageFile"
+                :model-value="mainImageFile"
+                @update:model-value="onMainImageSelected"
               />
             </VCol>
             <VCol cols="12" md="6">
@@ -330,10 +384,36 @@ const deleteNews = async () => {
                 accept="image/*"
                 multiple
                 :error-messages="galleryOverLimitMessage"
+                :hint="`يمكن اختيار كل الصور دفعة واحدة — الحد الأقصى ${MAX_IMAGE_MB} ميجابايت لكل صورة`"
+                persistent-hint
                 style="font-family:Cairo,sans-serif"
                 :model-value="form.gallery"
-                @update:model-value="form.gallery = toFileArray($event)"
+                @update:model-value="onGalleryFilesSelected(toFileArray($event))"
               />
+            </VCol>
+
+            <VCol v-if="newGalleryPreviews.length" cols="12">
+              <label class="text-body-2 font-weight-medium mb-2 d-block" style="font-family:Cairo,sans-serif">
+                معاينة الصور المُختارة (لم تُنشر بعد — اضغط أيقونة الحذف لإزالة صورة على حدة)
+              </label>
+              <div class="d-flex flex-wrap gap-3">
+                <div
+                  v-for="(url, index) in newGalleryPreviews"
+                  :key="url"
+                  class="position-relative"
+                  style="width:80px;height:80px"
+                >
+                  <VImg :src="url" width="80" height="80" cover rounded />
+                  <VIcon
+                    icon="tabler-trash"
+                    color="error"
+                    size="18"
+                    class="position-absolute"
+                    style="top:2px;left:2px;background:white;border-radius:50%;padding:2px;cursor:pointer"
+                    @click="removeNewGalleryFile(index)"
+                  />
+                </div>
+              </div>
             </VCol>
 
             <VCol v-if="form.existingGallery.length" cols="12">
@@ -377,7 +457,12 @@ const deleteNews = async () => {
               />
             </VCol>
             <VCol cols="12" md="6" class="d-flex align-center">
-              <VSwitch v-model="form.is_published" label="نشر مباشرة" color="success" style="font-family:Cairo,sans-serif" />
+              <VSwitch
+                v-model="form.is_published"
+                :label="isScheduledForLater ? 'جدولة النشر لهذا التاريخ' : 'نشر مباشرة'"
+                color="success"
+                style="font-family:Cairo,sans-serif"
+              />
             </VCol>
           </VRow>
         </VCardText>

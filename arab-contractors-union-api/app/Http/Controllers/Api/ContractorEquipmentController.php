@@ -23,6 +23,13 @@ class ContractorEquipmentController extends Controller
 {
     use ApiResponseTrait;
 
+    /** حدود صور إعلان الآلية — 5 صور كحد أقصى، 5 ميجابايت لكل صورة. */
+    private const MAX_IMAGES    = 5;
+    private const MAX_IMAGE_KB  = 5120;
+
+    /** حد وصف الحالة الفنية للآلية بالحروف. */
+    private const DESCRIPTION_MAX_LENGTH = 250;
+
     public function __construct(
         private \App\Services\ContractorFinancialService $financialService
     ) {}
@@ -134,7 +141,7 @@ class ContractorEquipmentController extends Controller
             'equipment_type_id'  => 'required|exists:equipment_types,id',
             'name'               => 'required|string|max:255',
             'brand'              => 'nullable|string|max:100',
-            'description'        => 'nullable|string|max:2000',
+            'description'        => 'nullable|string|max:' . self::DESCRIPTION_MAX_LENGTH,
             'manufacture_year'   => 'nullable|integer|min:1970|max:' . date('Y'),
             'power'              => 'nullable|string|max:50',
             'condition'          => 'nullable|in:excellent,good,needs_maintenance',
@@ -143,8 +150,11 @@ class ContractorEquipmentController extends Controller
             'city'               => 'nullable|string|max:100',
             'owner_phone'        => 'nullable|string|max:20',
             'accept_disclaimer'  => 'sometimes|boolean',
-            'images'             => 'nullable|array|max:8',
-            'images.*'           => 'image|mimes:jpg,jpeg,png,webp|max:3072',
+            'images'             => 'nullable|array|max:' . self::MAX_IMAGES,
+            'images.*'           => 'image|mimes:jpg,jpeg,png,webp|max:' . self::MAX_IMAGE_KB,
+        ], [
+            'images.max'   => 'الحد الأقصى ' . self::MAX_IMAGES . ' صور لكل آلية.',
+            'images.*.max' => 'حجم الصورة يتجاوز الحد الأقصى ' . (self::MAX_IMAGE_KB / 1024) . ' ميجابايت.',
         ]);
 
         if (! $contractor->equipment_disclaimer_accepted_at) {
@@ -200,7 +210,7 @@ class ContractorEquipmentController extends Controller
             'equipment_type_id' => 'sometimes|exists:equipment_types,id',
             'name'              => 'sometimes|string|max:255',
             'brand'             => 'nullable|string|max:100',
-            'description'       => 'nullable|string|max:2000',
+            'description'       => 'nullable|string|max:' . self::DESCRIPTION_MAX_LENGTH,
             'manufacture_year'  => 'nullable|integer|min:1970|max:' . date('Y'),
             'power'             => 'nullable|string|max:50',
             'condition'         => 'nullable|in:excellent,good,needs_maintenance',
@@ -233,16 +243,18 @@ class ContractorEquipmentController extends Controller
 
         $request->validate([
             'images'   => 'required|array|min:1',
-            'images.*' => 'image|mimes:jpg,jpeg,png,webp|max:3072',
+            'images.*' => 'image|mimes:jpg,jpeg,png,webp|max:' . self::MAX_IMAGE_KB,
+        ], [
+            'images.*.max' => 'حجم الصورة يتجاوز الحد الأقصى ' . (self::MAX_IMAGE_KB / 1024) . ' ميجابايت.',
         ]);
 
-        // الحد 8 صور إجمالي (موجودة + جديدة)، لا الدفعة المرفوعة فقط
+        // الحد 5 صور إجمالي (موجودة + جديدة)، لا الدفعة المرفوعة فقط
         $existingCount = $equipment->images()->count();
         $newCount      = count($request->file('images'));
 
-        if ($existingCount + $newCount > 8) {
+        if ($existingCount + $newCount > self::MAX_IMAGES) {
             return $this->error(
-                "الحد الأقصى 8 صور لكل آلية. لديك حالياً {$existingCount} صورة، ولا يمكن إضافة {$newCount} أخرى.",
+                'الحد الأقصى ' . self::MAX_IMAGES . " صور لكل آلية. لديك حالياً {$existingCount} صورة، ولا يمكن إضافة {$newCount} أخرى.",
                 422,
             );
         }

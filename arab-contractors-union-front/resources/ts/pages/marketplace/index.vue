@@ -33,7 +33,6 @@ const filterContractType = ref('')
 const editDialog    = ref(false)
 const deleteDialog  = ref(false)
 const imagesDialog  = ref(false)
-const calendarDialog = ref(false)
 const selectedItem  = ref<any>(null)
 const saving        = ref(false)
 const deleting      = ref(false)
@@ -49,16 +48,6 @@ const editForm = ref({
 const imageUploading = ref(false)
 const imageFiles     = ref<File[]>([])
 const equipImages    = ref<any[]>([])
-
-// calendar (blocked dates)
-const blockedDates   = ref<any[]>([])
-const calLoading     = ref(false)
-const newDates       = ref<string[]>([])
-const dateReason     = ref('booked')
-
-// حجوزات فعلية طلبها مقاولون من التطبيق — للعرض فقط، مختلفة تماماً عن blockedDates
-// (حجب يدوي يضيفه الأدمن). الفصل بينهم هو جواب REQ-08 #6
-const reservations   = ref<any[]>([])
 
 // ─── Options ────────────────────────────────────────────────────────────────
 const statusOptions = [
@@ -248,12 +237,23 @@ const openImages = async (item: any) => {
   imagesDialog.value = true
 }
 
+const MAX_IMAGES   = 5
+const MAX_IMAGE_MB = 5
+
 const onImageFiles = (e: Event) => {
   const input = e.target as HTMLInputElement
   const files = input.files ? Array.from(input.files) : []
-  const remaining = 8 - equipImages.value.length
+
+  const tooBig = files.find(f => f.size > MAX_IMAGE_MB * 1024 * 1024)
+  if (tooBig) {
+    notify(`حجم الصورة "${tooBig.name}" (${(tooBig.size / 1024 / 1024).toFixed(1)} ميغابايت) يتجاوز الحد الأقصى ${MAX_IMAGE_MB} ميغابايت — فشل رفعها.`, 'error')
+    imageFiles.value = []
+    return
+  }
+
+  const remaining = MAX_IMAGES - equipImages.value.length
   if (files.length > remaining) {
-    notify(`الحد الأقصى 8 صور لكل آلية — لديها ${equipImages.value.length} حالياً، تم اختيار أول ${Math.max(remaining, 0)} فقط من ${files.length} صورة.`, 'warning')
+    notify(`الحد الأقصى ${MAX_IMAGES} صور لكل آلية — لديها ${equipImages.value.length} حالياً، تم اختيار أول ${Math.max(remaining, 0)} فقط من ${files.length} صورة.`, 'warning')
   }
   imageFiles.value = files.slice(0, Math.max(remaining, 0))
 }
@@ -299,48 +299,6 @@ const setPrimary = async (img: any) => {
   equipImages.value.forEach(i => (i.is_primary = i.id === img.id))
 }
 
-// ─── Blocked Dates ────────────────────────────────────────────────────────────
-const openCalendar = async (item: any) => {
-  selectedItem.value  = item
-  calLoading.value    = true
-  calendarDialog.value = true
-  newDates.value      = []
-  try {
-    const [blockedRes, reservationsRes] = await Promise.all([
-      api.get(`/api/v1/equipment/${item.id}/blocked-dates`),
-      api.get(`/api/v1/equipment/${item.id}/reservations`),
-    ])
-    blockedDates.value = blockedRes.data
-    reservations.value = reservationsRes.data
-  }
-  finally {
-    calLoading.value = false
-  }
-}
-
-const addBlockedDates = async () => {
-  if (!newDates.value.length) return
-  const { data } = await api.post(`/api/v1/equipment/${selectedItem.value.id}/blocked-dates`, {
-    dates: newDates.value,
-    reason: dateReason.value,
-  })
-  blockedDates.value.push(...data)
-  newDates.value = []
-}
-
-const removeDate = async (bd: any) => {
-  await api.delete(`/api/v1/equipment/${selectedItem.value.id}/blocked-dates/${bd.id}`)
-  blockedDates.value = blockedDates.value.filter(d => d.id !== bd.id)
-}
-
-const reasonLabel: Record<string, string> = {
-  booked: 'محجوز', maintenance: 'صيانة', other: 'أخرى',
-}
-
-const reservationStatus: Record<string, { color: string; label: string }> = {
-  confirmed: { color: 'success', label: 'مؤكَّد' },
-  cancelled: { color: 'secondary', label: 'ملغى' },
-}
 </script>
 
 <template>
@@ -544,10 +502,6 @@ const reservationStatus: Record<string, { color: string; label: string }> = {
                   <VIcon icon="tabler-photo" size="16" />
                   <VTooltip activator="parent">الصور</VTooltip>
                 </VBtn>
-                <VBtn icon size="x-small" variant="tonal" color="secondary" @click="openCalendar(item)">
-                  <VIcon icon="tabler-calendar" size="16" />
-                  <VTooltip activator="parent">تواريخ عدم التوفر (حجز/صيانة)</VTooltip>
-                </VBtn>
                 <VBtn
                   icon
                   size="x-small"
@@ -606,7 +560,15 @@ const reservationStatus: Record<string, { color: string; label: string }> = {
               <VTextField v-model="editForm.brand" label="الماركة" variant="outlined" density="compact" style="font-family:Cairo,sans-serif" />
             </VCol>
             <VCol cols="12" md="6">
-              <VTextField v-model="editForm.owner_phone" label="هاتف المالك" variant="outlined" density="compact" style="font-family:Cairo,sans-serif" />
+              <VTextField
+                v-model="editForm.owner_phone"
+                label="رقم واتساب المالك"
+                hint="يُستخدم للتواصل المباشر عبر واتساب من شاشة تفاصيل الآلية"
+                persistent-hint
+                variant="outlined"
+                density="compact"
+                style="font-family:Cairo,sans-serif"
+              />
             </VCol>
             <VCol cols="12" md="3">
               <VTextField v-model.number="editForm.manufacture_year" label="سنة الصنع" type="number" variant="outlined" density="compact" style="font-family:Cairo,sans-serif" />
@@ -661,7 +623,7 @@ const reservationStatus: Record<string, { color: string; label: string }> = {
               <VSwitch v-model="editForm.needs_maintenance" label="بحاجة صيانة (تختفي من السوق مؤقتاً)" color="error" style="font-family:Cairo,sans-serif" />
             </VCol>
             <VCol cols="12">
-              <VTextarea v-model="editForm.description" label="الوصف" variant="outlined" density="compact" rows="2" maxlength="2000" counter style="font-family:Cairo,sans-serif" />
+              <VTextarea v-model="editForm.description" label="وصف الحالة الفنية للآلية" variant="outlined" density="compact" rows="2" maxlength="250" counter style="font-family:Cairo,sans-serif" />
             </VCol>
             <VCol cols="12">
               <VTextarea v-model="editForm.admin_notes" label="ملاحظات داخلية" variant="outlined" density="compact" rows="2" style="font-family:Cairo,sans-serif" />
@@ -748,117 +710,6 @@ const reservationStatus: Record<string, { color: string; label: string }> = {
             style="font-family:Cairo,sans-serif"
           >
             رفع الصور
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
-
-    <!-- ═══════════════════════════════════════════════════════════════════
-         Calendar / Blocked Dates Dialog
-    ════════════════════════════════════════════════════════════════════ -->
-    <VDialog v-model="calendarDialog" max-width="560" scrollable>
-      <VCard :loading="calLoading">
-        <VCardTitle style="font-family:Cairo,sans-serif;font-size:18px;padding:20px 24px 0">
-          <VIcon icon="tabler-calendar" size="20" class="me-2" />
-          تواريخ عدم التوفر: {{ selectedItem?.name }}
-        </VCardTitle>
-        <VCardText>
-          <!-- Reservations (read-only) — طلبات حجز وصلت من تطبيق المقاولين -->
-          <p class="text-subtitle-2 mb-1" style="font-family:Cairo,sans-serif">حجوزات المقاولين</p>
-          <p class="text-caption text-medium-emphasis mb-2" style="font-family:Cairo,sans-serif">
-            حجوزات طلبها مقاولون عبر التطبيق — للاطّلاع فقط، تُلغى من جهة المقاول
-          </p>
-          <div v-if="reservations.length === 0 && !calLoading" class="text-medium-emphasis mb-4" style="font-family:Cairo,sans-serif">
-            لا توجد حجوزات على هذه الآلية
-          </div>
-          <VList v-else density="compact" class="mb-4 pa-0">
-            <VListItem
-              v-for="r in reservations"
-              :key="r.id"
-              class="px-0"
-            >
-              <template #prepend>
-                <VChip
-                  :color="reservationStatus[r.status]?.color ?? 'secondary'"
-                  variant="tonal"
-                  size="x-small"
-                  class="me-2"
-                  style="font-family:Cairo,sans-serif"
-                >
-                  {{ reservationStatus[r.status]?.label ?? r.status }}
-                </VChip>
-              </template>
-              <VListItemTitle style="font-family:Cairo,sans-serif;font-size:13px">
-                {{ r.contractor?.name ?? '—' }}
-              </VListItemTitle>
-              <VListItemSubtitle style="font-family:Cairo,sans-serif;font-size:12px">
-                {{ r.start_date?.slice(0, 10) }} ← {{ r.end_date?.slice(0, 10) }}
-                <span v-if="r.contractor?.phone"> · {{ r.contractor.phone }}</span>
-              </VListItemSubtitle>
-            </VListItem>
-          </VList>
-
-          <VDivider class="mb-4" />
-
-          <!-- Blocked dates list -->
-          <p class="text-subtitle-2 mb-1" style="font-family:Cairo,sans-serif">الأيام المحجوزة / الموقوفة</p>
-          <p class="text-caption text-medium-emphasis mb-2" style="font-family:Cairo,sans-serif">
-            حجب يدوي يضيفه الأدمن لمنع الحجز في أيام محددة (صيانة أو ارتباط خارج المنصة)
-          </p>
-          <div v-if="blockedDates.length === 0 && !calLoading" class="text-medium-emphasis mb-4" style="font-family:Cairo,sans-serif">
-            لا توجد تواريخ محجوزة
-          </div>
-          <div class="d-flex flex-wrap gap-2 mb-4">
-            <VChip
-              v-for="bd in blockedDates"
-              :key="bd.id"
-              closable
-              :color="bd.reason === 'booked' ? 'error' : bd.reason === 'maintenance' ? 'warning' : 'secondary'"
-              variant="tonal"
-              size="small"
-              style="font-family:Cairo,sans-serif"
-              @click:close="removeDate(bd)"
-            >
-              {{ bd.blocked_date }} — {{ reasonLabel[bd.reason] ?? bd.reason }}
-            </VChip>
-          </div>
-
-          <VDivider class="mb-4" />
-
-          <!-- Add new dates -->
-          <p class="text-subtitle-2 mb-2" style="font-family:Cairo,sans-serif">إضافة تواريخ محجوزة</p>
-          <VRow dense>
-            <VCol cols="12">
-              <VTextField
-                v-model="newDates"
-                label="أدخل التواريخ (YYYY-MM-DD) مفصولة بفاصلة"
-                variant="outlined"
-                density="compact"
-                placeholder="2026-07-10,2026-07-11"
-                style="font-family:Cairo,sans-serif"
-                @change="(v: any) => { newDates = String(v).split(',').map(s => s.trim()).filter(Boolean) }"
-              />
-            </VCol>
-            <VCol cols="12">
-              <VSelect
-                v-model="dateReason"
-                :items="[
-                  { title: 'محجوز', value: 'booked' },
-                  { title: 'صيانة', value: 'maintenance' },
-                  { title: 'أخرى',  value: 'other' },
-                ]"
-                label="السبب"
-                variant="outlined"
-                density="compact"
-                style="font-family:Cairo,sans-serif"
-              />
-            </VCol>
-          </VRow>
-        </VCardText>
-        <VCardActions class="pa-4 pt-0 justify-end gap-2">
-          <VBtn variant="tonal" color="secondary" @click="calendarDialog = false" style="font-family:Cairo,sans-serif">إغلاق</VBtn>
-          <VBtn color="primary" prepend-icon="tabler-plus" @click="addBlockedDates" style="font-family:Cairo,sans-serif">
-            إضافة التواريخ
           </VBtn>
         </VCardActions>
       </VCard>
