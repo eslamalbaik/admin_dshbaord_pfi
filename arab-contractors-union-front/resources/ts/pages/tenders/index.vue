@@ -289,8 +289,10 @@ const statusLoading = ref<number | null>(null)
 const changeStatus = async (item: any, status: string) => {
   statusLoading.value = item.id
   try {
-    await api.patch(`/api/v1/tenders/${item.id}`, { status })
-    item.status = status
+    const { data } = await api.patch(`/api/v1/tenders/${item.id}`, { status })
+    // السيرفر يعيد حساب display_status مع الحالة (إغلاق → "مغلق")، فنأخذ الصف كاملاً من الرد
+    // بدل تحديث status وحده — وإلا بقي بادج "المستجدات" القديم ("جديد") ظاهراً حتى إعادة التحميل
+    Object.assign(item, data.items ?? { status })
   } catch (err) { console.error(err) }
   finally { statusLoading.value = null }
 }
