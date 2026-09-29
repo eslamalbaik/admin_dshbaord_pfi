@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import api from '@/plugins/axios'
+import { contractorDocumentLabels } from '@/utils/contractorDocuments'
 import { useRoute, useRouter } from 'vue-router'
 
 definePage({ meta: { requiresAdmin: true, adminOnly: true } })
@@ -198,22 +199,7 @@ const existingFiles = ref<Record<string, string | null>>({})
 // سابقاً كان الاستبدال هو السبيل الوحيد لإزالة مستند. يُجمَع المحدَّد للحذف محلياً
 // ويُرسَل عند الحفظ كـ remove_documents[]، لا فوراً — حتى يبقى "إلغاء" ممكناً قبل الحفظ،
 // ولأن الحذف على الخادم لا رجعة فيه (يُمحى الملف من القرص).
-const documentLabels: Record<string, string> = {
-  lease_or_ownership_contract: 'عقد الإيجار أو الملكية',
-  company_approval_letter: 'كتاب الموافقة على الانتساب',
-  municipal_license: 'رخصة المهن',
-  company_register: 'مستخرج عن سجل الشركة',
-  cr_file: 'السجل التجاري',
-  id_file: 'صورة الهوية',
-  articles_of_association: 'عقد تأسيس الشركة',
-  internal_bylaws: 'النظام الداخلي',
-  bank_dealing_letter: 'شهادة تعامل بنك',
-  secretary_contract: 'عقد سكرتير',
-  full_time_engineer_certificate: 'شهادة مهندس متفرغ',
-  accountant_certificate_or_contract: 'شهادة تفرغ محاسب / عقد مكتب',
-  partners_ids: 'صور هويات الشركاء',
-  authorization_letter: 'كتاب تفويض المعتمد بالتوقيع',
-}
+const documentLabels: Record<string, string> = contractorDocumentLabels
 
 const documentsToRemove = ref<string[]>([])
 const removeDocumentDialog = ref(false)
@@ -708,7 +694,7 @@ const submit = async () => {
             </div>
             <VFileInput
               v-model="form.cr_file"
-              label="السجل التجاري (للتحديث)"
+              :label="`${contractorDocumentLabels.cr_file} (للتحديث)`"
               :error-messages="validationErrors.cr_file"
               accept=".pdf,.doc,.docx,image/*"
               :rules="[fileSizeRule]"
@@ -737,7 +723,7 @@ const submit = async () => {
             </div>
             <VFileInput
               v-model="form.id_file"
-              label="صورة الهوية (للتحديث)"
+              :label="`${contractorDocumentLabels.id_file} (للتحديث)`"
               :error-messages="validationErrors.id_file"
               accept=".pdf,.doc,.docx,image/*"
               :rules="[fileSizeRule]"
@@ -766,7 +752,7 @@ const submit = async () => {
             </div>
             <VFileInput
               v-model="form.company_register"
-              label="مستخرج عن سجل الشركة (للتحديث)"
+              :label="`${contractorDocumentLabels.company_register} (للتحديث)`"
               :error-messages="validationErrors.company_register"
               accept=".pdf,.doc,.docx,image/*"
               :rules="[fileSizeRule]"
@@ -795,7 +781,7 @@ const submit = async () => {
             </div>
             <VFileInput
               v-model="form.municipal_license"
-              label="رخصة المهن سارية المفعول (للتحديث)"
+              :label="`${contractorDocumentLabels.municipal_license} (للتحديث)`"
               :error-messages="validationErrors.municipal_license"
               accept=".pdf,.doc,.docx,image/*"
               :rules="[fileSizeRule]"
@@ -824,7 +810,7 @@ const submit = async () => {
             </div>
             <VFileInput
               v-model="form.bank_dealing_letter"
-              label="شهادة تعامل للشركة مع بنك (للتحديث)"
+              :label="`${contractorDocumentLabels.bank_dealing_letter} (للتحديث)`"
               :error-messages="validationErrors.bank_dealing_letter"
               accept=".pdf,.doc,.docx,image/*"
               :rules="[fileSizeRule]"
@@ -853,7 +839,7 @@ const submit = async () => {
             </div>
             <VFileInput
               v-model="form.articles_of_association"
-              label="عقد تأسيس الشركة (للتحديث)"
+              :label="`${contractorDocumentLabels.articles_of_association} (للتحديث)`"
               :error-messages="validationErrors.articles_of_association"
               accept=".pdf,.doc,.docx,image/*"
               :rules="[fileSizeRule]"
@@ -882,7 +868,7 @@ const submit = async () => {
             </div>
             <VFileInput
               v-model="form.internal_bylaws"
-              label="النظام الداخلي (للتحديث)"
+              :label="`${contractorDocumentLabels.internal_bylaws} (للتحديث)`"
               :error-messages="validationErrors.internal_bylaws"
               accept=".pdf,.doc,.docx,image/*"
               :rules="[fileSizeRule]"
@@ -911,7 +897,7 @@ const submit = async () => {
             </div>
             <VFileInput
               v-model="form.lease_or_ownership_contract"
-              label="عقد الإيجار أو الملكية لمقر الشركة (للتحديث)"
+              :label="`${contractorDocumentLabels.lease_or_ownership_contract} (للتحديث)`"
               :error-messages="validationErrors.lease_or_ownership_contract"
               accept=".pdf,.doc,.docx,image/*"
               :rules="[fileSizeRule]"
@@ -940,7 +926,7 @@ const submit = async () => {
             </div>
             <VFileInput
               v-model="form.partners_ids"
-              label="صور هويات الشركاء (للتحديث)"
+              :label="`${contractorDocumentLabels.partners_ids} (للتحديث)`"
               :error-messages="validationErrors.partners_ids"
               accept=".pdf,.doc,.docx,image/*"
               :rules="[fileSizeRule]"
@@ -969,7 +955,7 @@ const submit = async () => {
             </div>
             <VFileInput
               v-model="form.authorization_letter"
-              label="كتاب تفويض المعتمد بالتوقيع (للتحديث)"
+              :label="`${contractorDocumentLabels.authorization_letter} (للتحديث)`"
               :error-messages="validationErrors.authorization_letter"
               accept=".pdf,.doc,.docx,image/*"
               :rules="[fileSizeRule]"
@@ -998,7 +984,7 @@ const submit = async () => {
             </div>
             <VFileInput
               v-model="form.company_approval_letter"
-              label="كتاب موافقة على الانتساب (للتحديث)"
+              :label="`${contractorDocumentLabels.company_approval_letter} (للتحديث)`"
               :error-messages="validationErrors.company_approval_letter"
               accept=".pdf,.doc,.docx,image/*"
               :rules="[fileSizeRule]"
@@ -1027,7 +1013,7 @@ const submit = async () => {
             </div>
             <VFileInput
               v-model="form.full_time_engineer_certificate"
-              label="شهادة مهندس متفرغ (للتحديث)"
+              :label="`${contractorDocumentLabels.full_time_engineer_certificate} (للتحديث)`"
               :error-messages="validationErrors.full_time_engineer_certificate"
               accept=".pdf,.doc,.docx,image/*"
               :rules="[fileSizeRule]"
@@ -1056,7 +1042,7 @@ const submit = async () => {
             </div>
             <VFileInput
               v-model="form.accountant_certificate_or_contract"
-              label="شهادة تفرغ محاسب من نقابة المحاسبين / أو عقد مع مكتب محاسبين معتمد (للتحديث)"
+              :label="`${contractorDocumentLabels.accountant_certificate_or_contract} (للتحديث)`"
               :error-messages="validationErrors.accountant_certificate_or_contract"
               accept=".pdf,.doc,.docx,image/*"
               :rules="[fileSizeRule]"
@@ -1085,7 +1071,7 @@ const submit = async () => {
             </div>
             <VFileInput
               v-model="form.secretary_contract"
-              label="عقد سكرتير (للتحديث)"
+              :label="`${contractorDocumentLabels.secretary_contract} (للتحديث)`"
               :error-messages="validationErrors.secretary_contract"
               accept=".pdf,.doc,.docx,image/*"
               :rules="[fileSizeRule]"

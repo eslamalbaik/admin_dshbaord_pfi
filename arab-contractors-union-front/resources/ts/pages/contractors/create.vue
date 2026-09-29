@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import api from '@/plugins/axios'
+import { contractorDocumentLabels } from '@/utils/contractorDocuments'
 import { useRouter } from 'vue-router'
 
 definePage({ meta: { requiresAdmin: true, adminOnly: true } })
@@ -240,7 +241,9 @@ const submit = async () => {
       // يُرسَل مصفوفة فارغة كقيمة للحقل فيرفضها الخادم بخطأ "يجب أن يكون ملفاً" (REQ-01 #4)
       if (Array.isArray(v) && v.length === 0 && k !== 'partners' && k !== 'specialties')
         return
-      if (v !== null && v !== '') {
+      // حقل ملف رُفع ثم أُزيل (زر X) يصير undefined لا null — كان يمرّ من الفحص فيُرسَل
+      // كنص "undefined" حرفياً فيرفضه الخادم ("يجب أن يكون ملفاً") ويتعذّر حفظ المقاول.
+      if (v != null && v !== '') {
         if (k === 'partners' && Array.isArray(v)) {
           if (v.length > 0) fd.append(k, v.join(','))
         } else if (k === 'specialties' && Array.isArray(v)) {
@@ -580,7 +583,7 @@ const submit = async () => {
           <VCol cols="12" md="6">
             <VFileInput
               v-model="form.cr_file"
-              label="السجل التجاري *"
+              :label="`${contractorDocumentLabels.cr_file} *`"
               accept=".pdf,.doc,.docx,image/*"
               :hint="fileHint"
               persistent-hint
@@ -596,7 +599,7 @@ const submit = async () => {
           <VCol cols="12" md="6">
             <VFileInput
               v-model="form.company_register"
-              label="مستخرج عن سجل الشركة *"
+              :label="`${contractorDocumentLabels.company_register} *`"
               accept=".pdf,.doc,.docx,image/*"
               :hint="fileHint"
               persistent-hint
@@ -612,7 +615,7 @@ const submit = async () => {
           <VCol cols="12" md="6">
             <VFileInput
               v-model="form.municipal_license"
-              label="رخصة المهن (الحرف) سارية المفعول *"
+              :label="`${contractorDocumentLabels.municipal_license} *`"
               accept=".pdf,.doc,.docx,image/*"
               :hint="fileHint"
               persistent-hint
@@ -628,7 +631,7 @@ const submit = async () => {
           <VCol cols="12" md="6">
             <VFileInput
               v-model="form.bank_dealing_letter"
-              label="شهادة تعامل للشركة مع بنك *"
+              :label="`${contractorDocumentLabels.bank_dealing_letter} *`"
               accept=".pdf,.doc,.docx,image/*"
               :hint="fileHint"
               persistent-hint
@@ -644,7 +647,7 @@ const submit = async () => {
           <VCol cols="12" md="6">
             <VFileInput
               v-model="form.articles_of_association"
-              label="عقد تأسيس الشركة *"
+              :label="`${contractorDocumentLabels.articles_of_association} *`"
               accept=".pdf,.doc,.docx,image/*"
               :hint="fileHint"
               persistent-hint
@@ -660,7 +663,7 @@ const submit = async () => {
           <VCol cols="12" md="6">
             <VFileInput
               v-model="form.internal_bylaws"
-              label="النظام الداخلي *"
+              :label="`${contractorDocumentLabels.internal_bylaws} *`"
               accept=".pdf,.doc,.docx,image/*"
               :hint="fileHint"
               persistent-hint
@@ -676,7 +679,7 @@ const submit = async () => {
           <VCol cols="12" md="6">
             <VFileInput
               v-model="form.lease_or_ownership_contract"
-              label="عقد الإيجار أو الملكية لمقر الشركة *"
+              :label="`${contractorDocumentLabels.lease_or_ownership_contract} *`"
               accept=".pdf,.doc,.docx,image/*"
               :hint="fileHint"
               persistent-hint
@@ -692,7 +695,7 @@ const submit = async () => {
           <VCol cols="12" md="6">
             <VFileInput
               v-model="form.partners_ids"
-              label="صور هويات الشركاء *"
+              :label="`${contractorDocumentLabels.partners_ids} *`"
               accept=".pdf,.doc,.docx,image/*"
               :hint="fileHint"
               persistent-hint
@@ -708,7 +711,7 @@ const submit = async () => {
           <VCol cols="12" md="6">
             <VFileInput
               v-model="form.authorization_letter"
-              label="كتاب تفويض المعتمد بالتوقيع *"
+              :label="`${contractorDocumentLabels.authorization_letter} *`"
               accept=".pdf,.doc,.docx,image/*"
               :hint="fileHint"
               persistent-hint
@@ -724,7 +727,7 @@ const submit = async () => {
           <VCol cols="12" md="6">
             <VFileInput
               v-model="form.company_approval_letter"
-              label="كتاب من الشركة بالموافقة على الانتساب *"
+              :label="`${contractorDocumentLabels.company_approval_letter} *`"
               accept=".pdf,.doc,.docx,image/*"
               :hint="fileHint"
               persistent-hint
@@ -740,7 +743,7 @@ const submit = async () => {
           <VCol cols="12" md="6">
             <VFileInput
               v-model="form.full_time_engineer_certificate"
-              label="شهادة مهندس متفرغ *"
+              :label="`${contractorDocumentLabels.full_time_engineer_certificate} *`"
               accept=".pdf,.doc,.docx,image/*"
               :hint="fileHint"
               persistent-hint
@@ -756,7 +759,7 @@ const submit = async () => {
           <VCol cols="12" md="6">
             <VFileInput
               v-model="form.accountant_certificate_or_contract"
-              label="شهادة تفرغ محاسب من نقابة المحاسبين / أو عقد مع مكتب محاسبين معتمد *"
+              :label="`${contractorDocumentLabels.accountant_certificate_or_contract} *`"
               accept=".pdf,.doc,.docx,image/*"
               :hint="fileHint"
               persistent-hint
@@ -772,7 +775,7 @@ const submit = async () => {
           <VCol cols="12" md="6">
             <VFileInput
               v-model="form.secretary_contract"
-              label="عقد سكرتير *"
+              :label="`${contractorDocumentLabels.secretary_contract} *`"
               accept=".pdf,.doc,.docx,image/*"
               :hint="fileHint"
               persistent-hint

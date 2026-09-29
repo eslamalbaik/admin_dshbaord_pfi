@@ -275,6 +275,12 @@ class ContractorAuthController extends Controller
 
         $validated = $request->validated();
 
+        // نسخ التطبيق التي لم تكن تستلم established_date بالملف تُرسله فارغاً في كل حفظ،
+        // فكان يمسح التاريخ الذي أدخلته الإدارة. الفراغ هنا لا يعني "احذف التاريخ".
+        if (array_key_exists('established_date', $validated) && empty($validated['established_date'])) {
+            unset($validated['established_date']);
+        }
+
         // تغيير رقم الجوال يتطلب تحقق OTP مسبق (phone/request-otp + phone/verify-otp)
         // — لا يُقبل مباشرة ولو مختلف عن القيمة المخزَّنة، لأن الجوال يُستخدم لتفعيل/دخول الحساب.
         if (array_key_exists('phone', $validated) && $validated['phone'] && $validated['phone'] !== $contractor->phone) {

@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import PublicNavbar from '@/components/PublicNavbar.vue'
+import { contractorDocumentLabels } from '@/utils/contractorDocuments'
 import {
   User, ClipboardList, CreditCard, FileText,
   Award, Phone, Mail, Building2,
@@ -189,22 +190,23 @@ interface FieldSpecialization {
 interface FieldGroup { field_id: number | null; field_name: string; specializations: FieldSpecialization[] }
 const contractorFields = ref<FieldGroup[]>([])
 const gradeLevelClass: Record<number, string> = { 1: 'grade-1', 2: 'grade-2', 3: 'grade-3', 4: 'grade-4', 5: 'grade-5' }
-const docFields = [
-  { key: 'cr_file',                        label: 'السجل التجاري' },
-  { key: 'id_file',                        label: 'الهوية' },
-  { key: 'company_register',               label: 'مستخرج سجل الشركة' },
-  { key: 'municipal_license',               label: 'رخصة المهن (البلدية)' },
-  { key: 'bank_dealing_letter',             label: 'شهادة تعامل بنكي' },
-  { key: 'articles_of_association',        label: 'عقد التأسيس' },
-  { key: 'internal_bylaws',                 label: 'النظام الداخلي' },
-  { key: 'lease_or_ownership_contract',     label: 'عقد الإيجار / الملكية' },
-  { key: 'partners_ids',                    label: 'صور هويات الشركاء' },
-  { key: 'authorization_letter',            label: 'كتاب تفويض المفوّض' },
-  { key: 'company_approval_letter',         label: 'كتاب موافقة الشركة' },
-  { key: 'full_time_engineer_certificate',  label: 'شهادة مهندس متفرغ' },
-  { key: 'accountant_certificate_or_contract', label: 'شهادة تفرغ محاسب من نقابة المحاسبين / أو عقد مع مكتب محاسبين معتمد' },
-  { key: 'secretary_contract',              label: 'عقد سكرتير' },
-] as const
+// أسماء المستندات من contractorDocumentLabels — نفسها بنماذج لوحة الأدمن ونافذة المعاينة
+const docFields = ([
+  'cr_file',
+  'id_file',
+  'company_register',
+  'municipal_license',
+  'bank_dealing_letter',
+  'articles_of_association',
+  'internal_bylaws',
+  'lease_or_ownership_contract',
+  'partners_ids',
+  'authorization_letter',
+  'company_approval_letter',
+  'full_time_engineer_certificate',
+  'accountant_certificate_or_contract',
+  'secretary_contract',
+] as const).map(key => ({ key, label: contractorDocumentLabels[key] }))
 
 const profileExtra = ref<ProfileExtra | null>(null)
 const logoUrl = ref<string | null>(null)

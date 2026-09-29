@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import api from '@/plugins/axios'
+import { type ContractorDocumentKey, contractorDocumentLabels } from '@/utils/contractorDocuments'
 
 definePage({ meta: { requiresAdmin: true, adminOnly: true } })
 
@@ -452,21 +453,25 @@ const activityRows = computed(() => {
   ]
 })
 
-const documentFields = [
-  { key: 'cr_file', label: 'السجل التجاري', icon: 'tabler-file-certificate' },
-  { key: 'company_register', label: 'سجل الشركة', icon: 'tabler-building' },
-  { key: 'municipal_license', label: 'رخصة البلدية', icon: 'tabler-stamp' },
-  { key: 'company_approval_letter', label: 'موافقة الانتساب', icon: 'tabler-checkbox' },
-  { key: 'lease_or_ownership_contract', label: 'عقد المقر', icon: 'tabler-home' },
-  { key: 'articles_of_association', label: 'عقد التأسيس', icon: 'tabler-file-text' },
-  { key: 'internal_bylaws', label: 'النظام الداخلي', icon: 'tabler-book' },
-  { key: 'bank_dealing_letter', label: 'تعامل البنك', icon: 'tabler-building-bank' },
-  { key: 'secretary_contract', label: 'عقد سكرتير', icon: 'tabler-briefcase' },
-  { key: 'full_time_engineer_certificate', label: 'شهادة مهندس متفرغ', icon: 'tabler-certificate' },
-  { key: 'accountant_certificate_or_contract', label: 'شهادة تفرغ محاسب / عقد مكتب محاسبين', icon: 'tabler-report-money' },
-  { key: 'partners_ids', label: 'هويات الشركاء', icon: 'tabler-id-badge-2' },
-  { key: 'authorization_letter', label: 'تفويض توقيع', icon: 'tabler-signature' },
-]
+// الأسماء من contractorDocumentLabels — نفس عنوان حقل الرفع بنموذجَي التسجيل والتعديل،
+// حتى يطابق اسم المرفق هنا الحقل الذي رُفع منه.
+const documentFields = ([
+  { key: 'cr_file', icon: 'tabler-file-certificate' },
+  { key: 'id_file', icon: 'tabler-id' },
+  { key: 'company_register', icon: 'tabler-building' },
+  { key: 'municipal_license', icon: 'tabler-stamp' },
+  { key: 'company_approval_letter', icon: 'tabler-checkbox' },
+  { key: 'lease_or_ownership_contract', icon: 'tabler-home' },
+  { key: 'articles_of_association', icon: 'tabler-file-text' },
+  { key: 'internal_bylaws', icon: 'tabler-book' },
+  { key: 'bank_dealing_letter', icon: 'tabler-building-bank' },
+  { key: 'secretary_contract', icon: 'tabler-briefcase' },
+  { key: 'full_time_engineer_certificate', icon: 'tabler-certificate' },
+  { key: 'accountant_certificate_or_contract', icon: 'tabler-report-money' },
+  { key: 'partners_ids', icon: 'tabler-id-badge-2' },
+  { key: 'authorization_letter', icon: 'tabler-signature' },
+] as Array<{ key: ContractorDocumentKey, icon: string }>)
+  .map(d => ({ ...d, label: contractorDocumentLabels[d.key] }))
 
 const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? detailsTarget.value?.[key] ?? null
 </script>
