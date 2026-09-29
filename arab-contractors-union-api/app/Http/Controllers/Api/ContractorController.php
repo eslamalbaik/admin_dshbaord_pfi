@@ -91,7 +91,6 @@ class ContractorController extends Controller
             ],
             'status'                        => 'sometimes|in:active,pending,expired,suspended',
             'classification'                => 'nullable|string|max:10',
-            'established_year'              => 'nullable|integer|min:1900|max:' . date('Y'),
             'field_lk_type'                 => 'nullable|integer',
             'specialization_lk_type'        => 'nullable|integer',
             'established_date'              => 'nullable|date',
@@ -247,14 +246,15 @@ class ContractorController extends Controller
 
     private function getValidationAttributes()
     {
-        return [
+        // أسماء المستندات من Contractor::DOCUMENT_LABELS حتى تطابق رسالة الخطأ عنوان الحقل نفسه
+        return Contractor::DOCUMENT_LABELS + [
             'name'                          => 'الاسم',
             'membership_number'             => 'رقم العضوية',
             'commercial_register'           => 'رقم السجل التجاري',
             'license_number'                => 'رقم الترخيص',
             'status'                        => 'الحالة',
             'classification'                => 'التصنيف',
-            'established_year'              => 'سنة التأسيس',
+            'established_date'              => 'تاريخ التأسيس',
             'owner_name'                    => 'اسم المالك',
             'email'                         => 'البريد الإلكتروني',
             'phone'                         => 'الجوال',
@@ -275,21 +275,6 @@ class ContractorController extends Controller
             'authorized_person_id_number'   => 'رقم هوية المفوض',
             'authorized_person_phone'       => 'رقم جوال المفوض',
             'authorized_person_whatsapp'    => 'رقم واتساب المفوض',
-            'cr_file'                       => 'ملف السجل التجاري',
-            'id_file'                       => 'ملف الهوية',
-            'authorized_signature'          => 'نموذج التوقيع',
-            'lease_or_ownership_contract'   => 'عقد الإيجار أو الملكية',
-            'company_approval_letter'       => 'كتاب الموافقة',
-            'municipal_license'             => 'رخصة المهن',
-            'company_register'              => 'مستخرج السجل',
-            'articles_of_association'       => 'عقد التأسيس',
-            'internal_bylaws'               => 'النظام الداخلي',
-            'bank_dealing_letter'           => 'كتاب البنك',
-            'secretary_contract'            => 'عقد السكرتير',
-            'full_time_engineer_certificate'=> 'شهادة المهندس المتفرغ',
-            'accountant_certificate_or_contract' => 'شهادة تفرغ المحاسب / عقد المكتب المحاسبي',
-            'partners_ids'                  => 'هويات الشركاء',
-            'authorization_letter'          => 'كتاب التفويض',
         ];
     }
 

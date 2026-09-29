@@ -28,7 +28,7 @@ class Contractor extends Authenticatable
         'membership_number', 'name', 'authorized_person', 'authorized_person_title',
         'authorized_person_id_number', 'authorized_person_phone', 'authorized_person_whatsapp',
         'commercial_register',
-        'license_number', 'classification', 'established_year', 'owner_name',
+        'license_number', 'classification', 'owner_name',
         'email', 'phone', 'phone_verified_at', 'city', 'governorate_id', 'city_id', 'district', 'address',
         'classification_decision_number', 'classification_decision_date',
         'status', 'is_frozen', 'profile_completed', 'profile_approved_by',
@@ -96,7 +96,6 @@ class Contractor extends Authenticatable
     }
 
     protected $casts = [
-        'established_year'       => 'integer',
         'field_lk_type'          => 'integer',
         'specialization_lk_type' => 'integer',
         'established_date'       => 'date',
@@ -229,20 +228,37 @@ class Contractor extends Authenticatable
         'company_purposes'  => 'غايات الشركة',
     ];
 
-    private const REQUIRED_PROFILE_FILES = [
+    /**
+     * الاسم الرسمي لكل مستند — مصدر واحد لعنوان حقل الرفع ولاسم المرفق عند المعاينة
+     * ولرسائل التحقق وقائمة "المستندات الناقصة" بالتطبيق. كانت هذه الأسماء مكرّرة
+     * بصيغ مختلفة في كل مكان ("كتاب البنك" / "تعامل البنك" / "شهادة تعامل بنكي")،
+     * فلا يعرف الأدمن أن المرفق المعروض هو نفسه الحقل الذي رفعه. نسختها بالواجهة:
+     * resources/ts/utils/contractorDocuments.ts — أي تعديل هنا يُعدَّل هناك أيضاً.
+     */
+    public const DOCUMENT_LABELS = [
         'cr_file'                       => 'السجل التجاري',
-        'company_register'              => 'مستخرج سجل الشركة',
-        'municipal_license'             => 'رخصة المهن (البلدية)',
-        'bank_dealing_letter'           => 'شهادة تعامل بنكي',
-        'articles_of_association'       => 'عقد التأسيس',
+        'id_file'                       => 'صورة الهوية',
+        'company_register'              => 'مستخرج عن سجل الشركة',
+        'municipal_license'             => 'رخصة المهن (الحرف) سارية المفعول',
+        'bank_dealing_letter'           => 'شهادة تعامل للشركة مع بنك',
+        'articles_of_association'       => 'عقد تأسيس الشركة',
         'internal_bylaws'               => 'النظام الداخلي',
-        'lease_or_ownership_contract'   => 'عقد الإيجار / الملكية',
+        'lease_or_ownership_contract'   => 'عقد الإيجار أو الملكية لمقر الشركة',
         'partners_ids'                  => 'صور هويات الشركاء',
-        'authorization_letter'          => 'كتاب تفويض المفوّض',
-        'company_approval_letter'       => 'كتاب موافقة الشركة',
+        'authorization_letter'          => 'كتاب تفويض المعتمد بالتوقيع',
+        'company_approval_letter'       => 'كتاب من الشركة بالموافقة على الانتساب',
         'full_time_engineer_certificate'=> 'شهادة مهندس متفرغ',
         'accountant_certificate_or_contract' => 'شهادة تفرغ محاسب من نقابة المحاسبين / أو عقد مع مكتب محاسبين معتمد',
         'secretary_contract'            => 'عقد سكرتير',
+        'authorized_signature'          => 'نموذج التوقيع',
+    ];
+
+    /** المستندات المطلوبة لاكتمال الملف (بترتيب نموذج التسجيل) — أسماؤها من DOCUMENT_LABELS. */
+    private const REQUIRED_PROFILE_FILES = [
+        'cr_file', 'company_register', 'municipal_license', 'bank_dealing_letter',
+        'articles_of_association', 'internal_bylaws', 'lease_or_ownership_contract',
+        'partners_ids', 'authorization_letter', 'company_approval_letter',
+        'full_time_engineer_certificate', 'accountant_certificate_or_contract', 'secretary_contract',
     ];
 
     /** أسماء الحقول والملفات الناقصة لإكمال الملف الشخصي (فارغة يعني الملف مكتمل). */
@@ -260,9 +276,9 @@ class Contractor extends Authenticatable
             $missing[] = 'المحافظة / المدينة';
         }
 
-        foreach (self::REQUIRED_PROFILE_FILES as $field => $label) {
+        foreach (self::REQUIRED_PROFILE_FILES as $field) {
             if (empty($this->$field)) {
-                $missing[] = $label;
+                $missing[] = self::DOCUMENT_LABELS[$field];
             }
         }
 

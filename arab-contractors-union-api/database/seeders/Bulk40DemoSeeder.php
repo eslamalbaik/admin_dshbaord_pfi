@@ -59,7 +59,7 @@ class Bulk40DemoSeeder extends Seeder
                     'authorized_person' => 'المفوّض بالتوقيع ' . $seq,
                     'commercial_register' => "DEMO-CR-{$seq}",
                     'classification'    => $classes[$i % count($classes)],
-                    'established_year'  => rand(1995, 2020),
+                    'established_date'  => rand(1995, 2020) . '-01-01',
                     'owner_name'        => "صاحب {$kind} {$word}",
                     'email'             => "demo-contractor-{$seq}@example-demo.union.ps",
                     'phone'             => '0599-9' . str_pad((string) $i, 6, '0', STR_PAD_LEFT),

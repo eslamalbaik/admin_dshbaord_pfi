@@ -26,7 +26,6 @@ class UpdateFullProfileRequest extends FormRequest
             // الشهادات، فكان قبولهما هنا يعني أن المقاول يستطيع من التطبيق تخفيض تصنيفه
             // بنفسه فيُخفّض الرسم المحتسَب عليه، وتغيير الدرجة المطبوعة على شهادته — بلا
             // مراجعة ولا أثر. إعادتهما هنا تُعيد فتح الثغرة.
-            'established_year'              => 'nullable|integer|min:1900|max:' . date('Y'),
             'established_date'              => 'nullable|date',
             'email'                         => 'nullable|email|unique:contractors,email,' . $contractorId,
             'phone'                         => 'nullable|string|max:20|unique:contractors,phone,' . $contractorId,

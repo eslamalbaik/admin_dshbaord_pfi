@@ -79,7 +79,9 @@ class ContractorProfileService
             // بطاقة "حسابي" — حالة العضوية/الذمم/الشهادات/اشتراك سوق الآليات في نداء واحد
             'account_status'    => $this->accountStatus($contractor),
 
-            'established_year'  => $contractor->established_year,
+            // تاريخ التأسيس الكامل (Y-m-d) — حلّ محل established_year القديم. غيابه عن
+            // الاستجابة كان يعني أن التطبيق يعرض الحقل فارغاً ثم يُرسله فارغاً عند الحفظ.
+            'established_date'  => $contractor->established_date?->toDateString(),
             'owner_name'        => $contractor->owner_name,
             'address'           => $contractor->address,
             'notes'             => $contractor->notes,
