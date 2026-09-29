@@ -56,6 +56,52 @@ class NewsAdminTest extends TestCase
         ])->assertStatus(200);
     }
 
+    public function test_update_allows_changing_published_at_to_yesterday(): void
+    {
+        $this->actingAsAdmin();
+
+        $news = News::create([
+            'title' => 'خبر', 'slug' => 'news-y', 'body' => 'نص',
+            'is_published' => true, 'published_at' => now(),
+        ]);
+
+        $yesterday = now(config('app.local_timezone'))->subDay()->toDateString();
+
+        $this->putJson("/api/v1/admin/news/{$news->id}", ['published_at' => $yesterday])
+            ->assertStatus(200);
+
+        $this->assertSame($yesterday, $news->fresh()->published_at->toDateString());
+    }
+
+    public function test_update_rejects_changing_published_at_to_before_yesterday(): void
+    {
+        $this->actingAsAdmin();
+
+        $news = News::create([
+            'title' => 'خبر', 'slug' => 'news-z', 'body' => 'نص',
+            'is_published' => true, 'published_at' => now(),
+        ]);
+
+        $this->putJson("/api/v1/admin/news/{$news->id}", [
+            'published_at' => now(config('app.local_timezone'))->subDays(2)->toDateString(),
+        ])->assertStatus(422)->assertJsonValidationErrors(['published_at']);
+    }
+
+    public function test_update_publish_now_moves_scheduled_news_to_now(): void
+    {
+        $this->actingAsAdmin();
+
+        $news = News::create([
+            'title' => 'خبر مجدول', 'slug' => 'news-s', 'body' => 'نص',
+            'is_published' => true, 'published_at' => now()->addWeek(),
+        ]);
+
+        $this->putJson("/api/v1/admin/news/{$news->id}", ['is_published' => true, 'publish_now' => true])
+            ->assertStatus(200);
+
+        $this->assertTrue($news->fresh()->published_at->lte(now()));
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     //  gallery — max 5 images total (REQ-10 #3)
     // ─────────────────────────────────────────────────────────────────────

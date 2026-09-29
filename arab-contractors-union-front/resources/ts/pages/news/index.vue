@@ -62,7 +62,7 @@ const emptyForm = () => ({
   existingGallery: [] as string[],
   video_url: '',
   external_url: '',
-  is_published: false,
+  publishMode: 'now' as PublishMode,
   published_at: '',
 })
 
@@ -150,14 +150,38 @@ const onMainImageSelected = (value: SingleFileModel) => {
   mainImageFile.value = value
 }
 
-// اختيار تاريخ لاحق يحوّل معنى المفتاح من "نشر مباشرة" إلى "جدولة نشر" — is_published يبقى
-// شرط تفعيل النشر بالحالتين (مباشر أو مؤجَّل)، لأن scopePublished بالموديل يتطلبه بغض النظر
-// عن published_at، فإخفاؤه أو تعطيله كان سيعطّل آلية الجدولة بالكامل
-const todayStr = () => new Date().toISOString().slice(0, 10)
-const isScheduledForLater = computed(() => !!form.value.published_at && form.value.published_at !== todayStr())
+// طريقة النشر: مباشرة (بدون تاريخ — الخادم يعتمد وقت الحفظ) / جدولة (التاريخ مطلوب) / مسودة.
+// is_published يُرسل 1 للمباشر والمجدول معاً لأن scopePublished بالموديل يتطلبه، والجدولة
+// تعتمد على published_at لاحق.
+type PublishMode = 'now' | 'schedule' | 'draft'
+
+const publishModeOptions = [
+  { value: 'now', label: 'نشر مباشرة', icon: 'tabler-send' },
+  { value: 'schedule', label: 'جدولة', icon: 'tabler-calendar-time' },
+  { value: 'draft', label: 'مسودة', icon: 'tabler-file-pencil' },
+]
+
+// تاريخ بصيغة YYYY-MM-DD بالتوقيت المحلي (toISOString كان يرجّع تاريخ UTC — غلط بعد منتصف الليل)
+const localDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const todayStr = () => localDateStr(new Date())
+const yesterdayStr = () => localDateStr(new Date(Date.now() - 24 * 60 * 60 * 1000))
+
+// أقل تاريخ مسموح: اليوم عند الإنشاء، وأمس (اليوم - 1) عند التعديل — نفس قيود الباك اند
+const minPublishDate = computed(() => (isEditing.value ? yesterdayStr() : todayStr()))
+
+// حالة الخبر عند فتحه للتعديل — لتحديد شو لازم ينبعت للخادم عند الحفظ
+const originalPublishMode = ref<PublishMode>('now')
+const originalPublishedAt = ref('')
+
+// حقل التاريخ يظهر فقط بالجدولة، أو بتعديل خبر منشور (لتصحيح تاريخه، مثلاً لأمس)
+const showPublishDate = computed(() =>
+  form.value.publishMode === 'schedule' || (isEditing.value && form.value.publishMode === 'now'),
+)
 
 const openCreate = () => {
   form.value = emptyForm()
+  originalPublishMode.value = 'now'
+  originalPublishedAt.value = ''
   mainImageFile.value = null
   isEditing.value = false
   formDialog.value = true
@@ -174,9 +198,13 @@ const openEdit = (item: any) => {
     existingGallery: item.gallery ?? [],
     video_url: item.video_url ?? '',
     external_url: item.external_url ?? '',
-    is_published: !!item.is_published,
+    publishMode: !item.is_published
+      ? 'draft'
+      : (item.published_at && new Date(item.published_at) > new Date() ? 'schedule' : 'now'),
     published_at: item.published_at ? item.published_at.substring(0, 10) : '',
   }
+  originalPublishMode.value = form.value.publishMode
+  originalPublishedAt.value = form.value.published_at
   mainImageFile.value = null
   isEditing.value = true
   formDialog.value = true
@@ -196,6 +224,19 @@ const saveNews = async () => {
     notify('العنوان والمحتوى مطلوبان', 'error')
     return
   }
+  const mode = form.value.publishMode
+  if (mode === 'schedule' && !form.value.published_at) {
+    notify('حدد تاريخ النشر للخبر المجدول', 'error')
+
+    return
+  }
+  if (showPublishDate.value && form.value.published_at
+    && form.value.published_at !== originalPublishedAt.value
+    && form.value.published_at < minPublishDate.value) {
+    notify(isEditing.value ? 'يجب أن يكون تاريخ النشر أمس أو بعده' : 'يجب أن يكون تاريخ النشر اليوم أو بعده', 'error')
+
+    return
+  }
   if (galleryTotalCount.value > 5) {
     notify('تجاوزت الحد الأقصى لصور المعرض (5 صور)', 'error')
     return
@@ -206,10 +247,20 @@ const saveNews = async () => {
     fd.append('title', form.value.title)
     fd.append('excerpt', form.value.excerpt)
     fd.append('body', form.value.body)
-    fd.append('is_published', form.value.is_published ? '1' : '0')
+    fd.append('is_published', mode === 'draft' ? '0' : '1')
     if (form.value.video_url) fd.append('video_url', form.value.video_url)
     if (form.value.external_url) fd.append('external_url', form.value.external_url)
-    if (form.value.published_at) fd.append('published_at', form.value.published_at)
+    const dateChanged = form.value.published_at !== originalPublishedAt.value
+    if (mode === 'schedule') {
+      fd.append('published_at', form.value.published_at)
+    }
+    else if (mode === 'now' && isEditing.value) {
+      // تاريخ معدّل يدوياً يُرسل كما هو؛ غير هيك خبر كان مسودة/مجدول يصير منشور من هلأ
+      if (form.value.published_at && dateChanged)
+        fd.append('published_at', form.value.published_at)
+      else if (originalPublishMode.value !== 'now')
+        fd.append('publish_now', '1')
+    }
     const mainImage = firstFile(mainImageFile.value)
     if (mainImage) fd.append('image', mainImage)
     form.value.gallery.forEach(f => fd.append('gallery[]', f))
@@ -394,48 +445,56 @@ const deleteNews = async () => {
 
             <VCol v-if="newGalleryPreviews.length" cols="12">
               <label class="text-body-2 font-weight-medium mb-2 d-block" style="font-family:Cairo,sans-serif">
-                معاينة الصور المُختارة (لم تُنشر بعد — اضغط أيقونة الحذف لإزالة صورة على حدة)
+                معاينة الصور المُختارة (لم تُنشر بعد — اضغط زر ✕ الأحمر فوق الصورة لإزالتها)
               </label>
               <div class="d-flex flex-wrap gap-3">
                 <div
                   v-for="(url, index) in newGalleryPreviews"
                   :key="url"
                   class="position-relative"
-                  style="width:80px;height:80px"
+                  style="width:96px;height:96px"
                 >
-                  <VImg :src="url" width="80" height="80" cover rounded />
-                  <VIcon
-                    icon="tabler-trash"
+                  <VImg :src="url" width="96" height="96" cover rounded class="border" />
+                  <VBtn
+                    icon
+                    size="x-small"
                     color="error"
-                    size="18"
-                    class="position-absolute"
-                    style="top:2px;left:2px;background:white;border-radius:50%;padding:2px;cursor:pointer"
+                    variant="elevated"
+                    class="gallery-remove-btn"
+                    aria-label="حذف الصورة"
                     @click="removeNewGalleryFile(index)"
-                  />
+                  >
+                    <VIcon icon="tabler-x" size="16" />
+                    <VTooltip activator="parent" location="top">حذف الصورة</VTooltip>
+                  </VBtn>
                 </div>
               </div>
             </VCol>
 
             <VCol v-if="form.existingGallery.length" cols="12">
               <label class="text-body-2 font-weight-medium mb-2 d-block" style="font-family:Cairo,sans-serif">
-                صور المعرض الحالية (اضغط أيقونة الحذف لإزالة صورة فوراً)
+                صور المعرض الحالية (اضغط زر ✕ الأحمر فوق الصورة لحذفها نهائياً)
               </label>
               <div class="d-flex flex-wrap gap-3">
                 <div
                   v-for="url in form.existingGallery"
                   :key="url"
                   class="position-relative"
-                  style="width:80px;height:80px"
+                  style="width:96px;height:96px"
                 >
-                  <VImg :src="url" width="80" height="80" cover rounded />
-                  <VIcon
-                    icon="tabler-trash"
+                  <VImg :src="url" width="96" height="96" cover rounded class="border" />
+                  <VBtn
+                    icon
+                    size="x-small"
                     color="error"
-                    size="18"
-                    class="position-absolute"
-                    style="top:2px;left:2px;background:white;border-radius:50%;padding:2px;cursor:pointer"
+                    variant="elevated"
+                    class="gallery-remove-btn"
+                    aria-label="حذف الصورة"
                     @click="confirmRemoveGalleryImage(url)"
-                  />
+                  >
+                    <VIcon icon="tabler-x" size="16" />
+                    <VTooltip activator="parent" location="top">حذف الصورة</VTooltip>
+                  </VBtn>
                 </div>
               </div>
             </VCol>
@@ -448,19 +507,29 @@ const deleteNews = async () => {
             </VCol>
 
             <VCol cols="12" md="6">
+              <label class="text-body-2 font-weight-medium mb-2 d-block" style="font-family:Cairo,sans-serif">طريقة النشر</label>
+              <VBtnToggle
+                v-model="form.publishMode"
+                mandatory
+                color="primary"
+                variant="outlined"
+                divided
+                density="comfortable"
+                style="font-family:Cairo,sans-serif"
+              >
+                <VBtn v-for="opt in publishModeOptions" :key="opt.value" :value="opt.value" :prepend-icon="opt.icon">
+                  {{ opt.label }}
+                </VBtn>
+              </VBtnToggle>
+            </VCol>
+            <VCol v-if="showPublishDate" cols="12" md="6">
               <VTextField
                 v-model="form.published_at"
-                label="تاريخ النشر (اختياري — الآن افتراضياً)"
+                :label="form.publishMode === 'schedule' ? 'تاريخ النشر المجدول' : 'تاريخ النشر'"
                 type="date"
-                :min="isEditing ? undefined : new Date().toISOString().slice(0, 10)"
-                style="font-family:Cairo,sans-serif"
-              />
-            </VCol>
-            <VCol cols="12" md="6" class="d-flex align-center">
-              <VSwitch
-                v-model="form.is_published"
-                :label="isScheduledForLater ? 'جدولة النشر لهذا التاريخ' : 'نشر مباشرة'"
-                color="success"
+                :min="minPublishDate"
+                :hint="isEditing ? 'يمكن اختيار تاريخ أمس أو أي تاريخ بعده' : undefined"
+                persistent-hint
                 style="font-family:Cairo,sans-serif"
               />
             </VCol>
@@ -577,3 +646,12 @@ const deleteNews = async () => {
     </VSnackbar>
   </div>
 </template>
+
+<style scoped>
+.gallery-remove-btn {
+  position: absolute;
+  top: -8px;
+  inset-inline-end: -8px;
+  z-index: 1;
+}
+</style>
