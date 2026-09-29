@@ -178,7 +178,8 @@ class ImportPaidContractors2026 extends Command
                 'name'                          => $this->str($row[2]),
                 'authorized_person'             => $this->str($row[3]) ?: null,
                 'authorized_person_id_number'   => preg_replace('/\D/', '', $this->str($row[4])) ?: null,
-                'license_number'                => $license,
+                // رقم المشتغل المرخص هو رقم السجل التجاري (9 خانات) — لا رقم رخصة البلدية
+                'commercial_register'           => $license,
                 'phone'                         => $phone,
                 'email'                         => $email,
                 'city'                          => $this->str($row[8]) ?: null,
