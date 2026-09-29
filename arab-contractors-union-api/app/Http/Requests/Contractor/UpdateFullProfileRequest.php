@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Contractor;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateFullProfileRequest extends FormRequest
 {
@@ -43,7 +44,14 @@ class UpdateFullProfileRequest extends FormRequest
             'registration_date'             => 'nullable|date',
             'legal_form'                    => 'nullable|string|max:100',
             'company_purposes'              => 'nullable|string',
-            'license_number'                => 'nullable|string|max:100',
+            // فريد مثل لوحة الأدمن — بدونه كان الرقم المكرر يصل لقيد الـ unique في قاعدة
+            // البيانات فيرجع التطبيق "حدث خطأ غير متوقع" (500) بدل رسالة واضحة.
+            'license_number'                => [
+                'nullable',
+                'string',
+                'max:100',
+                Rule::unique('contractors', 'license_number')->whereNull('deleted_at')->ignore($contractorId),
+            ],
 
             // Files — كل المستندات قابلة للرفع/الاستبدال المباشر، بما فيها partners_ids رغم
             // أن حقل partners النصي نفسه مقفل.
@@ -62,6 +70,13 @@ class UpdateFullProfileRequest extends FormRequest
             'partners_ids'                  => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
             'authorization_letter'          => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
             'authorized_signature'          => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
+        ];
+    }
+
+    public function attributes(): array
+    {
+        return [
+            'license_number' => 'رقم رخصة البلدية',
         ];
     }
 }

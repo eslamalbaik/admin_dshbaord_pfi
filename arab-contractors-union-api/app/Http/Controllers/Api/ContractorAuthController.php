@@ -43,7 +43,7 @@ class ContractorAuthController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
     public function login(LoginRequest $request)
     {
-        $contractor = Contractor::where('membership_number', trim($request->membership_number))->first();
+        $contractor = Contractor::where('membership_number', \App\Rules\MembershipNumber::normalize($request->membership_number))->first();
 
         // التحقق من العضوية أولاً (REQ-05): غير موجود = رسالة عضوية واضحة، وليس خطأ اعتماديات
         if (! $contractor) {
