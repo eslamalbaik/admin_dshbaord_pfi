@@ -8,8 +8,9 @@ use Illuminate\Contracts\Validation\ValidationRule;
 /**
  * قاعدة موحّدة لهيكلية رقم العضوية — تُستخدم في كل الواجهات (إضافة مقاول، تسجيل، دخول).
  *
- *  - الأرقام القديمة:  1 حتى 927 (رقم فقط).
- *  - الأرقام الجديدة:  928_g فما فوق (رقم يليه _g).
+ * كل أرقام العضوية بصيغة رقم يليه _g (مثال: 184_g، 932_g) — بما فيها الأرقام القديمة
+ * 1-927 التي كانت تُكتب رقماً فقط قبل توحيدها (migration 2026_09_29_120000).
+ * الأرقام الجديدة تُولَّد من 928_g فما فوق (Contractor::nextMembershipNumber).
  */
 class MembershipNumber implements ValidationRule
 {
@@ -29,21 +30,12 @@ class MembershipNumber implements ValidationRule
      */
     public static function isValid(string $value): bool
     {
-        $value = trim($value);
-
-        if (preg_match('/^[0-9]+$/', $value)) {
-            return (int) $value >= 1 && (int) $value <= self::OLD_MAX;
-        }
-
-        if (preg_match('/^([0-9]+)' . self::NEW_SUFFIX . '$/', $value, $matches)) {
-            return (int) $matches[1] >= self::NEW_MIN;
-        }
-
-        return false;
+        return (bool) preg_match('/^([0-9]+)' . self::NEW_SUFFIX . '$/', trim($value), $matches)
+            && (int) $matches[1] >= 1;
     }
 
     /**
-     * هل الرقم بالهيكلية الجديدة (928_g فما فوق)؟
+     * هل الرقم بالهيكلية الجديدة (رقم يليه _g)؟
      */
     public static function isNewFormat(string $value): bool
     {
@@ -53,10 +45,20 @@ class MembershipNumber implements ValidationRule
         );
     }
 
+    /**
+     * يُكمل الرقم المكتوب بدون لاحقة ("184" ← "184_g") — المقاولون القدامى اعتادوا
+     * كتابة رقمهم بدون _g، فيُقبل منهم عند الدخول والبحث.
+     */
+    public static function normalize(?string $value): string
+    {
+        $value = trim((string) $value);
+
+        return ctype_digit($value) ? $value . self::NEW_SUFFIX : $value;
+    }
+
     public static function formatError(): string
     {
-        return 'صيغة رقم العضوية غير صحيحة. يجب أن يكون رقماً قديماً (1-'
-            . self::OLD_MAX . ') أو رقماً جديداً يليه '
-            . self::NEW_SUFFIX . ' (مثال: ' . self::NEW_MIN . self::NEW_SUFFIX . ').';
+        return 'صيغة رقم العضوية غير صحيحة. يجب أن يكون رقماً يليه '
+            . self::NEW_SUFFIX . ' (مثال: 184' . self::NEW_SUFFIX . ').';
     }
 }

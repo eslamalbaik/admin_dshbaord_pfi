@@ -23,7 +23,7 @@ class ImportPaidContractors2026 extends Command
                             {--dry-run : عرض ما سيحدث دون أي كتابة}
                             {--status=active : حالة الشركات المستوردة (active|pending)}
                             {--membership-expires=2026-12-31 : تاريخ انتهاء اشتراك 2026، أو none لعدم إنشاء سجل اشتراك}
-                            {--g-suffix : إعطاء أرقام العضوية ≥928 اللاحقة _g حسب مخطط الترقيم الجديد}';
+                            {--g-suffix : (مهمل) كل الأرقام تأخذ اللاحقة _g تلقائياً الآن}';
 
     protected $description = 'استيراد كشف الشركات المسدّدة 2026 (بيانات الشركة + التصنيفات) إلى جدول contractors';
 
@@ -354,14 +354,10 @@ class ImportPaidContractors2026 extends Command
         }
     }
 
-    /** أرقام ≥928 تتبع مخطط {n}_g الجديد عند تفعيل الخيار */
+    /** كل أرقام العضوية بصيغة {n}_g — القديمة والجديدة (MembershipNumber) */
     private function membershipNumber(string $raw): string
     {
-        if ($this->option('g-suffix') && ctype_digit($raw) && (int) $raw >= 928) {
-            return $raw.'_g';
-        }
-
-        return $raw;
+        return \App\Rules\MembershipNumber::normalize($raw);
     }
 
     private function str(mixed $v): string

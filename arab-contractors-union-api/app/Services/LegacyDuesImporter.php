@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Contractor;
 use App\Models\ContractorDue;
+use App\Rules\MembershipNumber;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -56,7 +57,7 @@ class LegacyDuesImporter
         foreach ($companies as $company) {
             $number     = $company['membership_number'];
             $contractor = $number === '' ? null : Contractor::where('membership_number', $number)
-                ->orWhere('membership_number', (string) (int) $number)
+                ->orWhere('membership_number', MembershipNumber::normalize((string) (int) $number))
                 ->first();
 
             // مطابقة ثانية برقم المشتغل المرخص (السجل التجاري) — أرقام العضوية
@@ -214,7 +215,8 @@ class LegacyDuesImporter
                     'seq'                 => (int) $this->number($row[0]),
                     'name'                => $name,
                     'authorized_person'   => trim((string) ($row[2] ?? '')) ?: null,
-                    'membership_number'   => $this->normalizeDigits(trim((string) ($row[3] ?? ''))),
+                    // الكشف يكتب الرقم القديم بدون _g — يُوحَّد لصيغة قاعدة البيانات
+                    'membership_number'   => MembershipNumber::normalize($this->normalizeDigits(trim((string) ($row[3] ?? '')))),
                     'licensed_number'     => $this->normalizeDigits(trim((string) ($row[4] ?? ''))) ?: null,
                     'first_trade'         => null,
                     'first_grade'         => null,

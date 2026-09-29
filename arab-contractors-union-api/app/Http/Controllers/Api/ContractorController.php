@@ -56,6 +56,14 @@ class ContractorController extends Controller
      * قاعدة Laravel الخام إعادة استخدام قيمة (جوال، بريد، رقم عضوية...) لمقاول محذوف سابقاً،
      * لأنها تتحقق من كل الصفوف بالجدول مباشرة بدون المرور بـ global scope الخاص بـ SoftDeletes.
      */
+    // رقم مكتوب بدون لاحقة ("184") يُكمَل إلى "184_g" قبل التحقق — كل الأرقام بصيغة _g
+    private function normalizeMembershipNumber(Request $request): void
+    {
+        if ($request->filled('membership_number')) {
+            $request->merge(['membership_number' => \App\Rules\MembershipNumber::normalize($request->input('membership_number'))]);
+        }
+    }
+
     private function uniqueIgnoringSoftDeleted(string $column, $isUpdate, $contractorId): \Illuminate\Validation\Rules\Unique
     {
         $rule = Rule::unique('contractors', $column)->whereNull('deleted_at');
@@ -293,7 +301,8 @@ class ContractorController extends Controller
     // POST /api/contractors
     public function store(Request $request)
     {
-        $validated = $request->validate($this->getValidationRules(), $this->getValidationMessages(), $this->getValidationAttributes());
+        $this->normalizeMembershipNumber($request);
+        $validated = $request->validate($this->getValidationRules(),$this->getValidationMessages(), $this->getValidationAttributes());
         $this->handleFileUploads($request, $validated);
         $this->syncLocation($validated);
 
@@ -319,7 +328,8 @@ class ContractorController extends Controller
     // PUT/PATCH /api/contractors/{id}
     public function update(Request $request, Contractor $contractor)
     {
-        $validated = $request->validate($this->getValidationRules(true, $contractor->id), $this->getValidationMessages(), $this->getValidationAttributes());
+        $this->normalizeMembershipNumber($request);
+        $validated = $request->validate($this->getValidationRules(true,$contractor->id), $this->getValidationMessages(), $this->getValidationAttributes());
         $this->handleFileUploads($request, $validated, $contractor);
         $this->syncLocation($validated);
 

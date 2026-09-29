@@ -429,9 +429,9 @@ const submit = async () => {
             <VTextField v-model="form.membership_number" readonly label="رقم العضوية بالاتحاد *" :error-messages="validationErrors.membership_number" :rules="[
               v => !!v || 'مطلوب',
               v => {
-                if (/^[0-9]+$/.test(v)) return (parseInt(v) >= 1 && parseInt(v) <= 927) || 'أرقام العضوية القديمة يجب أن تكون بين 1 و 927'
-                if (/^[0-9]+_g$/.test(v)) return parseInt(v.split('_')[0]) >= 928 || 'أرقام العضوية الجديدة يجب أن تبدأ من 928_g'
-                return 'صيغة غير صحيحة (مثال: 100 أو 928_g)'
+                // كل الأرقام بصيغة _g — الرقم بدون لاحقة يُكمَل تلقائياً في الخادم
+                if (/^[0-9]+(_g)?$/.test(v)) return parseInt(v) >= 1 || 'رقم العضوية يجب أن يكون 1 أو أكثر'
+                return 'صيغة غير صحيحة (مثال: 184_g)'
               }
             ]" />
           </VCol>
