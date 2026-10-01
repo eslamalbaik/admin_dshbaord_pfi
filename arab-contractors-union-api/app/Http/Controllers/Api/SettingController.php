@@ -87,6 +87,7 @@ class SettingController extends Controller
             'address'  => Setting::get('union_address', ''),
             'phone'    => Setting::get('union_phone', ''),
             'phone2'   => Setting::get('union_phone2', ''),
+            'whatsapp' => Setting::get('support_whatsapp', ''),
             'email'    => Setting::get('union_email', ''),
             'logo_url' => $this->logoUrl(),
             // cast لكائن حتى يبقى النوع {} في JSON حتى لو كانت الروابط كلها فارغة
