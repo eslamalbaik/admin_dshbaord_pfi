@@ -27,20 +27,16 @@ class AuthController extends Controller
                 Log::info("Admin login: {$user->email} at " . now());
             }
 
-            // FTR-001: Invalidate all previous sessions before issuing new token
-            $user->tokens()->delete();
-
             $deviceLabel = substr($request->header('User-Agent', 'Unknown Device'), 0, 120);
             $token = $user->createToken('auth_token', ['*'], now()->addDays(30));
             $token->accessToken->update(['device_label' => $deviceLabel]);
             $plainToken = $token->plainTextToken;
 
-            $frontendUrl = rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/');
-            $landingUrl = rtrim(env('LANDING_URL', 'http://localhost:8080'), '/');
+            $frontendUrl = rtrim(config('app.frontend_url'), '/');
+            $landingUrl = rtrim(config('app.landing_url'), '/');
 
             $redirectUrl = match($user->role) {
                 'admin', 'accountant' => $frontendUrl . '/dashboards',
-                'student'             => $landingUrl . '/student/dashboard',
                 default               => $landingUrl . '/',
             };
 
@@ -48,7 +44,7 @@ class AuthController extends Controller
                 'id'          => $user->id,
                 'name'        => $user->name,
                 'fullName'    => $user->name,
-                'role'        => $user->role ?? 'student',
+                'role'        => $user->role ?? 'admin',
                 'email'       => $user->email,
                 'redirect_url'=> $redirectUrl,
             ], 'تم تسجيل الدخول بنجاح.', 200, 'user');
@@ -73,14 +69,12 @@ class AuthController extends Controller
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => bcrypt($validated['password']),
-            'role' => 'student',
+            'role' => 'admin',
         ]);
 
-        // FTR-001: No prior tokens on fresh registration, but be defensive
-        $user->tokens()->delete();
         $plainToken = $user->createToken('auth_token')->plainTextToken;
 
-        $landingUrl = rtrim(env('LANDING_URL', 'http://localhost:8080'), '/');
+        $landingUrl = rtrim(config('app.landing_url'), '/');
 
         return $this->successWithToken($plainToken, [
             'id'           => $user->id,
@@ -88,7 +82,7 @@ class AuthController extends Controller
             'fullName'     => $user->name,
             'role'         => $user->role,
             'email'        => $user->email,
-            'redirect_url' => $landingUrl . '/student/dashboard',
+            'redirect_url' => rtrim(config('app.frontend_url'), '/') . '/dashboards',
         ], 'تم إنشاء الحساب بنجاح.', 201, 'user');
     }
 
@@ -113,7 +107,7 @@ class AuthController extends Controller
      */
     public function redirectToGoogle(Request $request)
     {
-        $landingUrl = rtrim(env('LANDING_URL', 'http://localhost:8080'), '/');
+        $landingUrl = rtrim(config('app.landing_url'), '/');
 
         if (! config('services.google.client_id') || ! config('services.google.client_secret')) {
             return redirect($landingUrl . '/login?error=google_not_configured');
@@ -138,7 +132,7 @@ class AuthController extends Controller
     {
         $request->validate(['code' => 'required|string']);
 
-        $landingUrl = rtrim(env('LANDING_URL', 'http://localhost:8080'), '/');
+        $landingUrl = rtrim(config('app.landing_url'), '/');
 
         try {
             $driver     = Socialite::driver('google')->stateless();
@@ -155,7 +149,7 @@ class AuthController extends Controller
 
         $email = strtolower(trim($googleUser->getEmail()));
 
-        // Find existing user or create a new student account
+        // Find existing user or create a new admin account
         $user = \App\Models\User::withTrashed()->where('email', $email)->first();
 
         if ($user && $user->trashed()) {
@@ -167,24 +161,22 @@ class AuthController extends Controller
                 'name'     => $googleUser->getName() ?: $email,
                 'email'    => $email,
                 'password' => bcrypt(\Illuminate\Support\Str::random(32)), // random unusable password
-                'role'     => 'student',
+                'role'     => 'admin',
             ]);
-            Log::info("New Google student registered: {$email}");
+            Log::info("New Google admin registered: {$email}");
         }
 
-        // FTR-001: Invalidate all previous sessions on Google OAuth login too
-        $user->tokens()->delete();
         $plainToken = $user->createToken('google_oauth')->plainTextToken;
 
         $redirectUrl = in_array($user->role, ['admin', 'accountant'])
-            ? rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/') . '/dashboards'
-            : $landingUrl . '/student/dashboard';
+            ? rtrim(config('app.frontend_url'), '/') . '/dashboards'
+            : $landingUrl . '/';
 
         return $this->successWithToken($plainToken, [
             'id'           => $user->id,
             'name'         => $user->name,
             'fullName'     => $user->name,
-            'role'         => $user->role ?? 'student',
+            'role'         => $user->role ?? 'admin',
             'email'        => $user->email,
             'redirect_url' => $redirectUrl,
         ], 'تم تسجيل الدخول عبر Google بنجاح.', 200, 'user');

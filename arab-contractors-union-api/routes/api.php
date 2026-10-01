@@ -8,8 +8,8 @@ use App\Http\Controllers\Api\MembershipController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PenaltyController;
 use App\Http\Controllers\Api\TenderController;
+use App\Http\Controllers\Api\TenderCategoryController;
 use App\Http\Controllers\Api\DocumentController;
-use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ContractorAuthController;
 use App\Http\Controllers\Api\ContractorRegisterController;
@@ -18,13 +18,13 @@ use App\Http\Controllers\Api\EquipmentTypeController;
 use App\Http\Controllers\Api\EquipmentController;
 use App\Http\Controllers\Api\ReportsController;
 use App\Http\Controllers\Api\NewsController;
+use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\TermsController;
 use App\Http\Controllers\Api\LegalFileController;
 use App\Http\Controllers\Api\BankAccountController;
-use App\Http\Controllers\Api\SupportTicketController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\CertificateRequestController;
-use App\Http\Controllers\Api\ContractorNameChangeRequestController;
+use App\Http\Controllers\Api\SupportTicketController;
 use App\Http\Controllers\Api\ContractorHomeController;
 
 // ============================================================
@@ -36,11 +36,11 @@ Route::prefix('v1')->group(function () {
     //  Contractor Mobile App — Auth (Public)
     // --------------------------------------------------------
     Route::prefix('contractor/auth')->group(function () {
-        // throttle: 5 محاولات كل دقيقة لمنع brute force
-        Route::middleware('throttle:5,1')->post('login', [ContractorAuthController::class, 'login']);
+        // throttle:auth (5 محاولات كل دقيقة) لمنع brute force
+        Route::middleware('throttle:auth')->post('login', [ContractorAuthController::class, 'login']);
 
         // تسجيل العضو (خطوتان): التحقق من الهوية ثم تعيين كلمة المرور
-        Route::middleware('throttle:10,1')->group(function () {
+        Route::middleware('throttle:auth')->group(function () {
             Route::post('verify-identity', [ContractorRegisterController::class, 'verifyIdentity']);
             Route::post('set-password',    [ContractorRegisterController::class, 'setPassword']);
             Route::post('verify-otp',      [ContractorRegisterController::class, 'verifyOtp']);
@@ -55,23 +55,26 @@ Route::prefix('v1')->group(function () {
     // --------------------------------------------------------
     Route::middleware(['auth:sanctum', 'contractor.active'])->prefix('contractor/auth')->group(function () {
         Route::post('logout',          [ContractorAuthController::class, 'logout']);
-        Route::get('me',               [ContractorAuthController::class, 'me']);
         Route::get('profile',          [ContractorAuthController::class, 'profile']);
         Route::patch('profile',        [ContractorAuthController::class, 'updateProfile']);
         Route::post('profile/update',  [ContractorAuthController::class, 'updateFullProfile']);
+        Route::post('profile/phone/request-otp', [ContractorAuthController::class, 'requestPhoneChangeOtp']);
+        Route::post('profile/phone/verify-otp',  [ContractorAuthController::class, 'verifyPhoneChangeOtp']);
         Route::post('logo',            [ContractorAuthController::class, 'updateLogo']);
         Route::get('profile/pdf',      [ContractorAuthController::class, 'exportPdf']);
         Route::get('profile/download-file/{field}', [ContractorAuthController::class, 'downloadFile']);
         Route::post('change-password', [ContractorAuthController::class, 'changePassword']);
 
-        // طلب تعديل اسم الشركة (يتطلب موافقة الإدارة + وثيقة رسمية)
-        Route::get('name-change-request',  [ContractorNameChangeRequestController::class, 'show']);
-        Route::post('name-change-request', [ContractorNameChangeRequestController::class, 'store']);
-
-        // إشعارات المقاول (صندوق الوارد)
+        // إشعارات المقاول (صندوق الوارد) — نظام الإشعارات القديم (Laravel notifications)
         Route::get('notifications',                    [NotificationController::class, 'index']);
+        Route::get('notifications/unread-count',       [NotificationController::class, 'unreadCount']);
         Route::post('notifications/read',              [NotificationController::class, 'markAllRead']);
         Route::patch('notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead']);
+
+        // إشعارات التطبيق الجديدة (App Notifications — Announcements, Reminders, etc.)
+        Route::get('app-notifications',                 [NotificationController::class, 'getContractorNotifications']);
+        Route::get('app-notifications/unread-count',    [NotificationController::class, 'getContractorUnreadCount']);
+        Route::patch('app-notifications/{notification}', [NotificationController::class, 'markNotificationAsRead']);
     });
 
     // --------------------------------------------------------
@@ -86,19 +89,21 @@ Route::prefix('v1')->group(function () {
         Route::get('memberships',  [ContractorDashboardController::class, 'memberships']);
         Route::get('payments',     [ContractorDashboardController::class, 'payments']);
         Route::get('documents',    [ContractorDashboardController::class, 'documents']);
+        Route::post('documents',               [DocumentController::class, 'contractorStore']);
+        Route::delete('documents/{document}',  [DocumentController::class, 'contractorDestroy']);
 
         // شاشة الدفع — رفع إشعار التحويل ومتابعته
         Route::post('payments/transfer', [PaymentController::class, 'submitTransfer']);
         Route::get('payments/transfer',  [PaymentController::class, 'myTransfers']);
         Route::get('payments/{payment}/receipt', [PaymentController::class, 'receipt']);
+        Route::get('payments/{payment}',         [PaymentController::class, 'show']);
 
-        // شاشة الدعم الفني — مجمَّدة (REQ-23): الاتحاد قرر التحويل المباشر لاتصال هاتفي/واتساب
-        // بدل نظام التذاكر داخل التطبيق (موارد بشرية محدودة). الكود (Controller/Model/migrations)
-        // يبقى بالمستودع كما هو دون حذف لإمكانية إعادة التفعيل بـv2 — فقط الوصول من الموبايل معطَّل هنا.
-        // Route::get('support-tickets',           [SupportTicketController::class, 'myTickets']);
-        // Route::post('support-tickets',          [SupportTicketController::class, 'store']);
-        // Route::get('support-tickets/{ticket}',  [SupportTicketController::class, 'showMine']);
-        // Route::post('support-tickets/{ticket}/reply', [SupportTicketController::class, 'replyMine']);
+        // شاشة الدعم الفني — أُعيد تفعيلها بتصميم جديد (REQ-23 تراجع عنها): تذكرة مع رقم واتساب
+        // للتواصل بدل تحويل مباشر بالكامل خارج التطبيق.
+        Route::get('support-tickets',           [SupportTicketController::class, 'myTickets']);
+        Route::post('support-tickets',          [SupportTicketController::class, 'store']);
+        Route::get('support-tickets/{ticket}',  [SupportTicketController::class, 'showMine']);
+        Route::post('support-tickets/{ticket}/reply', [SupportTicketController::class, 'replyMine']);
 
         // شاشة طلب شهادة العضوية
         Route::get('certificate-requests',  [CertificateRequestController::class, 'index']);
@@ -111,6 +116,9 @@ Route::prefix('v1')->group(function () {
         // أهلية تجديد العضوية (تُمنع مع ذمم غير مسدَّدة)
         Route::get('renewal-eligibility', [ContractorDashboardController::class, 'renewalEligibility']);
 
+        // كائن موحّد لتفاصيل الاشتراك ووضعه — لإعادة الاستخدام بأكثر من شاشة
+        Route::get('subscription', [ContractorDashboardController::class, 'subscription']);
+
         // شاشة العطاءات — تصفح موثَّق (فعّال/مؤرشف/مجالاتي) + حفظ بالمفضلة (REQ-09/11/13)
         Route::get('tenders',                   [TenderController::class, 'contractorIndex']);
         Route::get('tenders/bookmarked',         [TenderController::class, 'bookmarked']);
@@ -122,26 +130,34 @@ Route::prefix('v1')->group(function () {
         Route::get('circulars/pending', [\App\Http\Controllers\Api\AnnouncementController::class, 'pending']);
         Route::post('circulars/{announcement}/acknowledge', [\App\Http\Controllers\Api\AnnouncementController::class, 'acknowledge']);
 
+        // أرشيف التعميمات + فتح تفاصيل التعميم من الإشعار (Deep linking)
+        Route::get('announcements/{announcement}', [\App\Http\Controllers\Api\AnnouncementController::class, 'show']);
+
         // الفعاليات — تصفح + انضمام/إلغاء (RSVP) — REQ-21
-        Route::get('events',                 [NewsController::class, 'contractorEvents']);
-        Route::get('events/{news}',          [NewsController::class, 'contractorEventShow']);
-        Route::post('events/{news}/join',    [NewsController::class, 'joinEvent']);
-        Route::delete('events/{news}/join',  [NewsController::class, 'leaveEvent']);
+        Route::get('events',                  [EventController::class, 'contractorEvents']);
+        Route::get('events/{event}',          [EventController::class, 'contractorEventShow']);
+        Route::post('events/{event}/join',    [EventController::class, 'joinEvent']);
+        Route::delete('events/{event}/join',  [EventController::class, 'leaveEvent']);
 
         // سوق الآليات — "آلياتي" + تصفح السوق + بلاغات + الباقات (REQ-04→08)
         Route::get('equipment-packages',            [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'packages']);
+        Route::get('equipment/form-options',         [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'formOptions']);
         Route::get('equipment/subscription-status',  [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'subscriptionStatus']);
         Route::get('equipment/marketplace',          [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'marketplace']);
+        Route::get('equipment/marketplace/{equipment}', [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'show']);
+        Route::get('equipment/marketplace/{equipment}/availability', [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'availability']);
+        Route::post('equipment/{equipment}/reservations', [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'requestReservation']);
+        Route::get('my-equipment-reservations',           [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'myReservations']);
+        Route::delete('equipment-reservations/{equipmentReservation}', [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'cancelReservation']);
         Route::get('equipment',                      [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'index']);
         Route::post('equipment',                     [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'store']);
         Route::patch('equipment/{equipment}',        [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'update']);
         Route::delete('equipment/{equipment}',       [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'destroy']);
         Route::post('equipment/{equipment}/report',  [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'report']);
-
-        // طلبات تعديل بيانات البروفايل الثانوية (REQ-26)
-        Route::get('profile-update-requests/mine',          [\App\Http\Controllers\Api\ProfileUpdateRequestController::class, 'mine']);
-        Route::post('profile-update-requests/send-phone-otp', [\App\Http\Controllers\Api\ProfileUpdateRequestController::class, 'sendPhoneOtp']);
-        Route::post('profile-update-requests',               [\App\Http\Controllers\Api\ProfileUpdateRequestController::class, 'store']);
+        // إدارة صور الإعلان بعد النشر (REQ-08 #2/#3/#5) — لم تكن موجودة أصلاً
+        Route::post('equipment/{equipment}/images',                          [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'uploadImages']);
+        Route::delete('equipment/{equipment}/images/{equipmentImage}',       [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'deleteImage']);
+        Route::post('equipment/{equipment}/images/{equipmentImage}/primary', [\App\Http\Controllers\Api\ContractorEquipmentController::class, 'setPrimaryImage']);
     });
 
     // --------------------------------------------------------
@@ -149,6 +165,7 @@ Route::prefix('v1')->group(function () {
     // --------------------------------------------------------
     Route::get('tenders-public',          [TenderController::class, 'publicIndex']);
     Route::get('tenders-public/{tender}', [TenderController::class, 'publicShow']);
+    Route::get('tender-categories-public', [TenderCategoryController::class, 'publicIndex']);
 
     // --------------------------------------------------------
     //  News — Public (no auth)
@@ -156,7 +173,18 @@ Route::prefix('v1')->group(function () {
     Route::prefix('news')->group(function () {
         Route::get('latest',  [NewsController::class, 'latest']);
         Route::get('/',       [NewsController::class, 'index']);
-        Route::get('{slug}',  [NewsController::class, 'show']);
+        // Accepts the numeric id (matches `reference_id` in the contractor home feed);
+        // a slug still resolves too, for older clients.
+        Route::get('{news}',  [NewsController::class, 'show']);
+    });
+
+    // --------------------------------------------------------
+    //  Events — Public (no auth) — كيان مستقل عن الأخبار
+    // --------------------------------------------------------
+    Route::prefix('events')->group(function () {
+        Route::get('latest',  [EventController::class, 'latest']);
+        Route::get('/',       [EventController::class, 'index']);
+        Route::get('{slug}',  [EventController::class, 'show']);
     });
 
     // --------------------------------------------------------
@@ -176,6 +204,11 @@ Route::prefix('v1')->group(function () {
     Route::get('terms', [TermsController::class, 'public']);
 
     // --------------------------------------------------------
+    //  Privacy Policy — Public (no auth)
+    // --------------------------------------------------------
+    Route::get('privacy-policy', [TermsController::class, 'publicPrivacy']);
+
+    // --------------------------------------------------------
     //  Legal Library — Public (no auth)
     // --------------------------------------------------------
     Route::get('legal-files', [LegalFileController::class, 'publicIndex']);
@@ -184,6 +217,11 @@ Route::prefix('v1')->group(function () {
     //  Bank Accounts (شاشة الدفع) — Public (no auth)
     // --------------------------------------------------------
     Route::get('bank-accounts', [BankAccountController::class, 'publicIndex']);
+
+    // --------------------------------------------------------
+    //  Certificate Verification (QR) — Public (no auth)
+    // --------------------------------------------------------
+    Route::get('certificates/verify/{token}', [\App\Http\Controllers\Api\CertificateRequestController::class, 'verify']);
 
     // --------------------------------------------------------
     //  Landing Home — Public (كل بيانات الصفحة الرئيسية في نداء واحد)
@@ -278,7 +316,18 @@ Route::prefix('v1')->group(function () {
             Route::post('/',         [NewsController::class, 'store']);
             Route::put('{news}',     [NewsController::class, 'update']);
             Route::delete('{news}',  [NewsController::class, 'destroy']);
-            Route::get('{news}/attendees', [NewsController::class, 'attendees']);
+            Route::delete('{news}/gallery-image', [NewsController::class, 'destroyGalleryImage']);
+        });
+
+        // --------------------------------------------------------
+        //  Events — Admin CRUD
+        // --------------------------------------------------------
+        Route::prefix('admin/events')->group(function () {
+            Route::get('/',                 [EventController::class, 'adminIndex']);
+            Route::post('/',                [EventController::class, 'store']);
+            Route::put('{event}',           [EventController::class, 'update']);
+            Route::delete('{event}',        [EventController::class, 'destroy']);
+            Route::get('{event}/attendees', [EventController::class, 'attendees']);
         });
 
         // --------------------------------------------------------
@@ -291,21 +340,30 @@ Route::prefix('v1')->group(function () {
             Route::delete('{announcement}',  [\App\Http\Controllers\Api\AnnouncementController::class, 'destroy']);
         });
 
+        Route::get('announcement-categories',    [\App\Http\Controllers\Api\AnnouncementCategoryController::class, 'index']);
+        Route::post('announcement-categories',   [\App\Http\Controllers\Api\AnnouncementCategoryController::class, 'store']);
+        Route::patch('announcement-categories/{announcementCategory}',  [\App\Http\Controllers\Api\AnnouncementCategoryController::class, 'update']);
+        Route::delete('announcement-categories/{announcementCategory}', [\App\Http\Controllers\Api\AnnouncementCategoryController::class, 'destroy']);
+
         // --------------------------------------------------------
         //  Terms & Conditions — Admin CRUD
         // --------------------------------------------------------
-        Route::get('dashboard/terms',          [TermsController::class, 'index']);
-        Route::post('dashboard/terms',         [TermsController::class, 'store']);
-        Route::put('dashboard/terms/{term}',   [TermsController::class, 'update']);
-        Route::delete('dashboard/terms/{term}',[TermsController::class, 'destroy']);
+        Route::middleware('role:admin')->group(function () {
+            Route::get('dashboard/terms',          [TermsController::class, 'index']);
+            Route::post('dashboard/terms',         [TermsController::class, 'store']);
+            Route::put('dashboard/terms/{term}',   [TermsController::class, 'update']);
+            Route::delete('dashboard/terms/{term}',[TermsController::class, 'destroy']);
+        });
 
         // --------------------------------------------------------
         //  Legal Library — Admin CRUD
         // --------------------------------------------------------
-        Route::get('dashboard/legal-files',                  [LegalFileController::class, 'index']);
-        Route::post('dashboard/legal-files',                 [LegalFileController::class, 'store']);
-        Route::post('dashboard/legal-files/{legalFile}',     [LegalFileController::class, 'update']);
-        Route::delete('dashboard/legal-files/{legalFile}',   [LegalFileController::class, 'destroy']);
+        Route::middleware('role:admin')->group(function () {
+            Route::get('dashboard/legal-files',                  [LegalFileController::class, 'index']);
+            Route::post('dashboard/legal-files',                 [LegalFileController::class, 'store']);
+            Route::post('dashboard/legal-files/{legalFile}',     [LegalFileController::class, 'update']);
+            Route::delete('dashboard/legal-files/{legalFile}',   [LegalFileController::class, 'destroy']);
+        });
 
         // --------------------------------------------------------
         //  Contractors
@@ -315,6 +373,8 @@ Route::prefix('v1')->group(function () {
              ->only(['index', 'store', 'show', 'update', 'destroy']);
         Route::post('contractors/{contractor}/qr', [ContractorController::class, 'generateQR']);
         Route::patch('contractors/{contractor}/status', [ContractorController::class, 'changeStatus']);
+        Route::patch('contractors/{contractor}/freeze', [ContractorController::class, 'freeze']);
+        Route::patch('contractors/{contractor}/contact', [ContractorController::class, 'updateContact']);
 
         // --------------------------------------------------------
         //  Memberships
@@ -332,60 +392,72 @@ Route::prefix('v1')->group(function () {
         Route::post('payments/transactions', [PaymentController::class, 'store']);
         Route::post('payments/transactions/{payment}/confirm', [PaymentController::class, 'confirm']);
         Route::post('payments/transactions/{payment}/reject',  [PaymentController::class, 'reject']);
+        Route::post('payments/transactions/{payment}/receipt-image', [PaymentController::class, 'uploadReceiptImage']);
 
         // --------------------------------------------------------
         //  Bank Accounts — Admin CRUD (شاشة الدفع)
         // --------------------------------------------------------
-        Route::get('dashboard/bank-accounts',                [BankAccountController::class, 'index']);
-        Route::post('dashboard/bank-accounts',               [BankAccountController::class, 'store']);
-        Route::post('dashboard/bank-accounts/{bankAccount}', [BankAccountController::class, 'update']);
-        Route::delete('dashboard/bank-accounts/{bankAccount}',[BankAccountController::class, 'destroy']);
-
-        // --------------------------------------------------------
-        //  Support Tickets — Admin (الدعم الفني والشكاوى)
-        // --------------------------------------------------------
-        Route::get('dashboard/support-tickets',                   [SupportTicketController::class, 'index']);
-        Route::get('dashboard/support-tickets/{ticket}',          [SupportTicketController::class, 'show']);
-        Route::post('dashboard/support-tickets/{ticket}/reply',   [SupportTicketController::class, 'reply']);
-        Route::patch('dashboard/support-tickets/{ticket}/status', [SupportTicketController::class, 'updateStatus']);
-        Route::delete('dashboard/support-tickets/{ticket}',       [SupportTicketController::class, 'destroy']);
+        Route::middleware('role:admin')->group(function () {
+            Route::get('dashboard/bank-accounts',                [BankAccountController::class, 'index']);
+            Route::post('dashboard/bank-accounts',               [BankAccountController::class, 'store']);
+            Route::post('dashboard/bank-accounts/{bankAccount}', [BankAccountController::class, 'update']);
+            Route::delete('dashboard/bank-accounts/{bankAccount}',[BankAccountController::class, 'destroy']);
+        });
 
         // --------------------------------------------------------
         //  App Settings — Admin (واتساب/بريد الدعم، بيانات الاتحاد، السوشال ميديا)
         // --------------------------------------------------------
-        Route::get('dashboard/settings',       [SettingController::class, 'index']);
-        Route::put('dashboard/settings',       [SettingController::class, 'update']);
-        Route::post('dashboard/settings/logo', [SettingController::class, 'uploadLogo']);
+        Route::middleware('role:admin')->group(function () {
+            Route::get('dashboard/settings',       [SettingController::class, 'index']);
+            Route::put('dashboard/settings',       [SettingController::class, 'update']);
+            Route::post('dashboard/settings/logo', [SettingController::class, 'uploadLogo']);
+            Route::post('dashboard/settings/cover-image', [SettingController::class, 'uploadCoverImage']);
+        });
+
+        // --------------------------------------------------------
+        //  Activity Log — سجل النشاط الإداري (Admin only، للمساءلة والمراجعة)
+        // --------------------------------------------------------
+        Route::middleware('role:admin')->group(function () {
+            Route::get('dashboard/activity-logs',         [\App\Http\Controllers\Api\ActivityLogController::class, 'index']);
+            Route::get('dashboard/activity-logs/actions',  [\App\Http\Controllers\Api\ActivityLogController::class, 'actions']);
+        });
 
         // --------------------------------------------------------
         //  Dynamic Pages — Admin CRUD
         // --------------------------------------------------------
-        Route::get('dashboard/pages',           [\App\Http\Controllers\Api\PageController::class, 'index']);
-        Route::post('dashboard/pages',          [\App\Http\Controllers\Api\PageController::class, 'store']);
-        Route::put('dashboard/pages/{page}',    [\App\Http\Controllers\Api\PageController::class, 'update']);
-        Route::delete('dashboard/pages/{page}', [\App\Http\Controllers\Api\PageController::class, 'destroy']);
+        Route::middleware('role:admin')->group(function () {
+            Route::get('dashboard/pages',           [\App\Http\Controllers\Api\PageController::class, 'index']);
+            Route::post('dashboard/pages',          [\App\Http\Controllers\Api\PageController::class, 'store']);
+            Route::put('dashboard/pages/{page}',    [\App\Http\Controllers\Api\PageController::class, 'update']);
+            Route::delete('dashboard/pages/{page}', [\App\Http\Controllers\Api\PageController::class, 'destroy']);
+        });
 
         // --------------------------------------------------------
         //  Certificate Requests — Admin (طلبات شهادات العضوية)
         // --------------------------------------------------------
-        Route::get('dashboard/certificate-requests',                                [CertificateRequestController::class, 'adminIndex']);
-        Route::get('dashboard/certificate-requests/{certificateRequest}',           [CertificateRequestController::class, 'show']);
-        Route::post('dashboard/certificate-requests/issue-membership',              [CertificateRequestController::class, 'adminIssueMembership']);
-        Route::post('dashboard/certificate-requests/{certificateRequest}/approve',  [CertificateRequestController::class, 'approve']);
-        Route::post('dashboard/certificate-requests/{certificateRequest}/reject',   [CertificateRequestController::class, 'reject']);
-        Route::post('dashboard/certificate-requests/{certificateRequest}/issue',    [CertificateRequestController::class, 'issue']);
-        Route::delete('dashboard/certificate-requests/{certificateRequest}',        [CertificateRequestController::class, 'destroy']);
+        // المسارات الثابتة قبل {certificateRequest} حتى لا تُلتقط كمعرّف
+        Route::middleware('role:admin')->group(function () {
+            Route::get('dashboard/certificate-requests',                                  [CertificateRequestController::class, 'adminIndex']);
+            Route::post('dashboard/certificate-requests/issue-membership',                [CertificateRequestController::class, 'adminIssueMembership']);
+            Route::post('dashboard/certificate-requests/bulk-delete',                     [CertificateRequestController::class, 'bulkDestroy']);
+            Route::get('dashboard/certificate-requests/{certificateRequest}',             [CertificateRequestController::class, 'show']);
+            Route::post('dashboard/certificate-requests/{certificateRequest}/approve',    [CertificateRequestController::class, 'approve']);
+            Route::post('dashboard/certificate-requests/{certificateRequest}/reject',     [CertificateRequestController::class, 'reject']);
+            Route::post('dashboard/certificate-requests/{certificateRequest}/issue',      [CertificateRequestController::class, 'issue']);
+            Route::post('dashboard/certificate-requests/{certificateRequest}/regenerate', [CertificateRequestController::class, 'regenerate']);
+            Route::delete('dashboard/certificate-requests/{certificateRequest}',          [CertificateRequestController::class, 'destroy']);
+        });
 
         // --------------------------------------------------------
-        //  طلبات تعديل اسم الشركة — Admin
+        //  Support Tickets — Admin (الدعم الفني، أُعيد تفعيلها بتصميم جديد)
         // --------------------------------------------------------
-        Route::get('dashboard/name-change-requests',                                    [ContractorNameChangeRequestController::class, 'index']);
-        Route::post('dashboard/name-change-requests/{nameChangeRequest}/approve',        [ContractorNameChangeRequestController::class, 'approve']);
-        Route::post('dashboard/name-change-requests/{nameChangeRequest}/reject',         [ContractorNameChangeRequestController::class, 'reject']);
-
-        Route::get('dashboard/profile-update-requests',                                       [\App\Http\Controllers\Api\ProfileUpdateRequestController::class, 'index']);
-        Route::post('dashboard/profile-update-requests/{profileUpdateRequest}/approve',        [\App\Http\Controllers\Api\ProfileUpdateRequestController::class, 'approve']);
-        Route::post('dashboard/profile-update-requests/{profileUpdateRequest}/reject',         [\App\Http\Controllers\Api\ProfileUpdateRequestController::class, 'reject']);
+        Route::middleware('role:admin')->group(function () {
+            Route::get('dashboard/support-tickets',                     [SupportTicketController::class, 'index']);
+            Route::get('dashboard/support-tickets/{ticket}',             [SupportTicketController::class, 'show']);
+            Route::post('dashboard/support-tickets/{ticket}/reply',      [SupportTicketController::class, 'reply']);
+            Route::patch('dashboard/support-tickets/{ticket}/status',    [SupportTicketController::class, 'updateStatus']);
+            Route::delete('dashboard/support-tickets/{ticket}',          [SupportTicketController::class, 'destroy']);
+        });
 
         // --------------------------------------------------------
         //  Contractor Dues — الذمم المالية (أدمن + محاسب)
@@ -401,21 +473,88 @@ Route::prefix('v1')->group(function () {
             Route::post('dashboard/dues/{due}/settle',  [\App\Http\Controllers\Api\ContractorDueController::class, 'settle']);
             Route::delete('dashboard/dues/{due}',       [\App\Http\Controllers\Api\ContractorDueController::class, 'destroy']);
 
+            // أرصدة المقاولين — صافي له/عليه لكل شركة
+            Route::get('dashboard/balances',            [\App\Http\Controllers\Api\ContractorBalanceController::class, 'index']);
+            Route::get('dashboard/balances/summary',    [\App\Http\Controllers\Api\ContractorBalanceController::class, 'summary']);
+
             // أسعار الصرف (عرض + override يدوي)
             Route::get('dashboard/exchange-rates',  [\App\Http\Controllers\Api\ExchangeRateController::class, 'index']);
             Route::post('dashboard/exchange-rates', [\App\Http\Controllers\Api\ExchangeRateController::class, 'store']);
+
+            // جدول رسوم الدرجات — قراءة فقط هنا (التعديل صلاحية أدمن، أدناه)
+            Route::get('dashboard/grade-fees', [\App\Http\Controllers\Api\GradeFeeController::class, 'index']);
+
+            // محرّك احتساب رسوم العضوية (المادة 37) — معاينة/توليد فردي وجماعي
+            Route::post('dashboard/contractors/{contractor}/dues/calculate-fee', [\App\Http\Controllers\Api\ContractorDueController::class, 'calculateFee']);
+            Route::post('dashboard/contractors/{contractor}/dues/generate-fee',  [\App\Http\Controllers\Api\ContractorDueController::class, 'generateFee']);
+            Route::post('dashboard/dues/generate-fee/bulk',                     [\App\Http\Controllers\Api\ContractorDueController::class, 'generateFeeBulk']);
+
+            // خصم فردي على ذمة قائمة (المادة 37/ت)
+            Route::post('dashboard/dues/{due}/discount', [\App\Http\Controllers\Api\ContractorDueController::class, 'applyDiscount']);
+        });
+
+        // صلاحية أدمن فقط — تعديل رسوم الدرجات والخصم الجماعي (المادة 37/ت تُطر هذه كصلاحية مجلس إدارة)
+        Route::middleware('role:admin')->group(function () {
+            Route::put('dashboard/grade-fees/{gradeFee}', [\App\Http\Controllers\Api\GradeFeeController::class, 'update']);
+            Route::post('dashboard/dues/discount/bulk',   [\App\Http\Controllers\Api\ContractorDueController::class, 'applyDiscountBulk']);
         });
 
         // --------------------------------------------------------
-        //  Penalties
+        //  Contractor Lookups — إدارة المجالات/الاختصاصات/الدرجات (REQ-01 #7، صلاحية أدمن فقط:
+        //  هذه الأكواد تغذّي محرّك حساب الرسوم وتوليد الشهادات مباشرة)
         // --------------------------------------------------------
-        Route::get('penalties',                 [PenaltyController::class, 'index']);
-        Route::post('penalties',                [PenaltyController::class, 'store']);
-        Route::patch('penalties/{penalty}/pay', [PenaltyController::class, 'markPaid']);
+        Route::middleware('role:admin')->group(function () {
+            Route::get('dashboard/contractor-fields',          [\App\Http\Controllers\Api\ContractorLookupController::class, 'fieldsIndex']);
+            Route::post('dashboard/contractor-fields',         [\App\Http\Controllers\Api\ContractorLookupController::class, 'fieldsStore']);
+            Route::patch('dashboard/contractor-fields/{contractorField}',  [\App\Http\Controllers\Api\ContractorLookupController::class, 'fieldsUpdate']);
+            Route::delete('dashboard/contractor-fields/{contractorField}', [\App\Http\Controllers\Api\ContractorLookupController::class, 'fieldsDestroy']);
+
+            Route::get('dashboard/contractor-specializations',          [\App\Http\Controllers\Api\ContractorLookupController::class, 'specializationsIndex']);
+            Route::post('dashboard/contractor-specializations',         [\App\Http\Controllers\Api\ContractorLookupController::class, 'specializationsStore']);
+            Route::patch('dashboard/contractor-specializations/{contractorSpecialization}',  [\App\Http\Controllers\Api\ContractorLookupController::class, 'specializationsUpdate']);
+            Route::delete('dashboard/contractor-specializations/{contractorSpecialization}', [\App\Http\Controllers\Api\ContractorLookupController::class, 'specializationsDestroy']);
+
+            Route::get('dashboard/contractor-grades',          [\App\Http\Controllers\Api\ContractorLookupController::class, 'gradesIndex']);
+            Route::post('dashboard/contractor-grades',         [\App\Http\Controllers\Api\ContractorLookupController::class, 'gradesStore']);
+            Route::patch('dashboard/contractor-grades/{contractorGrade}',  [\App\Http\Controllers\Api\ContractorLookupController::class, 'gradesUpdate']);
+            Route::delete('dashboard/contractor-grades/{contractorGrade}', [\App\Http\Controllers\Api\ContractorLookupController::class, 'gradesDestroy']);
+        });
+
+        // --------------------------------------------------------
+        //  Governorates & Cities — إدارة المحافظات والمدن (صلاحية أدمن فقط: هذه الأكواد
+        //  تغذّي contractors.governorate_id/city_id وGET /api/v1/app/governorates العام)
+        // --------------------------------------------------------
+        Route::middleware('role:admin')->group(function () {
+            Route::get('dashboard/governorates',          [\App\Http\Controllers\Api\GovernorateController::class, 'governoratesIndex']);
+            Route::post('dashboard/governorates',         [\App\Http\Controllers\Api\GovernorateController::class, 'governoratesStore']);
+            Route::patch('dashboard/governorates/{governorate}',  [\App\Http\Controllers\Api\GovernorateController::class, 'governoratesUpdate']);
+            Route::delete('dashboard/governorates/{governorate}', [\App\Http\Controllers\Api\GovernorateController::class, 'governoratesDestroy']);
+
+            Route::get('dashboard/cities',          [\App\Http\Controllers\Api\GovernorateController::class, 'citiesIndex']);
+            Route::post('dashboard/cities',         [\App\Http\Controllers\Api\GovernorateController::class, 'citiesStore']);
+            Route::patch('dashboard/cities/{city}',  [\App\Http\Controllers\Api\GovernorateController::class, 'citiesUpdate']);
+            Route::delete('dashboard/cities/{city}', [\App\Http\Controllers\Api\GovernorateController::class, 'citiesDestroy']);
+        });
+
+        // --------------------------------------------------------
+        //  Penalties — Admin (الغرامات المالية)
+        // --------------------------------------------------------
+        Route::middleware('role:admin,accountant')->group(function () {
+            Route::get('penalties',                    [PenaltyController::class, 'index']);
+            Route::post('penalties',                   [PenaltyController::class, 'store']);
+            Route::get('penalties/{penalty}',          [PenaltyController::class, 'show']);
+            Route::patch('penalties/{penalty}/status', [PenaltyController::class, 'updateStatus']);
+            Route::delete('penalties/{penalty}',       [PenaltyController::class, 'destroy']);
+        });
 
         // --------------------------------------------------------
         //  Tenders
         // --------------------------------------------------------
+        // تصنيفات العطاءات + صورة افتراضية لكل تصنيف (بدل tenders/category-images السابقة)
+        Route::get('tender-categories',                     [TenderCategoryController::class, 'index']);
+        Route::post('tender-categories',                    [TenderCategoryController::class, 'store']);
+        Route::patch('tender-categories/{tenderCategory}',  [TenderCategoryController::class, 'update']);
+        Route::delete('tender-categories/{tenderCategory}', [TenderCategoryController::class, 'destroy']);
         Route::apiResource('tenders', TenderController::class);
         Route::post('tenders/{tender}/attachments', [TenderController::class, 'storeAttachment']);
         Route::delete('tenders/{tender}/attachments/{attachment}', [TenderController::class, 'destroyAttachment']);
@@ -424,14 +563,15 @@ Route::prefix('v1')->group(function () {
         //  Documents
         // --------------------------------------------------------
         Route::get('documents',               [DocumentController::class, 'index']);
+        Route::get('documents/export-zip',    [DocumentController::class, 'exportZip']);
         Route::post('documents',              [DocumentController::class, 'store']);
         Route::delete('documents/{document}', [DocumentController::class, 'destroy']);
 
         // --------------------------------------------------------
         //  Users & Notifications
         // --------------------------------------------------------
-        Route::get('users',               [UserController::class,         'index']);
         Route::get('notifications',                    [NotificationController::class, 'index']);
+        Route::get('notifications/unread-count',       [NotificationController::class, 'unreadCount']);
         Route::post('notifications/read',              [NotificationController::class, 'markAllRead']);
         Route::patch('notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead']);
 
@@ -462,6 +602,7 @@ Route::prefix('v1')->group(function () {
         Route::get('equipment/{equipment}/blocked-dates',                  [EquipmentController::class, 'blockedDates']);
         Route::post('equipment/{equipment}/blocked-dates',                 [EquipmentController::class, 'addBlockedDate']);
         Route::delete('equipment/{equipment}/blocked-dates/{blockedDate}', [EquipmentController::class, 'removeBlockedDate']);
+        Route::get('equipment/{equipment}/reservations',                  [EquipmentController::class, 'reservations']);
 
         // بلاغات "الإبلاغ عن مشكلة" بالسوق (اكتُشف بتصميم الموبايل)
         Route::get('equipment-reports',                [\App\Http\Controllers\Api\EquipmentReportController::class, 'index']);
@@ -486,3 +627,7 @@ Route::prefix('v1')->group(function () {
         });
     });
 });
+
+
+
+

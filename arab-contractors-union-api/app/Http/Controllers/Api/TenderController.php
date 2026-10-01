@@ -7,15 +7,24 @@ use App\Http\Traits\ApiResponseTrait;
 use App\Models\Contractor;
 use App\Models\Tender;
 use App\Models\TenderBookmark;
+use App\Models\TenderCategory;
+use App\Notifications\NewTenderPublishedNotification;
+use App\Services\AuditLogService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Notification as NotificationFacade;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class TenderController extends Controller
 {
     use ApiResponseTrait;
+
+    /** [اسم التصنيف => رابط صورته] — يُحمَّل مرة واحدة لكل طلب عند تنسيق قائمة عطاءات */
+    private ?array $categoryImages = null;
 
     // GET /api/tenders
     public function index(Request $request)
@@ -55,7 +64,7 @@ class TenderController extends Controller
         $bookmarkedIds = $contractor->bookmarkedTenders()->pluck('tenders.id');
 
         $paginator = $query->paginate($this->perPage($request))
-            ->through(fn ($t) => $this->formatPublic($t, $bookmarkedIds));
+            ->through(fn ($t) => $this->formatPublic($t, $bookmarkedIds, forContractor: true));
 
         return $this->paginated($paginator);
     }
@@ -65,7 +74,7 @@ class TenderController extends Controller
     {
         $bookmarkedIds = $request->user()->bookmarkedTenders()->pluck('tenders.id');
 
-        return $this->success($this->formatPublic($tender, $bookmarkedIds));
+        return $this->success($this->formatPublic($tender, $bookmarkedIds, forContractor: true));
     }
 
     // GET /api/v1/contractor/tenders/bookmarked
@@ -77,7 +86,7 @@ class TenderController extends Controller
         );
 
         $paginator = $query->paginate($this->perPage($request))
-            ->through(fn ($t) => $this->formatPublic($t, collect([$t->id])));
+            ->through(fn ($t) => $this->formatPublic($t, collect([$t->id]), forContractor: true));
 
         return $this->paginated($paginator);
     }
@@ -108,10 +117,13 @@ class TenderController extends Controller
     {
         $validated = $request->validate([
             'title'              => 'required|string|max:255',
+            'issuing_entity'     => 'nullable|string|max:255',
             'description'        => 'nullable|string',
             'union_notes'        => 'nullable|string',
-            'category'           => ['nullable', Rule::in(Tender::CATEGORIES)],
-            'deadline'           => 'nullable|date',
+            'category'           => ['nullable', Rule::in(TenderCategory::activeNames())],
+            // بتاريخ ووقت (ساعة ودقيقة) معاً، وأقرب موعد مسموح هو بداية الغد بالتوقيت المحلي
+            // (تاريخ اليوم + 1). التعديل لا يفرضه إلا إذا تغيّر الموعد فعلاً — انظر update().
+            'deadline'           => ['nullable', 'date', 'after_or_equal:' . self::minDeadline()->toDateTimeString()],
             'status'             => 'nullable|in:open,closed,cancelled',
             'submission_types'   => 'nullable|array',
             'submission_types.*' => 'in:email,phone,file',
@@ -120,6 +132,10 @@ class TenderController extends Controller
             'submission_file'    => 'nullable|file|mimes:pdf,doc,docx|max:5120',
             'external_url'       => 'nullable|url|max:500',
         ]);
+
+        if (! empty($validated['deadline'])) {
+            $validated['deadline'] = $this->normalizeDeadline($validated['deadline']);
+        }
 
         if ($request->hasFile('submission_file')) {
             $validated['submission_file'] = $request->file('submission_file')
@@ -132,8 +148,68 @@ class TenderController extends Controller
 
         $validated['created_by'] = Auth::id();
         $tender = Tender::create($validated);
+        $tender->update(['reference_number' => $this->generateReferenceNumber($tender)]);
+
+        $this->notifyContractorsOfNewTender($tender);
+
+        $tender->refresh();
+
+        AuditLogService::record(Auth::user(), 'tender.created', $tender, ['title' => $tender->title]);
 
         return $this->success($tender->toArray(), 'تم إضافة العطاء بنجاح.', 201);
+    }
+
+    /**
+     * إشعار المقاولين بعطاء جديد — database + push معاً.
+     *
+     * يُستدعى بعد توليد الرقم المرجعي لا قبله، لأن generateReferenceNumber() يحتاج
+     * $tender->id فلا يتوفّر إلا بعد الحفظ؛ الاستدعاء المبكر يُنزِل reference_number
+     * فارغاً في حمولة الإشعار.
+     *
+     * المحظورون مستثنون: EnsureContractorIsActive يردّهم 403 ويُلغي توكناتهم عند أي
+     * طلب، فالإشعار إليهم إزعاج بلا فائدة. لا نفلتر على fcm_token عمداً — المقاول بلا
+     * توكن يجب أن يبقى له سجل database يراه داخل التطبيق، وFcmChannel يتخطّاه بصمت.
+     */
+    private function notifyContractorsOfNewTender(Tender $tender): void
+    {
+        // عطاء يُنشأ مباشرة كمغلق/ملغى ليس "عطاءً جديداً" يستحق إشعاراً.
+        //
+        // نقرأ الحالة بـfresh() لا من الكائن في الذاكرة: Tender::create() لا يحمّل قيم
+        // DB الافتراضية، فـ$tender->status يبقى null عند عدم إرسال status في الطلب رغم
+        // أن العمود يُكتب 'open' افتراضياً — ومقارنته مباشرة كانت تُسقط كل إشعار.
+        if ($tender->fresh()?->status !== 'open') {
+            return;
+        }
+
+        Contractor::where('is_frozen', false)
+            ->chunkById(500, fn ($contractors) => NotificationFacade::send(
+                $contractors,
+                new NewTenderPublishedNotification($tender),
+            ));
+    }
+
+    /**
+     * أقرب موعد نهائي مسموح: بداية الغد بالتوقيت المحلي (app.local_timezone) محوَّلاً لتوقيت
+     * التطبيق (UTC) — "بداية الغد" بتوقيت UTC وحده كانت سترفض عطاءً ينتهي غداً فجراً محلياً.
+     */
+    public static function minDeadline(): Carbon
+    {
+        return now(config('app.local_timezone'))->addDay()->startOfDay()->setTimezone(config('app.timezone'));
+    }
+
+    /**
+     * الواجهة ترسل الموعد بصيغة ISO مع المنطقة الزمنية (…Z). عمود datetime يحفظ الساعة كما هي
+     * ويُسقط الإزاحة، فيُحوَّل أولاً لتوقيت التطبيق وإلا انزاحت الساعة المحفوظة بفرق التوقيت.
+     */
+    private function normalizeDeadline(string $value): Carbon
+    {
+        return Carbon::parse($value)->setTimezone(config('app.timezone'));
+    }
+
+    /** رقم مرجعي بصيغة TND-<سنة>-<رقم العطاء بـ3 خانات> — يُولَّد مرة واحدة عند الإنشاء */
+    private function generateReferenceNumber(Tender $tender): string
+    {
+        return 'TND-' . $tender->created_at->year . '-' . str_pad((string) $tender->id, 3, '0', STR_PAD_LEFT);
     }
 
     // GET /api/tenders/{id}
@@ -147,9 +223,11 @@ class TenderController extends Controller
     {
         $validated = $request->validate([
             'title'              => 'sometimes|string|max:255',
+            'issuing_entity'     => 'nullable|string|max:255',
             'description'        => 'nullable|string',
             'union_notes'        => 'nullable|string',
-            'category'           => ['nullable', Rule::in(Tender::CATEGORIES)],
+            // التصنيف الحالي للعطاء مقبول حتى لو عُطِّل لاحقاً — وإلا تعذّر حفظ أي حقل آخر فيه
+            'category'           => ['nullable', Rule::in(array_filter([...TenderCategory::activeNames(), $tender->category]))],
             'deadline'           => 'nullable|date',
             'status'             => 'nullable|in:open,closed,cancelled',
             'submission_types'   => 'nullable|array',
@@ -159,6 +237,22 @@ class TenderController extends Controller
             'submission_file'    => 'nullable|file|mimes:pdf,doc,docx|max:5120',
             'external_url'       => 'nullable|url|max:500',
         ]);
+
+        // موعد جديد فعلاً (لا مجرد إعادة إرسال القيمة المحفوظة) يخضع لنفس حدّ الإنشاء
+        if (! empty($validated['deadline'])) {
+            $validated['deadline'] = $this->normalizeDeadline($validated['deadline']);
+        }
+        if (! empty($validated['deadline'])
+            && ! ($tender->deadline && $validated['deadline']->equalTo($tender->deadline))
+            && $validated['deadline']->lt(self::minDeadline())) {
+            throw ValidationException::withMessages([
+                'deadline' => 'يجب أن يكون آخر موعد للتقديم بتاريخ الغد أو بعده.',
+            ]);
+        }
+
+        // الملف المحفوظ لا يُمسّ ما لم يُرفع بديل — غياب submission_file بالطلب يعني "أبقِه"
+        $oldSubmissionFile = $tender->getRawOriginal('submission_file');
+        unset($validated['submission_file']);
 
         if ($request->hasFile('submission_file')) {
             $validated['submission_file'] = $request->file('submission_file')
@@ -171,12 +265,20 @@ class TenderController extends Controller
 
         $tender->update($validated);
 
+        if (isset($validated['submission_file']) && $oldSubmissionFile && ! str_starts_with($oldSubmissionFile, 'http')) {
+            Storage::disk('public')->delete($oldSubmissionFile);
+        }
+
+        AuditLogService::record(Auth::user(), 'tender.updated', $tender, ['title' => $tender->title]);
+
         return $this->success($tender->fresh()->toArray(), 'تم تحديث العطاء بنجاح.');
     }
 
     // DELETE /api/tenders/{id}
     public function destroy(Tender $tender)
     {
+        AuditLogService::record(Auth::user(), 'tender.deleted', $tender, ['title' => $tender->title]);
+
         $tender->delete();
 
         return $this->success(message: 'تم حذف العطاء بنجاح.');
@@ -203,6 +305,42 @@ class TenderController extends Controller
         if ($request->filled('updated_to')) {
             $query->whereDate('updated_at', '<=', $request->date('updated_to'));
         }
+        // "تاريخ نشر العطاء" بمودال التصفية (شاشة العطاءات، تطبيق المقاول)
+        if ($request->filled('created_from')) {
+            $query->whereDate('published_at', '>=', $request->date('created_from'));
+        }
+        if ($request->filled('created_to')) {
+            $query->whereDate('published_at', '<=', $request->date('created_to'));
+        }
+        if ($request->filled('deadline_from')) {
+            $query->whereDate('deadline', '>=', $request->date('deadline_from'));
+        }
+        if ($request->filled('deadline_to')) {
+            $query->whereDate('deadline', '<=', $request->date('deadline_to'));
+        }
+
+        // فلتر "حالة العطاء" بمودال التصفية — أي عطاء يطابق واحدة من الحالات المفعّلة (new/updated/closing_soon)
+        if ($request->filled('states')) {
+            $states = array_intersect((array) $request->input('states'), ['new', 'updated', 'closing_soon']);
+            if ($states) {
+                $query->where(function (Builder $q) use ($states) {
+                    if (in_array('new', $states, true)) {
+                        $q->orWhere('created_at', '>=', now()->subHours(48));
+                    }
+                    if (in_array('updated', $states, true)) {
+                        $q->orWhere(function (Builder $qu) {
+                            $qu->where('updated_at', '>=', now()->subHours(48))
+                                ->whereColumn('updated_at', '>', 'created_at');
+                        });
+                    }
+                    if (in_array('closing_soon', $states, true)) {
+                        // endOfDay() على الحد الأعلى لازم بعد صيرورة deadline وقتاً كاملاً (REQ-07 #2)
+                        // وإلا عطاء بآخر يوم بالنافذة بعد منتصف الليل يسقط خارجها خطأً.
+                        $q->orWhereBetween('deadline', [now(), now()->addDays(4)->endOfDay()]);
+                    }
+                });
+            }
+        }
 
         // فعّالة/مؤرشفة (REQ-09) — archived_at يُضبط تلقائياً بأمر tenders:archive المجدول يومياً
         if ($request->input('scope') === 'active') {
@@ -212,9 +350,24 @@ class TenderController extends Controller
         }
 
         // فلترة "مجالاتي" (REQ-13) — فقط ضمن سياق مقاول موثَّق
+        //
+        // Contractor.specialties مصفوفة كائنات {field_lk_type, specialization_lk_type, classification}
+        // وليست أسماء تصنيفات — لازم تُحوَّل لأسماء المجالات (نفس نصوص tenders.category) قبل المقارنة،
+        // وإلا whereIn() يقارن عمود نصي بمصفوفة كائنات فلا يطابق أي عطاء أبداً.
         if ($request->input('scope') === 'my_specialties' && $request->user() instanceof Contractor) {
-            $specialties = $request->user()->specialties ?? [];
-            $query->whereIn('category', $specialties ?: ['__none__']);
+            $fieldNames = collect($request->user()->specialties ?? [])
+                ->map(fn ($spec) => \App\Support\ContractorLookups::fieldName($spec['field_lk_type'] ?? null))
+                ->filter(fn ($name) => $name && $name !== 'غير محدد')
+                ->unique()
+                ->values();
+
+            $query->whereIn('category', $fieldNames->isNotEmpty() ? $fieldNames : ['__none__']);
+        }
+
+        // toggle "العطاءات المهتم بها فقط" بمودال التصفية — بديل داخل applyFilters لمسار bookmarked المخصَّص
+        if ($request->boolean('bookmarked') && $request->user() instanceof Contractor) {
+            $bookmarkedIds = $request->user()->bookmarkedTenders()->pluck('tenders.id');
+            $query->whereIn('tenders.id', $bookmarkedIds->isNotEmpty() ? $bookmarkedIds : ['__none__']);
         }
 
         return match ($request->input('sort')) {
@@ -231,34 +384,50 @@ class TenderController extends Controller
 
     private function perPage(Request $request): int
     {
-        return min($request->integer('per_page', 15), 100);
+        // سقف أعلى (بدل 100) يسمح بتصدير كشف Excel كامل من لوحة التحكم بدون تقسيم صفحات
+        return min($request->integer('per_page', 15), 1000);
     }
 
-    // شكل العطاء المعروض للعامة — بدون union_notes / created_by
+    // شكل العطاء المعروض للعامة/للمقاول — بدون created_by
+    // union_notes ملاحظات داخلية موجّهة للمقاولين تحديداً (شاشة تفاصيل العطاء بالتطبيق) —
+    // ما بتظهر بـ tenders-public (زوار الموقع غير المسجّلين)
     // $bookmarkedIds: قائمة IDs عطاءات المقاول المحفوظة (لتعليم is_bookmarked) — اختياري خارج سياق المقاول
-    private function formatPublic(Tender $t, ?\Illuminate\Support\Collection $bookmarkedIds = null): array
+    private function formatPublic(Tender $t, ?\Illuminate\Support\Collection $bookmarkedIds = null, bool $forContractor = false): array
     {
         return [
             'id'                  => $t->id,
+            'reference_number'    => $t->reference_number,
             'title'               => $t->title,
+            'issuing_entity'      => $t->issuing_entity,
             'description'         => $t->description,
+            'union_notes'         => $forContractor ? $t->union_notes : null,
             'category'            => $t->category,
+            // العطاء نفسه بلا صورة خاصة به — صورة تصنيفه الافتراضية (REQ-07 #7) إن وُجدت
+            'category_image'      => $t->category
+                ? ($this->categoryImages ??= TenderCategory::imageMap())[$t->category] ?? null
+                : null,
             'budget'              => $t->budget,
-            'deadline'            => $t->deadline?->toDateString(),
+            'deadline'            => $t->deadline?->toIso8601String(),
+            'published_at'        => $t->published_at?->toDateString(),
             'status'              => $t->status,
+            'display_status'      => $t->display_status,
+            'display_status_label' => $t->display_status_label,
             'is_active'           => $t->is_active,
+            'is_new'              => $t->is_new,
+            'is_updated'          => $t->is_updated,
+            'closing_soon'        => $t->closing_soon,
             'archived_at'         => $t->archived_at?->toDateString(),
-            'bids_count'          => $t->bids_count,
             'submission_types'    => $t->submission_types,
             'submission_email'    => $t->submission_email,
             'submission_phone'    => $t->submission_phone,
-            'submission_file_url' => $t->submission_file
-                ? Storage::disk('public')->url($t->submission_file)
-                : null,
+            // $t->submission_file مُحلَّل مسبقاً لرابط كامل عبر getSubmissionFileAttribute() —
+            // تمريره مجدداً عبر Storage::url() كان ينتج رابط تحميل مضاعفاً مكسوراً
+            'submission_file_url' => $t->submission_file,
             'attachments'         => $t->attachments->map(fn ($a) => [
-                'id'    => $a->id,
-                'label' => $a->label,
-                'url'   => $a->file_url,
+                'id'       => $a->id,
+                'label'    => $a->label,
+                'url'      => $a->file_url,
+                'is_image' => $a->is_image,
             ])->values(),
             'external_url'        => $t->external_url,
             'is_bookmarked'       => $bookmarkedIds?->contains($t->id) ?? false,
@@ -275,7 +444,7 @@ class TenderController extends Controller
     public function storeAttachment(Request $request, Tender $tender)
     {
         $data = $request->validate([
-            'file'  => 'required|file|mimes:pdf,doc,docx|max:10240',
+            'file'  => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png,webp|max:10240',
             'label' => 'nullable|string|max:255',
         ]);
 
@@ -286,8 +455,13 @@ class TenderController extends Controller
             'label'     => $data['label'] ?? null,
         ]);
 
+        AuditLogService::record(Auth::user(), 'tender.attachment_added', $tender, ['label' => $attachment->label]);
+
         return $this->success([
-            'id' => $attachment->id, 'label' => $attachment->label, 'url' => $attachment->file_url,
+            'id'       => $attachment->id,
+            'label'    => $attachment->label,
+            'url'      => $attachment->file_url,
+            'is_image' => $attachment->is_image,
         ], 'تمت إضافة المرفق بنجاح.', 201);
     }
 
@@ -300,6 +474,8 @@ class TenderController extends Controller
 
         Storage::disk('public')->delete($attachment->file_path);
         $attachment->delete();
+
+        AuditLogService::record(Auth::user(), 'tender.attachment_deleted', $tender, ['label' => $attachment->label]);
 
         return $this->success(message: 'تم حذف المرفق.');
     }

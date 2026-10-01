@@ -1,139 +1,101 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useQuery } from '@tanstack/vue-query'
+import axios from 'axios'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
-const lastUpdated = '١ يناير ٢٠٢٤'
+const { data, isLoading } = useQuery({
+  queryKey: ['public-privacy-policy'],
+  queryFn: async () => {
+    const res = await axios.get('/api/v1/privacy-policy')
+    return res.data
+  },
+  staleTime: 5 * 60 * 1000,
+})
+
+const sections = computed(() => data.value ?? [])
 </script>
 
 <template>
   <div dir="rtl" class="pub-page">
-    
+
     <div class="page-hero">
       <div class="page-hero-shapes"><div class="ph-s ph-s1" /></div>
       <div class="pub-cont page-hero-inner">
-        <div class="page-breadcrumb"><RouterLink to="/landing">الرئيسية</RouterLink><span>/</span><span>سياسة الخصوصية</span></div>
+        <div class="page-breadcrumb">
+          <RouterLink to="/landing">الرئيسية</RouterLink>
+          <span>/</span>
+          <span>سياسة الخصوصية</span>
+        </div>
         <h1 class="page-hero-title">سياسة الخصوصية</h1>
-        <p class="page-hero-desc">آخر تحديث: {{ lastUpdated }}</p>
+        <p class="page-hero-desc">آخر تحديث: ١ يناير ٢٠٢٤</p>
       </div>
     </div>
 
     <section class="legal-section">
       <div class="pub-cont legal-layout">
-        <!-- TOC -->
+
+        <!-- TOC — Dynamic from API -->
         <nav class="legal-toc">
           <p class="toc-title">المحتويات</p>
-          <a href="#s1" class="toc-link">١. جمع المعلومات</a>
-          <a href="#s2" class="toc-link">٢. استخدام المعلومات</a>
-          <a href="#s3" class="toc-link">٣. حماية البيانات</a>
-          <a href="#s4" class="toc-link">٤. ملفات الارتباط</a>
-          <a href="#s5" class="toc-link">٥. مشاركة البيانات</a>
-          <a href="#s6" class="toc-link">٦. حقوق المستخدم</a>
-          <a href="#s7" class="toc-link">٧. الاحتفاظ بالبيانات</a>
-          <a href="#s8" class="toc-link">٨. التواصل معنا</a>
+          <template v-if="isLoading">
+            <div v-for="i in 5" :key="i" class="toc-skeleton" />
+          </template>
+          <template v-else>
+            <a
+              v-for="(sec, idx) in sections"
+              :key="sec.id"
+              :href="`#p${sec.id}`"
+              class="toc-link"
+            >
+              {{ idx + 1 }}. {{ sec.title }}
+            </a>
+          </template>
         </nav>
 
-        <!-- Content -->
+        <!-- Content — Dynamic from API -->
         <div class="legal-content">
-          <div class="legal-intro">
-            يلتزم اتحاد المقاولين الفلسطينيين بحماية خصوصية مستخدمي موقعه الإلكتروني وأعضائه.
-            توضح هذه السياسة كيفية جمع المعلومات واستخدامها وحمايتها.
+
+          <!-- Loading skeleton -->
+          <template v-if="isLoading">
+            <div v-for="i in 4" :key="i" class="legal-skeleton-sec">
+              <div class="skel skel-title" />
+              <div class="skel skel-line" />
+              <div class="skel skel-line skel-line-short" />
+            </div>
+          </template>
+
+          <!-- Sections from API -->
+          <template v-else-if="sections.length">
+            <section
+              v-for="(sec, idx) in sections"
+              :id="`p${sec.id}`"
+              :key="sec.id"
+              class="legal-sec"
+            >
+              <h2>{{ idx + 1 }}. {{ sec.title }}</h2>
+              <div v-html="sec.body" />
+            </section>
+          </template>
+
+          <!-- Fallback empty -->
+          <div v-else class="legal-empty">
+            <p>لا توجد بنود متاحة حالياً.</p>
           </div>
 
-          <section id="s1" class="legal-sec">
-            <h2>١. جمع المعلومات</h2>
-            <p>نقوم بجمع المعلومات التي تقدمها طوعاً عند:</p>
-            <ul>
-              <li>التسجيل في الاتحاد أو تجديد العضوية</li>
-              <li>التقدم لطلب تصنيف أو خدمة</li>
-              <li>التواصل معنا عبر النماذج الإلكترونية أو البريد الإلكتروني</li>
-              <li>الاشتراك في النشرات الإخبارية والفعاليات</li>
-            </ul>
-            <p>تشمل المعلومات المجمَّعة: الاسم، البريد الإلكتروني، رقم الهاتف، بيانات الشركة، والمعلومات المالية اللازمة للتحقق من الأهلية.</p>
-          </section>
-
-          <section id="s2" class="legal-sec">
-            <h2>٢. استخدام المعلومات</h2>
-            <p>نستخدم المعلومات المجمَّعة للأغراض التالية:</p>
-            <ul>
-              <li>تقديم الخدمات المطلوبة وإدارة العضوية</li>
-              <li>إصدار شهادات التصنيف والوثائق الرسمية</li>
-              <li>إرسال الإشعارات والتحديثات الهامة</li>
-              <li>تحسين خدماتنا وتطوير تجربة المستخدم</li>
-              <li>الامتثال للمتطلبات القانونية والتنظيمية</li>
-            </ul>
-          </section>
-
-          <section id="s3" class="legal-sec">
-            <h2>٣. حماية البيانات</h2>
-            <p>نطبّق إجراءات أمنية صارمة لحماية بياناتك، تشمل:</p>
-            <ul>
-              <li>تشفير البيانات أثناء النقل والتخزين باستخدام بروتوكول SSL/TLS</li>
-              <li>تقييد الوصول للبيانات على موظفين مخوّلين فقط</li>
-              <li>إجراء مراجعات أمنية دورية للأنظمة والبنية التحتية</li>
-              <li>تدريب الموظفين على ممارسات حماية البيانات</li>
-            </ul>
-          </section>
-
-          <section id="s4" class="legal-sec">
-            <h2>٤. ملفات الارتباط (Cookies)</h2>
-            <p>يستخدم موقعنا ملفات الارتباط لتحسين تجربتك، تشمل:</p>
-            <ul>
-              <li><strong>ملفات ضرورية:</strong> ضرورية لعمل الموقع بشكل صحيح</li>
-              <li><strong>ملفات الأداء:</strong> تساعدنا في تحليل استخدام الموقع</li>
-              <li><strong>ملفات التفضيلات:</strong> تتذكر إعداداتك وتفضيلاتك</li>
-            </ul>
-            <p>يمكنك التحكم في ملفات الارتباط من خلال إعدادات متصفحك.</p>
-          </section>
-
-          <section id="s5" class="legal-sec">
-            <h2>٥. مشاركة البيانات مع الأطراف الثالثة</h2>
-            <p>لا نبيع أو نؤجر بياناتك لأطراف ثالثة. قد نشارك البيانات في الحالات التالية:</p>
-            <ul>
-              <li>بموافقتك الصريحة</li>
-              <li>مع مزودي الخدمات الذين يعملون بموجب اتفاقيات سرية</li>
-              <li>للامتثال للمتطلبات القانونية أو أوامر المحاكم</li>
-              <li>مع الجهات الحكومية المعنية لإتمام خدمات التصنيف والترخيص</li>
-            </ul>
-          </section>
-
-          <section id="s6" class="legal-sec">
-            <h2>٦. حقوق المستخدم</h2>
-            <p>وفقاً للأنظمة المعمول بها، لديك الحق في:</p>
-            <ul>
-              <li>الاطلاع على البيانات التي نحتفظ بها عنك</li>
-              <li>طلب تصحيح البيانات غير الدقيقة</li>
-              <li>طلب حذف بياناتك في الحالات المنصوص عليها</li>
-              <li>الاعتراض على معالجة بياناتك لأغراض التسويق</li>
-              <li>نقل بياناتك إلى جهة أخرى (حق النقل)</li>
-            </ul>
-          </section>
-
-          <section id="s7" class="legal-sec">
-            <h2>٧. الاحتفاظ بالبيانات</h2>
-            <p>نحتفظ ببياناتك للمدة اللازمة لتقديم الخدمات وللامتثال للمتطلبات القانونية. عند انتهاء العضوية، نحتفظ ببيانات أساسية لمدة ٥ سنوات وفق متطلبات القانون الفلسطيني.</p>
-          </section>
-
-          <section id="s8" class="legal-sec">
-            <h2>٨. التواصل معنا</h2>
-            <p>لأي استفسارات حول سياسة الخصوصية أو ممارساتنا في معالجة البيانات:</p>
-            <ul>
-              <li>البريد الإلكتروني: <a href="mailto:privacy@pcu.ps">privacy@pcu.ps</a></li>
-              <li>الهاتف: <a href="tel:+97020000000">+970 2 000 0000</a></li>
-              <li>العنوان: رام الله، فلسطين — شارع الإرسال، مبنى الاتحاد</li>
-            </ul>
-          </section>
         </div>
       </div>
     </section>
 
-      </div>
+  </div>
 </template>
 
 <style scoped>
 @import url('https://fonts.cdnfonts.com/css/neo-sans-arabic');
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap');
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-.pub-page { font-family: 'Neo Sans Arabic', 'Tajawal', 'Neo Sans Arabic', 'Cairo', sans-serif; direction: rtl; color: #374151; background: #fff; }
+.pub-page { font-family: 'Neo Sans Arabic', 'Tajawal', 'Cairo', sans-serif; direction: rtl; color: #374151; background: #fff; }
 .pub-cont { max-width: 1240px; margin: 0 auto; padding: 0 1.5rem; }
 .page-hero { background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); padding: 4rem 0 3rem; position: relative; overflow: hidden; }
 .page-hero-shapes { position: absolute; inset: 0; pointer-events: none; }
@@ -151,6 +113,7 @@ const lastUpdated = '١ يناير ٢٠٢٤'
 .toc-title { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: .85rem; font-weight: 800; color: #0d1b3e; margin-bottom: 1rem; padding-bottom: .65rem; border-bottom: 2px solid #e5e7eb; }
 .toc-link { display: block; color: #6b7280; font-size: .83rem; font-weight: 600; text-decoration: none; padding: .4rem 0; border-bottom: 1px solid #f3f4f6; transition: color .2s; }
 .toc-link:hover { color: #1a237e; }
+.toc-skeleton { height: 1rem; background: #e5e7eb; border-radius: 6px; margin-bottom: .6rem; animation: pulse 1.4s ease-in-out infinite; }
 
 .legal-intro { background: #e8eaf6; border: 1.5px solid #c5cae9; border-radius: 12px; padding: 1.25rem 1.5rem; font-size: .92rem; color: #1a237e; line-height: 1.85; margin-bottom: 2.5rem; }
 .legal-sec { margin-bottom: 2.5rem; }
@@ -163,5 +126,15 @@ const lastUpdated = '١ يناير ٢٠٢٤'
 .legal-sec a { color: #1a237e; text-decoration: none; border-bottom: 1px solid #c5cae9; }
 .legal-sec a:hover { color: #f9a825; border-color: #f9a825; }
 
+/* Skeleton for sections */
+.legal-skeleton-sec { margin-bottom: 2.5rem; }
+.skel { background: #e5e7eb; border-radius: 6px; animation: pulse 1.4s ease-in-out infinite; margin-bottom: .75rem; }
+.skel-title { height: 1.3rem; width: 40%; }
+.skel-line { height: .9rem; width: 100%; }
+.skel-line-short { width: 70%; }
+
+.legal-empty { text-align: center; padding: 3rem; color: #9ca3af; font-size: .95rem; }
+
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
 @media (max-width: 900px) { .legal-layout { grid-template-columns: 1fr; } .legal-toc { position: static; } }
 </style>

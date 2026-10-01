@@ -35,7 +35,6 @@ class CreateTestContractor extends Command
             'commercial_register' => $commercialRegister,
             'authorized_person'   => 'مستخدم اختباري',
             'owner_name'          => 'مستخدم اختباري',
-            'trade'               => 'إنشاءات عامة',
             'classification'      => 'أ',
             'phone'               => $phone,
             'city'                => 'غزة',

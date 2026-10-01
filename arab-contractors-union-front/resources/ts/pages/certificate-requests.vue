@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import api from '@/plugins/axios'
+import { firstFile, type SingleFileModel } from '@/utils/files'
 
 definePage({ meta: { requiresAdmin: true } })
 
@@ -54,7 +55,7 @@ const lastPage = computed(() => data.value?.meta?.last_page ?? 1)
 const isViewOpen = ref(false)
 const selected = ref<any>(null)
 const rejectReason = ref('')
-const certificateFile = ref<File[]>([])
+const certificateFile = ref<SingleFileModel>(null)
 const actionError = ref('')
 
 const detailQueryEnabled = computed(() => isViewOpen.value && !!selected.value?.id)
@@ -70,7 +71,7 @@ const detail = computed(() => detailData.value?.items ?? selected.value)
 const openRequest = (r: any) => {
   selected.value = r
   rejectReason.value = ''
-  certificateFile.value = []
+  certificateFile.value = null
   actionError.value = ''
   isViewOpen.value = true
 }
@@ -102,15 +103,19 @@ const rejectMutation = useMutation({
 
 const issueMutation = useMutation({
   mutationFn: async () => {
+    const file = firstFile(certificateFile.value)
+    if (!file)
+      throw new Error('لم يتم اختيار ملف الشهادة.')
+
     const fd = new FormData()
-    fd.append('certificate', certificateFile.value[0])
+    fd.append('certificate', file)
 
     return (await api.post(`/api/v1/dashboard/certificate-requests/${selected.value.id}/issue`, fd)).data
   },
   onSuccess: (d: any) => {
     refresh()
     selected.value = d?.items ?? selected.value
-    certificateFile.value = []
+    certificateFile.value = null
   },
   onError: (e: any) => actionError.value = e?.response?.data?.message || 'فشل إصدار الشهادة.',
 })
@@ -219,6 +224,18 @@ function fmtDate(d: string | null) {
                 <VChip size="x-small" :color="statusColor[r.status] ?? 'secondary'">
                   {{ r.status_label ?? r.status }}
                 </VChip>
+                <!-- طلب قُدِّم بانتظار اعتماد دفعة الرسوم (TASK-17 #5): يُرى ويُراجَع،
+                     لكن الموافقة والإصدار موقوفان حتى يعتمد المحاسب الدفعة. -->
+                <VChip
+                  v-if="r.awaiting_payment_confirmation"
+                  size="x-small"
+                  color="warning"
+                  variant="tonal"
+                  prepend-icon="tabler-clock-dollar"
+                  class="ms-1"
+                >
+                  بانتظار اعتماد الدفعة
+                </VChip>
               </td>
               <td class="text-body-2">{{ fmtDate(r.request_date) }}</td>
               <td class="text-center" @click.stop>
@@ -295,6 +312,23 @@ function fmtDate(d: string | null) {
             تحميل الشهادة الصادرة
           </VBtn>
 
+          <VAlert
+            v-if="detail.awaiting_payment_confirmation"
+            type="warning"
+            variant="tonal"
+            class="mb-4"
+          >
+            <p class="mb-1 font-weight-medium">الطلب بانتظار اعتماد دفعة الرسوم</p>
+            <p class="text-body-2 mb-0">
+              قدّم المقاول الطلب بعد دفع الرسوم من التطبيق، ودفعته لم تُعتمد بعد
+              <template v-if="detail.pending_payment">
+                (معاملة {{ detail.pending_payment.transaction_number ?? detail.pending_payment.id }} —
+                {{ detail.pending_payment.amount }} {{ detail.pending_payment.currency }})
+              </template>.
+              اعتمد الدفعة من «سجل المدفوعات» أولاً؛ الموافقة والإصدار موقوفان حتى ذلك الحين.
+            </p>
+          </VAlert>
+
           <!-- إجراءات حسب الحالة -->
           <template v-if="detail.status === 'pending'">
             <VDivider class="my-4" />
@@ -303,6 +337,8 @@ function fmtDate(d: string | null) {
               <VBtn
                 color="info"
                 prepend-icon="tabler-check"
+                :disabled="detail.awaiting_payment_confirmation"
+                :title="detail.awaiting_payment_confirmation ? 'اعتمد دفعة الرسوم أولاً' : undefined"
                 :loading="approveMutation.isPending.value"
                 @click="approveMutation.mutate()"
               >
@@ -341,7 +377,7 @@ function fmtDate(d: string | null) {
             <VBtn
               color="success"
               prepend-icon="tabler-certificate"
-              :disabled="!certificateFile.length"
+              :disabled="!firstFile(certificateFile) || detail.awaiting_payment_confirmation"
               :loading="issueMutation.isPending.value"
               @click="issueMutation.mutate()"
             >

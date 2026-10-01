@@ -1,8 +1,83 @@
 <script setup lang="ts">
 import api from '@/plugins/axios'
+import { firstFile, toFileArray } from '@/utils/files'
 
 definePage({ meta: { requiresAdmin: true,
     adminOnly: true } })
+
+// ── الموعد النهائي: تاريخ + ساعة ودقيقة ──────────────
+// يُدخَل بحقلين منفصلين (تاريخ / وقت) بالتوقيت المحلي، ويُرسَل ISO بتوقيت UTC (…Z) —
+// الإرسال بلا منطقة زمنية كان يُخزَّن كأنه UTC فتظهر الساعة مزاحة بفرق التوقيت.
+const pad2 = (n: number) => String(n).padStart(2, '0')
+const localDateStr = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+
+/** ISO من السيرفر → { date: 'YYYY-MM-DD', time: 'HH:mm' } بالتوقيت المحلي */
+const splitDeadline = (value: string | null | undefined) => {
+  if (!value)
+    return { date: '', time: '' }
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime()))
+    return { date: '', time: '' }
+
+  return { date: localDateStr(d), time: `${pad2(d.getHours())}:${pad2(d.getMinutes())}` }
+}
+
+/** تاريخ + وقت محليان → ISO UTC للإرسال ('' إن لم يُحدَّد تاريخ) */
+const joinDeadline = (date: string, time: string) =>
+  date ? new Date(`${date}T${time || '00:00'}`).toISOString() : ''
+
+// أقرب تاريخ مسموح لانتهاء العطاء = تاريخ اليوم + 1 (نفس القاعدة مفروضة بالباك اند)
+const tomorrowStr = () => {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+
+  return localDateStr(d)
+}
+
+// حقل type=date يفتح التقويم فقط عند النقر على أيقونته الأصلية الصغيرة (وقد لا تظهر بـ RTL) —
+// نفتحه عند النقر على أي مكان بالحقل أو على أيقونة التقويم
+const openDatePicker = (e: Event) => {
+  const input = (e.target as HTMLElement).closest('.v-field')?.querySelector('input') as HTMLInputElement | null
+  try {
+    input?.showPicker?.()
+  }
+  catch {
+    // متصفح لا يدعم showPicker — يبقى الإدخال اليدوي متاحاً
+  }
+}
+
+const formatDeadline = (value: string | null | undefined) =>
+  value
+    ? new Date(value).toLocaleString('ar-PS', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+    : '—'
+
+const deadlineRules = [
+  (v: string) => !v || v >= tomorrowStr() || 'يجب أن يكون تاريخ انتهاء العطاء غداً أو بعده',
+]
+
+// ── تصنيفات العطاءات (من جدول tender_categories — تُدار من صفحة التصنيفات) ──
+const categories = ref<{ id: number, name: string, image_url: string | null, is_active: boolean }[]>([])
+
+const fetchCategories = async () => {
+  try {
+    const { data } = await api.get('/api/v1/tender-categories')
+    categories.value = data.items ?? []
+  }
+  catch (err) {
+    console.error(err)
+  }
+}
+
+const activeCategoryNames = computed(() => categories.value.filter(c => c.is_active).map(c => c.name))
+const categoryImage = (name: string | null | undefined) => categories.value.find(c => c.name === name)?.image_url ?? null
+
+// منتقي التعديل: الفعّالة + تصنيف العطاء الحالي حتى لو عُطِّل لاحقاً
+const editCategoryOptions = computed(() => {
+  const current = editTender.value.category
+  const names = activeCategoryNames.value
+
+  return current && !names.includes(current) ? [...names, current] : names
+})
 
 const loading = ref(false)
 const tenders = ref<any[]>([])
@@ -36,31 +111,120 @@ const editDialog  = ref(false)
 const editLoading = ref(false)
 const editTender  = ref<any>({})
 
-const openEdit = (item: any) => {
+const openEdit = async (item: any) => {
   editTender.value = {
     id:               item.id,
     title:            item.title,
     description:      item.description    || '',
     union_notes:      item.union_notes    || '',
     category:         item.category       || '',
-    deadline:         item.deadline ? item.deadline.substring(0, 10) : '',
+    deadline_date:    splitDeadline(item.deadline).date,
+    deadline_time:    splitDeadline(item.deadline).time,
     status:           item.status,
     submission_types: Array.isArray(item.submission_types) ? [...item.submission_types] : [],
     submission_email: item.submission_email || '',
     submission_phone: item.submission_phone || '',
     submission_file:  null,
     external_url:     item.external_url || '',
+    issuing_entity:   item.issuing_entity || '',
   }
+  originalDeadline.value = item.deadline ? new Date(item.deadline).toISOString() : ''
+  existingSubmissionFile.value = item.submission_file || ''
+  attachments.value = Array.isArray(item.attachments) ? item.attachments.map(normalizeAttachment) : []
   editDialog.value = true
+
+  // القائمة الإدارية ما بترجّع attachments (تفادياً لتحميل زايد على كل صف) — نجيبها وقت فتح التعديل
+  try {
+    const { data } = await api.get(`/api/v1/tenders/${item.id}`)
+    attachments.value = (data.items?.attachments ?? []).map(normalizeAttachment)
+  } catch (err) {
+    console.error(err)
+  }
+}
+
+// ملف التقديم الحالي المخزَّن (رابط) — يبقى محفوظاً بعد أي حفظ ما لم يُختر ملف بديل
+const existingSubmissionFile = ref('')
+const fileNameFromUrl = (url: string) => decodeURIComponent(url.split('/').pop() || 'ملف التقديم')
+
+// الموعد الأصلي — تعديل عطاء انتهى موعده دون لمس الموعد لا يخضع لشرط "غداً أو بعده"
+const originalDeadline = ref('')
+const editDeadlineRules = [
+  (v: string) => {
+    const changed = joinDeadline(v, editTender.value.deadline_time) !== originalDeadline.value
+
+    return !changed || !v || v >= tomorrowStr() || 'يجب أن يكون تاريخ انتهاء العطاء غداً أو بعده'
+  },
+]
+
+// ── مرفقات العطاء (متعددة — مستندات وصور) ──────────
+// GET tenders/{id} يرجّع المرفق بـ file_url بينما رفع مرفق يرجّعه بـ url — الاعتماد على url
+// وحده كان يترك روابط المرفقات المحمَّلة من السيرفر فارغة (غير قابلة للفتح/المعاينة)
+const normalizeAttachment = (a: any) => ({ ...a, url: a.url ?? a.file_url })
+
+const attachments = ref<any[]>([])
+const newAttachmentFiles = ref<File[]>([])
+const attachmentUploading = ref(false)
+const attachmentDeletingId = ref<number | null>(null)
+
+const uploadAttachments = async () => {
+  if (!editTender.value.id || !newAttachmentFiles.value.length)
+    return
+  attachmentUploading.value = true
+  try {
+    for (const file of newAttachmentFiles.value) {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('label', file.name)
+      const { data } = await api.post(`/api/v1/tenders/${editTender.value.id}/attachments`, fd)
+      attachments.value.push(data.items)
+    }
+    newAttachmentFiles.value = []
+    notify('تمت إضافة المرفقات بنجاح')
+  } catch (err) {
+    console.error(err)
+    notify('تعذّر رفع أحد المرفقات', 'error')
+  } finally {
+    attachmentUploading.value = false
+  }
+}
+
+// تأكيد قبل حذف مرفق (REQ-07 #4) — كان يُحذف فوراً بلا تأكيد
+const deleteAttachmentDialog = ref(false)
+const deletingAttachment = ref<any>(null)
+
+const confirmRemoveAttachment = (att: any) => {
+  deletingAttachment.value = att
+  deleteAttachmentDialog.value = true
+}
+
+const removeAttachment = async () => {
+  const attachmentId = deletingAttachment.value?.id
+  if (!attachmentId)
+    return
+  attachmentDeletingId.value = attachmentId
+  try {
+    await api.delete(`/api/v1/tenders/${editTender.value.id}/attachments/${attachmentId}`)
+    attachments.value = attachments.value.filter(a => a.id !== attachmentId)
+    deleteAttachmentDialog.value = false
+  } catch (err) {
+    console.error(err)
+    notify('تعذّر حذف المرفق', 'error')
+  } finally {
+    attachmentDeletingId.value = null
+  }
 }
 
 const saveTender = async () => {
+  const { valid } = await editForm.value?.validate() ?? { valid: true }
+  if (!valid)
+    return
   editLoading.value = true
   try {
     const formData = new FormData()
     formData.append('_method', 'PATCH')
-    ;(['title','description','union_notes','category','deadline','status','submission_email','submission_phone','external_url'] as const)
+    ;(['title','issuing_entity','description','union_notes','category','status','submission_email','submission_phone','external_url'] as const)
       .forEach(k => formData.append(k, (editTender.value as any)[k] ?? ''))
+    formData.append('deadline', joinDeadline(editTender.value.deadline_date, editTender.value.deadline_time))
     // إرسال المصفوفة
     const types: string[] = editTender.value.submission_types ?? []
     types.forEach(t => formData.append('submission_types[]', t))
@@ -70,8 +234,65 @@ const saveTender = async () => {
     editDialog.value = false
     notify('تم حفظ التعديلات بنجاح')
     fetchTenders()
-  } catch (err) { console.error(err); notify('تعذّر حفظ التعديلات', 'error') }
+  } catch (err: any) { console.error(err); notify(firstError(err) || 'تعذّر حفظ التعديلات', 'error') }
   finally { editLoading.value = false }
+}
+
+// ── View details (read-only) ───────────────────────
+const viewDialog = ref(false)
+const viewingItem = ref<any>(null)
+const viewAttachments = ref<any[]>([])
+
+const openView = async (item: any) => {
+  viewingItem.value = item
+  viewAttachments.value = Array.isArray(item.attachments) ? item.attachments.map(normalizeAttachment) : []
+  viewDialog.value = true
+  try {
+    const { data } = await api.get(`/api/v1/tenders/${item.id}`)
+    viewAttachments.value = (data.items?.attachments ?? []).map(normalizeAttachment)
+  } catch (err) {
+    console.error(err)
+  }
+}
+
+// ── معاينة مرفق (صورة / PDF داخل النافذة، وغيرها فتح بتبويب جديد) ──
+const previewDialog = ref(false)
+const previewItem = ref<{ url: string, label: string, kind: 'image' | 'pdf' | 'other' } | null>(null)
+
+const fileKind = (url: string, isImage?: boolean): 'image' | 'pdf' | 'other' => {
+  const ext = (url ?? '').split('?')[0].split('.').pop()?.toLowerCase() ?? ''
+  if (isImage || ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext))
+    return 'image'
+
+  return ext === 'pdf' ? 'pdf' : 'other'
+}
+
+const openPreview = (url: string, label: string, isImage?: boolean) => {
+  if (!url) {
+    notify('رابط المرفق غير متاح', 'error')
+
+    return
+  }
+  const kind = fileKind(url, isImage)
+  if (kind === 'other') {
+    window.open(url, '_blank', 'noopener')
+
+    return
+  }
+  previewItem.value = { url, label, kind }
+  previewDialog.value = true
+}
+
+// أول رسالة تحقق من الباك اند (422) — بدل رسالة عامة لا تشرح السبب
+const firstError = (err: any): string => {
+  const errors = err?.response?.data?.errors
+  if (errors && typeof errors === 'object') {
+    const first = Object.values(errors)[0] as any
+
+    return Array.isArray(first) ? first[0] : String(first)
+  }
+
+  return err?.response?.data?.message || ''
 }
 
 // ── Status ────────────────────────────────────────
@@ -80,8 +301,10 @@ const statusLoading = ref<number | null>(null)
 const changeStatus = async (item: any, status: string) => {
   statusLoading.value = item.id
   try {
-    await api.patch(`/api/v1/tenders/${item.id}`, { status })
-    item.status = status
+    const { data } = await api.patch(`/api/v1/tenders/${item.id}`, { status })
+    // السيرفر يعيد حساب display_status مع الحالة (إغلاق → "مغلق")، فنأخذ الصف كاملاً من الرد
+    // بدل تحديث status وحده — وإلا بقي بادج "المستجدات" القديم ("جديد") ظاهراً حتى إعادة التحميل
+    Object.assign(item, data.items ?? { status })
   } catch (err) { console.error(err) }
   finally { statusLoading.value = null }
 }
@@ -107,10 +330,12 @@ const createDialog = ref(false)
 const createLoading = ref(false)
 const newTender = ref({
   title:            '',
+  issuing_entity:   '',
   description:      '',
   union_notes:      '',
   category:         '',
-  deadline:         '',
+  deadline_date:    '',
+  deadline_time:    '',
   status:           'open' as string,
   submission_types: [] as string[],
   submission_email: '',
@@ -118,6 +343,19 @@ const newTender = ref({
   submission_file:  null as File | null,
   external_url:     '',
 })
+
+// مرفق إضافي واحد فقط عند الإنشاء — تعدد المرفقات متاح من نافذة التعديل. يُرفع تلقائياً فور الإنشاء
+const newAttachmentsStaged = ref<File[]>([])
+
+const createForm = ref<any>(null)
+const editForm = ref<any>(null)
+
+const emptyNewTender = () => ({ title: '', issuing_entity: '', description: '', union_notes: '', category: '', deadline_date: '', deadline_time: '', status: 'open', submission_types: [] as string[], submission_email: '', submission_phone: '', submission_file: null as File | null, external_url: '' })
+
+const openCreate = () => {
+  newAttachmentsStaged.value = []
+  createDialog.value = true
+}
 
 const editTenderTyped = editTender as any
 
@@ -143,24 +381,24 @@ const submissionOptions = [
   { label: 'ملف مرفق', value: 'file', icon: 'tabler-file-upload' },
 ]
 
-const categoryOptions = [
-  'غير محدد',
-  'طرق',
-  'ابنية',
-  'كهروميكانيك',
-  'المياه/المجارى',
-  'أشغال عامة',
-]
 
 const headers = [
   { title: 'عنوان العطاء', key: 'title' },
   { title: 'التصنيف', key: 'category' },
   { title: 'ملاحظات الاتحاد', key: 'union_notes' },
+  { title: 'تاريخ النشر', key: 'published_at' },
   { title: 'آخر موعد', key: 'deadline' },
+  { title: 'المستجدات', key: 'display_status' },
   { title: 'الحالة', key: 'status' },
-  { title: 'العروض', key: 'bids_count' },
   { title: 'إجراءات', key: 'actions', sortable: false },
 ]
+
+const displayStatusColor: Record<string, string> = {
+  new: 'info',
+  updated: 'primary',
+  closing_soon: 'warning',
+  closed: 'secondary',
+}
 
 const statusOptions = [
   { title: 'الكل', value: '' },
@@ -196,15 +434,75 @@ const fetchTenders = async () => {
 const getStatusColor = (s: string) => ({ open: 'success', closed: 'error', cancelled: 'secondary' }[s] || 'info')
 const getStatusLabel = (s: string) => ({ open: 'مفتوحة', closed: 'مغلقة', cancelled: 'ملغية' }[s] || s)
 
+// ── تصدير كشف Excel لعطاءات طُرحت خلال فترة معيّنة (تاريخ النشر) ──
+const exportDialog = ref(false)
+const exportFrom = ref(new Date().toISOString().slice(0, 8) + '01') // أول الشهر الحالي افتراضياً
+const exportTo = ref(new Date().toISOString().slice(0, 10))
+const exporting = ref(false)
+
+const runExport = async () => {
+  exporting.value = true
+  try {
+    const { data } = await api.get('/api/v1/tenders', {
+      params: {
+        created_from: exportFrom.value || undefined,
+        created_to: exportTo.value || undefined,
+        per_page: 1000,
+      },
+    })
+    const rows: any[] = data.data || data.items || []
+
+    const headerRow = ['الرقم المرجعي', 'عنوان العطاء', 'الجهة المعلنة', 'التصنيف', 'تاريخ النشر', 'آخر موعد للتقديم', 'الحالة']
+    const csvRows = [
+      headerRow,
+      ...rows.map(t => [
+        t.reference_number ?? '',
+        t.title ?? '',
+        t.issuing_entity ?? '',
+        t.category ?? '',
+        t.published_at ? new Date(t.published_at).toLocaleDateString('ar-EG') : '',
+        formatDeadline(t.deadline),
+        getStatusLabel(t.status),
+      ]),
+    ]
+
+    const csv = '﻿' + csvRows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+    const link = document.createElement('a')
+
+    link.href = url
+    link.download = `tenders-${exportFrom.value}-to-${exportTo.value}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+    exportDialog.value = false
+  } catch (err) {
+    console.error(err)
+    notify('تعذّر تصدير الكشف.', 'error')
+  } finally {
+    exporting.value = false
+  }
+}
+
 const createTender = async () => {
+  const { valid } = await createForm.value?.validate() ?? { valid: true }
+  if (!valid)
+    return
+  if (newTender.value.deadline_date && !newTender.value.deadline_time) {
+    notify('حدّد ساعة ودقيقة انتهاء العطاء', 'error')
+
+    return
+  }
   createLoading.value = true
   try {
     const formData = new FormData()
     formData.append('title',       newTender.value.title)
+    formData.append('issuing_entity', newTender.value.issuing_entity)
     formData.append('description', newTender.value.description)
     formData.append('union_notes', newTender.value.union_notes)
     formData.append('category',    newTender.value.category)
-    formData.append('deadline',    newTender.value.deadline)
+    const deadline = joinDeadline(newTender.value.deadline_date, newTender.value.deadline_time)
+    if (deadline)
+      formData.append('deadline', deadline)
     formData.append('status',      newTender.value.status)
     if (newTender.value.external_url)
       formData.append('external_url', newTender.value.external_url)
@@ -219,15 +517,34 @@ const createTender = async () => {
     if (newTender.value.submission_types.includes('file') && newTender.value.submission_file)
       formData.append('submission_file', newTender.value.submission_file)
 
-    await api.post('/api/v1/tenders', formData)
+    const { data } = await api.post('/api/v1/tenders', formData)
+    const created = data.items
+
+    // رفع المرفقات المختارة (واحد أو أكثر) تلقائياً فور الإنشاء — فشل أحدها لا يُلغي نشر العطاء
+    const failedAttachments: string[] = []
+    for (const file of newAttachmentsStaged.value) {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('label', file.name)
+      try {
+        await api.post(`/api/v1/tenders/${created.id}/attachments`, fd)
+      } catch (attachErr) {
+        console.error(attachErr)
+        failedAttachments.push(file.name)
+      }
+    }
+    const attachmentFailed = failedAttachments.length > 0
+
+    // إغلاق نافذة الإضافة بعد الحفظ مباشرة
     createDialog.value = false
-    newTender.value = { title: '', description: '', union_notes: '', category: '', deadline: '', status: 'open', submission_types: [], submission_email: '', submission_phone: '', submission_file: null }
-    notify('تم نشر العطاء بنجاح')
+    newTender.value = emptyNewTender()
+    newAttachmentsStaged.value = []
+    notify(attachmentFailed ? `تم نشر العطاء، لكن تعذّر رفع: ${failedAttachments.join('، ')} — أضفها من نافذة التعديل` : 'تم نشر العطاء بنجاح', attachmentFailed ? 'error' : 'success')
     fetchTenders()
   }
-  catch (err) {
+  catch (err: any) {
     console.error(err)
-    notify('تعذّر نشر العطاء، حاول مرة أخرى', 'error')
+    notify(firstError(err) || 'تعذّر نشر العطاء، حاول مرة أخرى', 'error')
   }
   finally {
     createLoading.value = false
@@ -235,6 +552,7 @@ const createTender = async () => {
 }
 
 watchEffect(() => fetchTenders())
+onMounted(fetchCategories)
 </script>
 
 <template>
@@ -244,9 +562,14 @@ watchEffect(() => fetchTenders())
         <h1 class="text-h4 font-weight-bold" style="font-family:Cairo,sans-serif">العطاءات</h1>
         <p class="text-body-2 text-medium-emphasis mb-0" style="font-family:Cairo,sans-serif">إدارة عطاءات الاتحاد ومتابعة العروض</p>
       </div>
-      <VBtn color="primary" prepend-icon="tabler-plus" @click="createDialog = true">
-        عطاء جديد
-      </VBtn>
+      <div class="d-flex gap-2">
+        <VBtn variant="tonal" prepend-icon="tabler-file-spreadsheet" @click="exportDialog = true">
+          تصدير Excel
+        </VBtn>
+        <VBtn color="primary" prepend-icon="tabler-plus" @click="openCreate">
+          عطاء جديد
+        </VBtn>
+      </div>
     </div>
 
     <VCard>
@@ -271,7 +594,7 @@ watchEffect(() => fetchTenders())
         />
         <VSelect
           v-model="categoryFilter"
-          :items="[{ title: 'كل التصنيفات', value: '' }, ...categoryOptions.map(c => ({ title: c, value: c }))]"
+          :items="[{ title: 'كل التصنيفات', value: '' }, ...categories.map(c => ({ title: c.name, value: c.name }))]"
           item-title="title"
           item-value="value"
           label="التصنيف"
@@ -327,18 +650,24 @@ watchEffect(() => fetchTenders())
           <span v-else class="text-medium-emphasis text-body-2">—</span>
         </template>
 
+        <template #item.published_at="{ item }">
+          {{ item.published_at ? new Date(item.published_at).toLocaleDateString('ar-PS') : '—' }}
+        </template>
+
         <template #item.deadline="{ item }">
-          {{ item.deadline ? new Date(item.deadline).toLocaleDateString('ar-PS') : '—' }}
+          <span>{{ formatDeadline(item.deadline) }}</span>
+        </template>
+
+        <template #item.display_status="{ item }">
+          <VChip :color="displayStatusColor[item.display_status] ?? 'info'" size="small" label style="font-family:Cairo,sans-serif">
+            {{ item.display_status_label }}
+          </VChip>
         </template>
 
         <template #item.status="{ item }">
           <VChip :color="getStatusColor(item.status)" size="small" label style="font-family:Cairo,sans-serif">
             {{ getStatusLabel(item.status) }}
           </VChip>
-        </template>
-
-        <template #item.bids_count="{ item }">
-          <VChip color="info" size="small" variant="tonal">{{ item.bids_count || 0 }}</VChip>
         </template>
 
         <template #item.actions="{ item }">
@@ -366,6 +695,12 @@ watchEffect(() => fetchTenders())
               </VList>
             </VMenu>
 
+            <!-- عرض التفاصيل -->
+            <VBtn icon size="small" variant="text" color="info" @click="openView(item)">
+              <VIcon icon="tabler-eye" />
+              <VTooltip activator="parent">عرض التفاصيل</VTooltip>
+            </VBtn>
+
             <!-- تعديل -->
             <VBtn icon size="small" variant="text" color="primary" @click="openEdit(item)">
               <VIcon icon="tabler-pencil" />
@@ -386,14 +721,37 @@ watchEffect(() => fetchTenders())
       </VDataTableServer>
     </VCard>
 
+    <!-- Export Dialog — كشف Excel لعطاءات فترة معيّنة (حسب تاريخ النشر) -->
+    <VDialog v-model="exportDialog" max-width="420">
+      <VCard>
+        <VCardTitle style="font-family:Cairo,sans-serif">تصدير كشف Excel</VCardTitle>
+        <VCardText>
+          <p class="text-body-2 text-medium-emphasis mb-4" style="font-family:Cairo,sans-serif">
+            يُصدَّر كل عطاء طُرح (تاريخ النشر) ضمن الفترة المحددة
+          </p>
+          <VTextField v-model="exportFrom" type="date" label="من تاريخ" class="mb-4" style="font-family:Cairo,sans-serif" />
+          <VTextField v-model="exportTo" type="date" label="إلى تاريخ" style="font-family:Cairo,sans-serif" />
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="text" @click="exportDialog = false">إلغاء</VBtn>
+          <VBtn color="primary" :loading="exporting" @click="runExport">تصدير</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
     <!-- Create Tender Dialog -->
     <VDialog v-model="createDialog" max-width="520">
       <VCard>
         <VCardTitle style="font-family:Cairo,sans-serif">عطاء جديد</VCardTitle>
         <VCardText>
+          <VForm ref="createForm" @submit.prevent>
           <VRow>
             <VCol cols="12">
               <VTextField v-model="newTender.title" label="عنوان العطاء" style="font-family:Cairo,sans-serif" />
+            </VCol>
+            <VCol cols="12">
+              <VTextField v-model="newTender.issuing_entity" label="الجهة المعلنة" prepend-inner-icon="tabler-building" style="font-family:Cairo,sans-serif" />
             </VCol>
             <VCol cols="12">
               <VTextarea v-model="newTender.description" label="وصف العطاء" rows="3" style="font-family:Cairo,sans-serif" />
@@ -411,15 +769,52 @@ watchEffect(() => fetchTenders())
             <VCol cols="12">
               <VSelect
                 v-model="newTender.category"
-                :items="categoryOptions"
+                :items="activeCategoryNames"
                 label="تصنيف العطاء"
                 prepend-inner-icon="tabler-category"
                 clearable
                 style="font-family:Cairo,sans-serif"
+              >
+                <template #item="{ props: itemProps, item }">
+                  <VListItem v-bind="itemProps">
+                    <template #prepend>
+                      <VAvatar size="28" rounded :image="categoryImage(item.raw) ?? undefined" color="secondary" variant="tonal" class="me-2">
+                        <VIcon v-if="!categoryImage(item.raw)" icon="tabler-photo-off" size="14" />
+                      </VAvatar>
+                    </template>
+                  </VListItem>
+                </template>
+              </VSelect>
+              <!-- الصورة الافتراضية للتصنيف المختار — هي ما سيظهر للعطاء بالتطبيق والموقع -->
+              <div v-if="newTender.category" class="mt-2">
+                <VImg v-if="categoryImage(newTender.category)" :src="categoryImage(newTender.category)!" height="120" cover class="rounded" />
+                <div v-else class="text-caption text-medium-emphasis d-flex align-center gap-1" style="font-family:Cairo,sans-serif">
+                  <VIcon icon="tabler-photo-off" size="14" /> لا توجد صورة افتراضية لهذا التصنيف — يمكن إضافتها من صفحة تصنيفات العطاءات
+                </div>
+              </div>
+            </VCol>
+            <VCol cols="12" md="7">
+              <VTextField
+                v-model="newTender.deadline_date"
+                label="تاريخ انتهاء العطاء"
+                type="date"
+                :min="tomorrowStr()"
+                :rules="deadlineRules"
+                prepend-inner-icon="tabler-calendar"
+                @click="openDatePicker"
+                @click:prepend-inner="openDatePicker"
+                style="font-family:Cairo,sans-serif"
               />
             </VCol>
-            <VCol cols="12">
-              <VTextField v-model="newTender.deadline" label="آخر موعد للتقديم" type="date" style="font-family:Cairo,sans-serif" />
+            <VCol cols="12" md="5">
+              <VTextField
+                v-model="newTender.deadline_time"
+                label="ساعة الانتهاء (ساعة:دقيقة)"
+                type="time"
+                prepend-inner-icon="tabler-clock"
+                :rules="[(v: string) => !newTender.deadline_date || !!v || 'حدّد الساعة والدقيقة']"
+                style="font-family:Cairo,sans-serif"
+              />
             </VCol>
 
             <!-- طريقة التقديم — متعددة الاختيار -->
@@ -484,8 +879,8 @@ watchEffect(() => fetchTenders())
                 prepend-icon=""
                 accept=".pdf,.doc,.docx"
                 style="font-family:Cairo,sans-serif"
-                :model-value="newTender.submission_file ? [newTender.submission_file] : []"
-                @update:model-value="newTender.submission_file = $event?.[0] ?? null"
+                :model-value="newTender.submission_file"
+                @update:model-value="newTender.submission_file = firstFile($event as any)"
               />
             </VCol>
 
@@ -500,7 +895,25 @@ watchEffect(() => fetchTenders())
                 placeholder="https://example.com/tender/123"
               />
             </VCol>
+
+            <!-- مرفقات العطاء عند الإنشاء — يمكن اختيار أكثر من ملف، وإضافة المزيد لاحقاً من نافذة التعديل -->
+            <VCol cols="12">
+              <VFileInput
+                label="مرفقات العطاء (اختياري — يمكن اختيار أكثر من ملف)"
+                hint="مستندات أو صور، حتى 10MB للملف"
+                persistent-hint
+                prepend-inner-icon="tabler-paperclip"
+                prepend-icon=""
+                multiple
+                chips
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+                style="font-family:Cairo,sans-serif"
+                :model-value="newAttachmentsStaged"
+                @update:model-value="newAttachmentsStaged = toFileArray($event)"
+              />
+            </VCol>
           </VRow>
+          </VForm>
         </VCardText>
         <VCardActions>
           <VSpacer />
@@ -514,9 +927,13 @@ watchEffect(() => fetchTenders())
       <VCard>
         <VCardTitle style="font-family:Cairo,sans-serif">تعديل العطاء</VCardTitle>
         <VCardText>
+          <VForm ref="editForm" @submit.prevent>
           <VRow>
             <VCol cols="12">
               <VTextField v-model="editTender.title" label="عنوان العطاء" style="font-family:Cairo,sans-serif" />
+            </VCol>
+            <VCol cols="12">
+              <VTextField v-model="editTender.issuing_entity" label="الجهة المعلنة" prepend-inner-icon="tabler-building" style="font-family:Cairo,sans-serif" />
             </VCol>
             <VCol cols="12">
               <VTextarea v-model="editTender.description" label="وصف العطاء" rows="3" style="font-family:Cairo,sans-serif" />
@@ -534,17 +951,48 @@ watchEffect(() => fetchTenders())
             <VCol cols="12">
               <VSelect
                 v-model="editTender.category"
-                :items="categoryOptions"
+                :items="editCategoryOptions"
                 label="تصنيف العطاء"
                 prepend-inner-icon="tabler-category"
                 clearable
                 style="font-family:Cairo,sans-serif"
+              >
+                <template #item="{ props: itemProps, item }">
+                  <VListItem v-bind="itemProps">
+                    <template #prepend>
+                      <VAvatar size="28" rounded :image="categoryImage(item.raw) ?? undefined" color="secondary" variant="tonal" class="me-2">
+                        <VIcon v-if="!categoryImage(item.raw)" icon="tabler-photo-off" size="14" />
+                      </VAvatar>
+                    </template>
+                  </VListItem>
+                </template>
+              </VSelect>
+              <VImg v-if="editTender.category && categoryImage(editTender.category)" :src="categoryImage(editTender.category)!" height="120" cover class="rounded mt-2" />
+            </VCol>
+            <VCol cols="12" md="4">
+              <VTextField
+                v-model="editTender.deadline_date"
+                label="تاريخ انتهاء العطاء"
+                type="date"
+                :min="tomorrowStr()"
+                :rules="editDeadlineRules"
+                prepend-inner-icon="tabler-calendar"
+                @click="openDatePicker"
+                @click:prepend-inner="openDatePicker"
+                style="font-family:Cairo,sans-serif"
               />
             </VCol>
-            <VCol cols="12" md="6">
-              <VTextField v-model="editTender.deadline" label="آخر موعد للتقديم" type="date" style="font-family:Cairo,sans-serif" />
+            <VCol cols="12" md="4">
+              <VTextField
+                v-model="editTender.deadline_time"
+                label="ساعة الانتهاء"
+                type="time"
+                prepend-inner-icon="tabler-clock"
+                :rules="[(v: string) => !editTender.deadline_date || !!v || 'حدّد الساعة والدقيقة']"
+                style="font-family:Cairo,sans-serif"
+              />
             </VCol>
-            <VCol cols="12" md="6">
+            <VCol cols="12" md="4">
               <VSelect
                 v-model="editTender.status"
                 :items="[{ title:'مفتوحة', value:'open' }, { title:'مغلقة', value:'closed' }, { title:'ملغية', value:'cancelled' }]"
@@ -590,14 +1038,29 @@ watchEffect(() => fetchTenders())
               <VTextField v-model="editTender.submission_phone" label="رقم التواصل" prepend-inner-icon="tabler-phone" style="font-family:Cairo,sans-serif" />
             </VCol>
             <VCol v-if="(editTender.submission_types ?? []).includes('file')" cols="12">
+              <!-- الملف المحفوظ يبقى كما هو بعد الحفظ؛ لا يُستبدل إلا باختيار ملف جديد -->
+              <div
+                v-if="existingSubmissionFile"
+                class="d-flex align-center gap-2 pa-2 mb-2"
+                style="border:1px solid rgba(var(--v-border-color),var(--v-border-opacity));border-radius:8px"
+              >
+                <VIcon icon="tabler-file-check" size="20" color="success" />
+                <div class="flex-grow-1 text-truncate" style="font-family:Cairo,sans-serif">
+                  <div class="text-body-2 font-weight-medium">الملف المحفوظ حالياً</div>
+                  <div class="text-caption text-medium-emphasis text-truncate" dir="ltr">{{ fileNameFromUrl(existingSubmissionFile) }}</div>
+                </div>
+                <VBtn size="small" variant="tonal" prepend-icon="tabler-eye" @click="openPreview(existingSubmissionFile, 'ملف التقديم')">معاينة</VBtn>
+              </div>
               <VFileInput
-                label="ملف التقديم (PDF أو Word)"
+                :label="existingSubmissionFile ? 'استبدال ملف التقديم (اختياري)' : 'ملف التقديم (PDF أو Word)'"
+                :hint="editTender.submission_file ? 'سيُستبدل الملف المحفوظ بهذا الملف عند الحفظ' : ''"
+                persistent-hint
                 prepend-inner-icon="tabler-file-upload"
                 prepend-icon=""
                 accept=".pdf,.doc,.docx"
                 style="font-family:Cairo,sans-serif"
-                :model-value="editTender.submission_file ? [editTender.submission_file] : []"
-                @update:model-value="editTender.submission_file = $event?.[0] ?? null"
+                :model-value="editTender.submission_file"
+                @update:model-value="editTender.submission_file = firstFile($event as any)"
               />
             </VCol>
             <VCol cols="12">
@@ -610,12 +1073,177 @@ watchEffect(() => fetchTenders())
                 placeholder="https://example.com/tender/123"
               />
             </VCol>
+
+            <!-- مرفقات العطاء — متعددة، مستندات أو صور -->
+            <VCol cols="12">
+              <div class="text-body-2 font-weight-medium mb-2" style="font-family:Cairo,sans-serif">
+                مرفقات العطاء
+                <span class="text-medium-emphasis">(يمكن إضافة أكثر من ملف — مستند أو صورة)</span>
+              </div>
+
+              <div v-if="attachments.length" class="d-flex flex-wrap gap-3 mb-3">
+                <div
+                  v-for="att in attachments"
+                  :key="att.id"
+                  class="d-flex align-center gap-2 pa-2"
+                  style="border:1px solid rgba(var(--v-border-color),var(--v-border-opacity));border-radius:8px;max-width:220px"
+                >
+                  <VAvatar v-if="att.is_image" :image="att.url" size="32" rounded />
+                  <VAvatar v-else size="32" rounded color="secondary" variant="tonal">
+                    <VIcon icon="tabler-file-text" size="16" />
+                  </VAvatar>
+                  <a
+                    href="#"
+                    class="text-body-2 text-truncate"
+                    style="max-width:100px"
+                    @click.prevent="openPreview(att.url, att.label || 'مرفق', att.is_image)"
+                  >{{ att.label || 'ملف' }}</a>
+                  <VBtn
+                    icon
+                    size="x-small"
+                    variant="text"
+                    color="error"
+                    :loading="attachmentDeletingId === att.id"
+                    @click="confirmRemoveAttachment(att)"
+                  >
+                    <VIcon icon="tabler-x" size="14" />
+                  </VBtn>
+                </div>
+              </div>
+
+              <div class="d-flex align-center gap-2">
+                <VFileInput
+                  label="إضافة مرفقات جديدة"
+                  prepend-inner-icon="tabler-paperclip"
+                  prepend-icon=""
+                  multiple
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+                  density="compact"
+                  style="font-family:Cairo,sans-serif;flex:1"
+                  :model-value="newAttachmentFiles"
+                  @update:model-value="newAttachmentFiles = toFileArray($event)"
+                />
+                <VBtn
+                  :disabled="!newAttachmentFiles.length"
+                  :loading="attachmentUploading"
+                  color="primary"
+                  variant="tonal"
+                  @click="uploadAttachments"
+                >
+                  رفع
+                </VBtn>
+              </div>
+            </VCol>
           </VRow>
+          </VForm>
         </VCardText>
         <VCardActions>
           <VSpacer />
           <VBtn variant="tonal" @click="editDialog = false">إلغاء</VBtn>
           <VBtn color="primary" :loading="editLoading" @click="saveTender">حفظ التعديلات</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- View Details Dialog -->
+    <VDialog v-model="viewDialog" max-width="680" scrollable>
+      <VCard v-if="viewingItem">
+        <VCardTitle class="d-flex align-center justify-space-between flex-wrap gap-2" style="font-family:Cairo,sans-serif">
+          <span>{{ viewingItem.title }}</span>
+          <div class="d-flex gap-2">
+            <VChip v-if="viewingItem.display_status_label" :color="displayStatusColor[viewingItem.display_status] ?? 'info'" size="small" label>
+              {{ viewingItem.display_status_label }}
+            </VChip>
+            <VChip :color="getStatusColor(viewingItem.status)" size="small" label>
+              {{ getStatusLabel(viewingItem.status) }}
+            </VChip>
+          </div>
+        </VCardTitle>
+        <VCardText>
+          <VRow dense class="mb-3">
+            <VCol cols="6" md="4">
+              <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">الرقم المرجعي</span>
+              <span dir="ltr">{{ viewingItem.reference_number || '—' }}</span>
+            </VCol>
+            <VCol cols="6" md="4">
+              <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">الجهة المعلنة</span>
+              <span style="font-family:Cairo,sans-serif">{{ viewingItem.issuing_entity || '—' }}</span>
+            </VCol>
+            <VCol cols="6" md="4">
+              <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">التصنيف</span>
+              <span style="font-family:Cairo,sans-serif">{{ viewingItem.category || '—' }}</span>
+            </VCol>
+            <VCol cols="6" md="4">
+              <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">آخر موعد</span>
+              <span style="font-family:Cairo,sans-serif">{{ formatDeadline(viewingItem.deadline) }}</span>
+            </VCol>
+            <VCol cols="6" md="4">
+              <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">تاريخ النشر</span>
+              <span style="font-family:Cairo,sans-serif">{{ viewingItem.published_at ? new Date(viewingItem.published_at).toLocaleDateString('ar-PS') : '—' }}</span>
+            </VCol>
+          </VRow>
+
+          <VDivider class="mb-4" />
+
+          <div v-if="viewingItem.description" class="mb-4">
+            <label class="text-body-2 font-weight-medium mb-1 d-block" style="font-family:Cairo,sans-serif">الوصف</label>
+            <p class="text-body-2" style="font-family:Cairo,sans-serif">{{ viewingItem.description }}</p>
+          </div>
+          <div v-if="viewingItem.union_notes" class="mb-4">
+            <label class="text-body-2 font-weight-medium mb-1 d-block" style="font-family:Cairo,sans-serif">ملاحظات الاتحاد</label>
+            <p class="text-body-2" style="font-family:Cairo,sans-serif">{{ viewingItem.union_notes }}</p>
+          </div>
+
+          <div class="mb-4">
+            <label class="text-body-2 font-weight-medium mb-1 d-block" style="font-family:Cairo,sans-serif">طريقة التقديم</label>
+            <div class="d-flex flex-wrap gap-2">
+              <VChip v-if="(viewingItem.submission_types ?? []).includes('email')" size="small" prepend-icon="tabler-mail">
+                {{ viewingItem.submission_email || 'بريد إلكتروني' }}
+              </VChip>
+              <VChip v-if="(viewingItem.submission_types ?? []).includes('phone')" size="small" prepend-icon="tabler-phone">
+                {{ viewingItem.submission_phone || 'هاتف' }}
+              </VChip>
+              <VChip
+                v-if="(viewingItem.submission_types ?? []).includes('file') && viewingItem.submission_file"
+                size="small"
+                color="primary"
+                prepend-icon="tabler-eye"
+                @click="openPreview(viewingItem.submission_file, 'ملف التقديم')"
+              >
+                معاينة ملف التقديم
+              </VChip>
+              <span v-if="!(viewingItem.submission_types ?? []).length" class="text-medium-emphasis text-body-2">—</span>
+            </div>
+          </div>
+
+          <div v-if="viewAttachments.length" class="mb-2">
+            <label class="text-body-2 font-weight-medium mb-2 d-block" style="font-family:Cairo,sans-serif">المرفقات</label>
+            <div class="d-flex flex-wrap gap-3">
+              <VCard
+                v-for="att in viewAttachments"
+                :key="att.id"
+                variant="outlined"
+                class="d-flex align-center gap-2 pa-2 cursor-pointer"
+                style="max-width:260px"
+                @click="openPreview(att.url, att.label || 'مرفق', att.is_image)"
+              >
+                <VAvatar v-if="att.is_image" :image="att.url" size="40" rounded />
+                <VAvatar v-else size="40" rounded color="secondary" variant="tonal">
+                  <VIcon icon="tabler-file-text" size="20" />
+                </VAvatar>
+                <span class="text-body-2 text-truncate flex-grow-1" style="font-family:Cairo,sans-serif">{{ att.label || 'مرفق' }}</span>
+                <VBtn icon size="x-small" variant="text" :href="att.url" target="_blank" rel="noopener" download @click.stop>
+                  <VIcon icon="tabler-download" size="16" />
+                  <VTooltip activator="parent">تحميل</VTooltip>
+                </VBtn>
+              </VCard>
+            </div>
+          </div>
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" color="primary" @click="viewDialog = false; openEdit(viewingItem)">تعديل</VBtn>
+          <VBtn variant="tonal" @click="viewDialog = false">إغلاق</VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
@@ -636,6 +1264,45 @@ watchEffect(() => fetchTenders())
           <VSpacer />
           <VBtn variant="tonal" @click="deleteDialog = false">إلغاء</VBtn>
           <VBtn color="error" :loading="deleteLoading" @click="deleteTender">حذف</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- Delete Attachment Confirm Dialog -->
+    <VDialog v-model="deleteAttachmentDialog" max-width="400">
+      <VCard>
+        <VCardTitle class="d-flex align-center gap-2" style="font-family:Cairo,sans-serif">
+          <VIcon icon="tabler-alert-triangle" color="error" />
+          تأكيد حذف المرفق
+        </VCardTitle>
+        <VCardText style="font-family:Cairo,sans-serif">
+          هل أنت متأكد من حذف المرفق
+          <strong>{{ deletingAttachment?.label || 'هذا الملف' }}</strong>؟
+          لا يمكن التراجع عن هذا الإجراء.
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" @click="deleteAttachmentDialog = false">إلغاء</VBtn>
+          <VBtn color="error" :loading="attachmentDeletingId === deletingAttachment?.id" @click="removeAttachment">حذف</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- Attachment Preview Dialog -->
+    <VDialog v-model="previewDialog" max-width="900">
+      <VCard v-if="previewItem">
+        <VCardTitle class="d-flex align-center gap-2" style="font-family:Cairo,sans-serif">
+          <VIcon :icon="previewItem.kind === 'image' ? 'tabler-photo' : 'tabler-file-type-pdf'" />
+          <span class="text-truncate">{{ previewItem.label }}</span>
+        </VCardTitle>
+        <VCardText>
+          <VImg v-if="previewItem.kind === 'image'" :src="previewItem.url" max-height="70vh" contain />
+          <iframe v-else :src="previewItem.url" style="width:100%;height:70vh;border:0" />
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" prepend-icon="tabler-external-link" :href="previewItem.url" target="_blank" rel="noopener">فتح بتبويب جديد</VBtn>
+          <VBtn variant="tonal" @click="previewDialog = false">إغلاق</VBtn>
         </VCardActions>
       </VCard>
     </VDialog>

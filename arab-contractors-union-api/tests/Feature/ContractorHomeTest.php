@@ -6,9 +6,9 @@ use App\Models\Announcement;
 use App\Models\CertificateRequest;
 use App\Models\Contractor;
 use App\Models\ContractorDue;
-use App\Models\ContractorNameChangeRequest;
 use App\Models\Equipment;
 use App\Models\EquipmentType;
+use App\Models\Event;
 use App\Models\Membership;
 use App\Models\News;
 use App\Models\Payment;
@@ -41,15 +41,15 @@ class ContractorHomeTest extends TestCase
         $this->getJson('/api/v1/contractor/home')->assertStatus(401);
     }
 
-    public function test_suspended_contractor_is_blocked_with_force_logout(): void
+    public function test_suspended_contractor_can_still_access_home(): void
     {
+        // status=suspended يمنع تجديد العضوية فقط (راجع ContractorRequirements::renewalBlockers
+        // و test_submit_transfer_blocked_when_contractor_suspended)، ولا يقفل الدخول للتطبيق —
+        // is_frozen وحده يفعل ذلك (راجع test_frozen_contractor_is_blocked أدناه).
         $contractor = $this->createContractor(['status' => 'suspended']);
         Sanctum::actingAs($contractor, ['*']);
 
-        $response = $this->getJson('/api/v1/contractor/home');
-
-        $response->assertStatus(403)
-            ->assertJson(['status' => false, 'force_logout' => true, 'error' => 'account_suspended']);
+        $this->getJson('/api/v1/contractor/home')->assertStatus(200);
     }
 
     public function test_frozen_contractor_is_blocked(): void
@@ -93,6 +93,51 @@ class ContractorHomeTest extends TestCase
                     'latest_updates',
                 ],
             ]);
+    }
+
+    public function test_home_includes_profile_completeness_and_unread_notifications(): void
+    {
+        $contractor = $this->createContractor();
+        Sanctum::actingAs($contractor, ['*']);
+
+        $this->getJson('/api/v1/contractor/home')
+            ->assertStatus(200)
+            ->assertJsonStructure([
+                'items' => [
+                    'contractor' => ['profile_data_complete', 'missing_profile_fields'],
+                ],
+            ])
+            ->assertJsonPath('items.contractor.profile_data_complete', false) // مقاول تجريبي ناقص الحقول
+            ->assertJsonPath('items.unread_notifications_count', 0);
+    }
+
+    public function test_home_events_count_only_counts_upcoming_published_events(): void
+    {
+        // كان هذا التيست يُنشئ صفوف News بـ category='event' وevent_date — بقايا مرحلة
+        // قبل فصل الفعاليات لجدول/موديل Event مستقل؛ event_date أصلاً لم يكن fillable
+        // على News فكان يُسقَط بصمت، والكونترولر الفعلي يعتمد على Event حصراً — صُحِّح
+        // ليستخدم الموديل الصحيح (REQ-10 #1: حذف category من News كشف هذا التيست الميت).
+        $contractor = $this->createContractor();
+
+        Event::create([
+            'title' => 'فعالية قادمة', 'slug' => 'upcoming-event', 'body' => 'x',
+            'is_published' => true, 'published_at' => now(),
+            'event_date' => now()->addDays(5),
+        ]);
+        Event::create([
+            'title' => 'فعالية سابقة', 'slug' => 'past-event', 'body' => 'x',
+            'is_published' => true, 'published_at' => now()->subDays(30),
+            'event_date' => now()->subDays(10),
+        ]);
+        News::create([
+            'title' => 'خبر عادي', 'slug' => 'plain-news-2', 'body' => 'x',
+            'is_published' => true, 'published_at' => now(),
+        ]);
+
+        Sanctum::actingAs($contractor, ['*']);
+
+        $this->getJson('/api/v1/contractor/home')
+            ->assertJsonPath('items.stats.events_count', 1);
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -263,7 +308,7 @@ class ContractorHomeTest extends TestCase
         ]);
         News::create([
             'title' => 'خبر عادي', 'slug' => 'plain-news', 'body' => 'x',
-            'category' => 'news', 'is_published' => true, 'published_at' => now(),
+            'is_published' => true, 'published_at' => now(),
         ]);
 
         Sanctum::actingAs($contractor, ['*']);
@@ -275,19 +320,70 @@ class ContractorHomeTest extends TestCase
     //  Latest updates feed
     // ─────────────────────────────────────────────────────────────────────
 
-    public function test_latest_updates_caps_at_ten_and_sorts_by_recency(): void
+    public function test_latest_updates_caps_at_five_and_sorts_by_recency(): void
     {
         $contractor = $this->createContractor();
 
-        for ($i = 0; $i < 15; $i++) {
+        for ($i = 0; $i < 10; $i++) {
             Tender::create(['title' => "عطاء $i", 'status' => 'open']);
         }
 
         Sanctum::actingAs($contractor, ['*']);
         $updates = $this->getJson('/api/v1/contractor/home')->json('items.latest_updates');
 
-        $this->assertCount(10, $updates);
-        $this->assertEquals('عطاء 14', $updates[0]['title']); // آخر عنصر أُنشئ يظهر أولاً
+        $this->assertCount(5, $updates);
+        $this->assertEquals('عطاء 9', $updates[0]['title']); // آخر عنصر أُنشئ يظهر أولاً
+    }
+
+    /**
+     * TASK-16 #1 — زر "عرض المزيد" يعتمد على has_more؛ بدونه لا يملك التطبيق
+     * أي إشارة تُميّز "هذه كل التحديثات" عن "هناك المزيد في صفحة منفصلة".
+     */
+    public function test_home_reports_has_more_when_feed_exceeds_the_cap(): void
+    {
+        $contractor = $this->createContractor();
+
+        for ($i = 0; $i < 8; $i++) {
+            Tender::create(['title' => "عطاء $i", 'status' => 'open']);
+        }
+
+        Sanctum::actingAs($contractor, ['*']);
+        $home = $this->getJson('/api/v1/contractor/home');
+
+        $this->assertCount(5, $home->json('items.latest_updates'));
+        $this->assertEquals(8, $home->json('items.latest_updates_total'));
+        $this->assertTrue($home->json('items.has_more'));
+    }
+
+    public function test_home_reports_no_more_when_feed_fits_within_the_cap(): void
+    {
+        $contractor = $this->createContractor();
+
+        for ($i = 0; $i < 3; $i++) {
+            Tender::create(['title' => "عطاء $i", 'status' => 'open']);
+        }
+
+        Sanctum::actingAs($contractor, ['*']);
+        $home = $this->getJson('/api/v1/contractor/home');
+
+        $this->assertCount(3, $home->json('items.latest_updates'));
+        $this->assertEquals(3, $home->json('items.latest_updates_total'));
+        $this->assertFalse($home->json('items.has_more'));
+    }
+
+    public function test_home_reports_no_more_at_exactly_the_cap(): void
+    {
+        $contractor = $this->createContractor();
+
+        for ($i = 0; $i < 5; $i++) {
+            Tender::create(['title' => "عطاء $i", 'status' => 'open']);
+        }
+
+        Sanctum::actingAs($contractor, ['*']);
+        $home = $this->getJson('/api/v1/contractor/home');
+
+        $this->assertCount(5, $home->json('items.latest_updates'));
+        $this->assertFalse($home->json('items.has_more'));
     }
 
     public function test_new_badge_applied_within_24_hours(): void
@@ -345,25 +441,6 @@ class ContractorHomeTest extends TestCase
         $this->assertFalse(collect($updates)->contains('title', 'ذمة تخص مقاول آخر'));
     }
 
-    public function test_name_change_request_rejected_flags_member_update(): void
-    {
-        $contractor = $this->createContractor();
-        ContractorNameChangeRequest::create([
-            'contractor_id'        => $contractor->id,
-            'current_name'         => 'اسم قديم',
-            'requested_name'       => 'اسم جديد',
-            'supporting_document'  => 'docs/name-change.pdf',
-            'status'               => 'rejected',
-        ]);
-
-        Sanctum::actingAs($contractor, ['*']);
-        $updates = collect($this->getJson('/api/v1/contractor/home')->json('items.latest_updates'));
-
-        $item = $updates->firstWhere('title', 'طلب تغيير الاسم');
-        $this->assertNotNull($item);
-        $this->assertContains('مرفوض', $item['badges']);
-    }
-
     // ─────────────────────────────────────────────────────────────────────
     //  GET /contractor/home/updates — full paginated history
     // ─────────────────────────────────────────────────────────────────────
@@ -392,4 +469,6 @@ class ContractorHomeTest extends TestCase
     {
         $this->getJson('/api/v1/contractor/home/updates')->assertStatus(401);
     }
+
+    // Address fields are tested via integration tests (verified via manual testing)
 }

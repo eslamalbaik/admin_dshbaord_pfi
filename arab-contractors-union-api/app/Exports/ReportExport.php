@@ -83,6 +83,15 @@ class ReportExport implements FromArray, WithTitle, WithStyles, ShouldAutoSize
         $rows[] = $monthNames;
         $rows[] = array_map(fn($v) => number_format((float)$v, 0), $this->data['revenueChart']);
 
+        // ─── رسوم التسجيل — أول انتساب (المادة 37) — للتقرير السنوي فقط ───
+        if ($this->period === 'annual' && isset($this->data['registrationFees'])) {
+            $rows[] = ['', ''];
+            $rows[] = ['رسوم التسجيل — أول انتساب (المادة 37)', ''];
+            $rows[] = ['البيان', 'القيمة'];
+            $rows[] = ['عدد ذمم أول انتساب هذه السنة', $this->data['registrationFees']['dues_count'] . ' ذمة'];
+            $rows[] = ['إجمالي رسوم التسجيل', number_format((float) $this->data['registrationFees']['total_jod'], 2) . ' د.أ'];
+        }
+
         return $rows;
     }
 

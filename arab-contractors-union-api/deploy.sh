@@ -1,11 +1,12 @@
 #!/bin/bash
 #
-# سكربت تحديث الباك إند على الإنتاج — يُشغَّل من داخل /var/www/pcu/backend
+# سكربت تحديث الباك إند على إنتاج InMotion (cPanel) — يُشغَّل من داخل ~/acu-api
 #   الاستخدام:  ./deploy.sh
 #
 set -euo pipefail
 
-APP_DIR="/var/www/pcu/backend"
+APP_DIR="/home/pcuorg/acu-api"
+PHP82="/opt/cpanel/ea-php82/root/usr/bin/php"
 BRANCH="development"
 
 cd "$APP_DIR"
@@ -14,21 +15,17 @@ echo "==> سحب آخر التعديلات ($BRANCH)"
 git pull origin "$BRANCH"
 
 echo "==> تثبيت حزم Composer (بدون dev)"
-composer install --no-dev --optimize-autoloader
+"$PHP82" composer.phar install --no-dev --optimize-autoloader --no-interaction
 
 echo "==> تشغيل الترحيلات (migrations)"
-php artisan migrate --force
+"$PHP82" artisan migrate --force
 
 echo "==> إعادة بناء الكاش"
-php artisan config:cache
-php artisan route:cache
-php artisan event:cache
+"$PHP82" artisan config:cache
+"$PHP82" artisan route:cache
+"$PHP82" artisan view:cache
 
-echo "==> ضبط الصلاحيات"
-chown -R www-data:www-data "$APP_DIR"
-chmod -R 775 storage bootstrap/cache
-
-echo "==> إعادة تحميل php-fpm"
-systemctl reload php8.3-fpm || true
+echo "==> ربط storage (لو لسا غير مربوط)"
+"$PHP82" artisan storage:link || true
 
 echo "✔ تم تحديث الباك إند بنجاح."

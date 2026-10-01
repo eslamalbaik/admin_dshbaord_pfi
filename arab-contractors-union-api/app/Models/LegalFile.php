@@ -19,13 +19,15 @@ class LegalFile extends Model
         'size',
         'sort',
         'is_active',
+        'is_featured',
         'uploaded_by',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
-        'sort'      => 'integer',
-        'size'      => 'integer',
+        'is_active'   => 'boolean',
+        'is_featured' => 'boolean',
+        'sort'        => 'integer',
+        'size'        => 'integer',
     ];
 
     /** تصنيفات الملفات */

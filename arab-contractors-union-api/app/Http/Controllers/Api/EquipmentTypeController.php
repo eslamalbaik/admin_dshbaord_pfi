@@ -4,14 +4,22 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\EquipmentType;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 
 class EquipmentTypeController extends Controller
 {
     // GET /api/equipment-types
-    public function index()
+    public function index(Request $request)
     {
-        return response()->json(EquipmentType::orderBy('name_ar')->get());
+        $query = EquipmentType::orderBy('name_ar');
+
+        // منتقيات إنشاء/تعديل الآلية تطلب فقط الأنواع الظاهرة؛ شاشة إدارة الأنواع تحتاج الكل (بما فيها المخفي)
+        if ($request->boolean('active_only')) {
+            $query->where('is_active', true);
+        }
+
+        return response()->json($query->get());
     }
 
     // POST /api/equipment-types
@@ -25,6 +33,8 @@ class EquipmentTypeController extends Controller
         ]);
 
         $type = EquipmentType::create($validated);
+
+        AuditLogService::record($request->user(), 'equipment_type.created', $type);
 
         return response()->json($type, 201);
     }
@@ -41,17 +51,21 @@ class EquipmentTypeController extends Controller
 
         $equipmentType->update($validated);
 
+        AuditLogService::record($request->user(), 'equipment_type.updated', $equipmentType, $validated);
+
         return response()->json($equipmentType);
     }
 
     // DELETE /api/equipment-types/{type}
-    public function destroy(EquipmentType $equipmentType)
+    public function destroy(Request $request, EquipmentType $equipmentType)
     {
         if ($equipmentType->equipment()->count() > 0) {
             return response()->json([
                 'message' => 'لا يمكن حذف هذا النوع لأنه مرتبط بآليات موجودة.',
             ], 422);
         }
+
+        AuditLogService::record($request->user(), 'equipment_type.deleted', $equipmentType);
 
         $equipmentType->delete();
 

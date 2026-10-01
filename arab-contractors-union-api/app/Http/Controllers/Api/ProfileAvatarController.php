@@ -7,8 +7,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * Avatar upload — shared by students (React) and admins (Vue). Any authenticated
- * user may change their own picture. Images are stored on the PUBLIC disk under
+ * Avatar upload — shared by all authenticated users (Admins, Accountants, etc.).
+ * (Contractors use a separate endpoint for their logos).
+ * Images are stored on the PUBLIC disk under
  * avatars/ and the relative path is saved on users.avatar.
  */
 class ProfileAvatarController extends Controller

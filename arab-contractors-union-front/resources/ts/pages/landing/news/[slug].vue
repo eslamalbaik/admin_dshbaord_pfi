@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '@/plugins/axios'
-import { Search, Calendar, MapPin, CalendarPlus } from 'lucide-vue-next'
+import { Search } from 'lucide-vue-next'
 
 definePage({
   meta: {
@@ -22,31 +22,15 @@ interface NewsDetail {
   body: string
   image: string | null
   video_url: string | null
+  external_url: string | null
   gallery: string[] | null
-  category: string
   published_at: string
-  event_date: string | null
-  event_location: string | null
   author?: { id: number; name: string }
 }
 
 const news = ref<NewsDetail | null>(null)
 const isLoading = ref(true)
 const notFound = ref(false)
-
-const categoryLabels: Record<string, string> = {
-  news: 'خبر',
-  announcement: 'إعلان',
-  event: 'فعالية',
-  tender: 'عطاء',
-}
-
-const categoryColors: Record<string, string> = {
-  news: '#1a237e',
-  announcement: '#0277bd',
-  event: '#2e7d32',
-  tender: '#e65100',
-}
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('ar-PS', {
@@ -55,32 +39,17 @@ function formatDate(dateStr: string): string {
   })
 }
 
-function formatEventDateTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleString('ar-PS', {
-    year: 'numeric', month: 'long', day: 'numeric',
-    hour: 'numeric', minute: '2-digit', hour12: true,
-  })
-}
-
 function youtubeEmbedUrl(url: string): string | null {
   const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([\w-]{11})/)
   return m ? `https://www.youtube.com/embed/${m[1]}` : null
 }
 
-function addToCalendar() {
-  if (!news.value?.event_date) return
-  const start = new Date(news.value.event_date)
-  const end = new Date(start.getTime() + 60 * 60 * 1000)
-  const toGCalDate = (d: Date) => d.toISOString().replace(/[-:]|\.\d{3}/g, '')
-  const params = new URLSearchParams({
-    action: 'TEMPLATE',
-    text: news.value.title,
-    dates: `${toGCalDate(start)}/${toGCalDate(end)}`,
-    details: news.value.excerpt ?? '',
-    location: news.value.event_location ?? '',
-  })
-  window.open(`https://calendar.google.com/calendar/render?${params.toString()}`, '_blank')
-}
+// الصورة الرئيسية تظهر أيضاً كأول صورة بشريط الصور القابل للتنقل بالسحب (بدل ما تكون
+// منفصلة تماماً عن المعرض) — overflow-x + scroll-snap يعطي سحب أصلي على اللمس بدون مكتبة جديدة
+const allImages = computed(() => {
+  if (!news.value) return []
+  return [news.value.image, ...(news.value.gallery ?? [])].filter((u): u is string => !!u)
+})
 
 onMounted(async () => {
   try {
@@ -132,12 +101,6 @@ onMounted(async () => {
 
           <!-- Meta -->
           <div class="article-meta">
-            <span
-              class="article-cat"
-              :style="`background: ${categoryColors[news.category] ?? '#000269'}`"
-            >
-              {{ categoryLabels[news.category] ?? news.category }}
-            </span>
             <span class="article-date">{{ formatDate(news.published_at) }}</span>
             <span v-if="news.author" class="article-author">بقلم: {{ news.author.name }}</span>
           </div>
@@ -147,27 +110,6 @@ onMounted(async () => {
 
           <!-- Excerpt -->
           <p v-if="news.excerpt" class="article-excerpt">{{ news.excerpt }}</p>
-
-          <!-- Event info -->
-          <div v-if="news.category === 'event' && (news.event_date || news.event_location)" class="event-info-box">
-            <div v-if="news.event_date" class="event-info-row">
-              <Calendar :size="18" />
-              <div>
-                <strong>تاريخ المناسبة</strong>
-                <span>{{ formatEventDateTime(news.event_date) }}</span>
-              </div>
-            </div>
-            <div v-if="news.event_location" class="event-info-row">
-              <MapPin :size="18" />
-              <div>
-                <strong>مكان الحدث</strong>
-                <span>{{ news.event_location }}</span>
-              </div>
-            </div>
-            <button v-if="news.event_date" class="btn-add-calendar" @click="addToCalendar">
-              <CalendarPlus :size="16" /> إضافة إلى التقويم
-            </button>
-          </div>
 
           <!-- Video -->
           <div v-if="news.video_url" class="article-video">
@@ -181,9 +123,14 @@ onMounted(async () => {
             <a v-else :href="news.video_url" target="_blank" rel="noopener" class="video-fallback-link">مشاهدة الفيديو ↗</a>
           </div>
 
-          <!-- Gallery -->
-          <div v-if="news.gallery && news.gallery.length > 0" class="article-gallery">
-            <img v-for="(img, i) in news.gallery" :key="i" :src="img" :alt="`${news.title} - ${i + 1}`" />
+          <!-- External link -->
+          <a v-if="news.external_url" :href="news.external_url" target="_blank" rel="noopener" class="article-external-link">
+            رابط ذو صلة ↗
+          </a>
+
+          <!-- Gallery — الصورة الرئيسية أول صورة بالشريط أيضاً، وقابل للتنقل بالسحب على اللمس -->
+          <div v-if="allImages.length > 1" class="article-gallery">
+            <img v-for="(img, i) in allImages" :key="i" :src="img" :alt="`${news.title} - ${i + 1}`" />
           </div>
 
           <!-- Divider -->
@@ -293,14 +240,6 @@ onMounted(async () => {
   flex-wrap: wrap;
 }
 
-.article-cat {
-  color: white;
-  font-size: 0.8rem;
-  font-weight: 700;
-  padding: 0.25rem 0.875rem;
-  border-radius: 50px;
-}
-
 .article-date { font-size: 0.85rem; color: #6b7280; }
 .article-author { font-size: 0.85rem; color: #6b7280; }
 
@@ -326,42 +265,6 @@ onMounted(async () => {
   margin: 1.5rem 0;
 }
 
-/* Event info box */
-.event-info-box {
-  background: #e8f5e9;
-  border: 1px solid #a5d6a7;
-  border-radius: 14px;
-  padding: 1.25rem;
-  margin-bottom: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.9rem;
-}
-
-.event-info-row { display: flex; align-items: center; gap: 0.75rem; color: #1b5e20; }
-.event-info-row div { display: flex; flex-direction: column; gap: 0.1rem; }
-.event-info-row strong { font-size: 0.8rem; font-weight: 700; }
-.event-info-row span { font-size: 0.9rem; color: #2e7d32; }
-
-.btn-add-calendar {
-  align-self: flex-start;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: #2e7d32;
-  color: white;
-  border: none;
-  border-radius: 10px;
-  padding: 0.6rem 1.25rem;
-  font-size: 0.85rem;
-  font-weight: 700;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.btn-add-calendar:hover { background: #1b5e20; }
-
 /* Video embed */
 .article-video {
   margin-bottom: 1.5rem;
@@ -385,17 +288,32 @@ onMounted(async () => {
   font-weight: 700;
 }
 
-/* Gallery */
+.article-external-link {
+  display: inline-block;
+  margin-bottom: 1.5rem;
+  padding: 0.6rem 1.25rem;
+  border: 1.5px solid #1a237e;
+  border-radius: 10px;
+  color: #1a237e;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+/* Gallery — سحب أفقي أصلي على اللمس عبر scroll-snap، الصورة الرئيسية أول عنصر بالشريط */
 .article-gallery {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
   gap: 0.75rem;
   margin-bottom: 1.5rem;
+  padding-bottom: 0.25rem;
 }
 
 .article-gallery img {
-  width: 100%;
-  height: 110px;
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  width: 220px;
+  height: 150px;
   object-fit: cover;
   border-radius: 10px;
   border: 1px solid #e5e7eb;

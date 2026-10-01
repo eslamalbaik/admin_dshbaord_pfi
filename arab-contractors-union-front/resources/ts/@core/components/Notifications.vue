@@ -6,6 +6,9 @@ interface Props {
   notifications: Notification[]
   badgeProps?: object
   location?: any
+  // Authoritative server-side unread total. The list is paginated (15/page), so
+  // counting unseen items in `notifications` undercounts once there are more.
+  unreadCount?: number
 }
 interface Emit {
   (e: 'read', value: (number | string)[]): void
@@ -17,6 +20,7 @@ interface Emit {
 const props = withDefaults(defineProps<Props>(), {
   location: 'bottom end',
   badgeProps: undefined,
+  unreadCount: undefined,
 })
 
 const emit = defineEmits<Emit>()
@@ -35,7 +39,7 @@ const markAllReadOrUnread = () => {
 }
 
 const totalUnseenNotifications = computed(() => {
-  return props.notifications.filter(item => item.isSeen === false).length
+  return props.unreadCount ?? props.notifications.filter(item => item.isSeen === false).length
 })
 
 const toggleReadUnread = (isSeen: boolean, Id: number | string) => {
@@ -50,9 +54,9 @@ const toggleReadUnread = (isSeen: boolean, Id: number | string) => {
   <IconBtn id="notification-btn">
     <VBadge
       v-bind="props.badgeProps"
-      :model-value="props.notifications.some(n => !n.isSeen)"
+      :model-value="totalUnseenNotifications > 0"
+      :content="totalUnseenNotifications > 99 ? '99+' : totalUnseenNotifications"
       color="error"
-      dot
       offset-x="2"
       offset-y="3"
     >

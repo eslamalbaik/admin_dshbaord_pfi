@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import api from '@/plugins/axios'
+import { firstFile, type SingleFileModel } from '@/utils/files'
 
 definePage({ meta: { requiresAdmin: true } })
 
@@ -14,9 +15,17 @@ const { data, isLoading } = useQuery({
 
 const accounts = computed(() => data.value?.items?.bank_accounts ?? [])
 
+const currencyOptions = [
+  { title: 'دينار أردني (JOD)', value: 'JOD' },
+  { title: 'شيكل (ILS)', value: 'ILS' },
+  { title: 'دولار (USD)', value: 'USD' },
+  { title: 'يورو (EUR)', value: 'EUR' },
+]
+
 const emptyForm = () => ({
   bank_name: '',
   bank_name_en: '',
+  currency: 'JOD',
   iban: '',
   account_number: '',
   account_holder: '',
@@ -30,7 +39,7 @@ const isFormOpen = ref(false)
 const isEditing = ref(false)
 const editingId = ref<number | null>(null)
 const form = ref<any>(emptyForm())
-const logoFile = ref<File[]>([])
+const logoFile = ref<SingleFileModel>(null)
 const formError = ref('')
 
 const openCreate = () => {
@@ -38,7 +47,7 @@ const openCreate = () => {
   editingId.value = null
   form.value = emptyForm()
   form.value.sort = accounts.value.length
-  logoFile.value = []
+  logoFile.value = null
   formError.value = ''
   isFormOpen.value = true
 }
@@ -47,7 +56,7 @@ const openEdit = (a: any) => {
   isEditing.value = true
   editingId.value = a.id
   form.value = { ...a }
-  logoFile.value = []
+  logoFile.value = null
   formError.value = ''
   isFormOpen.value = true
 }
@@ -55,12 +64,13 @@ const openEdit = (a: any) => {
 const saveMutation = useMutation({
   mutationFn: async () => {
     const fd = new FormData()
-    for (const key of ['bank_name', 'bank_name_en', 'iban', 'account_number', 'account_holder', 'swift', 'notes'])
+    for (const key of ['bank_name', 'bank_name_en', 'currency', 'iban', 'account_number', 'account_holder', 'swift', 'notes'])
       fd.append(key, form.value[key] ?? '')
     fd.append('is_active', form.value.is_active ? '1' : '0')
     fd.append('sort', String(form.value.sort ?? 0))
-    if (logoFile.value.length)
-      fd.append('logo', logoFile.value[0])
+    const logo = firstFile(logoFile.value)
+    if (logo)
+      fd.append('logo', logo)
 
     if (isEditing.value) {
       fd.append('_method', 'PUT')
@@ -119,6 +129,7 @@ const confirmDelete = (a: any) => {
         <thead>
           <tr>
             <th>البنك</th>
+            <th>العملة</th>
             <th>IBAN</th>
             <th>رقم الحساب</th>
             <th>صاحب الحساب</th>
@@ -141,6 +152,9 @@ const confirmDelete = (a: any) => {
                   </div>
                 </div>
               </div>
+            </td>
+            <td>
+              <VChip size="small" color="primary" variant="tonal">{{ a.currency }}</VChip>
             </td>
             <td dir="ltr">{{ a.iban }}</td>
             <td dir="ltr">{{ a.account_number ?? '—' }}</td>
@@ -178,6 +192,10 @@ const confirmDelete = (a: any) => {
             <VCol cols="12" md="6">
               <VTextField v-model="form.bank_name_en" label="Bank Name (English)" dir="ltr" />
             </VCol>
+            <VCol cols="12" md="6">
+              <VSelect v-model="form.currency" :items="currencyOptions" label="العملة *" />
+            </VCol>
+            <VCol cols="12" md="6" />
             <VCol cols="12">
               <VTextField v-model="form.iban" label="IBAN *" dir="ltr" />
             </VCol>

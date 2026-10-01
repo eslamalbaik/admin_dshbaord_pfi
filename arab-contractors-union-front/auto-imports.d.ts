@@ -10,7 +10,9 @@ declare global {
   const COOKIE_MAX_AGE_1_YEAR: typeof import('./resources/ts/utils/constants')['COOKIE_MAX_AGE_1_YEAR']
   const CreateUrl: typeof import('./src/@core/composable/CreateUrl')['CreateUrl']
   const EffectScope: typeof import('vue')['EffectScope']
+  const NOTIFICATIONS_KEY: typeof import('./resources/ts/composables/useNotifications')['NOTIFICATIONS_KEY']
   const acceptHMRUpdate: typeof import('pinia')['acceptHMRUpdate']
+  const adminToasts: typeof import('./resources/ts/composables/useRealtimeAdminNotifications')['adminToasts']
   const alphaDashValidator: typeof import('./resources/ts/@core/utils/validators')['alphaDashValidator']
   const alphaValidator: typeof import('./resources/ts/@core/utils/validators')['alphaValidator']
   const asyncComputed: typeof import('@vueuse/core')['asyncComputed']
@@ -50,6 +52,7 @@ declare global {
   const effectScope: typeof import('vue')['effectScope']
   const emailValidator: typeof import('./resources/ts/@core/utils/validators')['emailValidator']
   const extendRef: typeof import('@vueuse/core')['extendRef']
+  const firstFile: typeof import('./resources/ts/utils/files')['firstFile']
   const formatDate: typeof import('./resources/ts/@core/utils/formatters')['formatDate']
   const formatDateToMonthShort: typeof import('./resources/ts/@core/utils/formatters')['formatDateToMonthShort']
   const getActivePinia: typeof import('pinia')['getActivePinia']
@@ -57,6 +60,9 @@ declare global {
   const getCurrentScope: typeof import('vue')['getCurrentScope']
   const h: typeof import('vue')['h']
   const hexToRgb: typeof import('./resources/ts/@core/utils/colorConverter')['hexToRgb']
+  const idbDelete: typeof import('./resources/ts/utils/idbStore')['idbDelete']
+  const idbGet: typeof import('./resources/ts/utils/idbStore')['idbGet']
+  const idbSet: typeof import('./resources/ts/utils/idbStore')['idbSet']
   const ignorableWatch: typeof import('@vueuse/core')['ignorableWatch']
   const inject: typeof import('vue')['inject']
   const injectLocal: typeof import('@vueuse/core')['injectLocal']
@@ -65,6 +71,7 @@ declare global {
   const isDefined: typeof import('@vueuse/core')['isDefined']
   const isEmpty: typeof import('./resources/ts/@core/utils/helpers')['isEmpty']
   const isEmptyArray: typeof import('./resources/ts/@core/utils/helpers')['isEmptyArray']
+  const isIdbAvailable: typeof import('./resources/ts/utils/idbStore')['isIdbAvailable']
   const isNullOrUndefined: typeof import('./resources/ts/@core/utils/helpers')['isNullOrUndefined']
   const isObject: typeof import('./resources/ts/@core/utils/helpers')['isObject']
   const isProxy: typeof import('vue')['isProxy']
@@ -145,6 +152,7 @@ declare global {
   const templateRef: typeof import('@vueuse/core')['templateRef']
   const throttledRef: typeof import('@vueuse/core')['throttledRef']
   const throttledWatch: typeof import('@vueuse/core')['throttledWatch']
+  const toFileArray: typeof import('./resources/ts/utils/files')['toFileArray']
   const toRaw: typeof import('vue')['toRaw']
   const toReactive: typeof import('@vueuse/core')['toReactive']
   const toRef: typeof import('vue')['toRef']
@@ -214,6 +222,7 @@ declare global {
   const useDevicesList: typeof import('@vueuse/core')['useDevicesList']
   const useDisplayMedia: typeof import('@vueuse/core')['useDisplayMedia']
   const useDocumentVisibility: typeof import('@vueuse/core')['useDocumentVisibility']
+  const useDraftAutoSave: typeof import('./resources/ts/composables/useDraftAutoSave')['useDraftAutoSave']
   const useDraggable: typeof import('@vueuse/core')['useDraggable']
   const useDropZone: typeof import('@vueuse/core')['useDropZone']
   const useElementBounding: typeof import('@vueuse/core')['useElementBounding']
@@ -289,6 +298,7 @@ declare global {
   const usePrevious: typeof import('@vueuse/core')['usePrevious']
   const useProjection: typeof import('@vueuse/math')['useProjection']
   const useRafFn: typeof import('@vueuse/core')['useRafFn']
+  const useRealtimeAdminNotifications: typeof import('./resources/ts/composables/useRealtimeAdminNotifications')['useRealtimeAdminNotifications']
   const useRefHistory: typeof import('@vueuse/core')['useRefHistory']
   const useResizeObserver: typeof import('@vueuse/core')['useResizeObserver']
   const useResponsiveLeftSidebar: typeof import('./resources/ts/@core/composable/useResponsiveSidebar')['useResponsiveLeftSidebar']
@@ -381,7 +391,9 @@ declare module 'vue' {
     readonly $api: UnwrapRef<typeof import('./resources/ts/utils/api')['$api']>
     readonly COOKIE_MAX_AGE_1_YEAR: UnwrapRef<typeof import('./resources/ts/utils/constants')['COOKIE_MAX_AGE_1_YEAR']>
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
+    readonly NOTIFICATIONS_KEY: UnwrapRef<typeof import('./resources/ts/composables/useNotifications')['NOTIFICATIONS_KEY']>
     readonly acceptHMRUpdate: UnwrapRef<typeof import('pinia')['acceptHMRUpdate']>
+    readonly adminToasts: UnwrapRef<typeof import('./resources/ts/composables/useRealtimeAdminNotifications')['adminToasts']>
     readonly alphaDashValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['alphaDashValidator']>
     readonly alphaValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['alphaValidator']>
     readonly asyncComputed: UnwrapRef<typeof import('@vueuse/core')['asyncComputed']>
@@ -420,6 +432,7 @@ declare module 'vue' {
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly emailValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['emailValidator']>
     readonly extendRef: UnwrapRef<typeof import('@vueuse/core')['extendRef']>
+    readonly firstFile: UnwrapRef<typeof import('./resources/ts/utils/files')['firstFile']>
     readonly formatDate: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['formatDate']>
     readonly formatDateToMonthShort: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['formatDateToMonthShort']>
     readonly getActivePinia: UnwrapRef<typeof import('pinia')['getActivePinia']>
@@ -427,6 +440,9 @@ declare module 'vue' {
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
     readonly h: UnwrapRef<typeof import('vue')['h']>
     readonly hexToRgb: UnwrapRef<typeof import('./resources/ts/@core/utils/colorConverter')['hexToRgb']>
+    readonly idbDelete: UnwrapRef<typeof import('./resources/ts/utils/idbStore')['idbDelete']>
+    readonly idbGet: UnwrapRef<typeof import('./resources/ts/utils/idbStore')['idbGet']>
+    readonly idbSet: UnwrapRef<typeof import('./resources/ts/utils/idbStore')['idbSet']>
     readonly ignorableWatch: UnwrapRef<typeof import('@vueuse/core')['ignorableWatch']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
     readonly injectLocal: UnwrapRef<typeof import('@vueuse/core')['injectLocal']>
@@ -434,6 +450,7 @@ declare module 'vue' {
     readonly isDefined: UnwrapRef<typeof import('@vueuse/core')['isDefined']>
     readonly isEmpty: UnwrapRef<typeof import('./resources/ts/@core/utils/helpers')['isEmpty']>
     readonly isEmptyArray: UnwrapRef<typeof import('./resources/ts/@core/utils/helpers')['isEmptyArray']>
+    readonly isIdbAvailable: UnwrapRef<typeof import('./resources/ts/utils/idbStore')['isIdbAvailable']>
     readonly isNullOrUndefined: UnwrapRef<typeof import('./resources/ts/@core/utils/helpers')['isNullOrUndefined']>
     readonly isObject: UnwrapRef<typeof import('./resources/ts/@core/utils/helpers')['isObject']>
     readonly isProxy: UnwrapRef<typeof import('vue')['isProxy']>
@@ -513,6 +530,7 @@ declare module 'vue' {
     readonly templateRef: UnwrapRef<typeof import('@vueuse/core')['templateRef']>
     readonly throttledRef: UnwrapRef<typeof import('@vueuse/core')['throttledRef']>
     readonly throttledWatch: UnwrapRef<typeof import('@vueuse/core')['throttledWatch']>
+    readonly toFileArray: UnwrapRef<typeof import('./resources/ts/utils/files')['toFileArray']>
     readonly toRaw: UnwrapRef<typeof import('vue')['toRaw']>
     readonly toReactive: UnwrapRef<typeof import('@vueuse/core')['toReactive']>
     readonly toRef: UnwrapRef<typeof import('vue')['toRef']>
@@ -580,6 +598,7 @@ declare module 'vue' {
     readonly useDevicesList: UnwrapRef<typeof import('@vueuse/core')['useDevicesList']>
     readonly useDisplayMedia: UnwrapRef<typeof import('@vueuse/core')['useDisplayMedia']>
     readonly useDocumentVisibility: UnwrapRef<typeof import('@vueuse/core')['useDocumentVisibility']>
+    readonly useDraftAutoSave: UnwrapRef<typeof import('./resources/ts/composables/useDraftAutoSave')['useDraftAutoSave']>
     readonly useDraggable: UnwrapRef<typeof import('@vueuse/core')['useDraggable']>
     readonly useDropZone: UnwrapRef<typeof import('@vueuse/core')['useDropZone']>
     readonly useElementBounding: UnwrapRef<typeof import('@vueuse/core')['useElementBounding']>
@@ -654,6 +673,7 @@ declare module 'vue' {
     readonly usePrevious: UnwrapRef<typeof import('@vueuse/core')['usePrevious']>
     readonly useProjection: UnwrapRef<typeof import('@vueuse/math')['useProjection']>
     readonly useRafFn: UnwrapRef<typeof import('@vueuse/core')['useRafFn']>
+    readonly useRealtimeAdminNotifications: UnwrapRef<typeof import('./resources/ts/composables/useRealtimeAdminNotifications')['useRealtimeAdminNotifications']>
     readonly useRefHistory: UnwrapRef<typeof import('@vueuse/core')['useRefHistory']>
     readonly useResizeObserver: UnwrapRef<typeof import('@vueuse/core')['useResizeObserver']>
     readonly useResponsiveLeftSidebar: UnwrapRef<typeof import('./resources/ts/@core/composable/useResponsiveSidebar')['useResponsiveLeftSidebar']>

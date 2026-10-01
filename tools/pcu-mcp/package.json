@@ -1,0 +1,19 @@
+{
+  "name": "pcu-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP server for read/write access to the PCU production VPS and its MariaDB",
+  "bin": { "pcu-mcp": "./index.js" },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env index.js",
+    "check": "node --env-file-if-exists=.env check.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "mysql2": "^3.11.0",
+    "ssh2": "^1.15.0",
+    "zod": "^3.23.8"
+  },
+  "engines": { "node": ">=20" }
+}

@@ -20,10 +20,7 @@ interface NewsItem {
   image: string | null
   video_url: string | null
   gallery: string[] | null
-  category: string
   published_at: string
-  event_date: string | null
-  event_location: string | null
 }
 
 interface Pagination {
@@ -40,23 +37,7 @@ const news = ref<NewsItem[]>([])
 const pagination = ref<Pagination | null>(null)
 const isLoading = ref(false)
 const search = ref('')
-const activeCategory = ref('')
 const currentPage = ref(1)
-
-const categories = [
-  { value: '', label: 'الكل' },
-  { value: 'news', label: 'أخبار' },
-  { value: 'announcement', label: 'إعلانات' },
-  { value: 'event', label: 'فعاليات' },
-  { value: 'tender', label: 'عطاءات' },
-]
-
-const categoryColors: Record<string, string> = {
-  news: '#000269',
-  announcement: '#0369a1',
-  event: '#15803d',
-  tender: '#b45309',
-}
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('ar-PS', {
@@ -68,7 +49,6 @@ async function fetchNews() {
   isLoading.value = true
   try {
     const params: Record<string, any> = { page: currentPage.value, per_page: 9 }
-    if (activeCategory.value) params.category = activeCategory.value
     if (search.value.trim()) params.search = search.value.trim()
 
     const res = await api.get('/api/v1/news', { params })
@@ -85,12 +65,6 @@ async function fetchNews() {
   } finally {
     isLoading.value = false
   }
-}
-
-function setCategory(cat: string) {
-  activeCategory.value = cat
-  currentPage.value = 1
-  fetchNews()
 }
 
 function goToPage(page: number) {
@@ -127,18 +101,6 @@ onMounted(fetchNews)
     <!-- Filters -->
     <div class="filters-bar">
       <div class="container filters-inner">
-        <!-- Category tabs -->
-        <div class="category-tabs">
-          <button
-            v-for="cat in categories"
-            :key="cat.value"
-            class="cat-tab"
-            :class="{ active: activeCategory === cat.value }"
-            @click="setCategory(cat.value)"
-          >
-            {{ cat.label }}
-          </button>
-        </div>
         <!-- Search -->
         <div class="search-wrap">
           <Search :size="15" class="search-icon" />
@@ -179,12 +141,6 @@ onMounted(fetchNews)
           <div class="news-img-wrap">
             <img v-if="item.image" :src="item.image" :alt="item.title" class="news-img" />
             <div v-else class="news-img-placeholder">📰</div>
-            <span
-              class="news-cat"
-              :style="`background: ${categoryColors[item.category] ?? '#000269'}`"
-            >
-              {{ categories.find(c => c.value === item.category)?.label ?? item.category }}
-            </span>
             <span v-if="item.video_url" class="news-video-badge"><Play :size="22" fill="white" /></span>
             <span v-if="item.gallery && item.gallery.length > 0" class="news-gallery-badge">
               <Images :size="13" /> {{ item.gallery.length + (item.image ? 1 : 0) }}
@@ -193,10 +149,6 @@ onMounted(fetchNews)
           <div class="news-body">
             <p class="news-date">{{ formatDate(item.published_at) }}</p>
             <h2 class="news-title">{{ item.title }}</h2>
-            <p v-if="item.category === 'event' && item.event_date" class="news-event-info">
-              📅 {{ formatDate(item.event_date) }}
-              <span v-if="item.event_location"> — 📍 {{ item.event_location }}</span>
-            </p>
             <p v-if="item.excerpt" class="news-excerpt">{{ item.excerpt }}</p>
             <span class="news-read-more">اقرأ المزيد ←</span>
           </div>
@@ -352,33 +304,6 @@ onMounted(fetchNews)
   flex-wrap: wrap;
 }
 
-.category-tabs {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.cat-tab {
-  background: white;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 50px;
-  padding: 0.375rem 1rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #6b7280;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.2s;
-}
-
-.cat-tab.active {
-  background: #1a237e;
-  border-color: #1a237e;
-  color: white;
-}
-
-.cat-tab:hover:not(.active) { border-color: #1a237e; color: #1a237e; }
-
 .search-wrap {
   display: flex;
   align-items: center;
@@ -451,17 +376,6 @@ onMounted(fetchNews)
   background: linear-gradient(135deg, #eff6ff, #dbeafe);
 }
 
-.news-cat {
-  position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  color: white;
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 0.25rem 0.75rem;
-  border-radius: 50px;
-}
-
 .news-video-badge {
   position: absolute;
   inset: 0;
@@ -484,13 +398,6 @@ onMounted(fetchNews)
   font-weight: 700;
   padding: 0.2rem 0.6rem;
   border-radius: 50px;
-}
-
-.news-event-info {
-  font-size: 0.8rem;
-  color: #15803d;
-  font-weight: 600;
-  margin-bottom: 0.4rem;
 }
 
 .news-body {

@@ -133,6 +133,12 @@ function fmtDate(d: string | null) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
+
+// رقم واتساب المقاول بصيغة wa.me (يشيل أي رمز غير رقمي)
+function waLink(phone: string | null) {
+  if (!phone) return null
+  return `https://wa.me/${phone.replace(/\D/g, '')}`
+}
 </script>
 
 <template>
@@ -194,6 +200,7 @@ function fmtDate(d: string | null) {
               <th>#</th>
               <th>المقاول</th>
               <th>الموضوع</th>
+              <th>واتساب</th>
               <th>التصنيف</th>
               <th>الحالة</th>
               <th>التاريخ</th>
@@ -205,6 +212,18 @@ function fmtDate(d: string | null) {
               <td>{{ t.id }}</td>
               <td class="font-weight-medium">{{ t.contractor ?? '—' }}</td>
               <td>{{ t.subject }}</td>
+              <td>
+                <a
+                  v-if="waLink(t.whatsapp_phone)"
+                  :href="waLink(t.whatsapp_phone)!"
+                  target="_blank"
+                  class="text-success"
+                  @click.stop
+                >
+                  {{ t.whatsapp_phone }}
+                </a>
+                <span v-else>—</span>
+              </td>
               <td>
                 <VChip size="x-small" variant="tonal">{{ t.category_label ?? t.category }}</VChip>
               </td>
@@ -247,6 +266,12 @@ function fmtDate(d: string | null) {
             <div><strong>المقاول:</strong> {{ selected.contractor ?? '—' }}</div>
             <div><strong>التصنيف:</strong> {{ selected.category_label ?? selected.category }}</div>
             <div><strong>التاريخ:</strong> {{ fmtDate(selected.created_at) }}</div>
+            <div v-if="selected.whatsapp_phone">
+              <strong>واتساب:</strong>
+              <a :href="waLink(selected.whatsapp_phone)!" target="_blank" class="text-success">
+                {{ selected.whatsapp_phone }}
+              </a>
+            </div>
           </div>
 
           <!-- ─── المحادثة: الرسالة الأصلية أولاً ثم كل الردود بالترتيب الزمني ─── -->

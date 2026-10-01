@@ -100,7 +100,7 @@
 <!-- Header -->
 <div class="header">
   <div>
-    <h1>اتحاد المقاولين العرب — تقرير إحصائي</h1>
+    <h1>اتحاد المقاولين الفلسطينيين — تقرير إحصائي</h1>
     <div style="font-size:12px;color:#555;margin-top:4px;">
       @if($period === 'monthly')
         {{ $month_name }} {{ $year }}
@@ -216,7 +216,7 @@
 </table>
 
 <div class="footer">
-  تم إنشاء هذا التقرير تلقائياً بواسطة نظام اتحاد المقاولين العرب — {{ $generated_at }}
+  تم إنشاء هذا التقرير تلقائياً بواسطة نظام اتحاد المقاولين الفلسطينيين — {{ $generated_at }}
 </div>
 
 </body>

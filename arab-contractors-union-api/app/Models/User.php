@@ -52,44 +52,4 @@ class User extends Authenticatable
         ];
     }
 
-    public function taughtCourses()
-    {
-        return $this->hasMany(Course::class, 'instructor_id');
-    }
-
-    public function enrollments()
-    {
-        return $this->hasMany(Enrollment::class);
-    }
-
-    public function enrolledCourses()
-    {
-        return $this->belongsToMany(Course::class, 'enrollments')->withPivot('progress')->withTimestamps();
-    }
-
-    public function completedLessons()
-    {
-        return $this->belongsToMany(Lesson::class, 'lesson_user')->withPivot('is_completed', 'completed_at')->wherePivot('is_completed', true)->withTimestamps();
-    }
-
-    public function quizAttempts()
-    {
-        return $this->hasMany(QuizAttempt::class);
-    }
-
-    public function certificates()
-    {
-        return $this->hasMany(Certificate::class);
-    }
-
-    public function productPurchases()
-    {
-        return $this->hasMany(ProductPurchase::class);
-    }
-
-    // FTR-005: Study plans relationship
-    public function studyPlans()
-    {
-        return $this->hasMany(StudyPlan::class);
-    }
 }

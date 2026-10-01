@@ -15,6 +15,10 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             \App\Services\Sms\SmsSenderInterface::class,
             fn () => match (config('services.sms.driver', 'log')) {
+                'hotsms' => new \App\Services\Sms\HotSmsSender(
+                    config('services.sms.hotsms.api_token'),
+                    config('services.sms.hotsms.sender'),
+                ),
                 default => new \App\Services\Sms\LogSmsSender(),
             },
         );
@@ -47,10 +51,20 @@ class AppServiceProvider extends ServiceProvider
             return \Illuminate\Cache\RateLimiting\Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
 
+        \Illuminate\Support\Facades\RateLimiter::for('api', function (\Illuminate\Http\Request $request) {
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+        });
+
+        \Illuminate\Support\Facades\RateLimiter::for('auth', function (\Illuminate\Http\Request $request) {
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(5)->by($request->ip()); // 5 requests per minute for auth endpoints
+        });
+
         \App\Models\User::observe(\App\Observers\UserObserver::class);
-        \App\Models\Course::observe(\App\Observers\CourseObserver::class);
-        \App\Models\Enrollment::observe(\App\Observers\EnrollmentObserver::class);
-        \App\Models\CourseReview::observe(\App\Observers\CourseReviewObserver::class);
-        \App\Models\LessonComment::observe(\App\Observers\LessonCommentObserver::class);
+
+        // Register event listeners for app notifications
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Events\AnnouncementPublished::class,
+            \App\Listeners\SendAnnouncementNotifications::class,
+        );
     }
 }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import api from '@/plugins/axios'
+import { firstFile, toFileArray, type SingleFileModel } from '@/utils/files'
 
 definePage({ meta: { requiresAdmin: true, adminOnly: true } })
 
@@ -19,26 +20,14 @@ const notify = (text: string, color: 'success' | 'error' = 'success') => {
 }
 
 const search = ref('')
-const categoryFilter = ref('')
 const publishedFilter = ref('')
-
-const categoryOptions = [
-  { title: 'خبر', value: 'news' },
-  { title: 'إعلان', value: 'announcement' },
-  { title: 'مناسبة', value: 'event' },
-  { title: 'عطاء', value: 'tender' },
-]
 
 const headers = [
   { title: 'العنوان', key: 'title' },
-  { title: 'التصنيف', key: 'category' },
   { title: 'تاريخ النشر', key: 'published_at' },
   { title: 'الحالة', key: 'is_published' },
   { title: 'إجراءات', key: 'actions', sortable: false },
 ]
-
-const getCategoryLabel = (c: string) => categoryOptions.find(o => o.value === c)?.title ?? c
-const getCategoryColor = (c: string) => ({ news: 'primary', announcement: 'info', event: 'success', tender: 'warning' }[c] || 'secondary')
 
 const fetchNews = async () => {
   loading.value = true
@@ -46,7 +35,6 @@ const fetchNews = async () => {
     const { data } = await api.get('/api/v1/admin/news', {
       params: {
         search: search.value || undefined,
-        category: categoryFilter.value || undefined,
         is_published: publishedFilter.value !== '' ? publishedFilter.value : undefined,
         page: page.value,
       },
@@ -69,25 +57,132 @@ const emptyForm = () => ({
   title: '',
   excerpt: '',
   body: '',
-  category: 'news',
-  image: null as File | null,
   imagePreview: '' as string,
   gallery: [] as File[],
+  existingGallery: [] as string[],
   video_url: '',
   external_url: '',
-  event_date: '',
-  event_location: '',
-  is_published: false,
+  publishMode: 'now' as PublishMode,
   published_at: '',
 })
+
+// حذف فوري بتأكيد — بدل نمط "علّم ثم احفظ" اللي كان يربك الأدمن (الصورة تفضل ظاهرة بعتامة لحد ما يحفظ الفورم كله)
+const removeGalleryImageDialog = ref(false)
+const removingGalleryImageUrl = ref<string | null>(null)
+
+const confirmRemoveGalleryImage = (url: string) => {
+  removingGalleryImageUrl.value = url
+  removeGalleryImageDialog.value = true
+}
+
+const removeGalleryImageConfirmed = async () => {
+  if (!removingGalleryImageUrl.value || !form.value.id) return
+  try {
+    await api.delete(`/api/v1/admin/news/${form.value.id}/gallery-image`, {
+      data: { url: removingGalleryImageUrl.value },
+    })
+    form.value.existingGallery = form.value.existingGallery.filter(u => u !== removingGalleryImageUrl.value)
+    notify('تم حذف الصورة.')
+  } catch (err: any) {
+    console.error(err)
+    notify(err?.response?.data?.message || 'تعذّر حذف الصورة', 'error')
+  } finally {
+    removeGalleryImageDialog.value = false
+    removingGalleryImageUrl.value = null
+  }
+}
 
 const formDialog = ref(false)
 const formLoading = ref(false)
 const isEditing = ref(false)
 const form = ref(emptyForm())
 
+// VFileInput v-model must be a plain ref — binding it through a computed ternary
+// (`form.image ? [form.image] : []`) silently breaks Vuetify's internal proxied
+// model and the selected file never reaches form.image. Single-file VFileInput
+// emits a bare `File` (not an array), so read it through firstFile().
+const mainImageFile = ref<SingleFileModel>(null)
+
+// حد أقصى 5 صور بالمعرض بالمجموع (موجودة + مُضافة حديثاً) — نفس القيد اللي الباك اند يتحقق منه
+const galleryTotalCount = computed(() => form.value.existingGallery.length + form.value.gallery.length)
+const galleryOverLimitMessage = computed(() =>
+  galleryTotalCount.value > 5 ? [`تجاوزت الحد الأقصى (${galleryTotalCount.value}/5) — احذف صور قبل الإضافة`] : [],
+)
+
+const MAX_IMAGE_MB = 5
+
+// معاينات الصور المُختارة حديثاً (لسه ما انرفعت) — تُبنى من كائنات File مباشرة، وتُحرَّر
+// (revokeObjectURL) عند تغيّر القائمة لمنع تسريب الذاكرة
+const newGalleryPreviews = ref<string[]>([])
+
+watch(() => form.value.gallery, files => {
+  newGalleryPreviews.value.forEach(url => URL.revokeObjectURL(url))
+  newGalleryPreviews.value = files.map(f => URL.createObjectURL(f))
+}, { immediate: true })
+
+const removeNewGalleryFile = (index: number) => {
+  form.value.gallery = form.value.gallery.filter((_, i) => i !== index)
+}
+
+/** يرفض أي ملف أكبر من الحد المسموح قبل إضافته للفورم، ويعرض السبب — بدل الانتظار لرفض الخادم بعد الرفع بالكامل */
+const rejectOversizedFiles = (files: File[]): File[] => {
+  const oversized = files.filter(f => f.size > MAX_IMAGE_MB * 1024 * 1024)
+  if (oversized.length) {
+    notify(
+      `فشل رفع ${oversized.length > 1 ? 'الصور التالية' : 'الصورة'}: ${oversized.map(f => `"${f.name}" (${(f.size / 1024 / 1024).toFixed(1)} ميجابايت)`).join('، ')} — `
+      + `يتجاوز الحد الأقصى ${MAX_IMAGE_MB} ميجابايت للصورة الواحدة.`,
+      'error',
+    )
+  }
+  return files.filter(f => f.size <= MAX_IMAGE_MB * 1024 * 1024)
+}
+
+const onGalleryFilesSelected = (files: File[]) => {
+  form.value.gallery = rejectOversizedFiles(files)
+}
+
+const onMainImageSelected = (value: SingleFileModel) => {
+  const file = firstFile(value)
+  if (file && rejectOversizedFiles([file]).length === 0) {
+    mainImageFile.value = null
+    return
+  }
+  mainImageFile.value = value
+}
+
+// طريقة النشر: مباشرة (بدون تاريخ — الخادم يعتمد وقت الحفظ) / جدولة (التاريخ مطلوب) / مسودة.
+// is_published يُرسل 1 للمباشر والمجدول معاً لأن scopePublished بالموديل يتطلبه، والجدولة
+// تعتمد على published_at لاحق.
+type PublishMode = 'now' | 'schedule' | 'draft'
+
+const publishModeOptions = [
+  { value: 'now', label: 'نشر مباشرة', icon: 'tabler-send' },
+  { value: 'schedule', label: 'جدولة', icon: 'tabler-calendar-time' },
+  { value: 'draft', label: 'مسودة', icon: 'tabler-file-pencil' },
+]
+
+// تاريخ بصيغة YYYY-MM-DD بالتوقيت المحلي (toISOString كان يرجّع تاريخ UTC — غلط بعد منتصف الليل)
+const localDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const todayStr = () => localDateStr(new Date())
+const yesterdayStr = () => localDateStr(new Date(Date.now() - 24 * 60 * 60 * 1000))
+
+// أقل تاريخ مسموح: اليوم عند الإنشاء، وأمس (اليوم - 1) عند التعديل — نفس قيود الباك اند
+const minPublishDate = computed(() => (isEditing.value ? yesterdayStr() : todayStr()))
+
+// حالة الخبر عند فتحه للتعديل — لتحديد شو لازم ينبعت للخادم عند الحفظ
+const originalPublishMode = ref<PublishMode>('now')
+const originalPublishedAt = ref('')
+
+// حقل التاريخ يظهر فقط بالجدولة، أو بتعديل خبر منشور (لتصحيح تاريخه، مثلاً لأمس)
+const showPublishDate = computed(() =>
+  form.value.publishMode === 'schedule' || (isEditing.value && form.value.publishMode === 'now'),
+)
+
 const openCreate = () => {
   form.value = emptyForm()
+  originalPublishMode.value = 'now'
+  originalPublishedAt.value = ''
+  mainImageFile.value = null
   isEditing.value = false
   formDialog.value = true
 }
@@ -98,24 +193,52 @@ const openEdit = (item: any) => {
     title: item.title,
     excerpt: item.excerpt ?? '',
     body: item.body ?? '',
-    category: item.category,
-    image: null,
     imagePreview: item.image ?? '',
     gallery: [],
+    existingGallery: item.gallery ?? [],
     video_url: item.video_url ?? '',
     external_url: item.external_url ?? '',
-    event_date: item.event_date ? item.event_date.substring(0, 16) : '',
-    event_location: item.event_location ?? '',
-    is_published: !!item.is_published,
+    publishMode: !item.is_published
+      ? 'draft'
+      : (item.published_at && new Date(item.published_at) > new Date() ? 'schedule' : 'now'),
     published_at: item.published_at ? item.published_at.substring(0, 10) : '',
   }
+  originalPublishMode.value = form.value.publishMode
+  originalPublishedAt.value = form.value.published_at
+  mainImageFile.value = null
   isEditing.value = true
   formDialog.value = true
+}
+
+// ── View details (read-only) ───────────────────────
+const viewDialog = ref(false)
+const viewingItem = ref<any>(null)
+
+const openView = (item: any) => {
+  viewingItem.value = item
+  viewDialog.value = true
 }
 
 const saveNews = async () => {
   if (!form.value.title || !form.value.body) {
     notify('العنوان والمحتوى مطلوبان', 'error')
+    return
+  }
+  const mode = form.value.publishMode
+  if (mode === 'schedule' && !form.value.published_at) {
+    notify('حدد تاريخ النشر للخبر المجدول', 'error')
+
+    return
+  }
+  if (showPublishDate.value && form.value.published_at
+    && form.value.published_at !== originalPublishedAt.value
+    && form.value.published_at < minPublishDate.value) {
+    notify(isEditing.value ? 'يجب أن يكون تاريخ النشر أمس أو بعده' : 'يجب أن يكون تاريخ النشر اليوم أو بعده', 'error')
+
+    return
+  }
+  if (galleryTotalCount.value > 5) {
+    notify('تجاوزت الحد الأقصى لصور المعرض (5 صور)', 'error')
     return
   }
   formLoading.value = true
@@ -124,16 +247,22 @@ const saveNews = async () => {
     fd.append('title', form.value.title)
     fd.append('excerpt', form.value.excerpt)
     fd.append('body', form.value.body)
-    fd.append('category', form.value.category)
-    fd.append('is_published', form.value.is_published ? '1' : '0')
+    fd.append('is_published', mode === 'draft' ? '0' : '1')
     if (form.value.video_url) fd.append('video_url', form.value.video_url)
     if (form.value.external_url) fd.append('external_url', form.value.external_url)
-    if (form.value.published_at) fd.append('published_at', form.value.published_at)
-    if (form.value.category === 'event') {
-      if (form.value.event_date) fd.append('event_date', form.value.event_date)
-      if (form.value.event_location) fd.append('event_location', form.value.event_location)
+    const dateChanged = form.value.published_at !== originalPublishedAt.value
+    if (mode === 'schedule') {
+      fd.append('published_at', form.value.published_at)
     }
-    if (form.value.image) fd.append('image', form.value.image)
+    else if (mode === 'now' && isEditing.value) {
+      // تاريخ معدّل يدوياً يُرسل كما هو؛ غير هيك خبر كان مسودة/مجدول يصير منشور من هلأ
+      if (form.value.published_at && dateChanged)
+        fd.append('published_at', form.value.published_at)
+      else if (originalPublishMode.value !== 'now')
+        fd.append('publish_now', '1')
+    }
+    const mainImage = firstFile(mainImageFile.value)
+    if (mainImage) fd.append('image', mainImage)
     form.value.gallery.forEach(f => fd.append('gallery[]', f))
 
     if (isEditing.value) {
@@ -148,7 +277,11 @@ const saveNews = async () => {
     fetchNews()
   } catch (err: any) {
     console.error(err)
-    notify(err?.response?.data?.message || 'تعذّر حفظ الخبر', 'error')
+    // الخادم يرجّع رسالة عامة بـmessage ("البيانات المدخلة غير صحيحة") وتفاصيل السبب الفعلي
+    // (حجم صورة، تاريخ نشر...) بمفتاح errors — عرض message وحدها كان يُخفي السبب عن الأدمن
+    const fieldErrors = err?.response?.data?.errors
+    const reason = fieldErrors ? Object.values(fieldErrors).flat().join(' — ') : null
+    notify(reason || err?.response?.data?.message || 'تعذّر حفظ الخبر', 'error')
   } finally {
     formLoading.value = false
   }
@@ -181,11 +314,11 @@ const deleteNews = async () => {
   <div>
     <div class="d-flex justify-space-between align-center mb-6">
       <div>
-        <h1 class="text-h4 font-weight-bold" style="font-family:Cairo,sans-serif">الأخبار والمناسبات</h1>
-        <p class="text-body-2 text-medium-emphasis mb-0" style="font-family:Cairo,sans-serif">إدارة أخبار وإعلانات ومناسبات الاتحاد المنشورة على الموقع</p>
+        <h1 class="text-h4 font-weight-bold" style="font-family:Cairo,sans-serif">الأخبار</h1>
+        <p class="text-body-2 text-medium-emphasis mb-0" style="font-family:Cairo,sans-serif">إدارة أخبار وإعلانات وعطاءات الاتحاد المنشورة على الموقع</p>
       </div>
       <VBtn color="primary" prepend-icon="tabler-plus" @click="openCreate">
-        خبر / مناسبة جديدة
+        خبر جديد
       </VBtn>
     </div>
 
@@ -197,15 +330,6 @@ const deleteNews = async () => {
           prepend-inner-icon="tabler-search"
           density="compact"
           style="max-width:280px"
-          @update:model-value="page = 1"
-        />
-        <VSelect
-          v-model="categoryFilter"
-          :items="[{ title: 'كل التصنيفات', value: '' }, ...categoryOptions]"
-          label="التصنيف"
-          density="compact"
-          clearable
-          style="max-width:180px"
           @update:model-value="page = 1"
         />
         <VSelect
@@ -236,12 +360,6 @@ const deleteNews = async () => {
           </div>
         </template>
 
-        <template #item.category="{ item }">
-          <VChip :color="getCategoryColor(item.category)" size="small" label style="font-family:Cairo,sans-serif">
-            {{ getCategoryLabel(item.category) }}
-          </VChip>
-        </template>
-
         <template #item.published_at="{ item }">
           {{ item.published_at ? new Date(item.published_at).toLocaleDateString('ar-PS') : '—' }}
         </template>
@@ -254,6 +372,10 @@ const deleteNews = async () => {
 
         <template #item.actions="{ item }">
           <div class="d-flex align-center gap-1">
+            <VBtn icon size="small" variant="text" color="info" @click="openView(item)">
+              <VIcon icon="tabler-eye" />
+              <VTooltip activator="parent">عرض التفاصيل</VTooltip>
+            </VBtn>
             <VBtn icon size="small" variant="text" color="primary" @click="openEdit(item)">
               <VIcon icon="tabler-pencil" />
               <VTooltip activator="parent">تعديل</VTooltip>
@@ -266,7 +388,7 @@ const deleteNews = async () => {
         </template>
 
         <template #no-data>
-          <div class="text-center pa-6 text-medium-emphasis" style="font-family:Cairo,sans-serif">لا توجد أخبار أو مناسبات بعد</div>
+          <div class="text-center pa-6 text-medium-emphasis" style="font-family:Cairo,sans-serif">لا توجد أخبار بعد</div>
         </template>
       </VDataTableServer>
     </VCard>
@@ -274,19 +396,11 @@ const deleteNews = async () => {
     <!-- Create/Edit Dialog -->
     <VDialog v-model="formDialog" max-width="680" scrollable>
       <VCard>
-        <VCardTitle style="font-family:Cairo,sans-serif">{{ isEditing ? 'تعديل الخبر' : 'خبر / مناسبة جديدة' }}</VCardTitle>
+        <VCardTitle style="font-family:Cairo,sans-serif">{{ isEditing ? 'تعديل الخبر' : 'خبر جديد' }}</VCardTitle>
         <VCardText>
           <VRow>
-            <VCol cols="12" md="8">
+            <VCol cols="12">
               <VTextField v-model="form.title" label="العنوان" style="font-family:Cairo,sans-serif" />
-            </VCol>
-            <VCol cols="12" md="4">
-              <VSelect
-                v-model="form.category"
-                :items="categoryOptions"
-                label="التصنيف"
-                style="font-family:Cairo,sans-serif"
-              />
             </VCol>
             <VCol cols="12">
               <VTextarea v-model="form.excerpt" label="مقتطف مختصر (يظهر في القائمة)" rows="2" style="font-family:Cairo,sans-serif" />
@@ -297,27 +411,92 @@ const deleteNews = async () => {
             </VCol>
 
             <VCol cols="12" md="6">
+              <div v-if="form.imagePreview && !mainImageFile" class="d-flex align-center gap-2 mb-2">
+                <VImg :src="form.imagePreview" width="48" height="48" cover rounded />
+                <span class="text-caption text-medium-emphasis" style="font-family:Cairo,sans-serif">الصورة الحالية — اختر صورة جديدة لاستبدالها</span>
+              </div>
               <VFileInput
                 label="الصورة الرئيسية"
                 prepend-inner-icon="tabler-photo"
                 prepend-icon=""
                 accept="image/*"
+                :hint="`الحد الأقصى ${MAX_IMAGE_MB} ميجابايت`"
+                persistent-hint
                 style="font-family:Cairo,sans-serif"
-                :model-value="form.image ? [form.image] : []"
-                @update:model-value="form.image = $event?.[0] ?? null"
+                :model-value="mainImageFile"
+                @update:model-value="onMainImageSelected"
               />
             </VCol>
             <VCol cols="12" md="6">
               <VFileInput
-                label="معرض صور إضافي"
+                label="إضافة صور للمعرض (الحد الأقصى 5 صور بالمجموع)"
                 prepend-inner-icon="tabler-photo-plus"
                 prepend-icon=""
                 accept="image/*"
                 multiple
+                :error-messages="galleryOverLimitMessage"
+                :hint="`يمكن اختيار كل الصور دفعة واحدة — الحد الأقصى ${MAX_IMAGE_MB} ميجابايت لكل صورة`"
+                persistent-hint
                 style="font-family:Cairo,sans-serif"
                 :model-value="form.gallery"
-                @update:model-value="form.gallery = $event ?? []"
+                @update:model-value="onGalleryFilesSelected(toFileArray($event))"
               />
+            </VCol>
+
+            <VCol v-if="newGalleryPreviews.length" cols="12">
+              <label class="text-body-2 font-weight-medium mb-2 d-block" style="font-family:Cairo,sans-serif">
+                معاينة الصور المُختارة (لم تُنشر بعد — اضغط زر ✕ الأحمر فوق الصورة لإزالتها)
+              </label>
+              <div class="d-flex flex-wrap gap-3">
+                <div
+                  v-for="(url, index) in newGalleryPreviews"
+                  :key="url"
+                  class="position-relative"
+                  style="width:96px;height:96px"
+                >
+                  <VImg :src="url" width="96" height="96" cover rounded class="border" />
+                  <VBtn
+                    icon
+                    size="x-small"
+                    color="error"
+                    variant="elevated"
+                    class="gallery-remove-btn"
+                    aria-label="حذف الصورة"
+                    @click="removeNewGalleryFile(index)"
+                  >
+                    <VIcon icon="tabler-x" size="16" />
+                    <VTooltip activator="parent" location="top">حذف الصورة</VTooltip>
+                  </VBtn>
+                </div>
+              </div>
+            </VCol>
+
+            <VCol v-if="form.existingGallery.length" cols="12">
+              <label class="text-body-2 font-weight-medium mb-2 d-block" style="font-family:Cairo,sans-serif">
+                صور المعرض الحالية (اضغط زر ✕ الأحمر فوق الصورة لحذفها نهائياً)
+              </label>
+              <div class="d-flex flex-wrap gap-3">
+                <div
+                  v-for="url in form.existingGallery"
+                  :key="url"
+                  class="position-relative"
+                  style="width:96px;height:96px"
+                >
+                  <VImg :src="url" width="96" height="96" cover rounded class="border" />
+                  <VBtn
+                    icon
+                    size="x-small"
+                    color="error"
+                    variant="elevated"
+                    class="gallery-remove-btn"
+                    aria-label="حذف الصورة"
+                    @click="confirmRemoveGalleryImage(url)"
+                  >
+                    <VIcon icon="tabler-x" size="16" />
+                    <VTooltip activator="parent" location="top">حذف الصورة</VTooltip>
+                  </VBtn>
+                </div>
+              </div>
             </VCol>
 
             <VCol cols="12" md="6">
@@ -327,27 +506,97 @@ const deleteNews = async () => {
               <VTextField v-model="form.external_url" label="رابط خارجي (اختياري)" prepend-inner-icon="tabler-external-link" dir="ltr" />
             </VCol>
 
-            <template v-if="form.category === 'event'">
-              <VCol cols="12" md="6">
-                <VTextField v-model="form.event_date" label="موعد المناسبة" type="datetime-local" style="font-family:Cairo,sans-serif" />
-              </VCol>
-              <VCol cols="12" md="6">
-                <VTextField v-model="form.event_location" label="مكان المناسبة" prepend-inner-icon="tabler-map-pin" style="font-family:Cairo,sans-serif" />
-              </VCol>
-            </template>
-
             <VCol cols="12" md="6">
-              <VTextField v-model="form.published_at" label="تاريخ النشر (اختياري — الآن افتراضياً)" type="date" style="font-family:Cairo,sans-serif" />
+              <label class="text-body-2 font-weight-medium mb-2 d-block" style="font-family:Cairo,sans-serif">طريقة النشر</label>
+              <VBtnToggle
+                v-model="form.publishMode"
+                mandatory
+                color="primary"
+                variant="outlined"
+                divided
+                density="comfortable"
+                style="font-family:Cairo,sans-serif"
+              >
+                <VBtn v-for="opt in publishModeOptions" :key="opt.value" :value="opt.value" :prepend-icon="opt.icon">
+                  {{ opt.label }}
+                </VBtn>
+              </VBtnToggle>
             </VCol>
-            <VCol cols="12" md="6" class="d-flex align-center">
-              <VSwitch v-model="form.is_published" label="نشر مباشرة" color="success" style="font-family:Cairo,sans-serif" />
+            <VCol v-if="showPublishDate" cols="12" md="6">
+              <VTextField
+                v-model="form.published_at"
+                :label="form.publishMode === 'schedule' ? 'تاريخ النشر المجدول' : 'تاريخ النشر'"
+                type="date"
+                :min="minPublishDate"
+                :hint="isEditing ? 'يمكن اختيار تاريخ أمس أو أي تاريخ بعده' : undefined"
+                persistent-hint
+                style="font-family:Cairo,sans-serif"
+              />
             </VCol>
           </VRow>
         </VCardText>
         <VCardActions>
           <VSpacer />
           <VBtn variant="tonal" @click="formDialog = false">إلغاء</VBtn>
-          <VBtn color="primary" :loading="formLoading" @click="saveNews">{{ isEditing ? 'حفظ التعديلات' : 'نشر' }}</VBtn>
+          <VBtn color="primary" :loading="formLoading" :disabled="galleryTotalCount > 5" @click="saveNews">{{ isEditing ? 'حفظ التعديلات' : 'نشر' }}</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- View Details Dialog -->
+    <VDialog v-model="viewDialog" max-width="680" scrollable>
+      <VCard v-if="viewingItem">
+        <VCardTitle class="d-flex align-center justify-space-between" style="font-family:Cairo,sans-serif">
+          <span>{{ viewingItem.title }}</span>
+          <VChip :color="viewingItem.is_published ? 'success' : 'secondary'" size="small" label>
+            {{ viewingItem.is_published ? 'منشور' : 'مسودة' }}
+          </VChip>
+        </VCardTitle>
+        <VCardText>
+          <VImg v-if="viewingItem.image" :src="viewingItem.image" max-height="280" class="mb-4 rounded" cover />
+
+          <p v-if="viewingItem.excerpt" class="text-body-1 font-weight-medium mb-4" style="font-family:Cairo,sans-serif">
+            {{ viewingItem.excerpt }}
+          </p>
+
+          <div class="text-body-2 mb-4" style="font-family:Cairo,sans-serif" v-html="viewingItem.body" />
+
+          <div v-if="viewingItem.gallery?.length" class="mb-4">
+            <label class="text-body-2 font-weight-medium mb-2 d-block" style="font-family:Cairo,sans-serif">صور المعرض</label>
+            <div class="d-flex flex-wrap gap-3">
+              <VImg
+                v-for="url in (viewingItem.gallery ?? [])"
+                :key="url"
+                :src="url"
+                width="90"
+                height="90"
+                cover
+                rounded
+              />
+            </div>
+          </div>
+
+          <VDivider class="mb-4" />
+
+          <VRow dense>
+            <VCol v-if="viewingItem.video_url" cols="12" md="6">
+              <span class="text-caption text-medium-emphasis d-block">رابط فيديو يوتيوب</span>
+              <a :href="viewingItem.video_url" target="_blank" dir="ltr">{{ viewingItem.video_url }}</a>
+            </VCol>
+            <VCol v-if="viewingItem.external_url" cols="12" md="6">
+              <span class="text-caption text-medium-emphasis d-block">رابط خارجي</span>
+              <a :href="viewingItem.external_url" target="_blank" dir="ltr">{{ viewingItem.external_url }}</a>
+            </VCol>
+            <VCol cols="12" md="6">
+              <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">تاريخ النشر</span>
+              <span style="font-family:Cairo,sans-serif">{{ viewingItem.published_at ? new Date(viewingItem.published_at).toLocaleDateString('ar-PS') : '—' }}</span>
+            </VCol>
+          </VRow>
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" color="primary" @click="viewDialog = false; openEdit(viewingItem)">تعديل</VBtn>
+          <VBtn variant="tonal" @click="viewDialog = false">إغلاق</VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
@@ -370,6 +619,24 @@ const deleteNews = async () => {
       </VCard>
     </VDialog>
 
+    <!-- Gallery Image Delete Confirm Dialog -->
+    <VDialog v-model="removeGalleryImageDialog" max-width="400">
+      <VCard>
+        <VCardTitle class="d-flex align-center gap-2" style="font-family:Cairo,sans-serif">
+          <VIcon icon="tabler-alert-triangle" color="error" />
+          تأكيد حذف الصورة
+        </VCardTitle>
+        <VCardText style="font-family:Cairo,sans-serif">
+          هل أنت متأكد من حذف هذه الصورة من المعرض؟ لا يمكن التراجع عن هذا الإجراء.
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" @click="removeGalleryImageDialog = false">إلغاء</VBtn>
+          <VBtn color="error" @click="removeGalleryImageConfirmed">حذف</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
     <!-- Feedback Snackbar -->
     <VSnackbar v-model="snackbar" :timeout="3500" :color="snackbarColor" location="bottom end" variant="elevated">
       <span style="font-family:Cairo,sans-serif">{{ snackbarText }}</span>
@@ -379,3 +646,12 @@ const deleteNews = async () => {
     </VSnackbar>
   </div>
 </template>
+
+<style scoped>
+.gallery-remove-btn {
+  position: absolute;
+  top: -8px;
+  inset-inline-end: -8px;
+  z-index: 1;
+}
+</style>

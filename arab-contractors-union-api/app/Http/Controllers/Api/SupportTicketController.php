@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Notifications\SupportTicketContractorRepliedNotification;
 use App\Notifications\SupportTicketCreatedNotification;
 use App\Notifications\SupportTicketRepliedNotification;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -26,6 +27,7 @@ class SupportTicketController extends Controller
             'contractor_id'  => $t->contractor_id,
             'contractor'     => $t->contractor?->name,
             'subject'        => $t->subject,
+            'whatsapp_phone' => $t->whatsapp_phone,
             'category'       => $t->category,
             'category_label' => $t->category_label,
             'message'        => $t->message,
@@ -62,6 +64,7 @@ class SupportTicketController extends Controller
         return [
             'id'             => $t->id,
             'subject'        => $t->subject,
+            'whatsapp_phone' => $t->whatsapp_phone,
             'category'       => $t->category,
             'category_label' => $t->category_label,
             'status'         => $t->status,
@@ -101,10 +104,11 @@ class SupportTicketController extends Controller
         $contractor = $request->user();
 
         $data = $request->validate([
-            'subject'    => 'required|string|max:255',
-            'category'   => 'required|in:technical,complaint,inquiry,suggestion,other',
-            'message'    => 'required|string|max:5000',
-            'attachment' => 'nullable|file|mimes:png,jpg,jpeg,webp,pdf|max:5120',
+            'subject'        => 'required|string|max:255',
+            'whatsapp_phone' => 'required|string|max:20',
+            'category'       => 'required|in:technical,complaint,inquiry,suggestion,other',
+            'message'        => 'required|string|max:5000',
+            'attachment'     => 'nullable|file|mimes:png,jpg,jpeg,webp,pdf|max:5120',
         ]);
 
         if ($request->hasFile('attachment')) {
@@ -112,12 +116,13 @@ class SupportTicketController extends Controller
         }
 
         $ticket = SupportTicket::create([
-            'contractor_id' => $contractor->id,
-            'subject'       => $data['subject'],
-            'category'      => $data['category'],
-            'message'       => $data['message'],
-            'attachment'    => $data['attachment'] ?? null,
-            'status'        => 'open',
+            'contractor_id'   => $contractor->id,
+            'subject'         => $data['subject'],
+            'whatsapp_phone'  => $data['whatsapp_phone'],
+            'category'        => $data['category'],
+            'message'         => $data['message'],
+            'attachment'      => $data['attachment'] ?? null,
+            'status'          => 'open',
         ]);
 
         // إشعار الإدارة بوجود طلب دعم جديد
@@ -239,6 +244,8 @@ class SupportTicketController extends Controller
             }
         }
 
+        AuditLogService::record(Auth::user(), 'support_ticket.replied', $ticket);
+
         return $this->success(
             $this->format($ticket->fresh(['contractor:id,name', 'repliedBy:id,name', 'messages'])),
             'تم إرسال الرد بنجاح.',
@@ -301,7 +308,11 @@ class SupportTicketController extends Controller
             'status' => 'required|in:open,in_progress,answered,closed',
         ]);
 
+        $oldStatus = $ticket->getOriginal('status');
+
         $ticket->update(['status' => $data['status']]);
+
+        AuditLogService::record(Auth::user(), 'support_ticket.status_changed', $ticket, ['old_status' => $oldStatus, 'new_status' => $data['status']]);
 
         return $this->success($this->format($ticket), 'تم تحديث حالة الطلب.');
     }
@@ -309,6 +320,8 @@ class SupportTicketController extends Controller
     /** DELETE /api/v1/dashboard/support-tickets/{ticket} */
     public function destroy(SupportTicket $ticket)
     {
+        AuditLogService::record(Auth::user(), 'support_ticket.deleted', $ticket);
+
         $ticket->delete();
 
         return $this->success(message: 'تم حذف الطلب.');

@@ -3,12 +3,23 @@ import { ref, shallowRef } from 'vue'
 import api from '@/plugins/axios'
 
 export const useDashboardStore = defineStore('dashboard', () => {
+  const emptyChanges = () => ({
+    total_contractors: 0,
+    active_memberships: 0,
+    pending_requests: 0,
+    total_revenue: 0,
+    expiring_soon: 0,
+    app_users: 0,
+  })
+
   const stats = ref({
     total_contractors: 0,
     active_memberships: 0,
     pending_requests: 0,
     total_revenue: 0,
     expiring_soon: 0,
+    app_users: 0,
+    changes: emptyChanges(),
   })
 
   const latestContractors = shallowRef<any[]>([])
@@ -28,15 +39,11 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
     try {
       const response = await api.get('/api/v1/dashboard/stats')
-      const data = response?.data || {}
+      const data = response?.data?.items || {}
 
-      stats.value = data?.stats || {
-        total_contractors: 0,
-        active_memberships: 0,
-        pending_requests: 0,
-        total_revenue: 0,
-        expiring_soon: 0,
-          }
+      stats.value = data?.stats
+        ? { ...data.stats, changes: { ...emptyChanges(), ...(data.stats.changes || {}) } }
+        : { total_contractors: 0, active_memberships: 0, pending_requests: 0, total_revenue: 0, expiring_soon: 0, app_users: 0, changes: emptyChanges() }
 
       latestContractors.value = data?.latestContractors?.length ? data.latestContractors : []
       latestPayments.value = data?.latestPayments?.length ? data.latestPayments : []
@@ -48,7 +55,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
       error.value = err?.message || 'Failed to fetch dashboard data'
       console.error('Error fetching dashboard data:', err)
 
-      stats.value = { total_contractors: 0, active_memberships: 0, pending_requests: 0, total_revenue: 0, expiring_soon: 0 }
+      stats.value = { total_contractors: 0, active_memberships: 0, pending_requests: 0, total_revenue: 0, expiring_soon: 0, app_users: 0, changes: emptyChanges() }
       latestContractors.value = []
       latestPayments.value = []
       revenueChart.value = []

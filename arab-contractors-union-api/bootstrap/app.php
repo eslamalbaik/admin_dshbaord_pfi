@@ -11,9 +11,19 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    // Channel auth route lives under /api/broadcasting/auth, guarded the same way as the
+    // rest of the API (auth:sanctum) — the default "web"-middleware route relies on session
+    // auth, which doesn't apply here since the frontend authenticates with a bearer token.
+    ->withBroadcasting(
+        channels: __DIR__.'/../routes/channels.php',
+        attributes: ['prefix' => 'api', 'middleware' => ['api', 'auth:sanctum']],
+    )
     ->withMiddleware(function (Middleware $middleware): void {
         // API-only app — never redirect unauthenticated requests, always return 401 JSON
         $middleware->redirectGuestsTo(fn() => null);
+
+        // Security headers for all responses
+        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
 
         $middleware->validateCsrfTokens(except: [
             'login',
@@ -33,6 +43,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('api', [
             \App\Http\Middleware\NoCacheHeaders::class,
             \App\Http\Middleware\SetLocale::class,
+            // يجب أن يسبق التحقق: الطلب الذي أسقط PHP جسمه يصل فارغاً، فيُفشله
+            // التحقق بـ"الحقل مطلوب" على حقول مملوءة ويُخفي السبب الحقيقي (TASK-16 #3).
+            \App\Http\Middleware\DetectDiscardedRequestBody::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

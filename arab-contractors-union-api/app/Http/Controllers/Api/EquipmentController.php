@@ -6,11 +6,21 @@ use App\Http\Controllers\Controller;
 use App\Models\Equipment;
 use App\Models\EquipmentBlockedDate;
 use App\Models\EquipmentImage;
+use App\Models\EquipmentReservation;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 
 class EquipmentController extends Controller
 {
+    /** حدود صور إعلان الآلية — 5 صور كحد أقصى، 5 ميجابايت لكل صورة (نفس حد ContractorEquipmentController). */
+    private const MAX_IMAGES   = 5;
+    private const MAX_IMAGE_KB = 5120;
+
+    /** حد وصف الحالة الفنية للآلية بالحروف. */
+    private const DESCRIPTION_MAX_LENGTH = 250;
+
     // GET /api/equipment
     public function index(Request $request)
     {
@@ -34,6 +44,10 @@ class EquipmentController extends Controller
 
         if ($request->filled('governorate')) {
             $query->where('governorate', $request->governorate);
+        }
+
+        if ($request->filled('contract_type')) {
+            $query->where('contract_type', $request->contract_type);
         }
 
         if ($request->filled('contractor_id')) {
@@ -63,18 +77,24 @@ class EquipmentController extends Controller
             'contractor_id'     => 'required|exists:contractors,id',
             'equipment_type_id' => 'required|exists:equipment_types,id',
             'name'              => 'required|string|max:255',
-            'description'       => 'nullable|string',
+            'brand'             => 'nullable|string|max:100',
+            'description'       => 'nullable|string|max:' . self::DESCRIPTION_MAX_LENGTH,
             'manufacture_year'  => 'nullable|integer|min:1970|max:' . date('Y'),
             'power'             => 'nullable|string|max:50',
-            'condition'         => 'nullable|in:excellent,good,fair',
+            'condition'         => 'nullable|in:excellent,good,needs_maintenance',
+            'contract_type'     => 'nullable|in:daily,weekly,monthly',
             'governorate'       => 'nullable|string|max:100',
             'city'              => 'nullable|string|max:100',
-            'daily_price'       => 'required|numeric|min:0',
             'owner_phone'       => 'nullable|string|max:20',
             'status'            => 'nullable|in:visible,hidden,suspended',
+            'is_featured'       => 'nullable|boolean',
+            'needs_maintenance' => 'nullable|boolean',
             'admin_notes'       => 'nullable|string',
-            'images'            => 'nullable|array|max:8',
-            'images.*'          => 'image|mimes:jpg,jpeg,png,webp|max:3072',
+            'images'            => 'nullable|array|max:' . self::MAX_IMAGES,
+            'images.*'          => 'image|mimes:jpg,jpeg,png,webp|max:' . self::MAX_IMAGE_KB,
+        ], [
+            'images.max'   => 'الحد الأقصى ' . self::MAX_IMAGES . ' صور لكل آلية.',
+            'images.*.max' => 'حجم الصورة يتجاوز الحد الأقصى ' . (self::MAX_IMAGE_KB / 1024) . ' ميجابايت.',
         ]);
 
         $images = $request->file('images', []);
@@ -91,6 +111,8 @@ class EquipmentController extends Controller
                 'sort_order'   => $index,
             ]);
         }
+
+        AuditLogService::record(Auth::user(), 'equipment.created', $equipment, ['name' => $equipment->name]);
 
         return response()->json($equipment->load(['type', 'contractor', 'images']), 201);
     }
@@ -110,19 +132,24 @@ class EquipmentController extends Controller
             'contractor_id'     => 'sometimes|exists:contractors,id',
             'equipment_type_id' => 'sometimes|exists:equipment_types,id',
             'name'              => 'sometimes|string|max:255',
-            'description'       => 'nullable|string',
+            'brand'             => 'nullable|string|max:100',
+            'description'       => 'nullable|string|max:' . self::DESCRIPTION_MAX_LENGTH,
             'manufacture_year'  => 'nullable|integer|min:1970|max:' . date('Y'),
             'power'             => 'nullable|string|max:50',
-            'condition'         => 'nullable|in:excellent,good,fair',
+            'condition'         => 'nullable|in:excellent,good,needs_maintenance',
+            'contract_type'     => 'nullable|in:daily,weekly,monthly',
             'governorate'       => 'nullable|string|max:100',
             'city'              => 'nullable|string|max:100',
-            'daily_price'       => 'sometimes|numeric|min:0',
             'owner_phone'       => 'nullable|string|max:20',
             'status'            => 'nullable|in:visible,hidden,suspended',
+            'is_featured'       => 'nullable|boolean',
+            'needs_maintenance' => 'nullable|boolean',
             'admin_notes'       => 'nullable|string',
         ]);
 
         $equipment->update($validated);
+
+        AuditLogService::record(Auth::user(), 'equipment.updated', $equipment, ['name' => $equipment->name]);
 
         return response()->json($equipment->load(['type', 'contractor', 'images']));
     }
@@ -130,10 +157,19 @@ class EquipmentController extends Controller
     // DELETE /api/equipment/{equipment}
     public function destroy(Equipment $equipment)
     {
+        // ممنوع حذف آلية بحاجة صيانة (REQ-08 #2) — أزل الحالة أولاً إذا الحذف مقصود فعلاً
+        if ($equipment->needs_maintenance) {
+            return response()->json([
+                'message' => 'لا يمكن حذف آلية بحاجة صيانة — أزل حالة "بحاجة صيانة" أولاً إن كنت تريد الحذف.',
+            ], 422);
+        }
+
         // delete stored images from disk
         foreach ($equipment->images as $img) {
             Storage::disk('public')->delete($img->path);
         }
+
+        AuditLogService::record(Auth::user(), 'equipment.deleted', $equipment, ['name' => $equipment->name]);
 
         $equipment->delete();
 
@@ -144,9 +180,22 @@ class EquipmentController extends Controller
     public function uploadImages(Request $request, Equipment $equipment)
     {
         $request->validate([
-            'images'   => 'required|array|min:1|max:8',
-            'images.*' => 'image|mimes:jpg,jpeg,png,webp|max:3072',
+            'images'   => 'required|array|min:1',
+            'images.*' => 'image|mimes:jpg,jpeg,png,webp|max:' . self::MAX_IMAGE_KB,
+        ], [
+            'images.*.max' => 'حجم الصورة يتجاوز الحد الأقصى ' . (self::MAX_IMAGE_KB / 1024) . ' ميجابايت.',
         ]);
+
+        // الحد 5 صور إجمالي (موجودة + جديدة)، لا الدفعة المرفوعة فقط — كانت الدفعة تُفحص لوحدها
+        // مما سمح بتجاوز الحد الفعلي عبر رفعات متتالية
+        $existingCount = $equipment->images()->count();
+        $newCount      = count($request->file('images'));
+
+        if ($existingCount + $newCount > self::MAX_IMAGES) {
+            return response()->json([
+                'message' => 'الحد الأقصى ' . self::MAX_IMAGES . " صور لكل آلية. لديها حالياً {$existingCount} صورة، ولا يمكن إضافة {$newCount} أخرى.",
+            ], 422);
+        }
 
         $lastOrder = $equipment->images()->max('sort_order') ?? -1;
         $hasPrimary = $equipment->images()->where('is_primary', true)->exists();
@@ -209,6 +258,18 @@ class EquipmentController extends Controller
         $dates = $equipment->blockedDates()->orderBy('blocked_date')->get();
 
         return response()->json($dates);
+    }
+
+    // GET /api/equipment/{equipment}/reservations — حجوزات فعلية طلبها مقاولون عبر التطبيق
+    // (REQ-08 #6)، للعرض فقط بجانب أداة الحجب اليدوي (blocked-dates) أعلاه
+    public function reservations(Equipment $equipment)
+    {
+        $reservations = $equipment->reservations()
+            ->with('contractor:id,name,phone')
+            ->orderByDesc('start_date')
+            ->get();
+
+        return response()->json($reservations);
     }
 
     // POST /api/equipment/{equipment}/blocked-dates

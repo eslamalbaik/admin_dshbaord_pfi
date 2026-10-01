@@ -4,6 +4,16 @@ import api from '@/plugins/axios'
 definePage({ meta: { requiresAdmin: true,
     adminOnly: true } })
 
+// ─── Snackbar ──────────────────────────────────────
+const snackbar = ref(false)
+const snackbarText = ref('')
+const snackbarColor = ref<'success' | 'error' | 'warning'>('success')
+const notify = (text: string, color: 'success' | 'error' | 'warning' = 'success') => {
+  snackbarText.value = text
+  snackbarColor.value = color
+  snackbar.value = true
+}
+
 // ─── State ──────────────────────────────────────────────────────────────────
 const equipment   = ref<any[]>([])
 const types       = ref<any[]>([])
@@ -17,32 +27,27 @@ const search   = ref('')
 const filterType   = ref('')
 const filterStatus = ref('')
 const filterGov    = ref('')
+const filterContractType = ref('')
 
 // ─── Dialogs ────────────────────────────────────────────────────────────────
 const editDialog    = ref(false)
 const deleteDialog  = ref(false)
 const imagesDialog  = ref(false)
-const calendarDialog = ref(false)
 const selectedItem  = ref<any>(null)
 const saving        = ref(false)
 const deleting      = ref(false)
 
 const editForm = ref({
-  name: '', description: '', manufacture_year: null as number | null,
-  power: '', condition: 'good', governorate: '', city: '',
-  daily_price: 0, owner_phone: '', status: 'visible', admin_notes: '',
+  equipment_type_id: null as number | null,
+  name: '', brand: '', description: '', manufacture_year: null as number | null,
+  power: '', condition: 'good', contract_type: 'daily', governorate: '', city: '',
+  owner_phone: '', status: 'visible', is_featured: false, needs_maintenance: false, admin_notes: '',
 })
 
 // image management
 const imageUploading = ref(false)
 const imageFiles     = ref<File[]>([])
 const equipImages    = ref<any[]>([])
-
-// calendar (blocked dates)
-const blockedDates   = ref<any[]>([])
-const calLoading     = ref(false)
-const newDates       = ref<string[]>([])
-const dateReason     = ref('booked')
 
 // ─── Options ────────────────────────────────────────────────────────────────
 const statusOptions = [
@@ -55,7 +60,7 @@ const statusOptions = [
 const conditionOptions = [
   { title: 'ممتازة', value: 'excellent' },
   { title: 'جيدة', value: 'good' },
-  { title: 'مقبولة', value: 'fair' },
+  { title: 'بحاجة صيانة', value: 'needs_maintenance' },
 ]
 
 const statusMeta: Record<string, { color: string; label: string }> = {
@@ -65,9 +70,20 @@ const statusMeta: Record<string, { color: string; label: string }> = {
 }
 
 const conditionMeta: Record<string, { color: string; label: string }> = {
-  excellent: { color: 'success', label: 'ممتازة' },
-  good:      { color: 'primary', label: 'جيدة' },
-  fair:      { color: 'warning', label: 'مقبولة' },
+  excellent:         { color: 'success', label: 'ممتازة' },
+  good:              { color: 'primary', label: 'جيدة' },
+  needs_maintenance: { color: 'warning', label: 'بحاجة صيانة' },
+}
+
+const contractTypeOptions = [
+  { title: 'الكل', value: '' },
+  { title: 'يومي', value: 'daily' },
+  { title: 'أسبوعي', value: 'weekly' },
+  { title: 'شهري', value: 'monthly' },
+]
+
+const contractTypeLabel: Record<string, string> = {
+  daily: 'يومي', weekly: 'أسبوعي', monthly: 'شهري',
 }
 
 const governorates = [
@@ -85,6 +101,7 @@ const fetchEquipment = async () => {
     if (filterType.value)   params.type_id     = filterType.value
     if (filterStatus.value) params.status      = filterStatus.value
     if (filterGov.value)    params.governorate = filterGov.value
+    if (filterContractType.value) params.contract_type = filterContractType.value
 
     const { data } = await api.get('/api/v1/equipment', { params })
     equipment.value = data.data
@@ -101,9 +118,23 @@ const fetchStats = async () => {
 }
 
 const fetchTypes = async () => {
+  // فلتر القائمة بالأعلى يحتاج كل الأنواع (بما فيها المخفية) عشان يقدر يفلتر آليات قديمة مربوطة بنوع مخفي
   const { data } = await api.get('/api/v1/equipment-types')
   types.value = data
 }
+
+// خيارات منتقي التعديل: الأنواع الظاهرة فقط (نوع مخفي ما يظهرش كخيار قابل للاختيار من جديد) —
+// مع استثناء: لو الآلية الحالية مربوطة بنوع مخفي بالفعل، يبقى ظاهراً بالقائمة عشان ما يختفيش من الفورم
+const editTypeOptions = computed(() => {
+  const active = types.value.filter((t: any) => t.is_active)
+  const currentId = editForm.value.equipment_type_id
+  if (currentId && !active.some((t: any) => t.id === currentId)) {
+    const current = types.value.find((t: any) => t.id === currentId)
+    if (current) return [...active, current]
+  }
+
+  return active
+})
 
 onMounted(() => {
   fetchTypes()
@@ -112,10 +143,19 @@ onMounted(() => {
 })
 
 // reset page on filter change
-watch([search, filterType, filterStatus, filterGov], () => {
+watch([search, filterType, filterStatus, filterGov, filterContractType], () => {
   page.value = 1
   fetchEquipment()
 })
+
+// زر إلغاء الفلاتر المحددة بالبحث (REQ-08 #9)
+const resetFilters = () => {
+  search.value = ''
+  filterType.value = ''
+  filterStatus.value = ''
+  filterGov.value = ''
+  filterContractType.value = ''
+}
 
 watch(page, fetchEquipment)
 
@@ -123,16 +163,20 @@ watch(page, fetchEquipment)
 const openEdit = (item: any) => {
   selectedItem.value = item
   editForm.value = {
+    equipment_type_id: item.equipment_type_id ?? item.type?.id ?? null,
     name:             item.name,
+    brand:            item.brand ?? '',
     description:      item.description ?? '',
     manufacture_year: item.manufacture_year ?? null,
     power:            item.power ?? '',
     condition:        item.condition ?? 'good',
+    contract_type:    item.contract_type ?? 'daily',
     governorate:      item.governorate ?? '',
     city:             item.city ?? '',
-    daily_price:      Number(item.daily_price),
     owner_phone:      item.owner_phone ?? '',
     status:           item.status ?? 'visible',
+    is_featured:      !!item.is_featured,
+    needs_maintenance: !!item.needs_maintenance,
     admin_notes:      item.admin_notes ?? '',
   }
   editDialog.value = true
@@ -193,9 +237,25 @@ const openImages = async (item: any) => {
   imagesDialog.value = true
 }
 
+const MAX_IMAGES   = 5
+const MAX_IMAGE_MB = 5
+
 const onImageFiles = (e: Event) => {
   const input = e.target as HTMLInputElement
-  imageFiles.value = input.files ? Array.from(input.files) : []
+  const files = input.files ? Array.from(input.files) : []
+
+  const tooBig = files.find(f => f.size > MAX_IMAGE_MB * 1024 * 1024)
+  if (tooBig) {
+    notify(`حجم الصورة "${tooBig.name}" (${(tooBig.size / 1024 / 1024).toFixed(1)} ميغابايت) يتجاوز الحد الأقصى ${MAX_IMAGE_MB} ميغابايت — فشل رفعها.`, 'error')
+    imageFiles.value = []
+    return
+  }
+
+  const remaining = MAX_IMAGES - equipImages.value.length
+  if (files.length > remaining) {
+    notify(`الحد الأقصى ${MAX_IMAGES} صور لكل آلية — لديها ${equipImages.value.length} حالياً، تم اختيار أول ${Math.max(remaining, 0)} فقط من ${files.length} صورة.`, 'warning')
+  }
+  imageFiles.value = files.slice(0, Math.max(remaining, 0))
 }
 
 const uploadImages = async () => {
@@ -209,15 +269,29 @@ const uploadImages = async () => {
     })
     equipImages.value.push(...data)
     imageFiles.value = []
+  } catch (err: any) {
+    notify(err?.response?.data?.message || 'تعذّر رفع الصور', 'error')
   }
   finally {
     imageUploading.value = false
   }
 }
 
+// حماية ضد النقر المتكرر (REQ-08 #2 — كانت الصورة تحتاج أكثر من نقرة على أيقونة الحذف):
+// بدون هالحماية كل نقرة قبل رجوع أول طلب كانت تطلق DELETE جديد بلا أي إشارة تحميل
+const deletingImageId = ref<number | null>(null)
+
 const deleteImage = async (img: any) => {
-  await api.delete(`/api/v1/equipment/${selectedItem.value.id}/images/${img.id}`)
-  equipImages.value = equipImages.value.filter(i => i.id !== img.id)
+  if (deletingImageId.value !== null) return
+  deletingImageId.value = img.id
+  try {
+    await api.delete(`/api/v1/equipment/${selectedItem.value.id}/images/${img.id}`)
+    equipImages.value = equipImages.value.filter(i => i.id !== img.id)
+  } catch (err: any) {
+    notify(err?.response?.data?.message || 'تعذّر حذف الصورة', 'error')
+  } finally {
+    deletingImageId.value = null
+  }
 }
 
 const setPrimary = async (img: any) => {
@@ -225,39 +299,6 @@ const setPrimary = async (img: any) => {
   equipImages.value.forEach(i => (i.is_primary = i.id === img.id))
 }
 
-// ─── Blocked Dates ────────────────────────────────────────────────────────────
-const openCalendar = async (item: any) => {
-  selectedItem.value  = item
-  calLoading.value    = true
-  calendarDialog.value = true
-  newDates.value      = []
-  try {
-    const { data } = await api.get(`/api/v1/equipment/${item.id}/blocked-dates`)
-    blockedDates.value = data
-  }
-  finally {
-    calLoading.value = false
-  }
-}
-
-const addBlockedDates = async () => {
-  if (!newDates.value.length) return
-  const { data } = await api.post(`/api/v1/equipment/${selectedItem.value.id}/blocked-dates`, {
-    dates: newDates.value,
-    reason: dateReason.value,
-  })
-  blockedDates.value.push(...data)
-  newDates.value = []
-}
-
-const removeDate = async (bd: any) => {
-  await api.delete(`/api/v1/equipment/${selectedItem.value.id}/blocked-dates/${bd.id}`)
-  blockedDates.value = blockedDates.value.filter(d => d.id !== bd.id)
-}
-
-const reasonLabel: Record<string, string> = {
-  booked: 'محجوز', maintenance: 'صيانة', other: 'أخرى',
-}
 </script>
 
 <template>
@@ -350,6 +391,28 @@ const reasonLabel: Record<string, string> = {
               :placeholder="'الكل'"
             />
           </VCol>
+          <VCol cols="12" md="2">
+            <VSelect
+              v-model="filterContractType"
+              :items="contractTypeOptions"
+              label="نوع العقد"
+              variant="outlined"
+              density="compact"
+              style="font-family:Cairo,sans-serif"
+            />
+          </VCol>
+          <VCol cols="12" class="d-flex justify-end">
+            <VBtn
+              variant="text"
+              size="small"
+              prepend-icon="tabler-filter-x"
+              :disabled="!search && !filterType && !filterStatus && !filterGov && !filterContractType"
+              style="font-family:Cairo,sans-serif"
+              @click="resetFilters"
+            >
+              إلغاء الفلاتر
+            </VBtn>
+          </VCol>
         </VRow>
       </VCardText>
     </VCard>
@@ -363,14 +426,13 @@ const reasonLabel: Record<string, string> = {
             <th style="font-family:Cairo,sans-serif">النوع</th>
             <th style="font-family:Cairo,sans-serif">المالك</th>
             <th style="font-family:Cairo,sans-serif">المحافظة</th>
-            <th style="font-family:Cairo,sans-serif">السعر اليومي</th>
             <th style="font-family:Cairo,sans-serif">الحالة</th>
             <th style="font-family:Cairo,sans-serif">الإجراءات</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="!loading && equipment.length === 0">
-            <td colspan="7" class="text-center pa-10 text-medium-emphasis" style="font-family:Cairo,sans-serif">
+            <td colspan="6" class="text-center pa-10 text-medium-emphasis" style="font-family:Cairo,sans-serif">
               لا توجد آليات مطابقة للبحث
             </td>
           </tr>
@@ -388,10 +450,19 @@ const reasonLabel: Record<string, string> = {
                   <VIcon v-if="!item.primary_image" icon="tabler-tractor" size="20" />
                 </VAvatar>
                 <div>
-                  <div class="font-weight-semibold" style="font-family:Cairo,sans-serif">{{ item.name }}</div>
+                  <div class="font-weight-semibold d-flex align-center gap-1" style="font-family:Cairo,sans-serif">
+                    {{ item.name }}
+                    <VIcon v-if="item.is_featured" icon="tabler-star-filled" size="14" color="warning">
+                      <VTooltip activator="parent">آلية مميزة</VTooltip>
+                    </VIcon>
+                    <VIcon v-if="item.needs_maintenance" icon="tabler-tool" size="14" color="error">
+                      <VTooltip activator="parent">بحاجة صيانة</VTooltip>
+                    </VIcon>
+                  </div>
                   <div class="text-caption text-medium-emphasis" style="font-family:Cairo,sans-serif">
                     {{ item.manufacture_year ? `سنة ${item.manufacture_year}` : '' }}
                     {{ item.power ? `· ${item.power}` : '' }}
+                    {{ item.contract_type ? `· ${contractTypeLabel[item.contract_type] ?? item.contract_type}` : '' }}
                   </div>
                 </div>
               </div>
@@ -406,10 +477,6 @@ const reasonLabel: Record<string, string> = {
             <td style="font-family:Cairo,sans-serif;color:#374151">{{ item.contractor?.name ?? '—' }}</td>
             <!-- Governorate -->
             <td style="font-family:Cairo,sans-serif;color:#6B7280">{{ item.governorate ?? '—' }}</td>
-            <!-- Price -->
-            <td style="font-family:Cairo,sans-serif;font-weight:600;color:#000269">
-              {{ Number(item.daily_price).toLocaleString('ar') }} ₪
-            </td>
             <!-- Status -->
             <td>
               <VChip
@@ -435,13 +502,18 @@ const reasonLabel: Record<string, string> = {
                   <VIcon icon="tabler-photo" size="16" />
                   <VTooltip activator="parent">الصور</VTooltip>
                 </VBtn>
-                <VBtn icon size="x-small" variant="tonal" color="secondary" @click="openCalendar(item)">
-                  <VIcon icon="tabler-calendar" size="16" />
-                  <VTooltip activator="parent">جدول الحجوزات</VTooltip>
-                </VBtn>
-                <VBtn icon size="x-small" variant="tonal" color="error" @click="openDelete(item)">
+                <VBtn
+                  icon
+                  size="x-small"
+                  variant="tonal"
+                  color="error"
+                  :disabled="item.needs_maintenance"
+                  @click="openDelete(item)"
+                >
                   <VIcon icon="tabler-trash" size="16" />
-                  <VTooltip activator="parent">حذف</VTooltip>
+                  <VTooltip activator="parent">
+                    {{ item.needs_maintenance ? 'أزل حالة "بحاجة صيانة" أولاً قبل الحذف' : 'حذف' }}
+                  </VTooltip>
                 </VBtn>
               </div>
             </td>
@@ -473,16 +545,49 @@ const reasonLabel: Record<string, string> = {
               <VTextField v-model="editForm.name" label="اسم الآلية" variant="outlined" density="compact" style="font-family:Cairo,sans-serif" />
             </VCol>
             <VCol cols="12" md="6">
-              <VTextField v-model="editForm.owner_phone" label="هاتف المالك" variant="outlined" density="compact" style="font-family:Cairo,sans-serif" />
+              <VSelect
+                v-model="editForm.equipment_type_id"
+                :items="editTypeOptions"
+                item-title="name_ar"
+                item-value="id"
+                label="نوع الآلية"
+                variant="outlined"
+                density="compact"
+                style="font-family:Cairo,sans-serif"
+              />
             </VCol>
-            <VCol cols="12" md="4">
+            <VCol cols="12" md="6">
+              <VTextField v-model="editForm.brand" label="الماركة" variant="outlined" density="compact" style="font-family:Cairo,sans-serif" />
+            </VCol>
+            <VCol cols="12" md="6">
+              <VTextField
+                v-model="editForm.owner_phone"
+                label="رقم واتساب المالك"
+                hint="يُستخدم للتواصل المباشر عبر واتساب من شاشة تفاصيل الآلية"
+                persistent-hint
+                variant="outlined"
+                density="compact"
+                style="font-family:Cairo,sans-serif"
+              />
+            </VCol>
+            <VCol cols="12" md="3">
               <VTextField v-model.number="editForm.manufacture_year" label="سنة الصنع" type="number" variant="outlined" density="compact" style="font-family:Cairo,sans-serif" />
             </VCol>
-            <VCol cols="12" md="4">
+            <VCol cols="12" md="3">
               <VTextField v-model="editForm.power" label="القدرة" variant="outlined" density="compact" style="font-family:Cairo,sans-serif" />
             </VCol>
-            <VCol cols="12" md="4">
+            <VCol cols="12" md="3">
               <VSelect v-model="editForm.condition" :items="conditionOptions" label="الحالة" variant="outlined" density="compact" style="font-family:Cairo,sans-serif" />
+            </VCol>
+            <VCol cols="12" md="3">
+              <VSelect
+                v-model="editForm.contract_type"
+                :items="contractTypeOptions.filter(o => o.value)"
+                label="نوع العقد"
+                variant="outlined"
+                density="compact"
+                style="font-family:Cairo,sans-serif"
+              />
             </VCol>
             <VCol cols="12" md="4">
               <VSelect
@@ -496,9 +601,6 @@ const reasonLabel: Record<string, string> = {
             </VCol>
             <VCol cols="12" md="4">
               <VTextField v-model="editForm.city" label="المدينة" variant="outlined" density="compact" style="font-family:Cairo,sans-serif" />
-            </VCol>
-            <VCol cols="12" md="4">
-              <VTextField v-model.number="editForm.daily_price" label="السعر اليومي (₪)" type="number" min="0" variant="outlined" density="compact" style="font-family:Cairo,sans-serif" />
             </VCol>
             <VCol cols="12" md="6">
               <VSelect
@@ -514,8 +616,14 @@ const reasonLabel: Record<string, string> = {
                 style="font-family:Cairo,sans-serif"
               />
             </VCol>
+            <VCol cols="12" md="6" class="d-flex align-center">
+              <VSwitch v-model="editForm.is_featured" label="آلية مميزة (تظهر أولاً في السوق)" color="warning" style="font-family:Cairo,sans-serif" />
+            </VCol>
+            <VCol cols="12" md="6" class="d-flex align-center">
+              <VSwitch v-model="editForm.needs_maintenance" label="بحاجة صيانة (تختفي من السوق مؤقتاً)" color="error" style="font-family:Cairo,sans-serif" />
+            </VCol>
             <VCol cols="12">
-              <VTextarea v-model="editForm.description" label="الوصف" variant="outlined" density="compact" rows="2" style="font-family:Cairo,sans-serif" />
+              <VTextarea v-model="editForm.description" label="وصف الحالة الفنية للآلية" variant="outlined" density="compact" rows="2" maxlength="250" counter style="font-family:Cairo,sans-serif" />
             </VCol>
             <VCol cols="12">
               <VTextarea v-model="editForm.admin_notes" label="ملاحظات داخلية" variant="outlined" density="compact" rows="2" style="font-family:Cairo,sans-serif" />
@@ -565,6 +673,8 @@ const reasonLabel: Record<string, string> = {
                 <VBtn
                   icon size="x-small" variant="flat" color="error"
                   style="width:24px;height:24px;min-width:24px"
+                  :loading="deletingImageId === img.id"
+                  :disabled="deletingImageId !== null"
                   @click="deleteImage(img)"
                 >
                   <VIcon icon="tabler-trash" size="12" />
@@ -605,77 +715,6 @@ const reasonLabel: Record<string, string> = {
       </VCard>
     </VDialog>
 
-    <!-- ═══════════════════════════════════════════════════════════════════
-         Calendar / Blocked Dates Dialog
-    ════════════════════════════════════════════════════════════════════ -->
-    <VDialog v-model="calendarDialog" max-width="560" scrollable>
-      <VCard :loading="calLoading">
-        <VCardTitle style="font-family:Cairo,sans-serif;font-size:18px;padding:20px 24px 0">
-          <VIcon icon="tabler-calendar" size="20" class="me-2" />
-          جدول الحجوزات: {{ selectedItem?.name }}
-        </VCardTitle>
-        <VCardText>
-          <!-- Blocked dates list -->
-          <p class="text-subtitle-2 mb-2" style="font-family:Cairo,sans-serif">الأيام المحجوزة / الموقوفة</p>
-          <div v-if="blockedDates.length === 0 && !calLoading" class="text-medium-emphasis mb-4" style="font-family:Cairo,sans-serif">
-            لا توجد تواريخ محجوزة
-          </div>
-          <div class="d-flex flex-wrap gap-2 mb-4">
-            <VChip
-              v-for="bd in blockedDates"
-              :key="bd.id"
-              closable
-              :color="bd.reason === 'booked' ? 'error' : bd.reason === 'maintenance' ? 'warning' : 'secondary'"
-              variant="tonal"
-              size="small"
-              style="font-family:Cairo,sans-serif"
-              @click:close="removeDate(bd)"
-            >
-              {{ bd.blocked_date }} — {{ reasonLabel[bd.reason] ?? bd.reason }}
-            </VChip>
-          </div>
-
-          <VDivider class="mb-4" />
-
-          <!-- Add new dates -->
-          <p class="text-subtitle-2 mb-2" style="font-family:Cairo,sans-serif">إضافة تواريخ محجوزة</p>
-          <VRow dense>
-            <VCol cols="12">
-              <VTextField
-                v-model="newDates"
-                label="أدخل التواريخ (YYYY-MM-DD) مفصولة بفاصلة"
-                variant="outlined"
-                density="compact"
-                placeholder="2026-07-10,2026-07-11"
-                style="font-family:Cairo,sans-serif"
-                @change="(v: any) => { newDates = String(v).split(',').map(s => s.trim()).filter(Boolean) }"
-              />
-            </VCol>
-            <VCol cols="12">
-              <VSelect
-                v-model="dateReason"
-                :items="[
-                  { title: 'محجوز', value: 'booked' },
-                  { title: 'صيانة', value: 'maintenance' },
-                  { title: 'أخرى',  value: 'other' },
-                ]"
-                label="السبب"
-                variant="outlined"
-                density="compact"
-                style="font-family:Cairo,sans-serif"
-              />
-            </VCol>
-          </VRow>
-        </VCardText>
-        <VCardActions class="pa-4 pt-0 justify-end gap-2">
-          <VBtn variant="tonal" color="secondary" @click="calendarDialog = false" style="font-family:Cairo,sans-serif">إغلاق</VBtn>
-          <VBtn color="primary" prepend-icon="tabler-plus" @click="addBlockedDates" style="font-family:Cairo,sans-serif">
-            إضافة التواريخ
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
-
     <!-- Delete Dialog -->
     <VDialog v-model="deleteDialog" max-width="400">
       <VCard>
@@ -694,5 +733,13 @@ const reasonLabel: Record<string, string> = {
         </VCardActions>
       </VCard>
     </VDialog>
+
+    <!-- Feedback Snackbar -->
+    <VSnackbar v-model="snackbar" :timeout="3500" :color="snackbarColor" location="bottom end" variant="elevated">
+      <span style="font-family:Cairo,sans-serif">{{ snackbarText }}</span>
+      <template #actions>
+        <VBtn variant="text" size="small" @click="snackbar = false">إغلاق</VBtn>
+      </template>
+    </VSnackbar>
   </div>
 </template>

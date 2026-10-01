@@ -7,7 +7,9 @@ use App\Http\Traits\ApiResponseTrait;
 use App\Models\BankAccount;
 use App\Models\Governorate;
 use App\Models\Setting;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 
 class SettingController extends Controller
@@ -33,6 +35,23 @@ class SettingController extends Controller
         $path = Setting::get('union_logo', '');
 
         return $path ? Storage::disk('public')->url($path) : null;
+    }
+
+    /** رابط صورة الغلاف (شاشة "عن الاتحاد") */
+    private function coverImageUrl(): ?string
+    {
+        $path = Setting::get('union_cover_image', '');
+
+        return $path ? Storage::disk('public')->url($path) : null;
+    }
+
+    /** الخدمات الرئيسية — مخزَّنة كـJSON بإعداد واحد union_services، كل عنصر {title, description, icon} */
+    private function services(): array
+    {
+        $raw = Setting::get('union_services', '');
+        $decoded = $raw ? json_decode($raw, true) : null;
+
+        return is_array($decoded) ? $decoded : [];
     }
 
     /**
@@ -81,15 +100,26 @@ class SettingController extends Controller
     public function about()
     {
         return $this->success([
-            'name'     => Setting::get('union_name', 'اتحاد المقاولين الفلسطينيين — غزة'),
-            'name_en'  => Setting::get('union_name_en', ''),
-            'about'    => Setting::get('union_about', ''),
-            'address'  => Setting::get('union_address', ''),
-            'phone'    => Setting::get('union_phone', ''),
-            'phone2'   => Setting::get('union_phone2', ''),
-            'whatsapp' => Setting::get('support_whatsapp', ''),
-            'email'    => Setting::get('union_email', ''),
-            'logo_url' => $this->logoUrl(),
+            'name'            => Setting::get('union_name', 'اتحاد المقاولين الفلسطينيين — غزة'),
+            'name_en'         => Setting::get('union_name_en', ''),
+            'about'           => Setting::get('union_about', ''),
+            'address'         => Setting::get('union_address', ''),
+            'phone'           => Setting::get('union_phone', ''),
+            'phone2'          => Setting::get('union_phone2', ''),
+            'whatsapp'        => Setting::get('support_whatsapp', ''),
+            'email'           => Setting::get('union_email', ''),
+            'logo_url'        => $this->logoUrl(),
+            'cover_image_url' => $this->coverImageUrl(),
+            'badge_label'     => Setting::get('union_badge_label', 'الجهة الرسمية المعتمدة'),
+            'vision'          => Setting::get('union_vision', ''),
+            'mission'         => Setting::get('union_mission', ''),
+            'stats'           => [
+                'members_count'   => Setting::get('union_members_count', ''),
+                'founding_year'   => Setting::get('union_founding_year', ''),
+                'official_label'  => Setting::get('union_official_label', 'معتمدة'),
+                'branches_count'  => Setting::get('union_branches_count', ''),
+            ],
+            'services' => $this->services(),
             // cast لكائن حتى يبقى النوع {} في JSON حتى لو كانت الروابط كلها فارغة
             'social'   => (object) $this->socialLinks(),
         ]);
@@ -123,8 +153,31 @@ class SettingController extends Controller
                 'support_email'    => Setting::get('support_email', ''),
                 'support_phone'    => Setting::get('support_phone', ''),
             ],
-            'social_media' => (object) $this->socialLinks(),
+            'social_media'   => (object) $this->socialLinks(),
+            // أسعار الصرف الحالية (1 وحدة = كم دينار) — لمعاينة التحويل قبل رفع إشعار الدفع
+            // (شاشة "التفاصيل البنكية")، نفس المصدر المعتمد من سلطة النقد المستخدَم عند تأكيد المحاسب
+            'exchange_rates' => (object) $this->exchangeRates(),
         ]);
+    }
+
+    /** أسعار صرف ILS/USD إلى الدينار — من آخر جلب معتمد (ExchangeRateService، كاش ساعة) */
+    private function exchangeRates(): array
+    {
+        $service = app(\App\Services\ExchangeRateService::class);
+        $rates = [];
+
+        foreach (\App\Services\ExchangeRateService::CURRENCIES as $currency) {
+            $latest = $service->latest($currency);
+            if ($latest) {
+                $rates[$currency] = [
+                    'rate_to_jod' => (float) $latest->rate_to_jod,
+                    'source'      => $latest->source,
+                    'fetched_at'  => $latest->fetched_at,
+                ];
+            }
+        }
+
+        return $rates;
     }
 
     /**
@@ -133,7 +186,8 @@ class SettingController extends Controller
      */
     public function governorates()
     {
-        $governorates = Governorate::with('cities')
+        $governorates = Governorate::where('is_active', true)
+            ->with(['cities' => fn ($query) => $query->where('is_active', true)])
             ->orderBy('sort')->orderBy('id')
             ->get()
             ->map(fn ($governorate) => [
@@ -158,18 +212,20 @@ class SettingController extends Controller
             ->map(fn ($name, $id) => ['id' => (int) $id, 'name' => $name])
             ->values();
 
-        $grades = collect(\App\Models\Contractor::CLASSIFICATION_LABELS)
-            ->map(fn ($label, $value) => [
-                'value' => $value,
-                'label' => $label,
-                'level' => \App\Support\ContractorLookups::GRADE_LEVELS[$value] ?? null,
-            ])
+        // التصنيف العام لعمود contractors.classification المنفصل — يبقى بصيغته القديمة عمداً (لم يُشمل بالتطبيع)
+        $overallGrades = collect(\App\Models\Contractor::CLASSIFICATION_LABELS)
+            ->map(fn ($label, $value) => ['value' => $value, 'label' => $label])
             ->values();
 
         return $this->success([
-            'fields'          => $mapToList(\App\Support\ContractorLookups::FIELDS),
-            'specializations' => $mapToList(\App\Support\ContractorLookups::SPECIALIZATIONS),
-            'grades'          => $grades,
+            'fields'                => $mapToList(\App\Support\ContractorLookups::fields()),
+            'specializations'       => $mapToList(\App\Support\ContractorLookups::specializations()),
+            'field_specializations' => \App\Support\ContractorLookups::fieldSpecializationsMap(),
+            'grades'                => \App\Support\ContractorLookups::gradesList(),
+            'overall_grades'        => $overallGrades,
+            // قيود رفع المستندات (TASK-16 #2) — تُقرأ من ini وقت التشغيل، فتعرض نماذج
+            // المقاولين السقف الحقيقي بدل رقم ثابت بالواجهة يفارق إعداد الخادم.
+            'upload_limits'         => \App\Support\UploadLimits::toArray(),
         ], 'تم جلب كتالوج التخصصات بنجاح');
     }
 
@@ -203,6 +259,8 @@ class SettingController extends Controller
         // الإعدادات تدخل في استجابة الصفحة الرئيسية المخزّنة
         \Illuminate\Support\Facades\Cache::forget('landing_home');
 
+        AuditLogService::record(Auth::user(), 'settings.updated', null, ['keys' => array_column($data['settings'], 'key')]);
+
         return $this->success(['settings' => Setting::all(['key', 'value', 'group'])], 'تم حفظ الإعدادات بنجاح.');
     }
 
@@ -224,6 +282,31 @@ class SettingController extends Controller
         $path = $request->file('logo')->store('union', 'public');
         Setting::set('union_logo', $path, 'about');
 
+        AuditLogService::record(Auth::user(), 'settings.logo_uploaded');
+
         return $this->success(['logo_url' => Storage::disk('public')->url($path)], 'تم رفع الشعار بنجاح.');
+    }
+
+    /**
+     * POST /api/v1/dashboard/settings/cover-image
+     * رفع صورة غلاف شاشة "عن الاتحاد".
+     */
+    public function uploadCoverImage(Request $request)
+    {
+        $request->validate([
+            'cover_image' => 'required|image|mimes:png,jpg,jpeg,webp|max:4096',
+        ]);
+
+        $old = Setting::get('union_cover_image', '');
+        if ($old) {
+            Storage::disk('public')->delete($old);
+        }
+
+        $path = $request->file('cover_image')->store('union', 'public');
+        Setting::set('union_cover_image', $path, 'about');
+
+        AuditLogService::record(Auth::user(), 'settings.cover_image_uploaded');
+
+        return $this->success(['cover_image_url' => Storage::disk('public')->url($path)], 'تم رفع صورة الغلاف بنجاح.');
     }
 }

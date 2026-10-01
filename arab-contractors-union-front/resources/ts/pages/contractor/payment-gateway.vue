@@ -83,8 +83,22 @@ const renewalBlocked = ref(false)
 const renewalIssues = ref<{ type: string; description: string; amount: number | null }[]>([])
 const outstandingDues = ref(0)
 
-// هل هذه دفعة سداد ذمم؟ (لا عضوية نشطة + ذمم مستحقّة) — لا تُحظر مثل دفعة التجديد
-const isDuesPayment = computed(() => !membership.value && outstandingDues.value > 0)
+// تبديل يدوي لوضع "سداد الذمم" حين تكون العضوية لا تزال نشطة رغم وجود ذمم سابقة —
+// بدونه لا طريقة لإرسال دفعة type=dues_payment ويبقى المستخدم عالقاً عند رسالة الحظر
+const payDuesMode = ref(false)
+
+// هل هذه دفعة سداد ذمم؟ (لا عضوية نشطة، أو المستخدم بدّل الوضع يدوياً) — لا تُحظر مثل دفعة التجديد
+const isDuesPayment = computed(() => outstandingDues.value > 0 && (!membership.value || payDuesMode.value))
+
+function togglePayDuesMode(on: boolean) {
+  payDuesMode.value = on
+  if (on) {
+    form.value.amount = String(outstandingDues.value)
+    form.value.currency = 'JOD'
+  } else if (membership.value?.amount) {
+    form.value.amount = String(Number(membership.value.amount))
+  }
+}
 
 async function checkEligibility() {
   try {
@@ -192,7 +206,7 @@ async function submitPayment() {
   fd.append('amount', form.value.amount)
   fd.append('currency', form.value.currency)
   fd.append('receipt_image', form.value.receipt_file)
-  if (membership.value) fd.append('membership_id', String(membership.value.id))
+  if (membership.value && !isDuesPayment.value) fd.append('membership_id', String(membership.value.id))
   fd.append('type', isDuesPayment.value ? 'dues_payment' : 'membership_fee')
   fd.append('notes', form.value.notes || (isDuesPayment.value ? 'سداد ذمم مالية مستحقّة' : 'دفع رسوم تجديد العضوية'))
 
@@ -335,6 +349,21 @@ function fmtMoney(v: string | number | null) {
           <span>لا توجد عضوية مسجّلة باسمك — تواصل مع إدارة الاتحاد لتفعيل عضويتك قبل الدفع.</span>
         </div>
 
+        <!-- عضوية نشطة لكن عليه ذمم سابقة — التجديد محظور حتى يسدّدها، فنُتيح له التبديل لوضع سداد الذمم -->
+        <div v-if="membership && outstandingDues > 0" class="renewal-banner expiring" style="margin-top: .75rem;">
+          <div class="rb-icon"><AlertCircle :size="24" /></div>
+          <div class="rb-info">
+            <p class="rb-title">عليك ذمم مالية مستحقّة من سنوات سابقة</p>
+            <p class="rb-meta">
+              لا يمكن دفع رسوم التجديد قبل تسويتها. اختر "سداد الذمم المستحقّة" أدناه لإرسال إشعار تحويل لتسويتها أولاً.
+            </p>
+          </div>
+          <div class="rb-amount">
+            <span class="rb-amount-val">{{ outstandingDues }} د.أ</span>
+            <span class="rb-amount-label">إجمالي الذمم المستحقّة</span>
+          </div>
+        </div>
+
         <!-- Main Content -->
         <div class="pg-grid">
           <!-- Bank Info Section -->
@@ -392,16 +421,47 @@ function fmtMoney(v: string | number | null) {
 
           <!-- Payment Form Section -->
           <section class="pg-section payment-form-section">
-            <h2 class="pg-section-title"><DollarSign :size="20" /> دفع رسوم تجديد العضوية</h2>
+            <h2 class="pg-section-title">
+              <DollarSign :size="20" /> {{ isDuesPayment ? 'سداد الذمم المالية المستحقّة' : 'دفع رسوم تجديد العضوية' }}
+            </h2>
 
             <div v-if="submitted" class="success-state">
               <CheckCircle :size="48" class="success-ico" />
-              <h3>تم إرسال طلب التجديد بنجاح!</h3>
-              <p>سيتم مراجعة إشعار الدفع من قبل قسم المحاسبة وتجديد عضويتك خلال 24 ساعة.</p>
+              <h3>{{ isDuesPayment ? 'تم إرسال إشعار سداد الذمم بنجاح!' : 'تم إرسال طلب التجديد بنجاح!' }}</h3>
+              <p>سيتم مراجعة إشعار الدفع من قبل قسم المحاسبة {{ isDuesPayment ? 'وتسوية الذمم المستحقّة' : 'وتجديد عضويتك' }} خلال 24 ساعة.</p>
               <button class="reset-btn" @click="submitted = false">إرسال إشعار آخر</button>
             </div>
 
             <form v-else @submit.prevent="submitPayment" class="payment-form">
+              <!-- تبديل الوضع: عضوية نشطة + ذمم سابقة — التجديد محظور فنُتيح التبديل لسداد الذمم بدلاً منه -->
+              <div v-if="membership && outstandingDues > 0" class="form-group">
+                <label>نوع الدفعة *</label>
+                <div style="display: flex; gap: .6rem;">
+                  <button
+                    type="button"
+                    class="form-input"
+                    style="cursor: pointer; text-align: center; flex: 1;"
+                    :style="!payDuesMode
+                      ? 'border-color: var(--navy, #1a237e); background: #e8eaf6; font-weight: 700;'
+                      : ''"
+                    @click="togglePayDuesMode(false)"
+                  >
+                    تجديد العضوية
+                  </button>
+                  <button
+                    type="button"
+                    class="form-input"
+                    style="cursor: pointer; text-align: center; flex: 1;"
+                    :style="payDuesMode
+                      ? 'border-color: var(--navy, #1a237e); background: #e8eaf6; font-weight: 700;'
+                      : ''"
+                    @click="togglePayDuesMode(true)"
+                  >
+                    سداد الذمم المستحقّة
+                  </button>
+                </div>
+              </div>
+
               <!-- تنبيه الذمم غير المسدَّدة -->
               <div
                 v-if="renewalBlocked && !isDuesPayment"
@@ -444,7 +504,7 @@ function fmtMoney(v: string | number | null) {
 
               <!-- Amount -->
               <div class="form-group">
-                <label>المبلغ المحول (رسوم الاشتراك) *</label>
+                <label>{{ isDuesPayment ? 'المبلغ المحول (سداد الذمم)' : 'المبلغ المحول (رسوم الاشتراك)' }} *</label>
                 <div class="amount-input-wrap">
                   <span class="currency-symbol">{{ currencySymbol }}</span>
                   <input
@@ -495,7 +555,7 @@ function fmtMoney(v: string | number | null) {
                 <label>ملاحظات إضافية (اختياري)</label>
                 <textarea
                   v-model="form.notes"
-                  placeholder="دفع رسوم تجديد العضوية"
+                  :placeholder="isDuesPayment ? 'سداد ذمم مالية مستحقّة' : 'دفع رسوم تجديد العضوية'"
                   class="form-textarea"
                 />
               </div>
@@ -504,7 +564,7 @@ function fmtMoney(v: string | number | null) {
               <button type="submit" class="submit-btn" :disabled="isSending">
                 <Send v-if="!isSending" :size="16" />
                 <span class="spinner-small" v-else></span>
-                {{ isSending ? 'جاري الإرسال...' : 'إرسال طلب تجديد العضوية' }}
+                {{ isSending ? 'جاري الإرسال...' : (isDuesPayment ? 'إرسال إشعار سداد الذمم' : 'إرسال طلب تجديد العضوية') }}
               </button>
             </form>
           </section>

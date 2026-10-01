@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useOnline } from '@vueuse/core'
 import axios from 'axios'
+import { useDraftAutoSave } from '@/composables/useDraftAutoSave'
 import {
   LogOut, Send, CheckCircle, AlertCircle, Award, FileCheck,
   Clock, XCircle, CheckCircle2, File, Download, ArrowRight,
@@ -42,6 +44,14 @@ interface RequirementIssue {
   due_date: string | null
 }
 
+interface MembershipStatus {
+  eligible: boolean
+  paid_percentage: number
+  required_percent: number
+  remaining_to_95_jod: number
+  current_year: number
+}
+
 const contractor = ref<Contractor | null>(null)
 const requests = ref<CertificateRequest[]>([])
 const requirementIssues = ref<RequirementIssue[]>([])
@@ -51,6 +61,7 @@ const missingProfileFields = ref<string[]>([])
 const showForm = ref(false)
 const successMessage = ref('')
 const errorMessage = ref('')
+const membershipStatus = ref<MembershipStatus | null>(null)
 
 const form = ref({
   type: '',
@@ -78,6 +89,43 @@ function onAttachmentChange(e: Event) {
   attachmentFile.value = file
 }
 
+// ── الحفظ التلقائي كمسودة + الصمود أمام انقطاع الإنترنت ──────────────────────
+// لا يُحفظ أي حقل حسّاس هنا: النموذج لا يحوي سوى نوع الشهادة والملاحظات والمرفق.
+const { savedAt, restoredFromDraft, clearDraft } = useDraftAutoSave({
+  key: 'contractor:certificate-request',
+  data: () => ({ type: form.value.type, notes: form.value.notes }),
+  file: () => attachmentFile.value,
+  apply: (data, file) => {
+    form.value.type = data.type ?? ''
+    form.value.notes = data.notes ?? ''
+    attachmentFile.value = file
+    // مسودة محفوظة تعني أن المستخدم كان في منتصف التعبئة — نفتح له النموذج.
+    showForm.value = true
+  },
+})
+
+const savedAtLabel = computed(() => savedAt.value
+  ? new Date(savedAt.value).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })
+  : '')
+
+// الإلغاء يمسح المرفق والمسودة أيضاً — وإلا عادت المسودة عند فتح الصفحة لاحقاً.
+async function discardDraft() {
+  form.value = { type: '', notes: '' }
+  attachmentFile.value = null
+  submitPending.value = false
+  await clearDraft()
+}
+
+const isOnline = useOnline()
+
+// طلب تعذّر إرساله بسبب الشبكة — يُعاد تلقائياً عند عودة الاتصال.
+const submitPending = ref(false)
+
+watch(isOnline, online => {
+  if (online && submitPending.value)
+    void submitRequest()
+})
+
 function getToken() {
   return localStorage.getItem('contractor_token')
 }
@@ -100,6 +148,9 @@ async function fetchData() {
     canRequest.value = r.data.items?.can_request ?? true
     profileDataComplete.value = r.data.items?.profile_data_complete ?? true
     missingProfileFields.value = r.data.items?.missing_profile_fields ?? []
+
+    const s = await axios.get(`${BASE}/api/v1/contractor/certificates/status`, { headers: apiHeaders() })
+    membershipStatus.value = s.data.items?.membership ?? null
   } catch (e: any) {
     if (e?.response?.status === 401) authError.value = true
   } finally {
@@ -110,6 +161,19 @@ async function fetchData() {
 async function submitRequest() {
   if (!form.value.type) {
     errorMessage.value = 'الرجاء اختيار نوع الشهادة المطلوبة'
+    return
+  }
+
+  if (form.value.type === 'membership' && membershipStatus.value && !membershipStatus.value.eligible) {
+    errorMessage.value = `يتبقى لك سداد ${membershipStatus.value.remaining_to_95_jod} دينار للوصول إلى حد الـ 95% واستخراج شهادتك تلقائياً.`
+    return
+  }
+
+  // بلا اتصال: لا نحرق المحاولة — المسودة محفوظة والإرسال يُستأنف تلقائياً.
+  if (!isOnline.value) {
+    submitPending.value = true
+    errorMessage.value = 'لا يوجد اتصال بالإنترنت. طلبك محفوظ وسيُرسل تلقائياً فور عودة الاتصال.'
+
     return
   }
 
@@ -128,18 +192,31 @@ async function submitRequest() {
       headers: apiHeaders(),
     })
     successMessage.value = r.data.message ?? 'تم تقديم طلب الشهادة بنجاح.'
+    submitPending.value = false
+    // نجح الإرسال — لم تعد المسودة لازمة.
+    await clearDraft()
     form.value = { type: '', notes: '' }
     attachmentFile.value = null
     showForm.value = false
     if (r.data.items) requests.value.unshift(r.data.items)
     setTimeout(() => { successMessage.value = '' }, 5000)
   } catch (e: any) {
-    if (e?.response?.data?.error === 'profile_incomplete') {
+    // غياب response يعني أن الطلب لم يصل أصلاً (شبكة مقطوعة) لا أن الخادم رفضه —
+    // هذه وحدها الحالة التي تُعاد تلقائياً.
+    if (!e?.response) {
+      submitPending.value = true
+      errorMessage.value = 'تعذّر الإرسال بسبب انقطاع الاتصال. طلبك محفوظ وسيُرسل تلقائياً عند عودة الاتصال.'
+
+      return
+    }
+
+    submitPending.value = false
+    if (e.response.data?.error === 'profile_incomplete') {
       profileDataComplete.value = false
       missingProfileFields.value = e.response.data.errors?.missing_profile_fields ?? []
       canRequest.value = false
     }
-    errorMessage.value = e?.response?.data?.message ?? 'حدث خطأ أثناء تقديم الطلب'
+    errorMessage.value = e.response.data?.message ?? 'حدث خطأ أثناء تقديم الطلب'
   } finally {
     isSubmitting.value = false
   }
@@ -148,6 +225,9 @@ async function submitRequest() {
 function downloadCertificate(url: string, id: number) {
   window.open(url, '_blank')
 }
+
+const showMembershipEligibility = computed(() => form.value.type === 'membership' && membershipStatus.value !== null)
+const membershipEligible = computed(() => membershipStatus.value?.eligible ?? false)
 
 const typeLabel = computed(() => {
   const labels: Record<string, string> = {
@@ -304,6 +384,10 @@ function fmtMoney(v: string | number | null) {
             </div>
           </div>
 
+          <p v-if="restoredFromDraft" class="draft-restored">
+            تم استعادة مسودة محفوظة من جلستك السابقة — يمكنك المتابعة من حيث توقّفت.
+          </p>
+
           <form @submit.prevent="submitRequest" class="request-form">
             <!-- Certificate Type -->
             <div class="form-group">
@@ -328,6 +412,16 @@ function fmtMoney(v: string | number | null) {
                   <span class="cert-label">{{ type.label }}</span>
                 </div>
               </div>
+            </div>
+
+            <!-- Membership 95% Eligibility Banner -->
+            <div v-if="showMembershipEligibility && !membershipEligible" class="alert alert-error">
+              <AlertCircle :size="18" />
+              <span>يتبقى لك سداد {{ membershipStatus?.remaining_to_95_jod }} دينار للوصول إلى حد الـ 95% واستخراج شهادتك تلقائياً.</span>
+            </div>
+            <div v-else-if="showMembershipEligibility && membershipEligible" class="alert alert-success">
+              <CheckCircle :size="18" />
+              <span>نسبة سداد ذمم {{ membershipStatus?.current_year }} — {{ membershipStatus?.paid_percentage }}% — مؤهل لتقديم طلب شهادة العضوية.</span>
             </div>
 
             <!-- Notes -->
@@ -357,14 +451,21 @@ function fmtMoney(v: string | number | null) {
 
             <!-- Submit -->
             <div class="form-actions">
-              <button type="submit" class="submit-btn" :disabled="isSubmitting">
+              <button
+                type="submit"
+                class="submit-btn"
+                :disabled="isSubmitting || (showMembershipEligibility && !membershipEligible)"
+              >
                 <Send v-if="!isSubmitting" :size="16" />
                 <span class="spinner-small" v-else></span>
                 {{ isSubmitting ? 'جاري الإرسال...' : 'تقديم الطلب' }}
               </button>
-              <button type="button" class="cancel-btn" @click="form = { type: '', notes: '' }">
+              <button type="button" class="cancel-btn" @click="discardDraft">
                 إلغاء
               </button>
+              <span v-if="savedAtLabel" class="draft-saved">
+                محفوظ تلقائياً {{ savedAtLabel }}
+              </span>
             </div>
           </form>
         </div>
@@ -539,6 +640,10 @@ function fmtMoney(v: string | number | null) {
 .form-desc { font-size: .9rem; color: var(--text-m); }
 
 .request-form { display: flex; flex-direction: column; gap: 1.5rem; }
+
+/* مؤشرات الحفظ التلقائي كمسودة */
+.draft-restored { font-size: .85rem; font-weight: 600; color: #1b5e20; background: rgba(27,94,32,.08); border: 1px solid rgba(27,94,32,.25); border-radius: 10px; padding: .6rem .9rem; margin-bottom: 1rem; }
+.draft-saved { align-self: center; font-size: .8rem; color: var(--text-b); }
 .form-group { display: flex; flex-direction: column; gap: .75rem; }
 .form-group label { font-size: .85rem; font-weight: 700; color: var(--text-h); }
 

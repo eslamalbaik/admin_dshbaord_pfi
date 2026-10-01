@@ -1,41 +1,41 @@
 <script setup lang="ts">
-const activities = ref([
-  {
+import { useDashboardStore } from '@/stores/dashboardStore'
+
+const dashboardStore = useDashboardStore()
+
+function timeAgo(dateStr: string) {
+  const diffMs = Date.now() - new Date(dateStr).getTime()
+  const minutes = Math.floor(diffMs / 60000)
+  if (minutes < 1) return 'الآن'
+  if (minutes < 60) return `منذ ${minutes} دقيقة`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `منذ ${hours} ساعة`
+  const days = Math.floor(hours / 24)
+  return `منذ ${days} يوم`
+}
+
+const activities = computed(() => {
+  const contractorEvents = dashboardStore.latestContractors.map(c => ({
     title: 'تسجيل مقاول جديد',
-    description: 'شركة المدار للمقاولات انضمت إلى الاتحاد',
-    time: 'منذ 10 دقائق',
+    description: `${c.name} انضم إلى الاتحاد`,
+    time: c.created_at,
     icon: 'tabler-building-factory-2',
     color: 'success',
-  },
-  {
+  }))
+
+  const paymentEvents = dashboardStore.latestPayments.map(p => ({
     title: 'دفعة مستلمة',
-    description: '₪ 850 من شركة النور للإنشاءات',
-    time: 'منذ 25 دقيقة',
+    description: `₪ ${p.amount} من ${p.contractor ?? 'مقاول'}`,
+    time: p.created_at,
     icon: 'tabler-cash',
     color: 'primary',
-  },
-  {
-    title: 'طلب عضوية جديد',
-    description: 'مقاول عمر خليل قدّم طلب عضوية',
-    time: 'منذ ساعة',
-    icon: 'tabler-id-badge-2',
-    color: 'info',
-  },
-  {
-    title: 'عطاء جديد',
-    description: 'عطاء مشروع توسعة الطرق المحلية',
-    time: 'منذ 3 ساعات',
-    icon: 'tabler-files',
-    color: 'secondary',
-  },
-  {
-    title: 'تجديد عضوية',
-    description: 'مؤسسة الفارابي جددت اشتراك سنوي',
-    time: 'منذ 5 ساعات',
-    icon: 'tabler-refresh',
-    color: 'success',
-  },
-])
+  }))
+
+  return [...contractorEvents, ...paymentEvents]
+    .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
+    .slice(0, 6)
+    .map(a => ({ ...a, time: timeAgo(a.time) }))
+})
 </script>
 
 <template>
@@ -47,14 +47,15 @@ const activities = ref([
 
     <VCardText class="pa-0">
       <VTimeline
+        v-if="activities.length"
         density="compact"
         align="start"
         truncate-line="both"
         class="px-5 pb-4"
       >
         <VTimelineItem
-          v-for="activity in activities"
-          :key="activity.title"
+          v-for="(activity, index) in activities"
+          :key="index"
           :dot-color="activity.color"
           size="x-small"
         >
@@ -71,6 +72,9 @@ const activities = ref([
           </div>
         </VTimelineItem>
       </VTimeline>
+      <p v-else class="text-center text-medium-emphasis py-8 px-5" style="font-family:Cairo,sans-serif">
+        لا توجد أنشطة بعد
+      </p>
     </VCardText>
   </VCard>
 </template>

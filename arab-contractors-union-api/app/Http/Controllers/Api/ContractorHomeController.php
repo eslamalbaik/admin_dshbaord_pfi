@@ -8,7 +8,7 @@ use App\Models\Announcement;
 use App\Models\AnnouncementAcknowledgement;
 use App\Models\CertificateRequest;
 use App\Models\Contractor;
-use App\Models\ContractorNameChangeRequest;
+use App\Models\Event;
 use App\Models\Membership;
 use App\Models\News;
 use App\Models\Tender;
@@ -27,10 +27,15 @@ class ContractorHomeController extends Controller
 {
     use ApiResponseTrait;
 
+    public function __construct(
+        private \App\Services\ContractorFinancialService $financialService,
+        private \App\Services\MembershipStatusService $membershipStatusService
+    ) {}
+
     private const NEW_TENDERS_WINDOW_DAYS = 7;
     private const NEW_BADGE_HOURS         = 24;
     private const FEED_POOL_LIMIT         = 30; // عدد السجلات المجلوبة من كل مصدر قبل الدمج والترتيب
-    private const HOME_UPDATES_LIMIT      = 10;
+    private const HOME_UPDATES_LIMIT      = 5;
     private const UPDATES_PER_PAGE        = 20;
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -40,15 +45,23 @@ class ContractorHomeController extends Controller
     {
         $contractor = $request->user();
 
+        // يُبنى مرة واحدة — النسخة السابقة كانت تستدعي buildFeed() داخل take() مباشرة،
+        // فإضافة العدّ الكلي كانت ستعيد بناء الخلاصة (7 استعلامات) مرة ثانية بلا داعٍ.
+        $feed = $this->buildFeed($contractor);
+
         return $this->success([
-            'contractor'      => $this->contractorCard($contractor),
-            'membership'      => $this->membershipStatus($contractor),
-            'financial'       => $this->financialSummary($contractor),
-            'stats'           => $this->statsCard($contractor),
-            'cta_certificate' => $this->ctaCertificate($contractor),
-            'latest_updates'  => $this->presentFeed(
-                $this->buildFeed($contractor)->take(self::HOME_UPDATES_LIMIT)
-            ),
+            'contractor'                 => $this->contractorCard($contractor),
+            'membership'                 => $this->membershipStatus($contractor),
+            'financial'                  => $this->financialSummary($contractor),
+            'stats'                      => $this->statsCard($contractor),
+            'cta_certificate'            => $this->ctaCertificate($contractor),
+            'unread_notifications_count' => $contractor->unreadNotifications()->count(),
+            'latest_updates'             => $this->presentFeed($feed->take(self::HOME_UPDATES_LIMIT)),
+            // إشارة زر "عرض المزيد" — التطبيق يحوّل بها إلى contractor/home/updates.
+            // ملاحظة: buildFeed() محدودة بـ FEED_POOL_LIMIT لكل مصدر، فالعدّ سقفه العملي
+            // هو حجم التجمّع لا العدد الكلي في قاعدة البيانات — وهو ما تعرضه شاشة "عرض الكل" نفسها.
+            'latest_updates_total'       => $feed->count(),
+            'has_more'                   => $feed->count() > self::HOME_UPDATES_LIMIT,
         ]);
     }
 
@@ -80,12 +93,14 @@ class ContractorHomeController extends Controller
     private function contractorCard(Contractor $contractor): array
     {
         return [
-            'id'                => $contractor->id,
-            'name'              => $contractor->name,
-            'membership_number' => $contractor->membership_number,
-            'logo'              => $contractor->logo
+            'id'                     => $contractor->id,
+            'name'                   => $contractor->name,
+            'membership_number'      => $contractor->membership_number,
+            'logo'                   => $contractor->logo
                 ? \Illuminate\Support\Facades\Storage::disk('public')->url($contractor->logo)
                 : null,
+            'profile_data_complete'  => $contractor->profile_data_complete,
+            'missing_profile_fields' => $contractor->missing_profile_fields,
         ];
     }
 
@@ -94,22 +109,14 @@ class ContractorHomeController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
     private function membershipStatus(Contractor $contractor): array
     {
-        $membership = $contractor->activeMembership;
-        $isPaidActive = $membership && $membership->expires_at && $membership->expires_at->isFuture();
-
-        // badge أخضر فقط لو فيه عضوية مدفوعة وسارية فعلياً — لا يكفي أن يكون status الإداري "active"
-        $badge = match (true) {
-            $isPaidActive                                                     => 'active',
-            $membership && $membership->expires_at && $membership->expires_at->isPast() => 'expired',
-            default                                                            => $contractor->status,
-        };
+        $status = $this->membershipStatusService->getSubscriptionStatus($contractor);
 
         return [
             'status'         => $contractor->status,
-            'badge'          => $badge,
-            'expires_at'     => $membership?->expires_at?->toDateString(),
-            'expiring_soon'  => (bool) $membership?->expiring_soon,
-            'days_remaining' => $membership?->expires_at ? max(0, (int) now()->diffInDays($membership->expires_at, false)) : null,
+            'badge'          => $status['badge'],
+            'expires_at'     => $status['expires_at'],
+            'expiring_soon'  => $status['expiring_soon'],
+            'days_remaining' => $status['days_remaining'],
         ];
     }
 
@@ -118,7 +125,7 @@ class ContractorHomeController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
     private function financialSummary(Contractor $contractor): array
     {
-        $balance = $contractor->totalObligations();
+        $balance = $this->financialService->totalObligations($contractor);
 
         $hasOverdue = $contractor->dues()
             ->outstanding()
@@ -131,7 +138,7 @@ class ContractorHomeController extends Controller
         return [
             'balance'         => number_format($balance, 2, '.', ''),
             'has_overdue'     => $hasOverdue,
-            'last_due'        => $lastDue ? [
+            'last_invoice'    => $lastDue ? [
                 'id'          => $lastDue->id,
                 'description' => $lastDue->description . ($lastDue->year ? " ({$lastDue->year})" : ''),
                 'amount_jod'  => $lastDue->amount_jod,
@@ -147,6 +154,9 @@ class ContractorHomeController extends Controller
     private function statsCard(Contractor $contractor): array
     {
         return [
+            'events_count'         => Event::published()
+                ->where('event_date', '>=', now())
+                ->count(),
             'announcements_count' => Announcement::published()->count(),
             'machinery_count'     => $contractor->equipment()->count(),
             'new_tenders_count'   => Tender::where('status', 'open')
@@ -165,7 +175,7 @@ class ContractorHomeController extends Controller
         return [
             'show'               => true,
             'has_pending_dues'   => count($issues) > 0,
-            'outstanding_amount' => $contractor->totalObligations(),
+            'outstanding_amount' => $this->financialService->totalObligations($contractor),
         ];
     }
 
@@ -233,7 +243,9 @@ class ContractorHomeController extends Controller
                 'type'         => 'news',
                 'reference_id' => $n->id,
                 'title'        => $n->title,
-                'subtitle'     => $n->category,
+                // category صار محذوفاً من الأخبار (REQ-10 #1) — كانت قيمته 'news' دائماً
+                // بلا فائدة أصلاً؛ المقتطف أكثر فائدة كعنوان فرعي بعنصر التغذية
+                'subtitle'     => $n->excerpt,
                 'has_attachment' => (bool) $n->image,
                 'is_new'       => $n->published_at->gt(now()->subHours(self::NEW_BADGE_HOURS)),
                 'priority'     => 'normal',
@@ -317,22 +329,6 @@ class ContractorHomeController extends Controller
                 'rejected'     => $c->status === 'rejected',
             ]);
 
-        $nameChanges = ContractorNameChangeRequest::where('contractor_id', $contractor->id)
-            ->latest('updated_at')
-            ->limit(self::FEED_POOL_LIMIT)
-            ->get()
-            ->map(fn (ContractorNameChangeRequest $r) => [
-                'type'         => 'member',
-                'reference_id' => $r->id,
-                'title'        => 'طلب تغيير الاسم',
-                'subtitle'     => $r->status_label,
-                'has_attachment' => (bool) $r->supporting_document,
-                'is_new'       => $r->updated_at->gt(now()->subHours(self::NEW_BADGE_HOURS)),
-                'priority'     => $r->status === 'rejected' ? 'high' : 'normal',
-                'created_at'   => $r->updated_at,
-                'rejected'     => $r->status === 'rejected',
-            ]);
-
-        return $memberships->concat($certificates)->concat($nameChanges);
+        return $memberships->concat($certificates);
     }
 }

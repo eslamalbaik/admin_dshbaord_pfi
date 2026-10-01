@@ -1,189 +1,158 @@
 <script setup lang="ts">
-import { MapPin, Phone, Mail, Clock, HardHat } from 'lucide-vue-next'
+import { ref } from 'vue'
+import { Clock, Mail, MapPin, Phone } from 'lucide-vue-next'
 
-const quickLinks = [
-  { label: 'الرئيسية',         href: '/landing' },
-  { label: 'عن الاتحاد',       href: '/landing/about' },
-  { label: 'مجلس الإدارة',    href: '/landing/board' },
-  { label: 'اللجان والفروع',  href: '/landing/committees' },
-  { label: 'أعضاء الاتحاد',  href: '/landing/members' },
+const unionLinks = [
+  { label: 'الرئيسية', href: '/landing' },
+  { label: 'الخدمات الالكترونية', href: '/landing/services' },
+  { label: 'عن الاتحاد', href: '/landing/about' },
+  { label: 'المركز الاعلامي', href: '/landing/news' },
+  { label: 'تواصل معنا', href: '/landing/contact-us' },
 ]
 
 const serviceLinks = [
-  { label: 'خدمات الاتحاد',   href: '/landing/services' },
-  { label: 'المشاريع والمعارض', href: '/landing/projects' },
-  { label: 'التدريب وبناء القدرات', href: '/landing/training-center' },
-  { label: 'التشريعات والأنظمة', href: '/landing/legislation' },
-  { label: 'مكتبة الملفات',    href: '/landing/library' },
-  { label: 'العطاءات', href: '/landing/public-tenders' },
+  { label: 'طلب شهادة عضوية', href: '/contractor/login' },
+  { label: 'طلب شهادة تصنيف', href: '/contractor/login' },
+  { label: 'سوق الاليات والمعدات', href: '/contractor/login' },
+  { label: 'بوابة العطاءات', href: '/landing/public-tenders' },
+  { label: 'الذمم المالية', href: '/contractor/login' },
 ]
 
 const legalLinks = [
-  { label: 'الأسئلة الشائعة',  href: '/landing/faq-public' },
-  { label: 'تواصل معنا',        href: '/landing/contact-us' },
-  { label: 'سياسة الخصوصية',   href: '/landing/privacy-policy' },
-  { label: 'الشروط والأحكام',   href: '/landing/terms' },
+  { label: 'الاسئلة الشائعة', href: '/landing/faq-public' },
+  { label: 'الشروط والاحكام', href: '/landing/terms' },
+  { label: 'سياسة الخصوصية', href: '/landing/privacy-policy' },
 ]
+
+const branches = {
+  gaza: { address: 'غزة - الرمال', phone: '+970-592373805' },
+  westbank: { address: 'رام الله - شارع الإرسال', phone: '+970-2-2987654' },
+}
+const branch = ref<keyof typeof branches>('gaza')
 </script>
 
 <template>
-  <!-- CTA Banner -->
-  <div class="pub-footer-cta-bar">
-    <div class="pub-container pub-cta-inner">
-      <div>
-        <h3 class="pub-cta-title">انضم إلى الاتحاد اليوم</h3>
-        <p class="pub-cta-sub">كن جزءاً من أكبر مجتمع مقاولين في فلسطين</p>
-      </div>
-      <RouterLink to="/landing" class="pub-cta-btn">
-        <HardHat :size="17" /> سجّل عضويتك الآن
-      </RouterLink>
-    </div>
-  </div>
-
-  <!-- Main Footer -->
   <footer class="pub-footer">
     <div class="pub-container pub-footer-grid">
-      <!-- Brand -->
       <div class="pub-footer-brand">
-        <img src="/logo.png" alt="اتحاد المقاولين الفلسطينيين" class="pub-footer-logo" />
-        <p class="pub-footer-name">اتحاد المقاولين الفلسطينيين</p>
-        <p class="pub-footer-en">Palestinian Contractors Union</p>
+        <div class="pub-footer-id">
+          <img src="/images/landing/logo-white.png" alt="اتحاد المقاولين الفلسطينيين" class="pub-footer-logo">
+          <div>
+            <p class="pub-footer-name">اتحاد المقاولين الفلسطينيين</p>
+            <p class="pub-footer-en">Palestinian Contractor<br>Union - PCU</p>
+          </div>
+        </div>
         <p class="pub-footer-bio">
-          الممثل الرسمي لقطاع المقاولات في فلسطين منذ أكثر من ثلاثة عقود،
-          نعمل على تطوير القطاع وحماية حقوق الأعضاء وتعزيز الشراكة مع الجهات الرسمية والدولية.
+          الممثل الرسمي لقطاع المقاولات في فلسطين منذ أكثر من ثلاثة عقود، نعمل على تطوير القطاع وحماية حقوق الأعضاء.
         </p>
         <div class="pub-footer-social">
           <a href="#" class="pub-fsoc" aria-label="Facebook">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" /></svg>
           </a>
-          <a href="#" class="pub-fsoc" aria-label="Twitter">𝕏</a>
-          <a href="#" class="pub-fsoc" aria-label="LinkedIn">in</a>
           <a href="#" class="pub-fsoc" aria-label="Instagram">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r=".8" fill="currentColor" /></svg>
+          </a>
+          <a href="#" class="pub-fsoc" aria-label="LinkedIn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 9h4v11H4zM6 4.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM11 9h3.8v1.6c.6-1 1.8-1.9 3.6-1.9 3.4 0 3.6 2.2 3.6 5V20h-4v-5.3c0-1.3 0-2.9-1.8-2.9S14 13.2 14 14.6V20h-3z" /></svg>
+          </a>
+          <a href="#" class="pub-fsoc" aria-label="X">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.8 3h3.1l-6.8 7.7L22 21h-6.2l-4.9-6.3L5.3 21H2.2l7.2-8.3L2 3h6.3l4.4 5.8zm-1.1 16.2h1.7L7.4 4.7H5.6z" /></svg>
           </a>
         </div>
       </div>
 
-      <!-- Quick Links -->
-      <div class="pub-footer-col">
+      <nav class="pub-footer-col" aria-label="روابط الاتحاد">
         <h4 class="pub-footer-col-h">روابط الاتحاد</h4>
-        <RouterLink v-for="l in quickLinks" :key="l.href" :to="l.href" class="pub-footer-link">{{ l.label }}</RouterLink>
-      </div>
+        <RouterLink v-for="l in unionLinks" :key="l.label" :to="l.href" class="pub-footer-link">{{ l.label }}</RouterLink>
+      </nav>
 
-      <!-- Services -->
-      <div class="pub-footer-col">
-        <h4 class="pub-footer-col-h">الخدمات والمحتوى</h4>
-        <RouterLink v-for="l in serviceLinks" :key="l.href" :to="l.href" class="pub-footer-link">{{ l.label }}</RouterLink>
-      </div>
+      <nav class="pub-footer-col" aria-label="الخدمات الالكترونية">
+        <h4 class="pub-footer-col-h">الخدمات الالكترونية</h4>
+        <RouterLink v-for="l in serviceLinks" :key="l.label" :to="l.href" class="pub-footer-link">{{ l.label }}</RouterLink>
+      </nav>
 
-      <!-- Contact + Legal -->
-      <div class="pub-footer-col">
+      <div class="pub-footer-col pub-footer-contact-col">
         <h4 class="pub-footer-col-h">تواصل معنا</h4>
-        <p class="pub-footer-contact"><MapPin :size="13" class="pub-fco-ico" /> رام الله، فلسطين — شارع الإرسال</p>
-        <p class="pub-footer-contact" dir="ltr"><Phone :size="13" class="pub-fco-ico" /> +970 2 000 0000</p>
-        <p class="pub-footer-contact"><Mail :size="13" class="pub-fco-ico" /> info@pcu.ps</p>
-        <p class="pub-footer-contact"><Clock :size="13" class="pub-fco-ico" /> الأحد — الخميس: ٨ص — ٤م</p>
-
-        <h4 class="pub-footer-col-h" style="margin-top:1.5rem">روابط قانونية</h4>
-        <RouterLink v-for="l in legalLinks" :key="l.href" :to="l.href" class="pub-footer-link">{{ l.label }}</RouterLink>
+        <div class="pub-branch-toggle" role="tablist">
+          <button :class="{ active: branch === 'gaza' }" @click="branch = 'gaza'">غزة</button>
+          <button :class="{ active: branch === 'westbank' }" @click="branch = 'westbank'">الضفة</button>
+        </div>
+        <p class="pub-footer-contact"><span class="pub-fco-ico"><MapPin :size="20" /></span>{{ branches[branch].address }}</p>
+        <p class="pub-footer-contact"><span class="pub-fco-ico"><Phone :size="20" /></span><span dir="ltr">{{ branches[branch].phone }}</span></p>
+        <p class="pub-footer-contact"><span class="pub-fco-ico"><Mail :size="20" /></span>info.pcu@gmail.com</p>
+        <p class="pub-footer-contact"><span class="pub-fco-ico"><Clock :size="20" /></span>الاحد - الخميس : 8ص - 4م</p>
       </div>
     </div>
 
-    <!-- Bottom Bar -->
-    <div class="pub-footer-bottom">
-      <div class="pub-container pub-footer-bottom-inner">
-        <p>جميع الحقوق محفوظة © {{ new Date().getFullYear() }} — اتحاد المقاولين الفلسطينيين</p>
-        <p class="pub-footer-dev">منصة رقمية متكاملة</p>
+    <div class="pub-container">
+      <div class="pub-footer-bottom">
+        <p>جميع الحقوق محفوظة © {{ new Date().getFullYear() }} – اتحاد المقاولين الفلسطينيين</p>
+        <p class="pub-footer-legal">
+          <template v-for="(l, i) in legalLinks" :key="l.href">
+            <span v-if="i" class="sep">|</span>
+            <RouterLink :to="l.href">{{ l.label }}</RouterLink>
+          </template>
+        </p>
       </div>
     </div>
   </footer>
-
-  <!-- Floating WhatsApp -->
-  <a href="https://wa.me/970200000000" class="pub-float-wa" target="_blank" rel="noopener" aria-label="واتساب">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.558 4.116 1.533 5.845L.073 23.25a.5.5 0 0 0 .613.613l5.405-1.46A11.94 11.94 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22a9.94 9.94 0 0 1-5.163-1.444l-.371-.221-3.809 1.03 1.03-3.809-.221-.371A9.94 9.94 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
-    <span>واتساب</span>
-  </a>
 </template>
 
 <style scoped>
-@import url('https://fonts.cdnfonts.com/css/neo-sans-arabic');
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap');
-@import url('https://fonts.cdnfonts.com/css/dubai');
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
 
-footer, .pub-footer-cta-bar, .pub-float-wa { font-family: 'Dubai', 'Neo Sans Arabic', 'Tajawal', 'Neo Sans Arabic', 'Cairo', sans-serif; }
-.pub-container { max-width: 1240px; margin: 0 auto; padding: 0 1.5rem; }
+.pub-footer { background: #000068; color: #fff; font-family: 'Tajawal', 'Cairo', sans-serif; }
+.pub-footer p { margin: 0; }
+.pub-container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+.pub-footer-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, .8fr) minmax(0, .9fr) minmax(0, 1fr); gap: 40px; padding: 40px 24px 30px; }
 
-.pub-footer-cta-bar {
-  background: linear-gradient(135deg, #1a237e, #283593);
-  padding: 1.75rem 0; border-bottom: 1px solid rgba(255,255,255,.1);
-}
-.pub-cta-inner { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; }
-.pub-cta-title { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: 1.25rem; font-weight: 900; color: #fff; margin-bottom: .2rem; }
-.pub-cta-sub { font-size: .85rem; color: rgba(255,255,255,.7); }
-.pub-cta-btn {
-  display: inline-flex; align-items: center; gap: .5rem;
-  background: linear-gradient(135deg, #f9a825, #e65100);
-  color: #fff; border: none; border-radius: 10px;
-  padding: .8rem 1.75rem; font-size: .9rem; font-weight: 800;
-  cursor: pointer; font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif; white-space: nowrap;
-  text-decoration: none; transition: all .25s;
-  box-shadow: 0 4px 14px rgba(249,168,37,.3);
-}
-.pub-cta-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(249,168,37,.4); }
-
-.pub-footer { background: #0d1b4b; color: rgba(255,255,255,.75); font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif; }
-.pub-footer-grid {
-  display: grid; grid-template-columns: 1.7fr 1fr 1fr 1fr;
-  gap: 3rem; padding: 3.5rem 0 3rem;
-  border-bottom: 1px solid rgba(255,255,255,.08);
-}
-.pub-footer-logo { height: 64px; width: auto; object-fit: contain; margin-bottom: .75rem; filter: brightness(0) invert(1) opacity(.9); }
-.pub-footer-name { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: .95rem; font-weight: 900; color: #fff; margin-bottom: .15rem; }
-.pub-footer-en { font-size: .65rem; color: rgba(255,255,255,.45); margin-bottom: .875rem; letter-spacing: .04em; }
-.pub-footer-bio { font-size: .82rem; color: rgba(255,255,255,.5); line-height: 1.85; margin-bottom: 1.25rem; }
-.pub-footer-social { display: flex; gap: .5rem; }
+.pub-footer-id { display: flex; align-items: center; gap: 18px; margin-bottom: 20px; }
+.pub-footer-logo { height: 84px; width: auto; }
+.pub-footer-name { font-size: 1.15rem; font-weight: 500; margin-bottom: 8px !important; }
+.pub-footer-en { font-size: 1.05rem; color: rgba(255, 255, 255, .85); direction: ltr; text-align: left; line-height: 1.5; }
+.pub-footer-bio { font-size: 1.15rem; line-height: 1.75; margin-bottom: 26px !important; }
+.pub-footer-social { display: flex; gap: 14px; justify-content: flex-end; }
 .pub-fsoc {
-  width: 34px; height: 34px; border-radius: 8px;
-  background: rgba(255,255,255,.1); color: rgba(255,255,255,.65);
-  display: flex; align-items: center; justify-content: center;
-  font-size: .82rem; text-decoration: none;
-  border: 1px solid rgba(255,255,255,.1); transition: all .2s;
+  width: 36px; height: 36px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, .25);
+  display: grid; place-items: center; color: #fff; text-decoration: none; transition: background .2s;
 }
-.pub-fsoc:hover { background: #f9a825; color: #0d1b4b; border-color: #f9a825; }
+.pub-fsoc:hover { background: rgba(255, 255, 255, .12); }
+
+.pub-footer-col { display: flex; flex-direction: column; gap: 18px; padding-top: 22px; }
 .pub-footer-col-h {
-  font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: .88rem; font-weight: 800; color: #fff;
-  margin-bottom: 1.25rem; padding-bottom: .55rem;
-  border-bottom: 2px solid #f9a825; display: inline-block;
+  margin: 0 0 4px; font-size: 1.05rem; font-weight: 600; color: #fff; position: relative; padding-bottom: 10px; align-self: flex-start;
 }
-.pub-footer-link { display: block; color: rgba(255,255,255,.5); text-decoration: none; font-size: .83rem; margin-bottom: .55rem; transition: color .2s; }
-.pub-footer-link:hover { color: #f9a825; }
-.pub-footer-contact { font-size: .82rem; color: rgba(255,255,255,.5); margin-bottom: .55rem; display: flex; align-items: center; gap: .4rem; line-height: 1.55; }
-.pub-fco-ico { flex-shrink: 0; color: #f9a825; }
-.pub-footer-bottom { padding: 1.5rem 0; }
-.pub-footer-bottom-inner { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem; }
-.pub-footer-bottom-inner p { font-size: .8rem; color: rgba(255,255,255,.35); }
-.pub-footer-dev { font-size: .75rem; }
+.pub-footer-col-h::after { content: ''; position: absolute; bottom: 0; right: 0; width: 26px; height: 1.5px; background: #d67a00; }
+.pub-footer-link { color: #fff; text-decoration: none; font-size: .95rem; transition: color .2s; }
+.pub-footer-link:hover { color: #ffbe1a; }
 
-.pub-float-wa {
-  position: fixed; bottom: 2rem; left: 2rem; z-index: 500;
-  background: #25d366; color: #fff; border-radius: 50px;
-  padding: .7rem 1.25rem .7rem .9rem;
-  display: flex; align-items: center; gap: .6rem;
-  text-decoration: none; font-size: .85rem; font-weight: 700;
-  box-shadow: 0 6px 20px rgba(37,211,102,.4); font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif;
-  animation: wa-float 3s ease-in-out infinite; border: 2px solid rgba(255,255,255,.3);
+.pub-footer-contact-col { padding-top: 0; gap: 14px; align-items: flex-start; }
+.pub-branch-toggle { display: flex; border: 1px solid rgba(255, 255, 255, .5); border-radius: 18px; padding: 4px; }
+.pub-branch-toggle button {
+  border: none; background: transparent; color: #fff; font-family: inherit; font-size: 1rem; font-weight: 600;
+  padding: 8px 28px; border-radius: 14px; cursor: pointer;
 }
-.pub-float-wa:hover { background: #128c7e; }
-@keyframes wa-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+.pub-branch-toggle button.active { background: #d67a00; }
+.pub-footer-contact { display: flex; align-items: center; gap: 12px; font-size: .92rem; font-weight: 500; }
+.pub-fco-ico {
+  width: 34px; height: 34px; border-radius: 8px; background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .15);
+  display: grid; place-items: center; color: #d67a00; flex-shrink: 0;
+}
 
-@media (max-width: 1024px) {
-  .pub-footer-grid { grid-template-columns: 1fr 1fr; gap: 2.5rem; }
+.pub-footer-bottom {
+  border-top: 1px solid rgba(255, 255, 255, .3); padding: 20px 0 26px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: .92rem;
+}
+.pub-footer-legal { display: flex; align-items: center; gap: 8px; }
+.pub-footer-legal a { color: #fff; text-decoration: underline; text-underline-offset: 4px; }
+.pub-footer-legal .sep { color: rgba(255, 255, 255, .6); }
+
+@media (max-width: 1000px) {
+  .pub-footer-grid { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 600px) {
-  .pub-footer-grid { grid-template-columns: 1fr; gap: 2rem; }
-  .pub-cta-inner { flex-direction: column; text-align: center; }
-  .pub-float-wa span { display: none; }
-  .pub-float-wa { padding: .7rem; border-radius: 50%; }
-  .pub-footer-bottom-inner { flex-direction: column; text-align: center; }
+  .pub-footer-grid { grid-template-columns: 1fr; gap: 28px; }
+  .pub-footer-social { justify-content: flex-start; }
+  .pub-footer-bottom { flex-direction: column; text-align: center; }
 }
 </style>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import api from '@/plugins/axios'
+import { contractorDocumentLabels } from '@/utils/contractorDocuments'
 import { useRoute, useRouter } from 'vue-router'
 
 definePage({ meta: { requiresAdmin: true, adminOnly: true } })
@@ -27,19 +28,26 @@ const form = ref({
   owner_name: '',
   partners: [] as string[],
   authorized_person: '',
+  authorized_person_id_number: '',
+  authorized_person_phone: '',
+  authorized_person_whatsapp: '',
 
   // Step 3: العنوان وبيانات الاتصال
   phone: '',
   fax: '',
   email: '',
-  city: '',
+  governorate_id: null as number | null,
+  city_id: null as number | null,
+  district: '',
   address: '',
-  trade: '',
+  building: '',
+  floor: '',
   specialties: [
     { field_lk_type: null as number | null, specialization_lk_type: null as number | null, classification: '' }
   ] as Array<{ field_lk_type: number | null, specialization_lk_type: number | null, classification: string }>,
   established_date: '',
   license_number: '',
+  classification: '',
 
   // Step 4: الوثائق والمستندات المطلوبة
   lease_or_ownership_contract: null as File | null,
@@ -47,11 +55,13 @@ const form = ref({
   municipal_license: null as File | null,
   company_register: null as File | null,
   cr_file: null as File | null,
+  id_file: null as File | null,
   articles_of_association: null as File | null,
   internal_bylaws: null as File | null,
   bank_dealing_letter: null as File | null,
   secretary_contract: null as File | null,
   full_time_engineer_certificate: null as File | null,
+  accountant_certificate_or_contract: null as File | null,
   partners_ids: null as File | null,
   authorization_letter: null as File | null,
   notes: '',
@@ -80,47 +90,136 @@ const addSpecialty = () => {
   form.value.specialties.push({ field_lk_type: null, specialization_lk_type: null, classification: '' })
 }
 
-const removeSpecialty = (index: number) => {
-  if (form.value.specialties.length > 1) {
-    form.value.specialties.splice(index, 1)
+const removeSpecialtyDialog = ref(false)
+const removingSpecialtyIndex = ref<number | null>(null)
+
+const confirmRemoveSpecialty = (index: number) => {
+  removingSpecialtyIndex.value = index
+  removeSpecialtyDialog.value = true
+}
+
+const removeSpecialty = () => {
+  if (removingSpecialtyIndex.value !== null)
+    form.value.specialties.splice(removingSpecialtyIndex.value, 1)
+  removeSpecialtyDialog.value = false
+  removingSpecialtyIndex.value = null
+}
+
+// المجالات/الاختصاصات/الدرجات وربط المحافظات-المدن تُجلب من الخادم (مصدر واحد REQ-01 #6،
+// بدل تكرار القوائم هنا ثابتة يدوياً كما كان سابقاً).
+const fieldOptions = ref<Array<{ title: string, value: number }>>([])
+const specializationOptions = ref<Array<{ title: string, value: number }>>([])
+const fieldSpecializations = ref<Record<number, number[]>>({})
+const gradeOptions = ref<Array<{ title: string, value: string }>>([])
+const topTierFields = ref<number[]>([])
+// التصنيف العام (contractors.classification) — منفصل عن تصنيف كل مجال/تخصص، ويقدر المقاول
+// يعدّله من التطبيق (dashboard.vue: editClassification) لكن كان غير معروض إطلاقاً بفورم لوحة
+// الأدمن، فيبدو للأدمن أن تعديل المقاول من التطبيق "لم ينعكس" رغم نجاح الحفظ فعلياً (TASK-03).
+const overallGradeOptions = ref<Array<{ title: string, value: string }>>([])
+
+const specializationOptionsFor = (fieldLkType: number | null) => {
+  if (!fieldLkType || !fieldSpecializations.value[fieldLkType])
+    return specializationOptions.value
+  const allowed = fieldSpecializations.value[fieldLkType]
+  return specializationOptions.value.filter(s => allowed.includes(s.value))
+}
+
+const gradeOptionsFor = (fieldLkType: number | null) =>
+  topTierFields.value.includes(fieldLkType as number) ? gradeOptions.value : gradeOptions.value.filter(g => g.value !== 'اولى أ')
+
+const governorates = ref<Array<{ id: number, name: string, cities: Array<{ id: number, name: string }> }>>([])
+const citiesForGovernorate = (governorateId: number | null) =>
+  governorates.value.find(g => g.id === governorateId)?.cities ?? []
+
+
+// قيود رفع المستندات (TASK-16 #2) — تُجلب من الخادم لأن السقف الحقيقي هو
+// upload_max_filesize في ini لا رقم ثابت هنا؛ رقم ثابت يفارق الخادم بصمت.
+const uploadLimits = ref({ max_file_kb: 0, max_file_mb: 0, max_post_mb: 0, allowed_extensions: [] as string[] })
+
+const fileHint = computed(() => uploadLimits.value.max_file_mb
+  ? `الحد الأقصى ${uploadLimits.value.max_file_mb} ميجابايت للملف — الصيغ المسموحة: ${uploadLimits.value.allowed_extensions.join('، ')}`
+  : '')
+
+// الرفض هنا قبل بدء الرفع هو ما يمنع انتظار رفع ملف سيُرفض أصلاً (TASK-16 #3):
+// المتصفح يرسل الجسم كاملاً ثم يُسقطه PHP، فالتحقق بعد الوصول لا يوفّر الانتظار.
+const fileSizeRule = (v: any) => {
+  const max = uploadLimits.value.max_file_kb
+  if (!max) return true
+  const files = Array.isArray(v) ? v : (v ? [v] : [])
+  const tooBig = files.find((f: any) => f instanceof File && f.size / 1024 > max)
+  return tooBig
+    ? `حجم الملف ${(tooBig.size / 1024 / 1024).toFixed(1)} ميجابايت — يتجاوز الحد الأقصى ${uploadLimits.value.max_file_mb} ميجابايت.`
+    : true
+}
+
+const totalAttachmentsMb = computed(() => {
+  const vals = Object.values(form.value).filter((v: any) => v instanceof File) as File[]
+  return vals.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024
+})
+
+const attachmentsTooLarge = computed(() =>
+  !!uploadLimits.value.max_post_mb && totalAttachmentsMb.value > uploadLimits.value.max_post_mb)
+
+const fetchCatalog = async () => {
+  try {
+    const { data } = await api.get('/api/v1/app/specialties-catalog')
+    const items = data.items ?? data
+    fieldOptions.value = (items.fields ?? []).map((f: any) => ({ title: f.name, value: f.id }))
+    specializationOptions.value = (items.specializations ?? []).map((s: any) => ({ title: s.name, value: s.id }))
+    fieldSpecializations.value = items.field_specializations ?? {}
+    gradeOptions.value = (items.grades ?? []).map((g: any) => ({ title: g.label, value: g.value }))
+    topTierFields.value = (items.grades ?? []).find((g: any) => g.eligible_fields)?.eligible_fields ?? []
+    overallGradeOptions.value = (items.overall_grades ?? []).map((g: any) => ({ title: g.label, value: g.value }))
+    if (items.upload_limits) uploadLimits.value = items.upload_limits
+  } catch (err) {
+    console.error('Failed to fetch specialties catalog', err)
   }
 }
 
-const fieldOptions = [
-  { title: 'غير محدد', value: 10 },
-  { title: 'طرق', value: 20 },
-  { title: 'ابنية', value: 30 },
-  { title: 'كهروميكانيك', value: 40 },
-  { title: 'الميــاه/المجــارى', value: 50 },
-  { title: 'أشغال عامه', value: 60 },
-]
+const fetchGovernorates = async () => {
+  try {
+    const { data } = await api.get('/api/v1/app/governorates')
+    governorates.value = (data.items ?? data).governorates ?? []
+  } catch (err) {
+    console.error('Failed to fetch governorates', err)
+  }
+}
 
-const specializationOptions = [
-  { title: 'غير محدد', value: 10 },
-  { title: 'الطرق', value: 20 },
-  { title: 'خلطات اسفلتيه', value: 30 },
-  { title: 'خرسانه جسور وعبارات', value: 40 },
-  { title: 'اشغال ترابيه', value: 50 },
-  { title: 'الأبنية', value: 60 },
-  { title: 'خرسانه مصنعه', value: 70 },
-  { title: 'منشأت معدنية', value: 80 },
-  { title: 'أبنية جاهزه بريفاف', value: 90 },
-  { title: 'صيانة الابنيه', value: 100 },
-  { title: 'كهروميكانيك', value: 110 },
-  { title: 'صيانة كهروميكانيك', value: 120 },
-  { title: 'ميكانيك', value: 130 },
-  { title: 'كـهرباء', value: 140 },
-  { title: 'الكترونيات', value: 150 },
-  { title: 'المياه والمجاري', value: 160 },
-  { title: 'محطات التنقيه', value: 170 },
-  { title: 'الري والصرف', value: 180 },
-  { title: 'حفريات وتعدين', value: 190 },
-  { title: 'اشغال عامه', value: 200 },
-  { title: 'سكك حديدية', value: 210 },
-  { title: 'حفر آبار', value: 220 },
-]
+// روابط الملفات المرفوعة مسبقاً — تُعرض للمعاينة/التحميل جنب كل حقل رفع، بدل ما يظهر الحقل فاضي
+const documentKeys = [
+  'lease_or_ownership_contract', 'company_approval_letter', 'municipal_license', 'company_register',
+  'cr_file', 'id_file', 'articles_of_association', 'internal_bylaws', 'bank_dealing_letter',
+  'secretary_contract', 'full_time_engineer_certificate', 'accountant_certificate_or_contract',
+  'partners_ids', 'authorization_letter',
+] as const
 
-const classOptions = ['أ', 'ب', 'ج', 'د', 'الأولى أ', 'الأولى ب', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة']
+const existingFiles = ref<Record<string, string | null>>({})
+
+// ── حذف مستند قائم (TASK-16 #4) ──
+// سابقاً كان الاستبدال هو السبيل الوحيد لإزالة مستند. يُجمَع المحدَّد للحذف محلياً
+// ويُرسَل عند الحفظ كـ remove_documents[]، لا فوراً — حتى يبقى "إلغاء" ممكناً قبل الحفظ،
+// ولأن الحذف على الخادم لا رجعة فيه (يُمحى الملف من القرص).
+const documentLabels: Record<string, string> = contractorDocumentLabels
+
+const documentsToRemove = ref<string[]>([])
+const removeDocumentDialog = ref(false)
+const removingDocumentKey = ref<string | null>(null)
+
+const confirmRemoveDocument = (key: string) => {
+  removingDocumentKey.value = key
+  removeDocumentDialog.value = true
+}
+
+const removeDocument = () => {
+  if (removingDocumentKey.value && !documentsToRemove.value.includes(removingDocumentKey.value))
+    documentsToRemove.value.push(removingDocumentKey.value)
+  removeDocumentDialog.value = false
+  removingDocumentKey.value = null
+}
+
+const undoRemoveDocument = (key: string) => {
+  documentsToRemove.value = documentsToRemove.value.filter(k => k !== key)
+}
 
 const fetchContractor = async () => {
   try {
@@ -131,12 +230,18 @@ const fetchContractor = async () => {
     const textFields = [
       'membership_number', 'commercial_register', 'name', 'capital', 'registration_date',
       'legal_form', 'company_purposes', 'owner_name', 'authorized_person',
-      'phone', 'fax', 'email', 'city', 'address', 'trade', 'established_date', 'license_number', 'notes'
+      'authorized_person_id_number', 'authorized_person_phone', 'authorized_person_whatsapp',
+      'phone', 'fax', 'email', 'governorate_id', 'city_id', 'district', 'building', 'floor',
+      'address', 'established_date', 'license_number', 'classification', 'notes'
     ]
     
+    const dateFields = ['established_date']
+
     textFields.forEach(field => {
       if (contractor[field] !== null && contractor[field] !== undefined) {
-        (form.value as any)[field] = contractor[field]
+        (form.value as any)[field] = dateFields.includes(field)
+          ? String(contractor[field]).substring(0, 10)
+          : contractor[field]
       }
     })
 
@@ -163,43 +268,105 @@ const fetchContractor = async () => {
     } else {
       form.value.partners = []
     }
+
+    documentKeys.forEach(key => {
+      existingFiles.value[key] = contractor[`${key}_url`] ?? contractor[key] ?? null
+    })
   } catch (err) {
     errorMsg.value = 'فشل جلب بيانات المقاول.'
   } finally {
+    // ننتظر أن يُفرَّغ الـ watch الخاص بـ governorate_id (يُجدوَل كـ microtask) قبل رفع initLoading،
+    // وإلا يقرأ الـ watch القيمة الجديدة لـ initLoading قبل تنفيذه فعلياً ويمسح city_id المحمَّل لتوّه.
+    await nextTick()
     initLoading.value = false
   }
 }
 
 onMounted(() => {
   fetchContractor()
+  fetchCatalog()
+  fetchGovernorates()
 })
 
 const nextStep = () => { if (step.value < 4) step.value++ }
 const prevStep = () => { if (step.value > 1) step.value-- }
 
+// لا يُفرَّغ city_id إلا عند تغيير المحافظة يدوياً بعد تحميل الملف — وإلا يُمسح city_id
+// المحمَّل من fetchContractor فوراً لأن ضبط governorate_id يُطلق هذا الـ watch أيضاً.
+watch(() => form.value.governorate_id, () => {
+  if (!initLoading.value)
+    form.value.city_id = null
+})
+
+const uploadProgress = ref(0)
+
 const submit = async () => {
+  // فحص المجموع قبل أي رفع (TASK-16 #3): المتصفح يرفع الجسم كاملاً ثم يُسقطه PHP
+  // لتجاوزه post_max_size — فبدون هذا الفحص ينتظر المستخدم رفع كل الملفات ثم يفشل.
+  if (attachmentsTooLarge.value) {
+    errorMsg.value = `مجموع أحجام المرفقات ${totalAttachmentsMb.value.toFixed(1)} ميجابايت `
+      + `ويتجاوز الحد الأقصى ${uploadLimits.value.max_post_mb} ميجابايت للطلب الواحد. `
+      + 'يرجى تقليل حجم بعض الملفات قبل الحفظ.'
+    step.value = 4
+
+    return
+  }
+
   loading.value = true
+  uploadProgress.value = 0
   errorMsg.value = ''
   validationErrors.value = {}
   try {
     const fd = new FormData()
     fd.append('_method', 'PUT') // Laravel uses PUT for file updates via POST request
-    
+
     Object.entries(form.value).forEach(([k, v]) => {
-      if (v !== null && v !== '') {
+      // VFileInput يُعيد [] (وليس null) عند تفريغ حقل الملف — بدون هذا الفحص كان يُرسَل
+      // مصفوفة فارغة كقيمة للحقل فيرفضها الخادم بخطأ "يجب أن يكون ملفاً" رغم عدم تعديل
+      // المستخدم للملف أصلاً، وهو سبب الخطأ المُبلَّغ عنه بعد فشل التحديث وحذف كل المرفقات (REQ-01 #4).
+      if (Array.isArray(v) && v.length === 0 && k !== 'partners' && k !== 'specialties')
+        return
+      // v-model لحقل ملف مُفرَّغ (زر X) قد يصير undefined لا null فقط — v !== null وحدها
+      // كانت تسمح بمرور undefined فيُرسَل كنص "undefined" حرفياً فيرفضه الخادم (سبب
+      // ظهور الحقل "مطلوب" رغم أن المستخدم لم يقصد تعديل هذا المستند أصلاً).
+      if (v != null) {
         if (k === 'partners' && Array.isArray(v)) {
-          if (v.length > 0) fd.append(k, v.join(','))
+          fd.append(k, v.join(','))
         } else if (k === 'specialties' && Array.isArray(v)) {
           fd.append(k, JSON.stringify(v))
-        } else {
+        } else if (!(v instanceof File) || v.size > 0) {
           fd.append(k, v as any)
         }
       }
     })
-    await api.post(`/api/v1/contractors/${route.params.id}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+    // المستندات المحدَّدة للحذف — قائمة صريحة، لا "قيمة فارغة تعني الحذف": VFileInput
+    // يُرجع [] عند تفريغه والفحص أعلاه يتخطّاها عمداً (إصلاح REQ-01 #4).
+    documentsToRemove.value.forEach(key => {
+      // رفعُ بديل لنفس الحقل يُلغي علامة الحذف — الخادم يُرجّح الرفع أيضاً، لكن عدم
+      // إرسالها أصلاً أوضح من الاتّكال على ترتيب المعالجة هناك.
+      if (!form.value[key as keyof typeof form.value])
+        fd.append('remove_documents[]', key)
+    })
+
+    await api.post(`/api/v1/contractors/${route.params.id}`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: e => {
+        uploadProgress.value = e.total ? Math.round((e.loaded / e.total) * 100) : 0
+      },
+    })
     router.push({ name: 'contractors' })
   }
   catch (err: any) {
+    // 413 = أسقط PHP جسم الطلب لتجاوزه post_max_size؛ رسالة الخادم تشرح الحد
+    // بدقة، والرسالة العامة هنا كانت تُخفي أن السبب هو الحجم لا المدخلات (TASK-16 #3).
+    if (err?.response?.status === 413) {
+      errorMsg.value = err?.response?.data?.message
+        || 'حجم المرفقات يتجاوز الحد الأقصى المسموح به. يرجى تقليل حجم الملفات أو رفعها على دفعات.'
+      step.value = 4
+
+      return
+    }
+
     errorMsg.value = err?.response?.data?.message || 'فشل تحديث المقاول. يرجى التحقق من المدخلات.'
     
     const errors = err?.response?.data?.errors
@@ -210,7 +377,7 @@ const submit = async () => {
             step.value = 1
         } else if (errors.owner_name || errors.partners || errors.authorized_person) {
             step.value = 2
-        } else if (errors.phone || errors.fax || errors.email || errors.city || errors.address || errors.license_number || errors.established_date || errors.specialties) {
+        } else if (errors.phone || errors.fax || errors.email || errors.governorate_id || errors.city_id || errors.district || errors.address || errors.building || errors.floor || errors.license_number || errors.established_date || errors.classification || errors.specialties) {
             step.value = 3
         } else {
             step.value = 4
@@ -262,9 +429,9 @@ const submit = async () => {
             <VTextField v-model="form.membership_number" readonly label="رقم العضوية بالاتحاد *" :error-messages="validationErrors.membership_number" :rules="[
               v => !!v || 'مطلوب',
               v => {
-                if (/^[0-9]+$/.test(v)) return (parseInt(v) >= 1 && parseInt(v) <= 927) || 'أرقام العضوية القديمة يجب أن تكون بين 1 و 927'
-                if (/^[0-9]+_g$/.test(v)) return parseInt(v.split('_')[0]) >= 928 || 'أرقام العضوية الجديدة يجب أن تبدأ من 928_g'
-                return 'صيغة غير صحيحة (مثال: 100 أو 928_g)'
+                // كل الأرقام بصيغة _g — الرقم بدون لاحقة يُكمَل تلقائياً في الخادم
+                if (/^[0-9]+(_g)?$/.test(v)) return parseInt(v) >= 1 || 'رقم العضوية يجب أن يكون 1 أو أكثر'
+                return 'صيغة غير صحيحة (مثال: 184_g)'
               }
             ]" />
           </VCol>
@@ -304,6 +471,15 @@ const submit = async () => {
           </VCol>
           <VCol cols="12" md="6">
             <VTextField v-model="form.authorized_person" label="اسم المفوض بالتوقيع" :error-messages="validationErrors.authorized_person" />
+          </VCol>
+          <VCol cols="12" md="4">
+            <VTextField v-model="form.authorized_person_id_number" label="رقم هوية المفوض" :error-messages="validationErrors.authorized_person_id_number" />
+          </VCol>
+          <VCol cols="12" md="4">
+            <VTextField v-model="form.authorized_person_phone" label="رقم جوال المفوض" :error-messages="validationErrors.authorized_person_phone" />
+          </VCol>
+          <VCol cols="12" md="4">
+            <VTextField v-model="form.authorized_person_whatsapp" label="رقم الواتساب للمفوض" :error-messages="validationErrors.authorized_person_whatsapp" />
           </VCol>
           <VCol cols="12">
             <div class="d-flex align-center gap-2">
@@ -365,15 +541,38 @@ const submit = async () => {
           </VCol>
           <VCol cols="12" md="4">
             <VSelect
-              v-model="form.city"
-              :items="['شمال غزة', 'غزة', 'الوسطى', 'خان يونس', 'رفح']"
-              label="المدينة / المحافظة (غزة) *"
-              :error-messages="validationErrors.city"
+              v-model="form.governorate_id"
+              :items="governorates"
+              item-title="name"
+              item-value="id"
+              label="المحافظة *"
+              :error-messages="validationErrors.governorate_id"
               :rules="[v => !!v || 'مطلوب']"
             />
           </VCol>
+          <VCol cols="12" md="4">
+            <VSelect
+              v-model="form.city_id"
+              :items="citiesForGovernorate(form.governorate_id)"
+              item-title="name"
+              item-value="id"
+              label="المدينة *"
+              :disabled="!form.governorate_id"
+              :error-messages="validationErrors.city_id"
+              :rules="[v => !!v || 'مطلوب']"
+            />
+          </VCol>
+          <VCol cols="12" md="4">
+            <VTextField v-model="form.district" label="الحي *" :error-messages="validationErrors.district" :rules="[v => !!v || 'مطلوب']" />
+          </VCol>
           <VCol cols="12" md="8">
-            <VTextField v-model="form.address" label="العنوان التفصيلي (الحي، الشارع، البناية، الطابق) *" :error-messages="validationErrors.address" :rules="[v => !!v || 'مطلوب']" />
+            <VTextField v-model="form.address" label="العنوان التفصيلي (الشارع) *" :error-messages="validationErrors.address" :rules="[v => !!v || 'مطلوب']" />
+          </VCol>
+          <VCol cols="12" md="2">
+            <VTextField v-model="form.building" label="العمارة *" :error-messages="validationErrors.building" :rules="[v => !!v || 'مطلوب']" />
+          </VCol>
+          <VCol cols="12" md="2">
+            <VTextField v-model="form.floor" label="الطابق *" :error-messages="validationErrors.floor" :rules="[v => !!v || 'مطلوب']" />
           </VCol>
           <!-- التخصصات والتصنيفات المتعددة -->
           <VCol cols="12">
@@ -388,12 +587,13 @@ const submit = async () => {
                   item-value="value"
                   label="المجال *"
                   :rules="[v => !!v || 'مطلوب']"
+                  @update:model-value="spec.specialization_lk_type = null"
                 />
               </VCol>
               <VCol cols="12" md="4">
                 <VSelect
                   v-model="spec.specialization_lk_type"
-                  :items="specializationOptions"
+                  :items="specializationOptionsFor(spec.field_lk_type)"
                   item-title="title"
                   item-value="value"
                   label="التخصص *"
@@ -403,7 +603,9 @@ const submit = async () => {
               <VCol cols="12" md="3">
                 <VSelect
                   v-model="spec.classification"
-                  :items="classOptions"
+                  :items="gradeOptionsFor(spec.field_lk_type)"
+                  item-title="title"
+                  item-value="value"
                   label="تصنيف المقاول لهذا المجال *"
                   :rules="[v => !!v || 'مطلوب']"
                 />
@@ -413,15 +615,18 @@ const submit = async () => {
                   icon
                   variant="text"
                   color="error"
-                  :disabled="form.specialties.length <= 1"
-                  @click="removeSpecialty(index)"
+                  @click="confirmRemoveSpecialty(index)"
                   title="حذف هذا المجال"
                 >
                   <VIcon icon="tabler-trash" />
                 </VBtn>
               </VCol>
             </VRow>
-            
+
+            <p v-if="!form.specialties.length" class="text-body-2 text-medium-emphasis mb-3" style="font-family:Cairo,sans-serif">
+              لا يوجد مجال/تصنيف مضاف.
+            </p>
+
             <VBtn
               prepend-icon="tabler-plus"
               variant="tonal"
@@ -445,6 +650,19 @@ const submit = async () => {
           <VCol cols="12" md="4">
             <VTextField v-model="form.established_date" label="تاريخ التأسيس *" :error-messages="validationErrors.established_date" type="date" :rules="[v => !!v || 'مطلوب']" />
           </VCol>
+          <VCol cols="12" md="4">
+            <VSelect
+              v-model="form.classification"
+              :items="overallGradeOptions"
+              item-title="title"
+              item-value="value"
+              label="التصنيف العام"
+              clearable
+              :error-messages="validationErrors.classification"
+              hint="يقدر المقاول يعدّله من التطبيق أيضاً — هذا الحقل يعرض ويسمح بتعديل نفس القيمة من لوحة الأدمن"
+              persistent-hint
+            />
+          </VCol>
         </VRow>
       </VCardText>
       <VCardActions class="pa-4">
@@ -461,11 +679,27 @@ const submit = async () => {
         <p class="text-body-2 text-medium-emphasis mb-4">يرجى رفع المستندات الجديدة فقط في حال أردت تحديث المستندات القديمة (يتحول الحقل للون الأخضر عند اختيار ملف جديد):</p>
         <VRow>
           <VCol cols="12" md="6">
+            <div v-if="existingFiles.cr_file && !form.cr_file" class="d-flex align-center gap-2 mb-1">
+              <template v-if="documentsToRemove.includes('cr_file')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('cr_file')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.cr_file!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('cr_file')" />
+              </template>
+            </div>
             <VFileInput
               v-model="form.cr_file"
-              label="السجل التجاري (للتحديث)"
+              :label="`${contractorDocumentLabels.cr_file} (للتحديث)`"
               :error-messages="validationErrors.cr_file"
-              accept=".pdf,image/*"
+              accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -474,11 +708,56 @@ const submit = async () => {
             />
           </VCol>
           <VCol cols="12" md="6">
+            <div v-if="existingFiles.id_file && !form.id_file" class="d-flex align-center gap-2 mb-1">
+              <template v-if="documentsToRemove.includes('id_file')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('id_file')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.id_file!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('id_file')" />
+              </template>
+            </div>
+            <VFileInput
+              v-model="form.id_file"
+              :label="`${contractorDocumentLabels.id_file} (للتحديث)`"
+              :error-messages="validationErrors.id_file"
+              accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
+              class="custom-file-input"
+              persistent-placeholder
+              placeholder="انقر هنا لاختيار الملف أو سحبه"
+              :color="form.id_file ? 'success' : ''"
+              :prepend-icon="form.id_file ? 'tabler-circle-check' : 'tabler-cloud-upload'"
+            />
+          </VCol>
+          <VCol cols="12" md="6">
+            <div v-if="existingFiles.company_register && !form.company_register" class="d-flex align-center gap-2 mb-1">
+              <template v-if="documentsToRemove.includes('company_register')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('company_register')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.company_register!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('company_register')" />
+              </template>
+            </div>
             <VFileInput
               v-model="form.company_register"
-              label="مستخرج عن سجل الشركة (للتحديث)"
+              :label="`${contractorDocumentLabels.company_register} (للتحديث)`"
               :error-messages="validationErrors.company_register"
-              accept=".pdf,image/*"
+              accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -487,11 +766,27 @@ const submit = async () => {
             />
           </VCol>
           <VCol cols="12" md="6">
+            <div v-if="existingFiles.municipal_license && !form.municipal_license" class="d-flex align-center gap-2 mb-1">
+              <template v-if="documentsToRemove.includes('municipal_license')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('municipal_license')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.municipal_license!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('municipal_license')" />
+              </template>
+            </div>
             <VFileInput
               v-model="form.municipal_license"
-              label="رخصة المهن سارية المفعول (للتحديث)"
+              :label="`${contractorDocumentLabels.municipal_license} (للتحديث)`"
               :error-messages="validationErrors.municipal_license"
-              accept=".pdf,image/*"
+              accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -500,11 +795,27 @@ const submit = async () => {
             />
           </VCol>
           <VCol cols="12" md="6">
+            <div v-if="existingFiles.bank_dealing_letter && !form.bank_dealing_letter" class="d-flex align-center gap-2 mb-1">
+              <template v-if="documentsToRemove.includes('bank_dealing_letter')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('bank_dealing_letter')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.bank_dealing_letter!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('bank_dealing_letter')" />
+              </template>
+            </div>
             <VFileInput
               v-model="form.bank_dealing_letter"
-              label="شهادة تعامل للشركة مع بنك (للتحديث)"
+              :label="`${contractorDocumentLabels.bank_dealing_letter} (للتحديث)`"
               :error-messages="validationErrors.bank_dealing_letter"
-              accept=".pdf,image/*"
+              accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -513,11 +824,27 @@ const submit = async () => {
             />
           </VCol>
           <VCol cols="12" md="6">
+            <div v-if="existingFiles.articles_of_association && !form.articles_of_association" class="d-flex align-center gap-2 mb-1">
+              <template v-if="documentsToRemove.includes('articles_of_association')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('articles_of_association')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.articles_of_association!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('articles_of_association')" />
+              </template>
+            </div>
             <VFileInput
               v-model="form.articles_of_association"
-              label="عقد تأسيس الشركة (للتحديث)"
+              :label="`${contractorDocumentLabels.articles_of_association} (للتحديث)`"
               :error-messages="validationErrors.articles_of_association"
-              accept=".pdf,image/*"
+              accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -526,11 +853,27 @@ const submit = async () => {
             />
           </VCol>
           <VCol cols="12" md="6">
+            <div v-if="existingFiles.internal_bylaws && !form.internal_bylaws" class="d-flex align-center gap-2 mb-1">
+              <template v-if="documentsToRemove.includes('internal_bylaws')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('internal_bylaws')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.internal_bylaws!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('internal_bylaws')" />
+              </template>
+            </div>
             <VFileInput
               v-model="form.internal_bylaws"
-              label="النظام الداخلي (للتحديث)"
+              :label="`${contractorDocumentLabels.internal_bylaws} (للتحديث)`"
               :error-messages="validationErrors.internal_bylaws"
-              accept=".pdf,image/*"
+              accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -539,11 +882,27 @@ const submit = async () => {
             />
           </VCol>
           <VCol cols="12" md="6">
+            <div v-if="existingFiles.lease_or_ownership_contract && !form.lease_or_ownership_contract" class="d-flex align-center gap-2 mb-1">
+              <template v-if="documentsToRemove.includes('lease_or_ownership_contract')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('lease_or_ownership_contract')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.lease_or_ownership_contract!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('lease_or_ownership_contract')" />
+              </template>
+            </div>
             <VFileInput
               v-model="form.lease_or_ownership_contract"
-              label="عقد الإيجار أو الملكية لمقر الشركة (للتحديث)"
+              :label="`${contractorDocumentLabels.lease_or_ownership_contract} (للتحديث)`"
               :error-messages="validationErrors.lease_or_ownership_contract"
-              accept=".pdf,image/*"
+              accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -552,11 +911,27 @@ const submit = async () => {
             />
           </VCol>
           <VCol cols="12" md="6">
+            <div v-if="existingFiles.partners_ids && !form.partners_ids" class="d-flex align-center gap-2 mb-1">
+              <template v-if="documentsToRemove.includes('partners_ids')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('partners_ids')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.partners_ids!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('partners_ids')" />
+              </template>
+            </div>
             <VFileInput
               v-model="form.partners_ids"
-              label="صور هويات الشركاء (للتحديث)"
+              :label="`${contractorDocumentLabels.partners_ids} (للتحديث)`"
               :error-messages="validationErrors.partners_ids"
-              accept=".pdf,image/*"
+              accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -565,11 +940,27 @@ const submit = async () => {
             />
           </VCol>
           <VCol cols="12" md="6">
+            <div v-if="existingFiles.authorization_letter && !form.authorization_letter" class="d-flex align-center gap-2 mb-1">
+              <template v-if="documentsToRemove.includes('authorization_letter')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('authorization_letter')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.authorization_letter!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('authorization_letter')" />
+              </template>
+            </div>
             <VFileInput
               v-model="form.authorization_letter"
-              label="كتاب تفويض المعتمد بالتوقيع (للتحديث)"
+              :label="`${contractorDocumentLabels.authorization_letter} (للتحديث)`"
               :error-messages="validationErrors.authorization_letter"
-              accept=".pdf,image/*"
+              accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -578,11 +969,27 @@ const submit = async () => {
             />
           </VCol>
           <VCol cols="12" md="6">
+            <div v-if="existingFiles.company_approval_letter && !form.company_approval_letter" class="d-flex align-center gap-2 mb-1">
+              <template v-if="documentsToRemove.includes('company_approval_letter')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('company_approval_letter')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.company_approval_letter!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('company_approval_letter')" />
+              </template>
+            </div>
             <VFileInput
               v-model="form.company_approval_letter"
-              label="كتاب موافقة على الانتساب (للتحديث)"
+              :label="`${contractorDocumentLabels.company_approval_letter} (للتحديث)`"
               :error-messages="validationErrors.company_approval_letter"
-              accept=".pdf,image/*"
+              accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -591,11 +998,27 @@ const submit = async () => {
             />
           </VCol>
           <VCol cols="12" md="6">
+            <div v-if="existingFiles.full_time_engineer_certificate && !form.full_time_engineer_certificate" class="d-flex align-center gap-2 mb-1">
+              <template v-if="documentsToRemove.includes('full_time_engineer_certificate')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('full_time_engineer_certificate')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.full_time_engineer_certificate!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('full_time_engineer_certificate')" />
+              </template>
+            </div>
             <VFileInput
               v-model="form.full_time_engineer_certificate"
-              label="شهادة مهندس متفرغ (للتحديث)"
+              :label="`${contractorDocumentLabels.full_time_engineer_certificate} (للتحديث)`"
               :error-messages="validationErrors.full_time_engineer_certificate"
-              accept=".pdf,image/*"
+              accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -604,11 +1027,56 @@ const submit = async () => {
             />
           </VCol>
           <VCol cols="12" md="6">
+            <div v-if="existingFiles.accountant_certificate_or_contract && !form.accountant_certificate_or_contract" class="d-flex align-center gap-2 mb-1">
+              <template v-if="documentsToRemove.includes('accountant_certificate_or_contract')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('accountant_certificate_or_contract')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.accountant_certificate_or_contract!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('accountant_certificate_or_contract')" />
+              </template>
+            </div>
+            <VFileInput
+              v-model="form.accountant_certificate_or_contract"
+              :label="`${contractorDocumentLabels.accountant_certificate_or_contract} (للتحديث)`"
+              :error-messages="validationErrors.accountant_certificate_or_contract"
+              accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
+              class="custom-file-input"
+              persistent-placeholder
+              placeholder="انقر هنا لاختيار الملف أو سحبه"
+              :color="form.accountant_certificate_or_contract ? 'success' : ''"
+              :prepend-icon="form.accountant_certificate_or_contract ? 'tabler-circle-check' : 'tabler-cloud-upload'"
+            />
+          </VCol>
+          <VCol cols="12" md="6">
+            <div v-if="existingFiles.secretary_contract && !form.secretary_contract" class="d-flex align-center gap-2 mb-1">
+              <template v-if="documentsToRemove.includes('secretary_contract')">
+                <VChip size="small" color="error" variant="tonal" prepend-icon="tabler-trash">سيُحذف عند الحفظ</VChip>
+                <VBtn size="x-small" variant="text" @click="undoRemoveDocument('secretary_contract')">تراجع</VBtn>
+              </template>
+              <template v-else>
+                <VChip size="small" color="success" variant="tonal" prepend-icon="tabler-circle-check">مرفوع</VChip>
+                <a :href="existingFiles.secretary_contract!" target="_blank" class="text-body-2 d-flex align-center gap-1">
+                  <VIcon icon="tabler-eye" size="14" /> عرض الملف الحالي
+                </a>
+                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" title="حذف المستند" @click="confirmRemoveDocument('secretary_contract')" />
+              </template>
+            </div>
             <VFileInput
               v-model="form.secretary_contract"
-              label="عقد سكرتير (للتحديث)"
+              :label="`${contractorDocumentLabels.secretary_contract} (للتحديث)`"
               :error-messages="validationErrors.secretary_contract"
-              accept=".pdf,image/*"
+              accept=".pdf,.doc,.docx,image/*"
+              :rules="[fileSizeRule]"
+              :hint="fileHint"
+              persistent-hint
               class="custom-file-input"
               persistent-placeholder
               placeholder="انقر هنا لاختيار الملف أو سحبه"
@@ -621,6 +1089,13 @@ const submit = async () => {
           </VCol>
         </VRow>
       </VCardText>
+      <VCardText v-if="loading" class="pt-0">
+        <VProgressLinear :model-value="uploadProgress" color="success" height="8" rounded striped>
+          <template #default>
+            <span class="text-caption font-weight-medium">{{ uploadProgress }}%</span>
+          </template>
+        </VProgressLinear>
+      </VCardText>
       <VCardActions class="pa-4">
         <VBtn variant="tonal" @click="prevStep" prepend-icon="tabler-arrow-right">السابق</VBtn>
         <VSpacer />
@@ -629,6 +1104,43 @@ const submit = async () => {
         </VBtn>
       </VCardActions>
     </VCard>
+
+    <!-- Confirm remove specialty dialog -->
+    <VDialog v-model="removeSpecialtyDialog" max-width="400">
+      <VCard>
+        <VCardTitle class="d-flex align-center gap-2" style="font-family:Cairo,sans-serif">
+          <VIcon icon="tabler-alert-triangle" color="error" />
+          تأكيد الحذف
+        </VCardTitle>
+        <VCardText style="font-family:Cairo,sans-serif">
+          هل أنت متأكد من حذف هذا المجال والتصنيف؟ لا يمكن التراجع عن هذا الإجراء.
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" @click="removeSpecialtyDialog = false">إلغاء</VBtn>
+          <VBtn color="error" @click="removeSpecialty">حذف</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- تأكيد حذف مستند (TASK-16 #4) — الحذف الفعلي يقع عند الحفظ لا الآن -->
+    <VDialog v-model="removeDocumentDialog" max-width="440">
+      <VCard>
+        <VCardTitle class="d-flex align-center gap-2" style="font-family:Cairo,sans-serif">
+          <VIcon icon="tabler-alert-triangle" color="error" />
+          تأكيد حذف المستند
+        </VCardTitle>
+        <VCardText style="font-family:Cairo,sans-serif">
+          سيُحذف مستند «{{ documentLabels[removingDocumentKey ?? ''] ?? '' }}» نهائياً من الخادم عند حفظ التعديلات،
+          ولا يمكن استرجاعه بعدها. يمكنك التراجع قبل الحفظ.
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" @click="removeDocumentDialog = false">إلغاء</VBtn>
+          <VBtn color="error" @click="removeDocument">تحديد للحذف</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
   </div>
   <div v-else class="d-flex justify-center align-center h-100 mt-10">
     <VProgressCircular indeterminate color="primary" />

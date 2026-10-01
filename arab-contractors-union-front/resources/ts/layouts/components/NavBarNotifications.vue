@@ -6,7 +6,7 @@ import { useNotifications } from '@/composables/useNotifications'
 
 // Single source of truth — all fetching/caching/polling handled by Vue Query.
 // This component performs ZERO manual axios calls.
-const { rawNotifications, markRead, markReadMany } = useNotifications()
+const { rawNotifications, unreadCount, markRead, markReadMany } = useNotifications()
 
 const router = useRouter()
 const { t } = useI18n()
@@ -48,6 +48,24 @@ const notifications = computed<Notification[]>(() =>
       color = 'success'
       icon = 'tabler-trophy'
     }
+    else if (d.type === 'payment_submitted') {
+      title = 'notifications.title'
+      subtitle = d.message || ''
+      color = 'success'
+      icon = 'tabler-cash'
+    }
+    else if (d.type === 'contractor_activated') {
+      title = 'notifications.title'
+      subtitle = d.message || ''
+      color = 'info'
+      icon = 'tabler-user-check'
+    }
+    else if (d.type === 'event_joined') {
+      title = 'notifications.title'
+      subtitle = d.message || ''
+      color = 'warning'
+      icon = 'tabler-calendar-event'
+    }
     else {
       title = 'notifications.title'
       subtitle = d.message || ''
@@ -87,14 +105,30 @@ const handleNotificationClick = async (notification: Notification) => {
     await markRead(notification.id)
 
   const dbN = rawNotifications.value.find(n => n.id === notification.id)
-  if (dbN && dbN.data && dbN.data.course_id)
-    router.push(`/courses/${dbN.data.course_id}/builder`)
+  if (!dbN || !dbN.data)
+    return
+
+  const d = dbN.data
+  const type = d.type
+
+  // توجيه بناءً على نوع الإشعار
+  if (type === 'payment_submitted') {
+    // توجيه لصفحة الدفعات مع عرض التفاصيل
+    router.push(`/payments/transactions?id=${d.payment_id}`)
+  } else if (type === 'contractor_activated') {
+    // توجيه لصفحة تفاصيل المقاول
+    router.push(`/contractors/${d.contractor_id}/edit`)
+  } else if (type === 'event_joined') {
+    // توجيه لصفحة الفعاليات
+    router.push(`/events`)
+  }
 }
 </script>
 
 <template>
   <Notifications
     :notifications="notifications"
+    :unread-count="unreadCount"
     @remove="removeNotification"
     @read="onRead"
     @unread="onUnread"

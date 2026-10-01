@@ -42,7 +42,7 @@ const showLoginPwd = ref(false)
 
 const showTermsModal = ref(false)
 
-const foundContractor = ref<{ name: string; trade: string; classification: string; membership_number?: string } | null>(null)
+const foundContractor = ref<{ name: string; classification: string; membership_number?: string } | null>(null)
 const isLoading = ref(false)
 const errorMsg  = ref('')
 
@@ -284,7 +284,7 @@ async function handleResendOtp() {
             <div class="rg-found-av">{{ foundContractor.name.charAt(0) }}</div>
             <div>
               <strong>{{ foundContractor.name }}</strong>
-              <p>{{ foundContractor.trade }} — {{ degLabel[foundContractor.classification] ?? foundContractor.classification }}</p>
+              <p>{{ degLabel[foundContractor.classification] ?? foundContractor.classification }}</p>
             </div>
           </div>
           <p class="rg-hint">أنشئ كلمة مرور قوية — ٨ أحرف على الأقل.</p>

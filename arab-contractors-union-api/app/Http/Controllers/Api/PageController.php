@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\Page;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -92,6 +93,8 @@ class PageController extends Controller
 
         $page = Page::create($data);
 
+        AuditLogService::record(Auth::user(), 'page.created', $page, ['slug' => $page->slug, 'title' => $page->title]);
+
         return $this->success($this->format($page), 'تم إنشاء الصفحة بنجاح.', 201);
     }
 
@@ -102,12 +105,16 @@ class PageController extends Controller
 
         $page->update($data);
 
+        AuditLogService::record(Auth::user(), 'page.updated', $page, ['slug' => $page->slug, 'title' => $page->title]);
+
         return $this->success($this->format($page->fresh('author')), 'تم تحديث الصفحة بنجاح.');
     }
 
     /** DELETE /api/v1/dashboard/pages/{page} */
     public function destroy(Page $page)
     {
+        AuditLogService::record(Auth::user(), 'page.deleted', $page, ['slug' => $page->slug, 'title' => $page->title]);
+
         $page->delete();
 
         return $this->success(message: 'تم حذف الصفحة.');

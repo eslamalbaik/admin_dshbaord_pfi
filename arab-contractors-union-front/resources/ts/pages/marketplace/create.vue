@@ -16,6 +16,20 @@ const pageTitle  = computed(() => isEdit.value ? 'تعديل بيانات الآ
 const types       = ref<any[]>([])
 const contractors = ref<any[]>([])
 
+// types يُجلب كاملاً (فعّال + مخفي)، ونفلتر هون للظاهر فقط — مع استثناء: لو كانت الآلية
+// الحالية (وضع التعديل) مربوطة بنوع صار مخفياً بعدين، يبقى ظاهراً كخيار وإلا يختفي من
+// الفورم عند فتح التعديل (نفس النمط المستخدم بمنتقي التعديل السريع في marketplace/index.vue)
+const typeOptions = computed(() => {
+  const active = types.value.filter((t: any) => t.is_active)
+  const currentId = form.value.equipment_type_id
+  if (currentId && !active.some((t: any) => String(t.id) === String(currentId))) {
+    const current = types.value.find((t: any) => String(t.id) === String(currentId))
+    if (current) return [...active, current]
+  }
+
+  return active
+})
+
 const governorates = [
   'غزة', 'شمال غزة', 'خانيونس', 'رفح', 'الوسطى',
   'رام الله والبيرة', 'نابلس', 'جنين', 'طولكرم', 'قلقيلية',
@@ -30,15 +44,18 @@ const form = ref({
   contractor_id:     '',
   equipment_type_id: '',
   name:              '',
+  brand:             '',
   description:       '',
   manufacture_year:  null as number | null,
   power:             '',
   condition:         'good',
+  contract_type:     'daily',
   governorate:       '',
   city:              '',
-  daily_price:       0,
   owner_phone:       '',
   status:            'visible',
+  is_featured:       false,
+  needs_maintenance: false,
   admin_notes:       '',
 })
 
@@ -63,15 +80,18 @@ const fetchEquipment = async () => {
       contractor_id:     String(data.contractor_id),
       equipment_type_id: String(data.equipment_type_id),
       name:              data.name,
+      brand:             data.brand ?? '',
       description:       data.description ?? '',
       manufacture_year:  data.manufacture_year ?? null,
       power:             data.power ?? '',
       condition:         data.condition ?? 'good',
+      contract_type:     data.contract_type ?? 'daily',
       governorate:       data.governorate ?? '',
       city:              data.city ?? '',
-      daily_price:       Number(data.daily_price),
       owner_phone:       data.owner_phone ?? '',
       status:            data.status ?? 'visible',
+      is_featured:       !!data.is_featured,
+      needs_maintenance: !!data.needs_maintenance,
       admin_notes:       data.admin_notes ?? '',
     }
   }
@@ -86,18 +106,23 @@ onMounted(async () => {
 })
 
 // ─── Image selection ─────────────────────────────────────────────────────────
+const MAX_IMAGES   = 5
+const MAX_IMAGE_MB = 5
+
 const onFilesSelected = (e: Event) => {
   const input = e.target as HTMLInputElement
   if (!input.files) return
   imageErrors.value = ''
   const files = Array.from(input.files)
   for (const f of files) {
-    if (f.size > 3 * 1024 * 1024) {
-      imageErrors.value = 'حجم الصورة يجب ألا يتجاوز 3 ميغابايت'
+    if (f.size > MAX_IMAGE_MB * 1024 * 1024) {
+      imageErrors.value = `حجم الصورة "${f.name}" (${(f.size / 1024 / 1024).toFixed(1)} ميغابايت) يتجاوز الحد الأقصى ${MAX_IMAGE_MB} ميغابايت — فشل رفعها.`
       return
     }
   }
-  newImages.value = files.slice(0, 8)
+  if (files.length > MAX_IMAGES)
+    imageErrors.value = `الحد الأقصى ${MAX_IMAGES} صور — تم اختيار أول ${MAX_IMAGES} من أصل ${files.length}.`
+  newImages.value = files.slice(0, MAX_IMAGES)
 }
 
 // ─── Submit ───────────────────────────────────────────────────────────────────
@@ -112,8 +137,12 @@ const submit = async () => {
     const payload = new FormData()
 
     Object.entries(form.value).forEach(([key, val]) => {
-      if (val !== null && val !== undefined && val !== '')
-        payload.append(key, String(val))
+      if (val !== null && val !== undefined && val !== '') {
+        if (typeof val === 'boolean')
+          payload.append(key, val ? '1' : '0')
+        else
+          payload.append(key, String(val))
+      }
     })
 
     newImages.value.forEach(file => payload.append('images[]', file))
@@ -151,7 +180,13 @@ const statusOptions = [
 const conditionOptions = [
   { title: 'ممتازة', value: 'excellent' },
   { title: 'جيدة', value: 'good' },
-  { title: 'مقبولة', value: 'fair' },
+  { title: 'بحاجة صيانة', value: 'needs_maintenance' },
+]
+
+const contractTypeOptions = [
+  { title: 'تأجير يومي', value: 'daily' },
+  { title: 'تأجير أسبوعي', value: 'weekly' },
+  { title: 'تأجير شهري', value: 'monthly' },
 ]
 </script>
 
@@ -196,7 +231,7 @@ const conditionOptions = [
           <VCol cols="12" md="6">
             <VSelect
               v-model="form.equipment_type_id"
-              :items="types"
+              :items="typeOptions"
               item-title="name_ar"
               item-value="id"
               label="نوع المعدة *"
@@ -217,8 +252,20 @@ const conditionOptions = [
           </VCol>
           <VCol cols="12" md="6">
             <VTextField
+              v-model="form.brand"
+              label="الماركة"
+              placeholder="مثال: كاتربيلر"
+              variant="outlined"
+              density="compact"
+              style="font-family:Cairo,sans-serif"
+            />
+          </VCol>
+          <VCol cols="12" md="6">
+            <VTextField
               v-model="form.owner_phone"
-              label="رقم هاتف المالك"
+              label="رقم واتساب المالك"
+              hint="يُستخدم للتواصل المباشر عبر واتساب من شاشة تفاصيل الآلية"
+              persistent-hint
               placeholder="0599-XXXXXX"
               variant="outlined"
               density="compact"
@@ -228,10 +275,12 @@ const conditionOptions = [
           <VCol cols="12">
             <VTextarea
               v-model="form.description"
-              label="وصف الآلية"
+              label="وصف الحالة الفنية للآلية"
               variant="outlined"
               density="compact"
               rows="3"
+              maxlength="250"
+              counter
               style="font-family:Cairo,sans-serif"
             />
           </VCol>
@@ -246,7 +295,7 @@ const conditionOptions = [
             </p>
           </VCol>
 
-          <VCol cols="12" md="4">
+          <VCol cols="12" md="3">
             <VTextField
               v-model.number="form.manufacture_year"
               label="سنة الصنع"
@@ -258,7 +307,7 @@ const conditionOptions = [
               style="font-family:Cairo,sans-serif"
             />
           </VCol>
-          <VCol cols="12" md="4">
+          <VCol cols="12" md="3">
             <VTextField
               v-model="form.power"
               label="القدرة / الطاقة"
@@ -268,7 +317,7 @@ const conditionOptions = [
               style="font-family:Cairo,sans-serif"
             />
           </VCol>
-          <VCol cols="12" md="4">
+          <VCol cols="12" md="3">
             <VSelect
               v-model="form.condition"
               :items="conditionOptions"
@@ -278,14 +327,25 @@ const conditionOptions = [
               style="font-family:Cairo,sans-serif"
             />
           </VCol>
+          <VCol cols="12" md="3">
+            <VSelect
+              v-model="form.contract_type"
+              :items="contractTypeOptions"
+              label="نوع العقد *"
+              variant="outlined"
+              density="compact"
+              style="font-family:Cairo,sans-serif"
+            />
+          </VCol>
 
           <VDivider class="my-2" />
 
-          <!-- Section: الموقع والسعر -->
+          <!-- Section: الموقع — لا يوجد حقل سعر للآلية أصلاً؛ نوع العقد (يومي/أسبوعي/شهري) أعلاه
+               هو فقط مدة التأجير، والتسعير الفعلي يتم خارج المنصة بين المالك والمستأجر مباشرة -->
           <VCol cols="12">
             <p class="text-subtitle-1 font-weight-bold mb-3" style="font-family:Cairo,sans-serif;color:#000269">
               <VIcon icon="tabler-map-pin" size="18" class="me-1" />
-              الموقع والسعر
+              الموقع
             </p>
           </VCol>
 
@@ -308,18 +368,6 @@ const conditionOptions = [
               style="font-family:Cairo,sans-serif"
             />
           </VCol>
-          <VCol cols="12" md="4">
-            <VTextField
-              v-model.number="form.daily_price"
-              label="السعر اليومي (₪) *"
-              type="number"
-              min="0"
-              variant="outlined"
-              density="compact"
-              style="font-family:Cairo,sans-serif"
-            />
-          </VCol>
-
           <VDivider class="my-2" />
 
           <!-- Section: إعدادات الظهور -->
@@ -340,7 +388,22 @@ const conditionOptions = [
               style="font-family:Cairo,sans-serif"
             />
           </VCol>
-          <VCol cols="12" md="6" />
+          <VCol cols="12" md="6" class="d-flex align-center">
+            <VSwitch
+              v-model="form.is_featured"
+              label="آلية مميزة (تظهر أولاً في السوق)"
+              color="warning"
+              style="font-family:Cairo,sans-serif"
+            />
+          </VCol>
+          <VCol cols="12" md="6" class="d-flex align-center">
+            <VSwitch
+              v-model="form.needs_maintenance"
+              label="بحاجة صيانة (تختفي من السوق مؤقتاً)"
+              color="error"
+              style="font-family:Cairo,sans-serif"
+            />
+          </VCol>
           <VCol cols="12">
             <VTextarea
               v-model="form.admin_notes"
@@ -358,7 +421,7 @@ const conditionOptions = [
             <VCol cols="12">
               <p class="text-subtitle-1 font-weight-bold mb-3" style="font-family:Cairo,sans-serif;color:#000269">
                 <VIcon icon="tabler-photo" size="18" class="me-1" />
-                صور الآلية (حتى 8 صور)
+                صور الآلية (حتى {{ MAX_IMAGES }} صور)
               </p>
               <VFileInput
                 label="اختر الصور"
@@ -372,7 +435,7 @@ const conditionOptions = [
                 @change="onFilesSelected"
               />
               <p class="text-caption text-medium-emphasis mt-1" style="font-family:Cairo,sans-serif">
-                JPG، PNG، WebP — الحد الأقصى 3 ميغابايت للصورة الواحدة. يمكنك إضافة المزيد من الصور لاحقاً.
+                JPG، PNG، WebP — الحد الأقصى {{ MAX_IMAGES }} صور، وحتى {{ MAX_IMAGE_MB }} ميغابايت للصورة الواحدة. يمكنك إضافة المزيد من الصور لاحقاً.
               </p>
             </VCol>
           </template>

@@ -25,9 +25,11 @@ class Contractor extends Authenticatable
     ];
 
     protected $fillable = [
-        'membership_number', 'name', 'authorized_person', 'authorized_person_title', 'commercial_register',
-        'license_number', 'trade', 'classification', 'established_year', 'owner_name',
-        'email', 'phone', 'phone_verified_at', 'city', 'governorate_id', 'city_id', 'address',
+        'membership_number', 'name', 'authorized_person', 'authorized_person_title',
+        'authorized_person_id_number', 'authorized_person_phone', 'authorized_person_whatsapp',
+        'commercial_register',
+        'license_number', 'classification', 'owner_name',
+        'email', 'phone', 'phone_verified_at', 'city', 'governorate_id', 'city_id', 'district', 'address',
         'classification_decision_number', 'classification_decision_date',
         'status', 'is_frozen', 'profile_completed', 'profile_approved_by',
         'cr_file', 'id_file', 'notes',
@@ -39,7 +41,7 @@ class Contractor extends Authenticatable
         'authorized_signature', 'logo', 'lease_or_ownership_contract', 'company_approval_letter',
         'municipal_license', 'company_register', 'articles_of_association',
         'internal_bylaws', 'bank_dealing_letter', 'secretary_contract',
-        'full_time_engineer_certificate', 'partners_ids', 'authorization_letter',
+        'full_time_engineer_certificate', 'accountant_certificate_or_contract', 'partners_ids', 'authorization_letter',
         // Auto-fields and specialized types
         'field_lk_type', 'specialization_lk_type', 'established_date', 'specialties', 'terms_accepted_at',
         'equipment_disclaimer_accepted_at', 'equipment_banned_at',
@@ -50,8 +52,50 @@ class Contractor extends Authenticatable
         'remember_token',
     ];
 
+    /** أسماء أعمدة الملفات المخزّنة على القرص — تُستخدم لبناء رابط `<field>_url` كامل تلقائيًا. */
+    public const FILE_FIELDS = [
+        'cr_file', 'id_file', 'authorized_signature', 'logo',
+        'lease_or_ownership_contract', 'company_approval_letter', 'municipal_license',
+        'company_register', 'articles_of_association', 'internal_bylaws',
+        'bank_dealing_letter', 'secretary_contract', 'full_time_engineer_certificate',
+        'accountant_certificate_or_contract', 'partners_ids', 'authorization_letter',
+    ];
+
+    protected $appends = ['has_app_account'];
+
+    /** يبني تلقائيًا `<field>_url` (رابط كامل عبر Storage::url) لأي حقل ملف عند الوصول له كمفتاح ديناميكي. */
+    public function getAttribute($key)
+    {
+        if (str_ends_with($key, '_url')) {
+            $field = substr($key, 0, -4);
+            if (in_array($field, self::FILE_FIELDS, true)) {
+                $path = $this->getAttributeFromArray($field);
+
+                return $path ? url(\Illuminate\Support\Facades\Storage::url($path)) : null;
+            }
+        }
+
+        return parent::getAttribute($key);
+    }
+
+    /** يُفعَّل بصفحة show/update فقط — تفاديًا لحساب 15 رابط لكل صف بقوائم/pagination. */
+    public bool $withFileUrls = false;
+
+    /** append() لا يصلح مع getAttribute() الديناميكي لأن Eloquent يطلب method get{Field}Attribute() فعلي — فبنحقن الروابط يدويًا بعد toArray(). */
+    public function toArray()
+    {
+        $array = parent::toArray();
+
+        if ($this->withFileUrls) {
+            foreach (self::FILE_FIELDS as $field) {
+                $array["{$field}_url"] = $this->getAttribute("{$field}_url");
+            }
+        }
+
+        return $array;
+    }
+
     protected $casts = [
-        'established_year'       => 'integer',
         'field_lk_type'          => 'integer',
         'specialization_lk_type' => 'integer',
         'established_date'       => 'date',
@@ -109,87 +153,9 @@ class Contractor extends Authenticatable
         return $this->hasMany(CertificateRequest::class);
     }
 
-    public function nameChangeRequests()
-    {
-        return $this->hasMany(ContractorNameChangeRequest::class);
-    }
-
-    public function profileUpdateRequests()
-    {
-        return $this->hasMany(ProfileUpdateRequest::class);
-    }
-
     public function dues()
     {
         return $this->hasMany(ContractorDue::class);
-    }
-
-    /** إجمالي الذمم المتبقية بالدينار الأردني */
-    public function outstandingDuesTotal(): float
-    {
-        return round((float) $this->dues()
-            ->outstanding()
-            ->selectRaw('COALESCE(SUM(amount_jod - paid_jod), 0) as total')
-            ->value('total'), 2);
-    }
-
-    /** إجمالي "ما عليه" — دفعات معلّقة + غرامات غير مسدَّدة + ذمم سابقة */
-    public function totalObligations(): float
-    {
-        $pendingPayments = (float) $this->payments()->where('status', 'pending')->sum('amount');
-        $unpaidPenalties = (float) $this->penalties()->where('status', '!=', 'paid')->sum('amount');
-
-        return round($pendingPayments + $unpaidPenalties + $this->outstandingDuesTotal(), 2);
-    }
-
-    /** الحد الأدنى لنسبة سداد الذمم لإصدار شهادة العضوية (REQ-02) — للعرض فقط الآن */
-    public const MEMBERSHIP_CERT_MIN_PAID_PERCENT = 95.0;
-
-    /** سقف هامش السماح المطلق بالدينار — أيهما أقل يُعتمَد: 5% من الإجمالي أو 50 دينار */
-    public const MEMBERSHIP_CERT_MAX_MARGIN_JOD = 50.0;
-
-    /** نسبة ما سُدِّد من إجمالي الذمم (amount_jod مقابل paid_jod) — 100% إن لم توجد ذمم مسجّلة */
-    public function duesPaidPercentage(): float
-    {
-        $totals = $this->duesTotals();
-        $total  = $totals['total'];
-
-        if ($total <= 0) {
-            return 100.0;
-        }
-
-        return round(($totals['paid'] / $total) * 100, 2);
-    }
-
-    /** @return array{total: float, paid: float, outstanding: float} */
-    private function duesTotals(): array
-    {
-        $totals = $this->dues()
-            ->selectRaw('COALESCE(SUM(amount_jod), 0) as total, COALESCE(SUM(paid_jod), 0) as paid')
-            ->first();
-
-        $total = (float) $totals->total;
-        $paid  = (float) $totals->paid;
-
-        return ['total' => $total, 'paid' => $paid, 'outstanding' => round($total - $paid, 2)];
-    }
-
-    /**
-     * هامش السماح المسموح بالدينار لإصدار شهادة العضوية — أيهما أقل: 5% من إجمالي
-     * الذمم أو سقف {@see MEMBERSHIP_CERT_MAX_MARGIN_JOD} — لمنع حسابات الذمم الكبيرة
-     * من الاستفادة من هامش نسبي كبير (إطار الحوكمة، اجتماع مجلس الإدارة).
-     */
-    public function membershipCertAllowedMarginJod(): float
-    {
-        $total = $this->duesTotals()['total'];
-
-        return min($total * (100 - self::MEMBERSHIP_CERT_MIN_PAID_PERCENT) / 100, self::MEMBERSHIP_CERT_MAX_MARGIN_JOD);
-    }
-
-    /** هل الذمة المتبقية تقع ضمن هامش السماح (5% أو 50 دينار، أيهما أقل) لإصدار شهادة العضوية؟ */
-    public function isEligibleForMembershipCertificate(): bool
-    {
-        return $this->duesTotals()['outstanding'] <= $this->membershipCertAllowedMarginJod();
     }
 
     public function documents()
@@ -207,11 +173,26 @@ class Contractor extends Authenticatable
         return $this->hasMany(ContractorEquipmentSubscription::class);
     }
 
+    /** حجوزات الآليات التي طلبها هذا المقاول كمستأجر (لا آلياته الخاصة كمالك) */
+    public function equipmentReservations()
+    {
+        return $this->hasMany(EquipmentReservation::class);
+    }
+
     public function activeEquipmentSubscription()
     {
         return $this->hasOne(ContractorEquipmentSubscription::class)
             ->where('expires_at', '>=', now())
             ->latestOfMany('expires_at');
+    }
+
+    /** وصول مجاني مؤقت لسوق الآليات (لم تنتهِ equipment_marketplace_free_until) أو اشتراك مدفوع ساري */
+    public function hasActiveEquipmentMarketplaceAccess(): bool
+    {
+        $freeUntil = Setting::get('equipment_marketplace_free_until');
+        $hasFreeTrialAccess = ! $freeUntil || now()->lte(\Carbon\Carbon::parse($freeUntil));
+
+        return $hasFreeTrialAccess || (bool) $this->activeEquipmentSubscription;
     }
 
     public function bookmarkedTenders()
@@ -247,19 +228,37 @@ class Contractor extends Authenticatable
         'company_purposes'  => 'غايات الشركة',
     ];
 
-    private const REQUIRED_PROFILE_FILES = [
+    /**
+     * الاسم الرسمي لكل مستند — مصدر واحد لعنوان حقل الرفع ولاسم المرفق عند المعاينة
+     * ولرسائل التحقق وقائمة "المستندات الناقصة" بالتطبيق. كانت هذه الأسماء مكرّرة
+     * بصيغ مختلفة في كل مكان ("كتاب البنك" / "تعامل البنك" / "شهادة تعامل بنكي")،
+     * فلا يعرف الأدمن أن المرفق المعروض هو نفسه الحقل الذي رفعه. نسختها بالواجهة:
+     * resources/ts/utils/contractorDocuments.ts — أي تعديل هنا يُعدَّل هناك أيضاً.
+     */
+    public const DOCUMENT_LABELS = [
         'cr_file'                       => 'السجل التجاري',
-        'company_register'              => 'مستخرج سجل الشركة',
-        'municipal_license'             => 'رخصة المهن (البلدية)',
-        'bank_dealing_letter'           => 'شهادة تعامل بنكي',
-        'articles_of_association'       => 'عقد التأسيس',
+        'id_file'                       => 'صورة الهوية',
+        'company_register'              => 'مستخرج عن سجل الشركة',
+        'municipal_license'             => 'رخصة المهن (الحرف) سارية المفعول',
+        'bank_dealing_letter'           => 'شهادة تعامل للشركة مع بنك',
+        'articles_of_association'       => 'عقد تأسيس الشركة',
         'internal_bylaws'               => 'النظام الداخلي',
-        'lease_or_ownership_contract'   => 'عقد الإيجار / الملكية',
+        'lease_or_ownership_contract'   => 'عقد الإيجار أو الملكية لمقر الشركة',
         'partners_ids'                  => 'صور هويات الشركاء',
-        'authorization_letter'          => 'كتاب تفويض المفوّض',
-        'company_approval_letter'       => 'كتاب موافقة الشركة',
+        'authorization_letter'          => 'كتاب تفويض المعتمد بالتوقيع',
+        'company_approval_letter'       => 'كتاب من الشركة بالموافقة على الانتساب',
         'full_time_engineer_certificate'=> 'شهادة مهندس متفرغ',
+        'accountant_certificate_or_contract' => 'شهادة تفرغ محاسب من نقابة المحاسبين / أو عقد مع مكتب محاسبين معتمد',
         'secretary_contract'            => 'عقد سكرتير',
+        'authorized_signature'          => 'نموذج التوقيع',
+    ];
+
+    /** المستندات المطلوبة لاكتمال الملف (بترتيب نموذج التسجيل) — أسماؤها من DOCUMENT_LABELS. */
+    private const REQUIRED_PROFILE_FILES = [
+        'cr_file', 'company_register', 'municipal_license', 'bank_dealing_letter',
+        'articles_of_association', 'internal_bylaws', 'lease_or_ownership_contract',
+        'partners_ids', 'authorization_letter', 'company_approval_letter',
+        'full_time_engineer_certificate', 'accountant_certificate_or_contract', 'secretary_contract',
     ];
 
     /** أسماء الحقول والملفات الناقصة لإكمال الملف الشخصي (فارغة يعني الملف مكتمل). */
@@ -277,9 +276,9 @@ class Contractor extends Authenticatable
             $missing[] = 'المحافظة / المدينة';
         }
 
-        foreach (self::REQUIRED_PROFILE_FILES as $field => $label) {
+        foreach (self::REQUIRED_PROFILE_FILES as $field) {
             if (empty($this->$field)) {
-                $missing[] = $label;
+                $missing[] = self::DOCUMENT_LABELS[$field];
             }
         }
 
@@ -289,6 +288,12 @@ class Contractor extends Authenticatable
     public function getProfileDataCompleteAttribute(): bool
     {
         return count($this->missing_profile_fields) === 0;
+    }
+
+    /** فتح حساب على التطبيق = أكمل التحقق من الهوية وضبط كلمة مرور (نفس شرط تسجيل الدخول). */
+    public function getHasAppAccountAttribute(): bool
+    {
+        return (bool) $this->password && (bool) $this->phone_verified_at;
     }
 
     /**
@@ -310,6 +315,35 @@ class Contractor extends Authenticatable
             });
 
         return ($maxNum + 1) . $suffix;
+    }
+
+    /**
+     * هل المقاول مؤهل لتسجيل الدخول؟
+     * مصدر واحد لشروط الحظر — أي تغيير مستقبلي يحصل هنا فقط.
+     *
+     * @return array{eligible: bool, reason: ?string, error_key: ?string, http_code: ?int}
+     */
+    public function loginEligibility(): array
+    {
+        if ($this->is_frozen) {
+            return [
+                'eligible'  => false,
+                'reason'    => \App\Support\ApiMessages::ACCOUNT_FROZEN,
+                'error_key' => 'account_frozen',
+                'http_code' => 403,
+            ];
+        }
+
+        if (! $this->phone_verified_at) {
+            return [
+                'eligible'  => false,
+                'reason'    => \App\Support\ApiMessages::PHONE_NOT_VERIFIED,
+                'error_key' => 'phone_not_verified',
+                'http_code' => 403,
+            ];
+        }
+
+        return ['eligible' => true, 'reason' => null, 'error_key' => null, 'http_code' => null];
     }
 
     /**

@@ -1,0 +1,9 @@
+node_modules/
+package-lock.json
+
+# مسارات ومحتوى استعلامات الإنتاج — لا يدخل git
+audit.log
+
+# نسخة محلية من الإعدادات تحوي مسار المفتاح وكلمات السر
+.env
+mcp.local.json

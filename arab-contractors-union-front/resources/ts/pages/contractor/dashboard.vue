@@ -3,10 +3,11 @@ import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import PublicNavbar from '@/components/PublicNavbar.vue'
+import { contractorDocumentLabels } from '@/utils/contractorDocuments'
 import {
   User, ClipboardList, CreditCard, FileText,
   Award, Phone, Mail, Building2,
-  CalendarDays, CheckCircle, AlertCircle, Clock,
+  CalendarDays, CheckCircle, AlertCircle,
   Download, RefreshCw, ChevronRight, Wallet,
   FileCheck, FileClock, MessageSquare, Truck, HelpCircle, Camera,
   Pencil, X, UploadCloud, Save, Paperclip, Check,
@@ -37,7 +38,8 @@ onUnmounted(() => window.removeEventListener('contractor-logged-out', logout))
 interface Contractor {
   id: number; name: string; membership_number: string
   commercial_register: string; authorized_person: string
-  trade: string; classification: string
+  authorized_person_id_number: string; authorized_person_phone: string; authorized_person_whatsapp: string
+  classification: string
   email: string; phone: string; city: string; address: string
   status: string; is_frozen: boolean
 }
@@ -60,6 +62,19 @@ interface Stats {
   total_payments: string; pending_payments: number; total_documents: number;
   total_equipment: number; certificate_requests: number; open_tickets: number;
 }
+
+interface AccountStatusBanner {
+  type: string; severity: 'error' | 'warning' | 'success'
+  message: string; cta: string | null; cta_label: string | null
+}
+interface AccountStatus {
+  banner: AccountStatusBanner | null
+  membership: { badge: string; expires_at: string | null }
+  dues: { has_pending: boolean; outstanding_amount: number; badge: string | null }
+  certificates: { locked: boolean; lock_reason: string | null }
+  equipment_subscription: { active: boolean; badge: string; expires_at: string | null }
+}
+const accountStatus = ref<AccountStatus | null>(null)
 
 const contractor  = ref<Contractor | null>(null)
 const membership  = ref<Membership | null>(null)
@@ -123,6 +138,17 @@ interface DueRow {
 }
 const dues = ref<DueRow[]>([])
 const outstandingDues = ref(0)
+const duesTotalJod = ref(0)
+const duesPaidJod = ref(0)
+const duesPaidPercentage = ref(0)
+const duesCounts = ref({ unpaid: 0, pending_review: 0 })
+const feeBreakdown = ref<{ fields: Array<{ field_name: string; counted_specialty?: { grade_label: string }; rate_percent: number; amount_jod: number }>; total_before_discount_jod: number } | null>(null)
+
+interface PendingDuesPayment {
+  id: number; description: string; amount: string; currency: string
+  reference_number: string | null; receipt_image_url: string | null; submitted_at: string | null
+}
+const pendingDuesPayments = ref<PendingDuesPayment[]>([])
 
 interface Obligation {
   date: string | null; description: string; type: 'payment' | 'penalty' | 'due'
@@ -136,9 +162,16 @@ const obligationTypeLabel: Record<string, string> = {
 async function fetchFinancial() {
   try {
     const r = await axios.get(`${BASE}/api/v1/contractor/financial`, { headers: apiHeaders() })
-    dues.value = r.data.items?.dues ?? []
-    outstandingDues.value = Number(r.data.items?.summary?.outstanding_dues_jod ?? 0)
-    obligations.value = r.data.items?.obligations ?? []
+    const items = r.data.items
+    dues.value = items?.dues ?? []
+    outstandingDues.value = Number(items?.summary?.outstanding_dues_jod ?? 0)
+    obligations.value = items?.obligations ?? []
+    duesTotalJod.value = Number(items?.summary?.dues_total_jod ?? 0)
+    duesPaidJod.value = Number(items?.summary?.dues_paid_jod ?? 0)
+    duesPaidPercentage.value = Number(items?.summary?.dues_paid_percentage ?? 0)
+    duesCounts.value = items?.dues_counts ?? { unpaid: 0, pending_review: 0 }
+    pendingDuesPayments.value = items?.pending_dues_payments ?? []
+    feeBreakdown.value = items?.current_year_fee_breakdown ?? null
   } catch {}
 }
 
@@ -157,21 +190,23 @@ interface FieldSpecialization {
 interface FieldGroup { field_id: number | null; field_name: string; specializations: FieldSpecialization[] }
 const contractorFields = ref<FieldGroup[]>([])
 const gradeLevelClass: Record<number, string> = { 1: 'grade-1', 2: 'grade-2', 3: 'grade-3', 4: 'grade-4', 5: 'grade-5' }
-const docFields = [
-  { key: 'cr_file',                        label: 'السجل التجاري' },
-  { key: 'id_file',                        label: 'الهوية' },
-  { key: 'company_register',               label: 'مستخرج سجل الشركة' },
-  { key: 'municipal_license',               label: 'رخصة المهن (البلدية)' },
-  { key: 'bank_dealing_letter',             label: 'شهادة تعامل بنكي' },
-  { key: 'articles_of_association',        label: 'عقد التأسيس' },
-  { key: 'internal_bylaws',                 label: 'النظام الداخلي' },
-  { key: 'lease_or_ownership_contract',     label: 'عقد الإيجار / الملكية' },
-  { key: 'partners_ids',                    label: 'صور هويات الشركاء' },
-  { key: 'authorization_letter',            label: 'كتاب تفويض المفوّض' },
-  { key: 'company_approval_letter',         label: 'كتاب موافقة الشركة' },
-  { key: 'full_time_engineer_certificate',  label: 'شهادة مهندس متفرغ' },
-  { key: 'secretary_contract',              label: 'عقد سكرتير' },
-] as const
+// أسماء المستندات من contractorDocumentLabels — نفسها بنماذج لوحة الأدمن ونافذة المعاينة
+const docFields = ([
+  'cr_file',
+  'id_file',
+  'company_register',
+  'municipal_license',
+  'bank_dealing_letter',
+  'articles_of_association',
+  'internal_bylaws',
+  'lease_or_ownership_contract',
+  'partners_ids',
+  'authorization_letter',
+  'company_approval_letter',
+  'full_time_engineer_certificate',
+  'accountant_certificate_or_contract',
+  'secretary_contract',
+] as const).map(key => ({ key, label: contractorDocumentLabels[key] }))
 
 const profileExtra = ref<ProfileExtra | null>(null)
 const logoUrl = ref<string | null>(null)
@@ -188,7 +223,8 @@ const editMode = ref(false)
 const isSaving = ref(false)
 const saveError = ref('')
 const editForm = ref({
-  authorized_person: '', owner_name: '', email: '', phone: '', fax: '',
+  authorized_person: '', authorized_person_id_number: '', authorized_person_phone: '',
+  authorized_person_whatsapp: '', owner_name: '', email: '', phone: '', fax: '',
   capital: '', legal_form: '', registration_date: '', company_purposes: '',
   address: '', notes: '', governorate_id: null as number | null, city_id: null as number | null,
 })
@@ -196,11 +232,15 @@ const editForm = ref({
 // ─── محرّر التخصصات والتصنيفات ───
 interface SpecRow { field_lk_type: number | null; specialization_lk_type: number | null; classification: string | null }
 interface CatalogItem { id: number; name: string }
-interface GradeItem { value: string; label: string; level: number | null }
+interface GradeItem { value: string; label: string; level: number | null; eligible_fields: number[] | null }
+interface OverallGradeItem { value: string; label: string }
+function gradesFor(fieldLkType: number | null) {
+  return catalog.value.grades.filter(g => !g.eligible_fields || g.eligible_fields.includes(fieldLkType as number))
+}
 const rawSpecialties = ref<SpecRow[]>([])
 const editClassification = ref<string>('')
 const editSpecialties = ref<SpecRow[]>([])
-const catalog = ref<{ fields: CatalogItem[]; specializations: CatalogItem[]; grades: GradeItem[] }>({ fields: [], specializations: [], grades: [] })
+const catalog = ref<{ fields: CatalogItem[]; specializations: CatalogItem[]; grades: GradeItem[]; overall_grades: OverallGradeItem[] }>({ fields: [], specializations: [], grades: [], overall_grades: [] })
 
 async function fetchCatalog() {
   if (catalog.value.fields.length) return
@@ -237,6 +277,7 @@ async function fetchProfile() {
       governorate: items.governorate, city: items.city,
     }
     docFields.forEach(f => { fileUrls.value[f.key] = items[`${f.key}_url`] ?? null })
+    accountStatus.value = items.account_status ?? null
     profileDataComplete.value = items.profile_data_complete ?? true
     missingProfileFields.value = items.missing_profile_fields ?? []
     logoUrl.value = items.logo_url ?? null
@@ -257,6 +298,9 @@ function startEdit() {
   if (!contractor.value || !profileExtra.value) return
   editForm.value = {
     authorized_person: contractor.value.authorized_person ?? '',
+    authorized_person_id_number: contractor.value.authorized_person_id_number ?? '',
+    authorized_person_phone: contractor.value.authorized_person_phone ?? '',
+    authorized_person_whatsapp: contractor.value.authorized_person_whatsapp ?? '',
     owner_name: profileExtra.value.owner_name ?? '',
     email: contractor.value.email ?? '',
     phone: contractor.value.phone ?? '',
@@ -323,6 +367,9 @@ function applyProfileResponse(items: any) {
   if (contractor.value) {
     contractor.value.name = items.name
     contractor.value.authorized_person = items.authorized_person
+    contractor.value.authorized_person_id_number = items.authorized_person_id_number
+    contractor.value.authorized_person_phone = items.authorized_person_phone
+    contractor.value.authorized_person_whatsapp = items.authorized_person_whatsapp
     contractor.value.email = items.email
     contractor.value.phone = items.phone
     contractor.value.address = items.address
@@ -401,18 +448,6 @@ async function saveProfile() {
   }
 }
 
-// ─── Name Change Request — تعديل اسم الشركة يتطلب موافقة الإدارة ───
-interface NameChangeRequest {
-  id: number; status: 'pending' | 'approved' | 'rejected'; requested_name: string
-  reject_reason: string | null; created_at: string
-}
-const nameChangeRequest = ref<NameChangeRequest | null>(null)
-const showNameChangeForm = ref(false)
-const nameChangeForm = ref({ requested_name: '', file: null as File | null })
-const nameChangeError = ref('')
-const isSubmittingNameChange = ref(false)
-const nameChangeUploadProgress = ref(0)
-
 const isDownloadingCompanyFile = ref(false)
 
 async function downloadCompanyFile() {
@@ -431,46 +466,6 @@ async function downloadCompanyFile() {
   } catch {}
   finally {
     isDownloadingCompanyFile.value = false
-  }
-}
-
-async function fetchNameChangeRequest() {
-  try {
-    const r = await axios.get(`${BASE}/api/v1/contractor/auth/name-change-request`, { headers: apiHeaders() })
-    nameChangeRequest.value = r.data.items ?? null
-  } catch {}
-}
-
-function onNameChangeFileChange(e: Event) {
-  nameChangeForm.value.file = (e.target as HTMLInputElement).files?.[0] ?? null
-}
-
-async function submitNameChangeRequest() {
-  nameChangeError.value = ''
-  if (!nameChangeForm.value.requested_name || !nameChangeForm.value.file) {
-    nameChangeError.value = 'يرجى تعبئة الاسم الجديد وإرفاق الكتاب الرسمي.'
-    return
-  }
-  isSubmittingNameChange.value = true
-  nameChangeUploadProgress.value = 0
-  try {
-    const fd = new FormData()
-    fd.append('requested_name', nameChangeForm.value.requested_name)
-    fd.append('supporting_document', nameChangeForm.value.file)
-    const r = await axios.post(`${BASE}/api/v1/contractor/auth/name-change-request`, fd, {
-      // لا نحدّد Content-Type يدوياً: المتصفح يضبط multipart/form-data مع الـ boundary تلقائياً
-      headers: apiHeaders(),
-      onUploadProgress: (evt) => {
-        if (evt.total) nameChangeUploadProgress.value = Math.round((evt.loaded / evt.total) * 100)
-      },
-    })
-    nameChangeRequest.value = r.data.items
-    showNameChangeForm.value = false
-    nameChangeForm.value = { requested_name: '', file: null }
-  } catch (e: any) {
-    nameChangeError.value = e?.response?.data?.message || 'تعذّر إرسال الطلب، حاول مرة أخرى.'
-  } finally {
-    isSubmittingNameChange.value = false
   }
 }
 
@@ -499,7 +494,7 @@ async function fetchTenders() {
     if (tenderSearch.value) params.set('search', tenderSearch.value)
     params.set('per_page', '10')
 
-    const r = await fetch(`${BASE}/api/v1/tenders-public?${params}`).then(res => res.json())
+    const r = await axios.get(`${BASE}/api/v1/contractor/tenders?${params}`, { headers: apiHeaders() }).then(res => res.data)
     latestTenders.value = r.items ?? []
     for (const t of latestTenders.value) {
       if (t.category && !tenderCategories.value.includes(t.category))
@@ -536,7 +531,6 @@ onMounted(async () => {
   fetchPublicFeeds()
   fetchFinancial()
   fetchProfile()
-  fetchNameChangeRequest()
   await fetchDashboard()
   const requestedTab = new URLSearchParams(window.location.search).get('tab')
   if (requestedTab && tabs.some(t => t.id === requestedTab))
@@ -577,6 +571,52 @@ function downloadDoc(url: string, title: string) {
   const a = document.createElement('a')
   a.href = url; a.download = title; a.target = '_blank'
   a.click()
+}
+
+// ─── وثائق العطاء الإضافية (REQ-Tender-Docs) — رفع/حذف يخص المقاول نفسه فقط ───
+const newDocTitle = ref('')
+const newDocFile = ref<File | null>(null)
+const uploadingDoc = ref(false)
+const uploadDocError = ref('')
+const deletingDocId = ref<number | null>(null)
+
+function onNewDocFileChange(e: Event) {
+  newDocFile.value = (e.target as HTMLInputElement).files?.[0] ?? null
+}
+
+async function uploadTenderDocument() {
+  if (!newDocFile.value || !newDocTitle.value.trim()) {
+    uploadDocError.value = 'الرجاء إدخال عنوان الوثيقة واختيار الملف.'
+    return
+  }
+
+  uploadingDoc.value = true
+  uploadDocError.value = ''
+  try {
+    const fd = new FormData()
+    fd.append('title', newDocTitle.value.trim())
+    fd.append('file', newDocFile.value)
+    const r = await axios.post(`${BASE}/api/v1/contractor/documents`, fd, { headers: apiHeaders() })
+    documents.value = [r.data.items, ...documents.value]
+    newDocTitle.value = ''
+    newDocFile.value = null
+  } catch (err: any) {
+    uploadDocError.value = err?.response?.data?.message || 'تعذّر رفع الوثيقة، حاول مرة أخرى.'
+  } finally {
+    uploadingDoc.value = false
+  }
+}
+
+async function deleteTenderDocument(id: number) {
+  deletingDocId.value = id
+  try {
+    await axios.delete(`${BASE}/api/v1/contractor/documents/${id}`, { headers: apiHeaders() })
+    documents.value = documents.value.filter(d => d.id !== id)
+  } catch {
+    uploadDocError.value = 'تعذّر حذف الوثيقة، حاول مرة أخرى.'
+  } finally {
+    deletingDocId.value = null
+  }
 }
 </script>
 
@@ -631,8 +671,16 @@ function downloadDoc(url: string, title: string) {
           </div>
         </div>
 
-        <!-- تنبيه ذمم مالية مستحقة -->
-        <div v-if="outstandingDues > 0" class="dues-warning-banner">
+        <!-- بانر حالة الحساب (عضوية منتهية / ذمم مستحقة / عضوية سارية) — بأولوية محسوبة من الباك اند -->
+        <div v-if="accountStatus?.banner" class="account-status-banner" :class="`severity-${accountStatus.banner.severity}`">
+          <AlertCircle :size="18" />
+          <div>
+            <strong>{{ accountStatus.banner.message }}</strong>
+            <p v-if="accountStatus.certificates.locked">{{ accountStatus.certificates.lock_reason }}</p>
+          </div>
+        </div>
+        <!-- تنبيه ذمم مالية مستحقة (احتياطي — يظهر بس لو ما وصل account_status لأي سبب) -->
+        <div v-else-if="outstandingDues > 0" class="dues-warning-banner">
           <AlertCircle :size="18" />
           <div>
             <strong>لديك ذمم مالية مستحقة بقيمة {{ outstandingDues }} د.أ</strong>
@@ -706,7 +754,7 @@ function downloadDoc(url: string, title: string) {
               </div>
             </div>
 
-            <!-- اسم الشركة — تعديله يتطلب موافقة الإدارة -->
+            <!-- اسم الشركة — حقل مقفل، لا يُعدَّل من بوابة المقاول إطلاقاً -->
             <div class="page-title-area">
               <h2>اسم الشركة</h2>
             </div>
@@ -725,50 +773,6 @@ function downloadDoc(url: string, title: string) {
                   <Download :size="16" /> {{ isDownloadingCompanyFile ? 'جاري التحميل...' : 'تحميل ملف الشركة' }}
                 </button>
               </div>
-
-              <div v-if="nameChangeRequest?.status === 'pending'" class="name-change-banner pending">
-                <Clock :size="16" />
-                <span>طلبك لتعديل الاسم إلى "{{ nameChangeRequest.requested_name }}" قيد المراجعة من الإدارة.</span>
-              </div>
-              <div v-else-if="nameChangeRequest?.status === 'rejected'" class="name-change-banner rejected">
-                <AlertCircle :size="16" />
-                <span>تم رفض طلب تعديل الاسم السابق{{ nameChangeRequest.reject_reason ? `: ${nameChangeRequest.reject_reason}` : '.' }}</span>
-              </div>
-
-              <button
-                v-if="!showNameChangeForm && nameChangeRequest?.status !== 'pending'"
-                class="md-action-btn outline name-change-toggle"
-                @click="showNameChangeForm = true"
-              >
-                <Pencil :size="15" /> تقديم طلب تعديل اسم الشركة
-              </button>
-
-              <form v-if="showNameChangeForm" class="md-edit-form name-change-form" @submit.prevent="submitNameChangeRequest">
-                <p class="docs-hint">يتطلب تعديل اسم الشركة إرفاق كتاب رسمي من وزارة الاقتصاد الوطني/التجارة يثبت تغيير الاسم.</p>
-                <div v-if="nameChangeError" class="md-form-err"><AlertCircle :size="16" /> {{ nameChangeError }}</div>
-                <div class="md-input-group">
-                  <label>الاسم الجديد المطلوب *</label>
-                  <input v-model="nameChangeForm.requested_name" type="text" class="md-fi" required />
-                </div>
-                <div class="md-input-group">
-                  <label>الكتاب الرسمي المثبت للتغيير *</label>
-                  <label class="md-doc-upload name-change-file">
-                    <UploadCloud :size="15" />
-                    {{ nameChangeForm.file ? nameChangeForm.file.name : 'اختر ملف (PDF أو صورة)' }}
-                    <input type="file" accept=".pdf,image/*" hidden required @change="onNameChangeFileChange" />
-                  </label>
-                </div>
-                <div v-if="isSubmittingNameChange" class="upload-progress-wrap">
-                  <div class="upload-progress-bar"><div class="upload-progress-fill" :style="{ width: nameChangeUploadProgress + '%' }" /></div>
-                  <span>{{ nameChangeUploadProgress }}%</span>
-                </div>
-                <div class="md-form-actions">
-                  <button type="button" class="md-action-btn outline" @click="showNameChangeForm = false"><X :size="16" /> إلغاء</button>
-                  <button type="submit" class="md-action-btn" :disabled="isSubmittingNameChange">
-                    <Save :size="16" /> {{ isSubmittingNameChange ? 'جاري الإرسال...' : 'إرسال الطلب' }}
-                  </button>
-                </div>
-              </form>
             </div>
 
             <!-- Account Details Form-like display -->
@@ -784,6 +788,18 @@ function downloadDoc(url: string, title: string) {
               <div class="md-input-group">
                 <label>الاسم الأول (المفوض)</label>
                 <div class="md-input-read">{{ contractor.authorized_person || '—' }}</div>
+              </div>
+              <div class="md-input-group">
+                <label>رقم هوية المفوض</label>
+                <div class="md-input-read">{{ contractor.authorized_person_id_number || '—' }}</div>
+              </div>
+              <div class="md-input-group">
+                <label>رقم جوال المفوض</label>
+                <div class="md-input-read">{{ contractor.authorized_person_phone || '—' }}</div>
+              </div>
+              <div class="md-input-group">
+                <label>رقم الواتساب للمفوض</label>
+                <div class="md-input-read">{{ contractor.authorized_person_whatsapp || '—' }}</div>
               </div>
               <div class="md-input-group">
                 <label>رقم العضوية</label>
@@ -804,10 +820,6 @@ function downloadDoc(url: string, title: string) {
               <div class="md-input-group">
                 <label>رقم رخصة البلدية</label>
                 <div class="md-input-read">{{ profileExtra?.license_number || '—' }}</div>
-              </div>
-              <div class="md-input-group">
-                <label>التخصص</label>
-                <div class="md-input-read">{{ contractor.trade || '—' }}</div>
               </div>
               <div class="md-input-group">
                 <label>المحافظة / المدينة</label>
@@ -851,6 +863,18 @@ function downloadDoc(url: string, title: string) {
                 <div class="md-input-group">
                   <label>الاسم الأول (المفوض)</label>
                   <input v-model="editForm.authorized_person" type="text" class="md-fi" />
+                </div>
+                <div class="md-input-group">
+                  <label>رقم هوية المفوض</label>
+                  <input v-model="editForm.authorized_person_id_number" type="text" class="md-fi" />
+                </div>
+                <div class="md-input-group">
+                  <label>رقم جوال المفوض</label>
+                  <input v-model="editForm.authorized_person_phone" type="tel" class="md-fi" dir="ltr" />
+                </div>
+                <div class="md-input-group">
+                  <label>رقم الواتساب للمفوض</label>
+                  <input v-model="editForm.authorized_person_whatsapp" type="tel" class="md-fi" dir="ltr" />
                 </div>
                 <div class="md-input-group">
                   <label>صاحب المنشأة</label>
@@ -921,7 +945,7 @@ function downloadDoc(url: string, title: string) {
                   <label>التصنيف العام</label>
                   <select v-model="editClassification" class="md-fi">
                     <option value="">— غير محدد —</option>
-                    <option v-for="g in catalog.grades" :key="g.value" :value="g.value">{{ g.label }} ({{ g.value }})</option>
+                    <option v-for="g in catalog.overall_grades" :key="g.value" :value="g.value">{{ g.label }} ({{ g.value }})</option>
                   </select>
                 </div>
 
@@ -946,7 +970,7 @@ function downloadDoc(url: string, title: string) {
                     <label>الدرجة</label>
                     <select v-model="row.classification" class="md-fi">
                       <option :value="null">— غير محدد —</option>
-                      <option v-for="g in catalog.grades" :key="g.value" :value="g.value">{{ g.label }}</option>
+                      <option v-for="g in gradesFor(row.field_lk_type)" :key="g.value" :value="g.value">{{ g.label }}</option>
                     </select>
                   </div>
                   <button type="button" class="spec-row-remove" title="حذف" @click="removeSpecRow(i)"><X :size="16" /></button>
@@ -1039,6 +1063,75 @@ function downloadDoc(url: string, title: string) {
               <h2>المعاملات المالية</h2>
             </div>
 
+            <!-- ملخص الذمم: الرصيد المستحق / المدفوع / إجمالي الرسوم + نسبة السداد -->
+            <div v-if="duesTotalJod > 0" class="dues-summary-card">
+              <div class="dsc-row">
+                <div class="dsc-item">
+                  <span class="dsc-label">الرصيد المستحق</span>
+                  <span class="dsc-val danger">{{ outstandingDues.toLocaleString('ar-PS') }} د.أ</span>
+                </div>
+                <div class="dsc-item">
+                  <span class="dsc-label">المدفوع</span>
+                  <span class="dsc-val success">{{ duesPaidJod.toLocaleString('ar-PS') }} د.أ</span>
+                </div>
+                <div class="dsc-item">
+                  <span class="dsc-label">إجمالي الرسوم</span>
+                  <span class="dsc-val">{{ duesTotalJod.toLocaleString('ar-PS') }} د.أ</span>
+                </div>
+              </div>
+              <div class="dsc-progress-track">
+                <div class="dsc-progress-fill" :style="{ width: duesPaidPercentage + '%' }" />
+              </div>
+              <div class="dsc-badges">
+                <span v-if="duesCounts.unpaid" class="md-badge badge-red">{{ duesCounts.unpaid }} غير مدفوع</span>
+                <span v-if="duesCounts.pending_review" class="md-badge badge-yellow">{{ duesCounts.pending_review }} قيد المراجعة</span>
+              </div>
+            </div>
+
+            <!-- تفصيل احتساب رسوم السنة الحالية (محرّك الاحتساب الآلي — المادة 37) -->
+            <div v-if="feeBreakdown?.fields?.length" class="fee-breakdown-card">
+              <h4 class="fbc-title">كيف احتُسبت رسومك لهذا العام</h4>
+              <table class="fbc-table">
+                <thead>
+                  <tr>
+                    <th>المجال</th>
+                    <th>الدرجة المعتمدة</th>
+                    <th>النسبة</th>
+                    <th>القيمة (د.أ)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="f in feeBreakdown.fields" :key="f.field_name">
+                    <td>{{ f.field_name }}</td>
+                    <td>{{ f.counted_specialty?.grade_label ?? '—' }}</td>
+                    <td>{{ f.rate_percent }}%</td>
+                    <td>{{ f.amount_jod }}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p class="fbc-total">الإجمالي: <strong>{{ feeBreakdown.total_before_discount_jod }} د.أ</strong></p>
+            </div>
+
+            <!-- تحويلات قيد المراجعة (بانتظار اعتماد المحاسبة) -->
+            <template v-if="pendingDuesPayments.length">
+              <div class="page-title-area obligations-title">
+                <h3>قيد المراجعة</h3>
+              </div>
+              <div class="obligations-list">
+                <div v-for="p in pendingDuesPayments" :key="p.id" class="obligation-row">
+                  <div class="obligation-info">
+                    <span class="obligation-type-badge obligation-due">بانتظار الاعتماد</span>
+                    <span class="obligation-desc">{{ p.description }}</span>
+                  </div>
+                  <div class="obligation-meta">
+                    <span class="obligation-date">{{ p.reference_number ?? '—' }}</span>
+                    <span class="obligation-amount">{{ p.amount }} {{ p.currency }}</span>
+                    <a v-if="p.receipt_image_url" :href="p.receipt_image_url" target="_blank" class="md-link">معاينة الإشعار</a>
+                  </div>
+                </div>
+              </div>
+            </template>
+
             <!-- الالتزامات المستحقة: غرامات + ذمم سابقة + دفعات معلّقة -->
             <template v-if="obligations.length">
               <div class="page-title-area obligations-title">
@@ -1116,6 +1209,21 @@ function downloadDoc(url: string, title: string) {
             <div class="page-title-area docs-title">
               <h2>ملفات ومرفقات إضافية</h2>
             </div>
+            <p class="docs-hint">وثائق العطاء وأي مرفقات إضافية تخص شركتك — ترفعها هنا وتبقى تحت تصرّف الإدارة عند مراجعة طلباتك.</p>
+
+            <div class="doc-upload-row">
+              <input v-model="newDocTitle" type="text" class="md-fi" placeholder="عنوان الوثيقة (مثال: وثيقة عطاء مشروع كذا)" />
+              <label class="md-doc-upload">
+                <UploadCloud :size="15" />
+                {{ newDocFile ? newDocFile.name : 'اختر ملفاً' }}
+                <input type="file" accept=".pdf,image/*" hidden @change="onNewDocFileChange" />
+              </label>
+              <button type="button" class="md-action-btn" :disabled="uploadingDoc" @click="uploadTenderDocument">
+                <UploadCloud :size="16" /> {{ uploadingDoc ? 'جاري الرفع...' : 'رفع' }}
+              </button>
+            </div>
+            <p v-if="uploadDocError" class="md-doc-row-err">{{ uploadDocError }}</p>
+
             <div class="doc-modern-grid">
               <div v-for="d in documents" :key="d.id" class="doc-modern-card">
                 <component :is="docIcon(d.mime_type)" :size="32" class="dmc-icon" />
@@ -1124,6 +1232,13 @@ function downloadDoc(url: string, title: string) {
                   <p>{{ d.formatted_size }} • {{ fmtDate(d.created_at) }}</p>
                 </div>
                 <button class="dmc-dl" @click="downloadDoc(d.url, d.title)"><Download :size="18"/></button>
+                <button
+                  class="dmc-dl dmc-del"
+                  :disabled="deletingDocId === d.id"
+                  @click="deleteTenderDocument(d.id)"
+                >
+                  <X :size="16"/>
+                </button>
               </div>
               <p v-if="!documents.length" class="docs-hint">لا توجد مرفقات إضافية بعد.</p>
             </div>
@@ -1148,10 +1263,15 @@ function downloadDoc(url: string, title: string) {
             <div v-if="!latestTenders.length" class="docs-hint">لا توجد عطاءات مطابقة لهذا الفلتر.</div>
             <div class="feed-list">
               <a v-for="t in latestTenders" :key="t.id" :href="t.external_url || '/landing/public-tenders'" class="feed-card" target="_blank">
-                <h4>{{ t.title }}</h4>
+                <h4>
+                  {{ t.title }}
+                  <span v-if="t.closing_soon" class="tender-closing-badge">ينتهي قريباً</span>
+                </h4>
                 <div class="fc-meta">
+                  <span><CalendarDays :size="14"/> نُشر: {{ t.published_at ? new Date(t.published_at).toLocaleDateString('ar-EG') : '—' }}</span>
                   <span><CalendarDays :size="14"/> إغلاق: {{ t.deadline ? new Date(t.deadline).toLocaleDateString('ar-EG') : '—' }}</span>
                   <span v-if="t.budget"><Wallet :size="14"/> {{ Number(t.budget).toLocaleString() }} $</span>
+                  <span v-if="t.attachments?.length"><Paperclip :size="14"/> {{ t.attachments.length }} مرفق</span>
                 </div>
               </a>
             </div>
@@ -1280,6 +1400,18 @@ function downloadDoc(url: string, title: string) {
 .pr-camera-progress { font-size: 0.55rem; font-weight: 800; }
 .pr-logo-err { font-size: 0.78rem; color: #dc2626; font-weight: 600; margin-top: 0.4rem; }
 
+/* ─── Account Status Banner (severity من الباك اند) ─── */
+.account-status-banner {
+  display: flex; gap: 0.85rem; align-items: flex-start;
+  border-radius: 14px; padding: 1.1rem 1.25rem; margin-bottom: 1.5rem;
+  border: 1px solid;
+}
+.account-status-banner strong { display: block; font-size: 0.95rem; margin-bottom: 0.25rem; }
+.account-status-banner p { font-size: 0.85rem; margin: 0; }
+.account-status-banner.severity-error   { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+.account-status-banner.severity-warning { background: #fff7ed; border-color: #fed7aa; color: #c2410c; }
+.account-status-banner.severity-success { background: #f0fdf4; border-color: #bbf7d0; color: #15803d; }
+
 /* ─── Dues Warning Banner ─── */
 .dues-warning-banner {
   display: flex; gap: 0.85rem; align-items: flex-start;
@@ -1403,6 +1535,27 @@ textarea.md-fi { resize: vertical; }
 .docs-title { margin-top: 2.5rem; }
 .docs-hint { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem; }
 
+/* ─── Dues Summary Card ─── */
+.dues-summary-card {
+  background: linear-gradient(135deg, #1e3a8a, #1e40af); color: #fff;
+  border-radius: 16px; padding: 1.25rem 1.5rem; margin-bottom: 1.5rem;
+}
+.dsc-row { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.dsc-item { display: flex; flex-direction: column; gap: 0.2rem; }
+.dsc-label { font-size: 0.78rem; opacity: 0.8; }
+.dsc-val { font-size: 1.1rem; font-weight: 800; }
+.dsc-val.danger { color: #fca5a5; }
+.dsc-val.success { color: #86efac; }
+.dsc-progress-track { height: 6px; background: rgba(255,255,255,0.2); border-radius: 999px; overflow: hidden; margin-bottom: 0.85rem; }
+.fee-breakdown-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; }
+.fbc-title { font-size: 0.95rem; font-weight: 800; margin-bottom: 0.85rem; }
+.fbc-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.fbc-table th, .fbc-table td { padding: 0.5rem 0.4rem; text-align: right; border-bottom: 1px solid #f0f0f0; }
+.fbc-table th { font-weight: 700; color: #6b7280; }
+.fbc-total { margin-top: 0.75rem; font-size: 0.9rem; text-align: left; }
+.dsc-progress-fill { height: 100%; background: #fff; border-radius: 999px; transition: width 0.3s; }
+.dsc-badges { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
 /* ─── Financial Obligations ─── */
 .obligations-title h3 { font-weight: 800; font-size: 1.05rem; color: var(--text-dark); }
 .obligations-list { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1.5rem; }
@@ -1511,6 +1664,12 @@ textarea.md-fi { resize: vertical; }
 .dmc-info p { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; }
 .dmc-dl { background: #f1f5f9; border: none; width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--primary); transition: background 0.2s; }
 .dmc-dl:hover { background: #e2e8f0; }
+.dmc-del { color: #dc2626; }
+.dmc-del:hover { background: #fee2e2; }
+.dmc-del:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.doc-upload-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+.doc-upload-row .md-fi { flex: 1; min-width: 220px; }
 
 /* ─── Feeds ─── */
 .feed-list { display: flex; flex-direction: column; gap: 1rem; }
@@ -1521,8 +1680,9 @@ textarea.md-fi { resize: vertical; }
 }
 .feed-card:hover { border-color: var(--text-muted); transform: translateX(-5px); }
 .feed-card h4 { font-size: 1.05rem; font-weight: 800; margin-bottom: 0.5rem; color: var(--primary); }
-.fc-meta { display: flex; gap: 1rem; font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
+.fc-meta { display: flex; gap: 1rem; font-size: 0.8rem; color: var(--text-muted); font-weight: 600; flex-wrap: wrap; }
 .fc-meta span { display: flex; align-items: center; gap: 0.3rem; }
+.tender-closing-badge { display: inline-block; margin-inline-start: 0.5rem; font-size: 0.7rem; font-weight: 700; color: #e65100; background: #fff8e1; border-radius: 50px; padding: 0.15rem 0.6rem; vertical-align: middle; }
 .md-link { font-size: 0.9rem; font-weight: 700; color: var(--accent); text-decoration: none; }
 
 /* ─── Utils ─── */

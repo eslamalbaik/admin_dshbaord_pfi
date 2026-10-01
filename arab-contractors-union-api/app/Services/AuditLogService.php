@@ -22,4 +22,16 @@ class AuditLogService
             'created_at'   => now(),
         ]);
     }
+
+    /**
+     * تسجيل محاولات الوصول غير المصرح بها أو المشبوهة.
+     */
+    public static function recordFailedAttempt(?Model $actor, string $endpoint, string $reason, array $meta = []): ActivityLog
+    {
+        return self::record(
+            actor: $actor,
+            action: 'security.unauthorized_access_attempt',
+            meta: array_merge(['endpoint' => $endpoint, 'reason' => $reason], $meta)
+        );
+    }
 }

@@ -168,6 +168,13 @@ const hideTitleAndIcon = configStore.isVerticalNavMini(isHovered)
   transition: inline-size 0.25s ease-in-out, box-shadow 0.25s ease-in-out;
   will-change: transform, inline-size;
 
+  // ℹ️ Animating inline-size (hover expand/collapse) while the nav list is mid-scroll
+  // fires PerfectScrollbar's ResizeObserver repeatedly, which can snap scrollTop back
+  // to the top. Skip the width animation while scrolled to avoid that fight.
+  &.scrolled {
+    transition: box-shadow 0.25s ease-in-out;
+  }
+
   .nav-header {
     display: flex;
     align-items: center;

@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Storage;
 class SupportTicket extends Model
 {
     protected $fillable = [
-        'contractor_id', 'subject', 'category', 'message', 'attachment',
+        'contractor_id', 'subject', 'whatsapp_phone', 'category', 'message', 'attachment',
         'status', 'reply', 'replied_by', 'replied_at',
     ];
 

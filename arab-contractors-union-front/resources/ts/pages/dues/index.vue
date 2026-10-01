@@ -12,6 +12,8 @@ interface ContractorRow {
   name: string
   membership_number: string
   dues_count: number
+  penalties_count: number
+  penalties_remaining_jod: number
   total_jod: number
   paid_jod: number
   remaining_jod: number
@@ -30,6 +32,7 @@ interface DueItem {
   source: string
   due_date: string | null
   notes: string | null
+  discount_amount_jod: string | number | null
 }
 
 const successMessage = ref('')
@@ -89,13 +92,18 @@ async function toggleExpand(c: ContractorRow) {
   await loadDues(c.contractor_id)
 }
 
+const expandedPenalties = ref<any[]>([])
+const penaltyStatusColor: Record<string, string> = { unpaid: 'error', partially_paid: 'warning', paid: 'success', rejected: 'secondary' }
+
 async function loadDues(contractorId: number) {
   expandedLoading.value = true
   try {
-    const r = await api.get('/api/v1/dashboard/dues', {
-      params: { contractor_id: contractorId, per_page: 100 },
-    })
+    const [r, p] = await Promise.all([
+      api.get('/api/v1/dashboard/dues', { params: { contractor_id: contractorId, per_page: 100 } }),
+      api.get('/api/v1/penalties', { params: { contractor_id: contractorId, per_page: 100 } }).catch(() => null),
+    ])
     expandedDues.value = (r.data.items ?? []).sort((a: DueItem, b: DueItem) => (a.year ?? 0) - (b.year ?? 0))
+    expandedPenalties.value = p?.data?.items ?? []
   }
   finally {
     expandedLoading.value = false
@@ -181,13 +189,40 @@ const dueForm = ref({
   year: '' as string | number,
   due_date: '',
   notes: '',
+  // تاريخ الاستحقاق محصور بتاريخ اليوم أو بعده، إلا بتفعيل هذين صراحةً لتسجيل ذمة
+  // متأخّرة سابقة (TASK-17 #7) — قرار واعٍ بسبب مكتوب، لا تاريخ مكتوب بالخطأ.
+  allow_backdate: false,
+  backdate_reason: '',
+})
+
+const todayIso = new Date().toISOString().slice(0, 10)
+
+// السنة تُعبّأ تلقائياً من تاريخ الاستحقاق إن كانت فارغة
+watch(() => dueForm.value.due_date, v => {
+  if (v && !dueForm.value.year)
+    dueForm.value.year = Number(v.slice(0, 4))
 })
 
 const contractorSearch = ref('')
 const contractorOptions = ref<{ id: number; name: string; membership_number: string }[]>([])
 let contractorTimer: ReturnType<typeof setTimeout> | null = null
 
+// When a contractor is selected, Vuetify's VAutocomplete rewrites `contractorSearch`
+// to the selected item's display label (e.g. "اسم (12345)"). Without this guard that
+// rewrite re-triggers the debounced search below, which refetches contractorOptions
+// with that label as the query, drops the selected id from the results, and makes the
+// autocomplete render blank/"غير معرف" even though dueForm.contractor_id is still set.
+const justSelectedContractor = ref(false)
+
+watch(() => dueForm.value.contractor_id, () => {
+  justSelectedContractor.value = true
+})
+
 watch(contractorSearch, q => {
+  if (justSelectedContractor.value) {
+    justSelectedContractor.value = false
+    return
+  }
   if (contractorTimer) clearTimeout(contractorTimer)
   contractorTimer = setTimeout(async () => {
     if (!q || q.length < 2) return
@@ -203,6 +238,41 @@ watch(contractorSearch, q => {
   }, 350)
 })
 
+// ─── إضافة غرامة من صفحة الذمم ───
+const penaltyDialog = ref(false)
+const penaltySaving = ref(false)
+const penaltyTarget = ref<ContractorRow | null>(null)
+const penaltyForm = ref({ reason: '', amount: '', notes: '' })
+
+function openAddPenalty(c: ContractorRow) {
+  penaltyTarget.value = c
+  penaltyForm.value = { reason: '', amount: '', notes: '' }
+  penaltyDialog.value = true
+}
+
+async function savePenalty() {
+  if (!penaltyTarget.value)
+    return
+  penaltySaving.value = true
+  try {
+    await api.post('/api/v1/penalties', {
+      contractor_id: penaltyTarget.value.contractor_id,
+      reason: penaltyForm.value.reason,
+      amount: penaltyForm.value.amount,
+      notes: penaltyForm.value.notes || undefined,
+    })
+    penaltyDialog.value = false
+    flash('تمت إضافة الغرامة وستظهر ضمن ذمم المقاول.')
+    refreshAll()
+  }
+  catch (e: any) {
+    flash(e?.response?.data?.message || 'فشل إضافة الغرامة.', true)
+  }
+  finally {
+    penaltySaving.value = false
+  }
+}
+
 function openCreateDue(c?: ContractorRow) {
   editingDue.value = null
   dueForm.value = {
@@ -212,6 +282,8 @@ function openCreateDue(c?: ContractorRow) {
     year: '',
     due_date: '',
     notes: '',
+    allow_backdate: false,
+    backdate_reason: '',
   }
   if (c)
     contractorOptions.value = [{ id: c.contractor_id, name: c.name, membership_number: c.membership_number }]
@@ -228,6 +300,10 @@ function openEditDue(d: DueItem) {
     year: d.year ?? '',
     due_date: d.due_date ?? '',
     notes: d.notes ?? '',
+    // التعديل لا يخضع لقاعدة التاريخ (مسار PATCH لا يفرضها): منع تعديل غير متعلّق بالتاريخ
+    // على ذمة قديمة لأن تاريخها ماضٍ يكرّر نمط TASK-01 — قاعدة جديدة تقفل سجلات قائمة.
+    allow_backdate: false,
+    backdate_reason: '',
   }
   dueDialog.value = true
 }
@@ -244,6 +320,10 @@ const saveDueMutation = useMutation({
     if (editingDue.value)
       return (await api.patch(`/api/v1/dashboard/dues/${editingDue.value.id}`, payload)).data
     payload.contractor_id = dueForm.value.contractor_id
+    if (dueForm.value.allow_backdate) {
+      payload.allow_backdate = true
+      payload.backdate_reason = dueForm.value.backdate_reason
+    }
 
     return (await api.post('/api/v1/dashboard/dues', payload)).data
   },
@@ -252,7 +332,14 @@ const saveDueMutation = useMutation({
     flash('تم حفظ الذمة المالية بنجاح.')
     refreshAll()
   },
-  onError: (e: any) => flash(e?.response?.data?.message || 'فشل حفظ الذمة.', true),
+  onError: (e: any) => flash(
+    e?.response?.data?.errors?.due_date?.[0]
+    || e?.response?.data?.errors?.year?.[0]
+    || e?.response?.data?.errors?.backdate_reason?.[0]
+    || e?.response?.data?.message
+    || 'فشل حفظ الذمة.',
+    true,
+  ),
 })
 
 const deleteDueMutation = useMutation({
@@ -261,7 +348,25 @@ const deleteDueMutation = useMutation({
     flash('تم حذف الذمة.')
     refreshAll()
   },
+  // بدون هذا كان فشل الحذف صامتاً تماماً — وهو تحديداً الشكل الذي يُقنع المستخدم أن
+  // الصفوف حُذفت وأن بطاقات الإجمالي "لم تتحدّث" (TASK-17 #9).
+  onError: (e: any) => flash(e?.response?.data?.message || 'فشل حذف الذمة — لم يُحذف شيء.', true),
 })
+
+const deleteDueDialog = ref(false)
+const deletingDueId = ref<number | null>(null)
+
+function confirmDeleteDue(id: number) {
+  deletingDueId.value = id
+  deleteDueDialog.value = true
+}
+
+function deleteDueConfirmed() {
+  if (deletingDueId.value !== null)
+    deleteDueMutation.mutate(deletingDueId.value)
+  deleteDueDialog.value = false
+  deletingDueId.value = null
+}
 
 const statusColor: Record<string, string> = {
   unpaid: 'error',
@@ -303,12 +408,295 @@ const importMutation = useMutation({
   onSuccess: (d: any) => {
     importResult.value = d.items
     if (!d.items?.dry_run) {
+      importDialog.value = false
       flash(d.message ?? 'تم الاستيراد بنجاح.')
       refreshAll()
     }
   },
   onError: (e: any) => flash(e?.response?.data?.message || 'فشل الاستيراد.', true),
 })
+
+// ─── احسب الرسوم (محرّك الاحتساب الآلي — المادة 37) ───
+const calcDialog = ref(false)
+const calculatingFor = ref<ContractorRow | null>(null)
+const calcForm = ref({ year: new Date().getFullYear(), discount_type: '' as '' | 'percent' | 'fixed', discount_value: '', discount_reason: '' })
+const calcPreview = ref<any>(null)
+const calcError = ref('')
+
+function openCalculateFees(c: ContractorRow) {
+  calculatingFor.value = c
+  calcForm.value = { year: new Date().getFullYear(), discount_type: '', discount_value: '', discount_reason: '' }
+  calcPreview.value = null
+  calcError.value = ''
+  calcDialog.value = true
+}
+
+function calcPayload() {
+  const payload: any = { year: calcForm.value.year }
+  if (calcForm.value.discount_type) {
+    payload.discount_type = calcForm.value.discount_type
+    payload.discount_value = calcForm.value.discount_value
+    payload.discount_reason = calcForm.value.discount_reason || undefined
+  }
+
+  return payload
+}
+
+const previewFeeMutation = useMutation({
+  mutationFn: async () => (await api.post(
+    `/api/v1/dashboard/contractors/${calculatingFor.value!.contractor_id}/dues/calculate-fee`,
+    calcPayload(),
+  )).data,
+  onSuccess: (d: any) => {
+    calcPreview.value = d.items
+    calcError.value = ''
+  },
+  onError: (e: any) => {
+    calcPreview.value = e?.response?.data?.errors?.breakdown ?? null
+    calcError.value = e?.response?.data?.message || 'تعذّر احتساب الرسوم.'
+  },
+})
+
+const generateFeeMutation = useMutation({
+  mutationFn: async (force: boolean) => (await api.post(
+    `/api/v1/dashboard/contractors/${calculatingFor.value!.contractor_id}/dues/generate-fee`,
+    { ...calcPayload(), force },
+  )).data,
+  onSuccess: (d: any) => {
+    calcDialog.value = false
+    flash(d.items?.warning ? `${d.message} — ${d.items.warning}` : d.message)
+    refreshAll()
+  },
+  onError: (e: any) => {
+    if (e?.response?.status === 409) {
+      calcError.value = `${e.response.data.message} (رقم الذمة: ${e.response.data.errors?.existing_due_id})`
+    }
+    else {
+      calcError.value = e?.response?.data?.message || 'فشل توليد ذمة الرسوم.'
+    }
+  },
+})
+
+// ─── توليد للكل (دفعة واحدة) ───
+const bulkGenDialog = ref(false)
+const bulkGenForm = ref({ year: new Date().getFullYear() })
+const bulkGenResult = ref<any>(null)
+
+function openBulkGenerate() {
+  bulkGenForm.value = { year: new Date().getFullYear() }
+  bulkGenResult.value = null
+  bulkGenDialog.value = true
+}
+
+const bulkGenMutation = useMutation({
+  mutationFn: async (dryRun: boolean) => (await api.post('/api/v1/dashboard/dues/generate-fee/bulk', {
+    year: bulkGenForm.value.year,
+    dry_run: dryRun,
+  }, { timeout: 300000 })).data,
+  onSuccess: (d: any, dryRun: boolean) => {
+    bulkGenResult.value = d.items
+    if (dryRun) return
+
+    // التطبيق الفعلي يُغلق المودل ويُبلّغ نتيجته دائماً — بما فيها "لم يُولَّد شيء". قبل ذلك
+    // كان المودل يبقى مفتوحاً، ولا رسالة إطلاقاً عند created_count = 0 (TASK-17 #11).
+    bulkGenDialog.value = false
+    flash(d.items?.created_count
+      ? `تم توليد ${d.items.created_count} ذمة رسوم.`
+      : 'لم تُولَّد أي ذمة جديدة — الرسوم مولَّدة مسبقاً لهذه السنة.')
+    refreshAll()
+  },
+  onError: (e: any) => flash(e?.response?.data?.message || 'فشل التوليد الجماعي.', true),
+})
+
+// ─── خصم جماعي — اختيار صريح (checkboxes) ───
+const selectedDueIds = ref<number[]>([])
+
+watch(expandedDues, () => selectedDueIds.value = [])
+
+const allDuesSelected = computed(() =>
+  expandedDues.value.length > 0 && selectedDueIds.value.length === expandedDues.value.length)
+
+function toggleSelectAllDues() {
+  selectedDueIds.value = allDuesSelected.value ? [] : expandedDues.value.map(d => d.id)
+}
+
+// ذمم 2025 وما قبلها لكل مقاول تُعرض كسطر واحد "إجمالي الرسوم المتراكمة" بدون تفصيل بالسنة
+const ACCUMULATED_BEFORE_YEAR = 2026
+
+const accumulatedDues = computed(() =>
+  expandedDues.value.filter(d => d.year !== null && d.year < ACCUMULATED_BEFORE_YEAR))
+
+const accumulatedRow = computed(() => {
+  const items = accumulatedDues.value
+  if (!items.length)
+    return null
+  const amount = items.reduce((s, d) => s + Number(d.amount_jod || 0), 0)
+  const paid = items.reduce((s, d) => s + Number(d.paid_jod || 0), 0)
+  const remaining = items.reduce((s, d) => s + Number(d.remaining_jod || 0), 0)
+  const status = remaining <= 0 ? 'paid' : paid > 0 ? 'partially_paid' : 'unpaid'
+  const statusLabels: Record<string, string> = { paid: 'مسدَّدة', partially_paid: 'مسدَّدة جزئياً', unpaid: 'غير مسدَّدة' }
+
+  return {
+    ids: items.map(d => d.id),
+    amount_jod: amount.toFixed(2),
+    paid_jod: paid.toFixed(2),
+    remaining_jod: remaining.toFixed(2),
+    status,
+    status_label: statusLabels[status],
+  }
+})
+
+const detailedDues = computed(() =>
+  expandedDues.value.filter(d => d.year === null || d.year >= ACCUMULATED_BEFORE_YEAR))
+
+const accumulatedSelected = computed(() =>
+  !!accumulatedRow.value && accumulatedRow.value.ids.every(id => selectedDueIds.value.includes(id)))
+
+function toggleAccumulated() {
+  const ids = accumulatedRow.value?.ids ?? []
+  selectedDueIds.value = accumulatedSelected.value
+    ? selectedDueIds.value.filter(id => !ids.includes(id))
+    : [...new Set([...selectedDueIds.value, ...ids])]
+}
+
+const selectedDiscountDialog = ref(false)
+const selectedDiscountForm = ref({ discount_type: 'percent' as 'percent' | 'fixed', discount_value: '', discount_reason: '' })
+const selectedDiscountPreview = ref<any>(null)
+
+function openSelectedDiscount() {
+  selectedDiscountForm.value = { discount_type: 'percent', discount_value: '', discount_reason: '' }
+  selectedDiscountPreview.value = null
+  selectedDiscountDialog.value = true
+}
+
+// dry_run مدعوم أصلاً بالباك (DuesDiscountService::applyBulk، مود ids ومعايير على حدّ سواء) —
+// الفجوة كانت فقط بعدم عرض معاينة قبل التطبيق لمود "المحدَّد بالـ checkboxes" (سؤال #7 بالشيت).
+const applySelectedDiscountMutation = useMutation({
+  mutationFn: async (dryRun: boolean) => (await api.post('/api/v1/dashboard/dues/discount/bulk', {
+    mode: 'ids',
+    ids: selectedDueIds.value,
+    ...selectedDiscountForm.value,
+    dry_run: dryRun,
+  })).data,
+  onSuccess: (d: any) => {
+    if (d.items?.is_dry_run) {
+      selectedDiscountPreview.value = d.items
+      return
+    }
+    selectedDiscountDialog.value = false
+    selectedDueIds.value = []
+    flash(`تم تطبيق الخصم على ${d.items?.applied_count ?? 0} ذمة.`)
+    refreshAll()
+  },
+  onError: (e: any) => flash(e?.response?.data?.message || 'فشل تطبيق الخصم.', true),
+})
+
+// ─── خصم جماعي — بمعايير (سنة/حالة/مصدر) عبر كل المقاولين ───
+const criteriaDiscountDialog = ref(false)
+const criteriaForm = ref({
+  contractor_ids: [] as number[],
+  year: '' as string | number,
+  status: '' as string,
+  source: '' as string,
+  discount_type: 'percent' as 'percent' | 'fixed',
+  discount_value: '',
+  discount_reason: '',
+})
+const criteriaPreview = ref<any>(null)
+
+// بحث المقاولين لمود المعايير — منفصل عن قائمة نموذج الذمة حتى لا يبتلع أحدهما اختيار الآخر
+const criteriaContractorSearch = ref('')
+const criteriaContractorOptions = ref<{ id: number; name: string; membership_number: string }[]>([])
+let criteriaContractorTimer: ReturnType<typeof setTimeout> | null = null
+
+const contractorLabel = (c: { name: string; membership_number: string }) => `${c.name} (${c.membership_number})`
+
+watch(criteriaContractorSearch, q => {
+  if (criteriaContractorTimer) clearTimeout(criteriaContractorTimer)
+  criteriaContractorTimer = setTimeout(async () => {
+    if (!q || q.length < 2) return
+    try {
+      const r = await api.get('/api/v1/contractors', { params: { search: q, per_page: 10 } })
+      const found = (r.data.items ?? r.data.data ?? []).map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        membership_number: c.membership_number,
+      }))
+
+      // الاختيارات المحدَّدة سابقاً تبقى ضمن items، وإلا اختفت رقائقها (chips) عند كل بحث جديد
+      const kept = criteriaContractorOptions.value.filter(o => criteriaForm.value.contractor_ids.includes(o.id))
+      const merged = [...kept]
+      for (const c of found) {
+        if (!merged.some(m => m.id === c.id)) merged.push(c)
+      }
+      criteriaContractorOptions.value = merged
+    }
+    catch {}
+  }, 350)
+})
+
+// معيار واحد على الأقل إلزامي — الباك يرفض كائن معايير فارغاً (كان يطابق كل ذمم النظام)،
+// والواجهة تمنع الإرسال قبل ذلك بدل ترك المستخدم يصطدم بـ422.
+const criteriaHasAnyFilter = computed(() =>
+  criteriaForm.value.contractor_ids.length > 0
+  || !!criteriaForm.value.year
+  || !!criteriaForm.value.status
+  || !!criteriaForm.value.source)
+
+const criteriaScopedToContractors = computed(() => criteriaForm.value.contractor_ids.length > 0)
+
+function openCriteriaDiscount() {
+  criteriaForm.value = { contractor_ids: [], year: '', status: '', source: '', discount_type: 'percent', discount_value: '', discount_reason: '' }
+  criteriaPreview.value = null
+  criteriaContractorSearch.value = ''
+  criteriaContractorOptions.value = []
+  criteriaDiscountDialog.value = true
+}
+
+function criteriaPayload() {
+  return {
+    mode: 'criteria',
+    criteria: {
+      contractor_ids: criteriaForm.value.contractor_ids.length ? criteriaForm.value.contractor_ids : undefined,
+      year: criteriaForm.value.year || undefined,
+      status: criteriaForm.value.status || undefined,
+      source: criteriaForm.value.source || undefined,
+    },
+    discount_type: criteriaForm.value.discount_type,
+    discount_value: criteriaForm.value.discount_value,
+    discount_reason: criteriaForm.value.discount_reason || undefined,
+  }
+}
+
+const criteriaDiscountMutation = useMutation({
+  mutationFn: async (dryRun: boolean) => (await api.post('/api/v1/dashboard/dues/discount/bulk', {
+    ...criteriaPayload(),
+    dry_run: dryRun,
+  })).data,
+  onSuccess: (d: any) => {
+    if (d.items?.is_dry_run) {
+      criteriaPreview.value = d.items
+      return
+    }
+    // تطبيق فعلي ناجح — يُغلق المودل فوراً ويحدّث الجدول بدل بقائه مفتوحاً بلا أي تغيير
+    // ظاهر حتى يعيد المستخدم تحميل الصفحة يدوياً (شكوى الشيت #7).
+    criteriaDiscountDialog.value = false
+    criteriaPreview.value = null
+    const skipped = d.items?.skipped?.length ?? 0
+    flash(`تم تطبيق الخصم على ${d.items?.applied_count ?? 0} ذمة`
+      + ` لدى ${d.items?.contractors_count ?? 0} مقاولاً.`
+      + (skipped > 0 ? ` (${skipped} ذمة متخطّاة)` : ''))
+    refreshAll()
+  },
+  onError: (e: any) => flash(
+    e?.response?.data?.errors?.criteria?.[0] || e?.response?.data?.message || 'فشل تطبيق الخصم الجماعي.',
+    true,
+  ),
+})
+
+// أي تعديل على المعايير أو قيمة الخصم يُبطل المعاينة — وإلا أمكن معاينة مجموعة ثم تطبيق
+// الخصم على مجموعة أخرى بالأرقام القديمة معروضة على الشاشة.
+watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
 </script>
 
 <template>
@@ -320,7 +708,23 @@ const importMutation = useMutation({
           صف لكل شركة — اضغط على الشركة لعرض كل سنواتها، وسجّل الدفعات الواردة لتوزيعها تلقائياً
         </p>
       </div>
-      <div class="d-flex gap-2">
+      <div class="d-flex gap-2 flex-wrap">
+        <VBtn
+          variant="tonal"
+          color="info"
+          prepend-icon="tabler-percentage"
+          @click="openCriteriaDiscount"
+        >
+          خصم جماعي بمعايير
+        </VBtn>
+        <VBtn
+          variant="tonal"
+          color="primary"
+          prepend-icon="tabler-calculator"
+          @click="openBulkGenerate"
+        >
+          توليد رسوم للكل
+        </VBtn>
         <VBtn
           variant="tonal"
           color="success"
@@ -349,6 +753,13 @@ const importMutation = useMutation({
           <VCardText>
             <p class="text-body-2 text-medium-emphasis mb-1">إجمالي الذمم القائمة</p>
             <h3 class="text-h5">{{ summary?.items?.outstanding_total_jod ?? '—' }} د.أ</h3>
+            <!-- عدد الذمم التي احتُسب منها الرقم: البطاقة على مستوى النظام كله بينما الجدول
+                 مجمّع حسب المقاول ومقسّم على صفحات، فبدون العدد لا سبيل للتوفيق بينهما —
+                 وهو ما قاد لظنّ أن كل الذمم حُذفت والبطاقة "لم تتحدّث" (TASK-17 #9). -->
+            <p class="text-caption text-medium-emphasis mb-0">
+              {{ summary?.items?.outstanding_dues_count ?? 0 }} ذمة قائمة من أصل
+              {{ summary?.items?.dues_count ?? 0 }} في النظام
+            </p>
           </VCardText>
         </VCard>
       </VCol>
@@ -376,6 +787,15 @@ const importMutation = useMutation({
               <span dir="ltr">ILS: {{ rates?.items?.latest?.ILS?.rate_to_jod ?? '—' }}</span>
               <span dir="ltr">USD: {{ rates?.items?.latest?.USD?.rate_to_jod ?? '—' }}</span>
             </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+      <VCol cols="12" md="3">
+        <VCard>
+          <VCardText>
+            <p class="text-body-2 text-medium-emphasis mb-1">رسوم تسجيل (أول انتساب)</p>
+            <h3 class="text-h5">{{ summary?.items?.registration_fees?.total_jod ?? '—' }} د.أ</h3>
+            <p class="text-caption text-medium-emphasis mb-0">{{ summary?.items?.registration_fees?.dues_count ?? 0 }} ذمة</p>
           </VCardText>
         </VCard>
       </VCol>
@@ -428,7 +848,12 @@ const importMutation = useMutation({
               </td>
               <td class="font-weight-medium">{{ c.name }}</td>
               <td dir="ltr">{{ c.membership_number }}</td>
-              <td>{{ c.dues_count }}</td>
+              <td>
+                {{ c.dues_count }}
+                <VChip v-if="c.penalties_count" size="x-small" color="error" variant="tonal" class="ms-1">
+                  + {{ c.penalties_count }} غرامة
+                </VChip>
+              </td>
               <td>{{ c.total_jod }}</td>
               <td class="text-success">{{ c.paid_jod }}</td>
               <td :class="c.remaining_jod > 0 ? 'text-error font-weight-bold' : 'text-success'">
@@ -436,7 +861,7 @@ const importMutation = useMutation({
               </td>
               <td class="text-end text-no-wrap" @click.stop>
                 <VBtn
-                  v-if="c.remaining_jod > 0"
+                  v-if="c.remaining_jod - (c.penalties_remaining_jod ?? 0) > 0"
                   size="small"
                   color="success"
                   variant="tonal"
@@ -449,9 +874,24 @@ const importMutation = useMutation({
                 <VBtn
                   size="small"
                   variant="text"
+                  icon="tabler-calculator"
+                  title="احسب الرسوم السنوية (محرّك الاحتساب الآلي)"
+                  @click="openCalculateFees(c)"
+                />
+                <VBtn
+                  size="small"
+                  variant="text"
                   icon="tabler-plus"
                   title="إضافة ذمة لهذه الشركة"
                   @click="openCreateDue(c)"
+                />
+                <VBtn
+                  size="small"
+                  variant="text"
+                  color="error"
+                  icon="tabler-alert-triangle"
+                  title="إضافة غرامة لهذه الشركة"
+                  @click="openAddPenalty(c)"
                 />
               </td>
             </tr>
@@ -460,10 +900,18 @@ const importMutation = useMutation({
             <tr v-if="expandedId === c.contractor_id">
               <td colspan="8" style="background: rgba(var(--v-theme-primary), 0.03); padding: 0;">
                 <VProgressLinear v-if="expandedLoading" indeterminate color="primary" />
+                <template v-else>
+                <div v-if="selectedDueIds.length" class="d-flex align-center gap-3 pa-2" style="background: rgba(var(--v-theme-info), 0.08);">
+                  <span class="text-body-2">{{ selectedDueIds.length }} ذمة محدَّدة</span>
+                  <VBtn size="small" color="info" @click="openSelectedDiscount">تطبيق خصم على المحدَّد</VBtn>
+                </div>
                 <div class="overflow-x-auto">
-                <VTable v-else density="compact" style="background: transparent;">
+                <VTable density="compact" style="background: transparent;">
                   <thead>
                     <tr>
+                      <th style="inline-size: 36px;">
+                        <VCheckboxBtn :model-value="allDuesSelected" @update:model-value="toggleSelectAllDues" />
+                      </th>
                       <th>السنة</th>
                       <th>البيان</th>
                       <th>المبلغ (د.أ)</th>
@@ -474,9 +922,30 @@ const importMutation = useMutation({
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="d in expandedDues" :key="d.id">
+                    <tr v-if="accumulatedRow" style="background: rgba(var(--v-theme-warning), 0.06);">
+                      <td><VCheckboxBtn :model-value="accumulatedSelected" @update:model-value="toggleAccumulated" /></td>
+                      <td>2025 وما قبل</td>
+                      <td class="font-weight-medium">إجمالي الرسوم المتراكمة</td>
+                      <td>{{ accumulatedRow.amount_jod }}</td>
+                      <td>{{ accumulatedRow.paid_jod }}</td>
+                      <td>{{ accumulatedRow.remaining_jod }}</td>
+                      <td>
+                        <VChip :color="statusColor[accumulatedRow.status]" size="small">
+                          {{ accumulatedRow.status_label }}
+                        </VChip>
+                      </td>
+                      <td />
+                    </tr>
+                    <tr v-for="d in detailedDues" :key="d.id">
+                      <td><VCheckboxBtn v-model="selectedDueIds" :value="d.id" /></td>
                       <td>{{ d.year ?? '—' }}</td>
-                      <td>{{ d.description }}</td>
+                      <td>
+                        {{ d.description }}
+                        <VChip v-if="d.source === 'fee_engine'" size="x-small" color="primary" variant="tonal" class="ms-1">محرّك الاحتساب</VChip>
+                        <VChip v-if="d.discount_amount_jod" size="x-small" color="info" variant="tonal" class="ms-1">
+                          خصم {{ d.discount_amount_jod }} د.أ
+                        </VChip>
+                      </td>
                       <td>{{ d.amount_jod }}</td>
                       <td>{{ d.paid_jod }}</td>
                       <td>{{ d.remaining_jod }}</td>
@@ -492,13 +961,46 @@ const importMutation = useMutation({
                           size="x-small"
                           variant="text"
                           color="error"
-                          @click="deleteDueMutation.mutate(d.id)"
+                          @click="confirmDeleteDue(d.id)"
                         />
                       </td>
                     </tr>
                   </tbody>
                 </VTable>
                 </div>
+                <div v-if="expandedPenalties.length" class="pa-3">
+                  <div class="text-subtitle-2 mb-2">
+                    الغرامات
+                    <RouterLink :to="{ name: 'contractors-penalties' }" class="text-caption ms-2">إدارة الغرامات</RouterLink>
+                  </div>
+                  <VTable density="compact" style="background: transparent;">
+                    <thead>
+                      <tr>
+                        <th>السبب</th>
+                        <th>المبلغ</th>
+                        <th>المسدَّد</th>
+                        <th>المتبقي</th>
+                        <th>الحالة</th>
+                        <th>التاريخ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="p in expandedPenalties" :key="p.id">
+                        <td>{{ p.reason }}</td>
+                        <td>{{ Number(p.amount || 0).toFixed(2) }}</td>
+                        <td>{{ Number(p.paid_amount || 0).toFixed(2) }}</td>
+                        <td>{{ p.status === 'rejected' ? '0.00' : (Number(p.amount || 0) - Number(p.paid_amount || 0)).toFixed(2) }}</td>
+                        <td>
+                          <VChip :color="penaltyStatusColor[p.status]" size="small">
+                            {{ p.status_label }}
+                          </VChip>
+                        </td>
+                        <td>{{ p.created_at ? new Date(p.created_at).toLocaleDateString('ar-PS') : '—' }}</td>
+                      </tr>
+                    </tbody>
+                  </VTable>
+                </div>
+                </template>
               </td>
             </tr>
           </template>
@@ -731,11 +1233,38 @@ const importMutation = useMutation({
               <VTextField v-model="dueForm.amount_jod" label="المبلغ (د.أ)" type="number" dir="ltr" />
             </VCol>
             <VCol cols="12" md="4">
-              <VTextField v-model="dueForm.year" label="السنة (اختياري)" type="number" dir="ltr" />
+              <VTextField v-model="dueForm.year" label="السنة" type="number" dir="ltr" />
             </VCol>
             <VCol cols="12" md="4">
-              <VTextField v-model="dueForm.due_date" label="تاريخ الاستحقاق (اختياري)" type="date" />
+              <VTextField
+                v-model="dueForm.due_date"
+                label="تاريخ الاستحقاق"
+                type="date"
+                :min="!editingDue && !dueForm.allow_backdate ? todayIso : undefined"
+              />
             </VCol>
+
+            <!-- تسجيل ذمة متأخّرة سابقة — حالة مشروعة لكنها تستحق أن تكون قراراً واعياً
+                 بسبب مكتوب، لا تاريخاً ماضياً مرَّ بالخطأ (TASK-17 #7). -->
+            <VCol v-if="!editingDue" cols="12">
+              <VCheckbox
+                v-model="dueForm.allow_backdate"
+                label="ذمة سابقة/متأخّرة — السماح بتاريخ استحقاق قبل اليوم"
+                density="compact"
+                hide-details
+              />
+            </VCol>
+            <VCol v-if="!editingDue && dueForm.allow_backdate" cols="12">
+              <VTextField
+                v-model="dueForm.backdate_reason"
+                label="سبب التاريخ السابق (إلزامي)"
+                dir="rtl"
+                :error="!dueForm.backdate_reason"
+                hint="يُحفظ بملاحظات الذمة وبسجل المالية"
+                persistent-hint
+              />
+            </VCol>
+
             <VCol cols="12">
               <VTextarea v-model="dueForm.notes" label="ملاحظات" rows="2" dir="rtl" />
             </VCol>
@@ -746,8 +1275,420 @@ const importMutation = useMutation({
           <VBtn
             color="primary"
             :loading="saveDueMutation.isPending.value"
-            :disabled="!editingDue && !dueForm.contractor_id"
+            :disabled="saveDueMutation.isPending.value
+              || (!editingDue && !dueForm.contractor_id)
+              || (!editingDue && (!dueForm.year || !dueForm.due_date))
+              || (dueForm.allow_backdate && !dueForm.backdate_reason)"
             @click="saveDueMutation.mutate()"
+          >
+            حفظ
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- ─── Dialog احسب الرسوم (محرّك الاحتساب الآلي) ─── -->
+    <VDialog v-model="calcDialog" max-width="720">
+      <VCard :title="`احتساب رسوم العضوية — ${calculatingFor?.name ?? ''}`">
+        <VCardText>
+          <VAlert v-if="calcError" type="error" variant="tonal" density="compact" class="mb-4">
+            {{ calcError }}
+          </VAlert>
+
+          <VRow dense>
+            <VCol cols="12" md="4">
+              <VTextField v-model.number="calcForm.year" label="السنة" type="number" dir="ltr" />
+            </VCol>
+            <VCol cols="12" md="4">
+              <VSelect
+                v-model="calcForm.discount_type"
+                :items="[{ title: 'بدون خصم', value: '' }, { title: 'نسبة مئوية', value: 'percent' }, { title: 'مبلغ ثابت', value: 'fixed' }]"
+                label="نوع الخصم (اختياري)"
+              />
+            </VCol>
+            <VCol v-if="calcForm.discount_type" cols="12" md="4">
+              <VTextField
+                v-model="calcForm.discount_value"
+                :label="calcForm.discount_type === 'percent' ? 'نسبة الخصم %' : 'مبلغ الخصم (د.أ)'"
+                type="number"
+                dir="ltr"
+              />
+            </VCol>
+            <VCol v-if="calcForm.discount_type" cols="12">
+              <VTextField v-model="calcForm.discount_reason" label="سبب الخصم" dir="rtl" />
+            </VCol>
+          </VRow>
+
+          <VBtn
+            class="mt-2"
+            variant="tonal"
+            color="primary"
+            :loading="previewFeeMutation.isPending.value"
+            @click="previewFeeMutation.mutate()"
+          >
+            احسب
+          </VBtn>
+
+          <template v-if="calcPreview">
+            <VDivider class="my-4" />
+            <div class="overflow-x-auto">
+              <VTable density="compact">
+                <thead>
+                  <tr>
+                    <th>المجال</th>
+                    <th>الدرجة المعتمدة</th>
+                    <th>النوع</th>
+                    <th>النسبة</th>
+                    <th>القيمة (د.أ)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="f in calcPreview.breakdown?.fields ?? []" :key="f.field_id">
+                    <td>{{ f.field_name }}</td>
+                    <td>{{ f.counted_specialty?.grade_label ?? '—' }}</td>
+                    <td>
+                      <VChip v-if="f.fee_type === 'registration'" size="x-small" color="primary" variant="tonal">رسم تسجيل</VChip>
+                      <span v-else>رسم سنوي</span>
+                    </td>
+                    <td>{{ f.rate_percent }}%</td>
+                    <td>{{ f.amount_jod }}</td>
+                  </tr>
+                </tbody>
+              </VTable>
+            </div>
+            <VAlert v-if="calcPreview.breakdown?.is_new_registration_year" type="info" variant="tonal" density="compact" class="mt-2">
+              أول سنة انتساب — رسم التسجيل مُطبَّق على المجال الأعلى بدل الرسم السنوي.
+            </VAlert>
+            <VRow dense class="mt-2">
+              <VCol cols="6" md="4">
+                <p class="text-caption text-medium-emphasis mb-0">الإجمالي قبل الخصم</p>
+                <strong>{{ calcPreview.total_before_discount_jod }} د.أ</strong>
+              </VCol>
+              <VCol v-if="calcPreview.discount_amount_jod" cols="6" md="4">
+                <p class="text-caption text-medium-emphasis mb-0">قيمة الخصم</p>
+                <strong class="text-info">{{ calcPreview.discount_amount_jod }} د.أ</strong>
+              </VCol>
+              <VCol cols="6" md="4">
+                <p class="text-caption text-medium-emphasis mb-0">الإجمالي المستحَق</p>
+                <strong class="text-success">{{ calcPreview.total_after_discount_jod }} د.أ</strong>
+              </VCol>
+            </VRow>
+          </template>
+        </VCardText>
+        <VCardActions class="justify-end pb-4 px-6">
+          <VBtn variant="tonal" color="secondary" @click="calcDialog = false">إلغاء</VBtn>
+          <VBtn
+            v-if="calcPreview && !calcPreview.unresolvable"
+            color="success"
+            :loading="generateFeeMutation.isPending.value"
+            @click="generateFeeMutation.mutate(false)"
+          >
+            توليد الذمة
+          </VBtn>
+          <VBtn
+            v-if="calcPreview && !calcPreview.unresolvable"
+            variant="tonal"
+            color="warning"
+            :loading="generateFeeMutation.isPending.value"
+            @click="generateFeeMutation.mutate(true)"
+          >
+            توليد (استبدال إن وُجدت)
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- ─── Dialog توليد رسوم للكل ─── -->
+    <VDialog v-model="bulkGenDialog" max-width="720">
+      <VCard title="توليد رسوم العضوية لجميع المقاولين">
+        <VCardText>
+          <VAlert type="info" variant="tonal" density="compact" class="mb-4">
+            يُنشئ ذمة رسوم لكل مقاول لديه تخصصات مسجَّلة وليس لديه ذمة رسوم سابقة لنفس السنة.
+            استخدم "معاينة" أولاً لمراجعة من سيُنشأ له ذمة ومن سيُستثنى (بيانات غير موحَّدة).
+          </VAlert>
+
+          <VTextField v-model.number="bulkGenForm.year" label="السنة" type="number" dir="ltr" style="max-width: 200px;" />
+
+          <template v-if="bulkGenResult">
+            <VDivider class="my-4" />
+            <VRow dense>
+              <VCol cols="4">
+                <p class="text-caption text-medium-emphasis mb-0">سيُنشأ لهم / أُنشئ</p>
+                <strong class="text-success">{{ bulkGenResult.would_create?.length ?? 0 }}</strong>
+              </VCol>
+              <VCol cols="4">
+                <p class="text-caption text-medium-emphasis mb-0">لديهم ذمة مسبقاً (تُستثنى)</p>
+                <strong>{{ bulkGenResult.would_skip_existing?.length ?? 0 }}</strong>
+              </VCol>
+              <VCol cols="4">
+                <p class="text-caption text-medium-emphasis mb-0">بيانات غير موحَّدة (تُستثنى)</p>
+                <strong class="text-error">{{ bulkGenResult.unresolvable?.length ?? 0 }}</strong>
+              </VCol>
+            </VRow>
+          </template>
+        </VCardText>
+        <VCardActions class="justify-end pb-4 px-6">
+          <VBtn variant="tonal" color="secondary" @click="bulkGenDialog = false">إغلاق</VBtn>
+          <VBtn
+            variant="tonal"
+            color="info"
+            :loading="bulkGenMutation.isPending.value"
+            @click="bulkGenMutation.mutate(true)"
+          >
+            معاينة (بدون كتابة)
+          </VBtn>
+          <VBtn
+            color="success"
+            :loading="bulkGenMutation.isPending.value"
+            @click="bulkGenMutation.mutate(false)"
+          >
+            توليد فعلي
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- ─── Dialog خصم على المحدَّد (checkboxes) ─── -->
+    <VDialog v-model="selectedDiscountDialog" max-width="480">
+      <VCard title="تطبيق خصم على الذمم المحدَّدة">
+        <VCardText>
+          <p class="text-body-2 mb-4">سيُطبَّق الخصم على {{ selectedDueIds.length }} ذمة محدَّدة.</p>
+          <VRow dense>
+            <VCol cols="12" md="6">
+              <VSelect
+                v-model="selectedDiscountForm.discount_type"
+                :items="[{ title: 'نسبة مئوية', value: 'percent' }, { title: 'مبلغ ثابت', value: 'fixed' }]"
+                label="نوع الخصم"
+              />
+            </VCol>
+            <VCol cols="12" md="6">
+              <VTextField
+                v-model="selectedDiscountForm.discount_value"
+                :label="selectedDiscountForm.discount_type === 'percent' ? 'نسبة الخصم %' : 'مبلغ الخصم (د.أ)'"
+                type="number"
+                dir="ltr"
+              />
+            </VCol>
+            <VCol cols="12">
+              <VTextField v-model="selectedDiscountForm.discount_reason" label="سبب الخصم" dir="rtl" />
+            </VCol>
+          </VRow>
+
+          <template v-if="selectedDiscountPreview">
+            <VDivider class="my-4" />
+            <VRow dense>
+              <VCol cols="6">
+                <p class="text-caption text-medium-emphasis mb-0">عدد الذمم المطابقة</p>
+                <strong>{{ selectedDiscountPreview.matched_count }}</strong>
+              </VCol>
+              <VCol cols="6">
+                <p class="text-caption text-medium-emphasis mb-0">إجمالي أثر الخصم (د.أ)</p>
+                <strong class="text-info">{{ selectedDiscountPreview.total_discount_impact_jod }}</strong>
+              </VCol>
+            </VRow>
+          </template>
+        </VCardText>
+        <VCardActions class="justify-end pb-4 px-6">
+          <VBtn variant="tonal" color="secondary" @click="selectedDiscountDialog = false">إلغاء</VBtn>
+          <VBtn
+            variant="tonal"
+            color="info"
+            :disabled="!selectedDiscountForm.discount_value"
+            :loading="applySelectedDiscountMutation.isPending.value"
+            @click="applySelectedDiscountMutation.mutate(true)"
+          >
+            معاينة (بدون تطبيق)
+          </VBtn>
+          <VBtn
+            color="success"
+            :disabled="!selectedDiscountForm.discount_value"
+            :loading="applySelectedDiscountMutation.isPending.value"
+            @click="applySelectedDiscountMutation.mutate(false)"
+          >
+            تطبيق الخصم
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- ─── Dialog تأكيد حذف الذمة ─── -->
+    <VDialog v-model="deleteDueDialog" max-width="400">
+      <VCard>
+        <VCardTitle class="d-flex align-center gap-2">
+          <VIcon icon="tabler-alert-triangle" color="error" />
+          تأكيد الحذف
+        </VCardTitle>
+        <VCardText>
+          هل أنت متأكد من حذف هذه الذمة؟ لا يمكن التراجع عن هذا الإجراء.
+        </VCardText>
+        <VCardActions class="justify-end pb-4 px-6">
+          <VBtn variant="tonal" color="secondary" @click="deleteDueDialog = false">إلغاء</VBtn>
+          <VBtn color="error" :loading="deleteDueMutation.isPending.value" @click="deleteDueConfirmed">حذف</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- ─── Dialog خصم جماعي بمعايير ─── -->
+    <VDialog v-model="criteriaDiscountDialog" max-width="620">
+      <VCard title="خصم جماعي بمعايير (مقاولون / سنة / حالة / مصدر)">
+        <VCardText>
+          <VAlert
+            :type="criteriaScopedToContractors ? 'info' : 'warning'"
+            variant="tonal"
+            density="compact"
+            class="mb-4"
+          >
+            <template v-if="criteriaScopedToContractors">
+              الخصم محصور بالمقاولين المحدَّدين أدناه. استخدم "معاينة" للتأكد من العدد والأثر قبل الالتزام.
+            </template>
+            <template v-else>
+              <strong>تنبيه:</strong> بدون تحديد مقاولين، يطبَّق الخصم على كل الذمم المطابقة عبر <strong>جميع</strong> المقاولين.
+              حدِّد المقاولين إن كنت تقصد بعضهم فقط.
+            </template>
+          </VAlert>
+
+          <VRow dense>
+            <VCol cols="12">
+              <!-- حصر الخصم بمقاولين محدَّدين: قبل إضافته كان مود المعايير يطابق ذمم كل
+                   المقاولين بنفس السنة، فيظهر عدد أكبر بكثير من المقصود (TASK-17 #10). -->
+              <VAutocomplete
+                v-model="criteriaForm.contractor_ids"
+                v-model:search="criteriaContractorSearch"
+                :items="criteriaContractorOptions"
+                :item-title="contractorLabel"
+                item-value="id"
+                label="المقاولون (اختياري — اتركه فارغاً ليشمل الجميع)"
+                multiple
+                chips
+                closable-chips
+                no-filter
+                hide-details="auto"
+                hint="اكتب حرفين على الأقل للبحث"
+                persistent-hint
+              />
+            </VCol>
+            <VCol cols="12" md="4">
+              <VTextField v-model="criteriaForm.year" label="السنة (اختياري)" type="number" dir="ltr" />
+            </VCol>
+            <VCol cols="12" md="4">
+              <VSelect
+                v-model="criteriaForm.status"
+                :items="[{ title: 'أي حالة (غير المسدَّدة بالكامل)', value: '' }, { title: 'غير مسدَّدة', value: 'unpaid' }, { title: 'مسدَّدة جزئياً', value: 'partially_paid' }]"
+                label="الحالة (اختياري)"
+                hint="الذمم المسدَّدة بالكامل مستثناة دائماً — لا خصم يُطبَّق عليها"
+                persistent-hint
+              />
+            </VCol>
+            <VCol cols="12" md="4">
+              <VSelect
+                v-model="criteriaForm.source"
+                :items="[{ title: 'أي مصدر', value: '' }, { title: 'محرّك الاحتساب', value: 'fee_engine' }, { title: 'يدوي', value: 'manual' }, { title: 'استيراد قديم', value: 'legacy_import' }]"
+                label="المصدر (اختياري)"
+              />
+            </VCol>
+            <VCol cols="12" md="6">
+              <VSelect
+                v-model="criteriaForm.discount_type"
+                :items="[{ title: 'نسبة مئوية', value: 'percent' }, { title: 'مبلغ ثابت', value: 'fixed' }]"
+                label="نوع الخصم"
+              />
+            </VCol>
+            <VCol cols="12" md="6">
+              <VTextField
+                v-model="criteriaForm.discount_value"
+                :label="criteriaForm.discount_type === 'percent' ? 'نسبة الخصم %' : 'مبلغ الخصم (د.أ)'"
+                type="number"
+                dir="ltr"
+              />
+            </VCol>
+            <VCol cols="12">
+              <VTextField v-model="criteriaForm.discount_reason" label="سبب الخصم" dir="rtl" />
+            </VCol>
+          </VRow>
+
+          <VAlert
+            v-if="!criteriaHasAnyFilter"
+            type="error"
+            variant="tonal"
+            density="compact"
+            class="mt-4"
+          >
+            حدِّد معياراً واحداً على الأقل (مقاولون أو سنة أو حالة أو مصدر). الخصم الجماعي بلا معايير يشمل كل ذمم النظام.
+          </VAlert>
+
+          <template v-if="criteriaPreview && 'total_discount_impact_jod' in criteriaPreview">
+            <VDivider class="my-4" />
+            <VRow dense>
+              <VCol cols="12" md="4">
+                <p class="text-caption text-medium-emphasis mb-0">القابلة للخصم</p>
+                <strong class="text-success">{{ criteriaPreview.applicable_count }}</strong>
+                <span class="text-caption text-medium-emphasis"> من {{ criteriaPreview.matched_count }} مطابقة</span>
+              </VCol>
+              <VCol cols="12" md="4">
+                <p class="text-caption text-medium-emphasis mb-0">عدد المقاولين المتأثّرين</p>
+                <strong>{{ criteriaPreview.contractors_count }}</strong>
+              </VCol>
+              <VCol cols="12" md="4">
+                <p class="text-caption text-medium-emphasis mb-0">إجمالي أثر الخصم (د.أ)</p>
+                <strong class="text-info">{{ criteriaPreview.total_discount_impact_jod }}</strong>
+              </VCol>
+            </VRow>
+
+            <!-- الذمم التي سيرفضها التطبيق — كانت تُعدّ ضمن "المطابقة" ويُضاف أثرها الكامل
+                 للإجمالي، فيظهر للمستخدم رقم لا يتحقّق أبداً (TASK-17 #10). -->
+            <VAlert
+              v-if="criteriaPreview.skipped?.length"
+              type="warning"
+              variant="tonal"
+              density="compact"
+              class="mt-3"
+            >
+              {{ criteriaPreview.skipped.length }} ذمة لن يُطبَّق عليها الخصم:
+              {{ criteriaPreview.skipped[0].reason }}
+            </VAlert>
+          </template>
+        </VCardText>
+        <VCardActions class="justify-end pb-4 px-6">
+          <VBtn variant="tonal" color="secondary" @click="criteriaDiscountDialog = false">إغلاق</VBtn>
+          <VBtn
+            variant="tonal"
+            color="info"
+            :disabled="!criteriaForm.discount_value || !criteriaHasAnyFilter"
+            :loading="criteriaDiscountMutation.isPending.value"
+            @click="criteriaDiscountMutation.mutate(true)"
+          >
+            معاينة (بدون كتابة)
+          </VBtn>
+          <!-- المعاينة إلزامية قبل التطبيق في مود المعايير: هذا المسار يقدر يمسّ ذمم كل
+               المقاولين بنداء واحد، فلا يصحّ أن يمرّ بلا رقم يراه المستخدم أولاً. -->
+          <VBtn
+            color="error"
+            :disabled="!criteriaForm.discount_value || !criteriaHasAnyFilter || !criteriaPreview"
+            :loading="criteriaDiscountMutation.isPending.value"
+            @click="criteriaDiscountMutation.mutate(false)"
+          >
+            تطبيق فعلياً
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- ─── إضافة غرامة ─── -->
+    <VDialog v-model="penaltyDialog" max-width="480">
+      <VCard :title="`إضافة غرامة — ${penaltyTarget?.name ?? ''}`">
+        <VCardText>
+          <VTextField v-model="penaltyForm.reason" label="سبب الغرامة" class="mb-4" />
+          <VTextField v-model="penaltyForm.amount" label="المبلغ (د.أ)" type="number" class="mb-4" />
+          <VTextarea v-model="penaltyForm.notes" label="ملاحظات" rows="2" />
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" @click="penaltyDialog = false">إلغاء</VBtn>
+          <VBtn
+            color="error"
+            :loading="penaltySaving"
+            :disabled="penaltySaving || !penaltyForm.reason || !penaltyForm.amount"
+            @click="savePenalty"
           >
             حفظ
           </VBtn>

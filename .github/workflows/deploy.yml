@@ -1,0 +1,49 @@
+name: Deploy to staging
+
+# هذا المونوريبو ينشر على بيئة الـ**staging** فقط.
+#   staging.pcuorg.cloud  +  api.pcuorg.cloud   →  /var/www/pcuorg/{front,api}
+#   قاعدة البيانات: pcuorg   ·   Reverb: 8080   ·   Firebase: معطّل (LogPushSender)
+#
+# الإنتاج لا يُنشر من هنا إطلاقاً. له مستودعان منفصلان بفرع main وبوابة موافقة
+# يدوية، وينشر على /var/www/pcuorg/production/* وقاعدة pcuorg_production:
+#   https://github.com/PcuGaza/PCU-Manager-Backend
+#   https://github.com/PcuGaza/PCU-Manager-Frontend
+# التفاصيل الكاملة في DEPLOYMENT.md.
+#
+# الدفع هنا لا يحتاج موافقة — وهذا مقصود: staging هي مساحة الاختبار.
+
+on:
+  push:
+    branches: [feature/arab-contractors-union]
+    paths:
+      - arab-contractors-union-api/**
+      - arab-contractors-union-front/**
+
+# Deploys share /var/www/pcuorg/{api,front} and the monorepo checkout on the
+# VPS; two runs overlapping there race each other's git reset/rsync/build and
+# can silently ship a mixed or stale build. Serialize them per branch instead
+# of cancelling — a deploy must finish, not be interrupted mid-rsync.
+concurrency:
+  group: deploy-staging-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          # القيمة الافتراضية (30s) قصيرة لما يبدأ هالران فوراً بعد ما ران سابق
+          # بنفس مجموعة concurrency لسا خلّص build/npm تقيل عالسيرفر المشترك —
+          # السيرفر بيضل مشغول شوي فبيفوت وقت الـ dial قبل ما يقدر يرد على SSH.
+          timeout: 90s
+          script_stop: true
+          script: |
+            cd /var/www/pcuorg/api && ./deploy-vps.sh
+            cd /var/www/pcuorg/front && ./deploy-vps.sh

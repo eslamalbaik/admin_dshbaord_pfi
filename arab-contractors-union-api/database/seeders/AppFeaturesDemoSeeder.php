@@ -48,7 +48,7 @@ class AppFeaturesDemoSeeder extends Seeder
                 'bank_name_en'   => 'Bank of Palestine',
                 'iban'           => 'PS92PALS000000000400123456700',
                 'account_number' => '400123456700',
-                'account_holder' => 'اتحاد المقاولين العرب',
+                'account_holder' => 'اتحاد المقاولين الفلسطينيين',
                 'swift'          => 'PALSPS22',
                 'is_active'      => true,
                 'sort'           => 1,
@@ -58,7 +58,7 @@ class AppFeaturesDemoSeeder extends Seeder
                 'bank_name_en'   => 'Palestine Islamic Bank',
                 'iban'           => 'PS45PIBC000000000900987654300',
                 'account_number' => '900987654300',
-                'account_holder' => 'اتحاد المقاولين العرب',
+                'account_holder' => 'اتحاد المقاولين الفلسطينيين',
                 'swift'          => 'PIBCPS22',
                 'is_active'      => true,
                 'sort'           => 2,
@@ -77,25 +77,22 @@ class AppFeaturesDemoSeeder extends Seeder
 
         $items = [
             [
-                'title'        => 'افتتاح المقر الجديد لاتحاد المقاولين العرب',
+                'title'        => 'افتتاح المقر الجديد لاتحاد المقاولين الفلسطينيين',
                 'excerpt'      => 'افتتح الاتحاد مقره الجديد بحضور نخبة من المقاولين وممثلي القطاع.',
-                'body'         => '<p>احتفل اتحاد المقاولين العرب بافتتاح مقره الجديد ضمن خطته للتوسّع وتقديم خدمات أفضل للأعضاء.</p>',
+                'body'         => '<p>احتفل اتحاد المقاولين الفلسطينيين بافتتاح مقره الجديد ضمن خطته للتوسّع وتقديم خدمات أفضل للأعضاء.</p>',
                 'video_url'    => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
                 'external_url' => 'https://acu.ps',
-                'category'     => 'news',
             ],
             [
                 'title'        => 'توقيع مذكرة تفاهم لتأهيل الكوادر الهندسية',
                 'excerpt'      => 'مذكرة تفاهم مع جهات أكاديمية لتدريب وتأهيل المهندسين الأعضاء.',
                 'body'         => '<p>وقّع الاتحاد مذكرة تفاهم تهدف إلى رفع كفاءة الكوادر الهندسية عبر برامج تدريبية متخصصة.</p>',
                 'external_url' => 'https://acu.ps/mou',
-                'category'     => 'announcement',
             ],
             [
                 'title'        => 'ملتقى المقاولين السنوي 2026',
                 'excerpt'      => 'دعوة لحضور الملتقى السنوي لمناقشة تحديات القطاع وفرصه.',
                 'body'         => '<p>يسر الاتحاد دعوتكم لحضور الملتقى السنوي الذي يجمع المقاولين وصنّاع القرار.</p>',
-                'category'     => 'event',
             ],
         ];
 

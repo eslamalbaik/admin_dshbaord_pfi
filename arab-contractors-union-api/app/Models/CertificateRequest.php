@@ -10,6 +10,7 @@ class CertificateRequest extends Model
     protected $fillable = [
         'contractor_id', 'type', 'status', 'notes', 'attachment',
         'reject_reason', 'certificate_path', 'issued_at', 'reviewed_by', 'reviewed_at',
+        'pending_payment_id',
     ];
 
     protected $casts = [
@@ -20,6 +21,22 @@ class CertificateRequest extends Model
     public function contractor()
     {
         return $this->belongsTo(Contractor::class);
+    }
+
+    /**
+     * دفعة الرسوم التي سُمح بتقديم الطلب بانتظار تأكيدها (TASK-17 #5). وجودها غير مؤكَّدة
+     * يمنع الموافقة والإصدار: الطلب يُرى ويُراجَع، لكن لا شهادة تُصدر مقابل مال غير مؤكَّد.
+     */
+    public function pendingPayment()
+    {
+        return $this->belongsTo(\App\Models\Payment::class, 'pending_payment_id');
+    }
+
+    /** الطلب موقوف بانتظار اعتماد المحاسب للدفعة المرتبطة به. */
+    public function isAwaitingPaymentConfirmation(): bool
+    {
+        return $this->pending_payment_id !== null
+            && $this->pendingPayment?->status !== 'paid';
     }
 
     public function reviewedBy()

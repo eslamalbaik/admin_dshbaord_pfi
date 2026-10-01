@@ -3,17 +3,18 @@
 # مستودع الباك على السيرفر مُستنسخ داخل ~/acu-api مباشرةً، لذا المهام تُنفَّذ في مكانها.
 # ملاحظات:
 #   - .env و storage/ و vendor/ خارج git — لا تُلمَس هنا.
-#   - Laravel 12 يحتاج PHP 8.2+ ؛ CLI الافتراضي 8.1، لذا نثبّت مسار ea-php83.
+#   - Laravel 12 يحتاج PHP 8.2+ ؛ CLI الافتراضي 8.1، لذا نثبّت مسار ea-php82
+#     (ea-php83 موجود كمجلد بالسيرفر بس بدون CLI binary فعلي — جُرِّب وفشل).
 #   - composer.phar متوقّع داخل ~/acu-api (أو عدّل السطر لمسار composer العام).
 deployment:
   tasks:
     - export DEPLOYPATH=/home/pcuorg/acu-api
-    - export PHP83=/opt/cpanel/ea-php83/root/usr/bin/php
+    - export PHP82=/opt/cpanel/ea-php82/root/usr/bin/php
     - /bin/echo "== deploy start: $(date) =="
-    - cd $DEPLOYPATH && $PHP83 composer.phar install --no-dev --optimize-autoloader --no-interaction
-    - cd $DEPLOYPATH && $PHP83 artisan migrate --force
-    - cd $DEPLOYPATH && $PHP83 artisan config:cache
-    - cd $DEPLOYPATH && $PHP83 artisan route:cache
-    - cd $DEPLOYPATH && $PHP83 artisan view:cache
-    - cd $DEPLOYPATH && $PHP83 artisan storage:link || /bin/true
+    - cd $DEPLOYPATH && $PHP82 composer.phar install --no-dev --optimize-autoloader --no-interaction
+    - cd $DEPLOYPATH && $PHP82 artisan migrate --force
+    - cd $DEPLOYPATH && $PHP82 artisan config:cache
+    - cd $DEPLOYPATH && $PHP82 artisan route:cache
+    - cd $DEPLOYPATH && $PHP82 artisan view:cache
+    - cd $DEPLOYPATH && $PHP82 artisan storage:link || /bin/true
     - /bin/echo "== deploy done: $(date) =="
