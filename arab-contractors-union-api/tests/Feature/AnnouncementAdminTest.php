@@ -138,4 +138,87 @@ class AnnouncementAdminTest extends TestCase
     {
         $this->postJson('/api/v1/admin/announcements', ['title' => 'x', 'body' => 'y'])->assertStatus(401);
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    //  expires_at — optional expiry/archiving date
+    // ─────────────────────────────────────────────────────────────────────
+
+    public function test_store_rejects_expires_at_before_published_at(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/announcements', [
+            'title'        => 'تعميم بتاريخ انتهاء خاطئ',
+            'body'         => 'نص التعميم',
+            'is_published' => true,
+            'published_at' => now()->toDateString(),
+            'expires_at'   => now()->toDateString(),
+        ])->assertStatus(422)->assertJsonValidationErrors(['expires_at']);
+    }
+
+    public function test_store_accepts_expires_at_after_published_at(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/announcements', [
+            'title'        => 'تعميم بتاريخ انتهاء صحيح',
+            'body'         => 'نص التعميم',
+            'is_published' => true,
+            'published_at' => now()->toDateString(),
+            'expires_at'   => now()->addWeek()->toDateString(),
+        ])->assertStatus(201);
+    }
+
+    public function test_effective_status_is_archived_after_expiry(): void
+    {
+        $announcement = Announcement::create([
+            'title' => 'منتهي', 'body' => 'نص',
+            'is_published' => true, 'published_at' => now()->subWeek(), 'expires_at' => now()->subDay(),
+        ]);
+
+        $this->assertSame('archived', $announcement->effective_status);
+    }
+
+    public function test_expired_announcement_not_shown_in_public_published_list(): void
+    {
+        Announcement::create([
+            'title' => 'منتهي', 'body' => 'نص',
+            'is_published' => true, 'published_at' => now()->subWeek(), 'expires_at' => now()->subDay(),
+        ]);
+        $active = Announcement::create([
+            'title' => 'ساري', 'body' => 'نص',
+            'is_published' => true, 'published_at' => now()->subHour(),
+        ]);
+
+        $response = $this->getJson('/api/v1/announcements');
+
+        $response->assertStatus(200)->assertJsonCount(1, 'items');
+        $this->assertSame($active->id, $response->json('items.0.id'));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    //  publish_now — republish an already-published-then-drafted announcement
+    //  (mirrors News's update() behavior; previously update() could only
+    //  backfill published_at when it was NULL, so re-publishing via edit
+    //  without touching the date left published_at stuck in the past)
+    // ─────────────────────────────────────────────────────────────────────
+
+    public function test_update_publish_now_refreshes_published_at(): void
+    {
+        $this->actingAsAdmin();
+
+        $announcement = Announcement::create([
+            'title' => 'تعميم', 'body' => 'نص',
+            'is_published' => false, 'published_at' => now()->subMonth(),
+        ]);
+
+        $this->postJson("/api/v1/admin/announcements/{$announcement->id}", [
+            '_method'      => 'PUT',
+            'is_published' => true,
+            'publish_now'  => true,
+        ])->assertStatus(200);
+
+        $announcement->refresh();
+        $this->assertTrue($announcement->published_at->isToday());
+    }
 }

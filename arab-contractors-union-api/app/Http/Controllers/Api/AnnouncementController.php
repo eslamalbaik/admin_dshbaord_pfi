@@ -100,7 +100,9 @@ class AnnouncementController extends Controller
     // GET /api/v1/announcements/{announcement}
     public function show(Announcement $announcement)
     {
-        if (! $announcement->is_published || ! $announcement->published_at || $announcement->published_at->isFuture()) {
+        $isExpired = $announcement->expires_at && $announcement->expires_at->isPast();
+
+        if (! $announcement->is_published || ! $announcement->published_at || $announcement->published_at->isFuture() || $isExpired) {
             return $this->error('الإعلان غير متاح.', 404);
         }
 
@@ -179,6 +181,12 @@ class AnnouncementController extends Controller
             // لازم اليوم أو بعده عند الإنشاء (REQ-12 #1) — التعديل يبقى بلا قيد حتى لا يُمنع
             // تصحيح حقول أخرى بتعميم قديم تاريخ نشره بالماضي فعلياً (نفس نمط Tenders/News).
             'published_at' => 'nullable|date|after_or_equal:today',
+            // تاريخ انتهاء اختياري (أرشفة تلقائية) — لازم يكون بعد تاريخ النشر الفعلي (المُدخل أو now() الافتراضي)
+            'expires_at'   => ['nullable', 'date', function ($attribute, $value, $fail) use ($request) {
+                $publishedAt = $request->filled('published_at') ? now()->parse($request->published_at) : now();
+                if (now()->parse($value)->lessThanOrEqualTo($publishedAt))
+                    $fail('يجب أن يكون تاريخ انتهاء التعميم بعد تاريخ النشر.');
+            }],
         ]);
 
         if (empty($validated['number'])) {
@@ -242,8 +250,20 @@ class AnnouncementController extends Controller
             'attachment'   => 'nullable|file|mimes:pdf,doc,docx|max:10240',
             'is_published' => 'boolean',
             'is_pinned'    => 'boolean',
+            'publish_now'  => 'boolean',
             'published_at' => $isDateChanged ? 'nullable|date|after_or_equal:today' : 'nullable|date',
+            'expires_at'   => ['nullable', 'date', function ($attribute, $value, $fail) use ($request, $announcement) {
+                $publishedAt = $request->filled('published_at')
+                    ? now()->parse($request->published_at)
+                    : ($announcement->published_at ?? now());
+                if (now()->parse($value)->lessThanOrEqualTo($publishedAt))
+                    $fail('يجب أن يكون تاريخ انتهاء التعميم بعد تاريخ النشر.');
+            }],
         ]);
+
+        // "نشر مباشرة" لتعميم كان مسودة أو مجدول لتاريخ لاحق: تاريخ النشر يصير الآن (نفس منطق News)
+        $publishNow = $request->boolean('publish_now');
+        unset($validated['publish_now']);
 
         if (array_key_exists('category_id', $validated) && $validated['category_id']) {
             $validated['category'] = AnnouncementCategory::find($validated['category_id'])->name;
@@ -258,7 +278,7 @@ class AnnouncementController extends Controller
         }
 
         $newlyPublished = ($validated['is_published'] ?? false) && ! $announcement->published_at;
-        if ($newlyPublished) {
+        if (($publishNow || $newlyPublished) && empty($validated['published_at'])) {
             $validated['published_at'] = now();
         }
 
