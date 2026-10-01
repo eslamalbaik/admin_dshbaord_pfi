@@ -197,6 +197,12 @@ const dueForm = ref({
 
 const todayIso = new Date().toISOString().slice(0, 10)
 
+// السنة تُعبّأ تلقائياً من تاريخ الاستحقاق إن كانت فارغة
+watch(() => dueForm.value.due_date, v => {
+  if (v && !dueForm.value.year)
+    dueForm.value.year = Number(v.slice(0, 4))
+})
+
 const contractorSearch = ref('')
 const contractorOptions = ref<{ id: number; name: string; membership_number: string }[]>([])
 let contractorTimer: ReturnType<typeof setTimeout> | null = null
@@ -328,6 +334,7 @@ const saveDueMutation = useMutation({
   },
   onError: (e: any) => flash(
     e?.response?.data?.errors?.due_date?.[0]
+    || e?.response?.data?.errors?.year?.[0]
     || e?.response?.data?.errors?.backdate_reason?.[0]
     || e?.response?.data?.message
     || 'فشل حفظ الذمة.',
@@ -1226,12 +1233,12 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
               <VTextField v-model="dueForm.amount_jod" label="المبلغ (د.أ)" type="number" dir="ltr" />
             </VCol>
             <VCol cols="12" md="4">
-              <VTextField v-model="dueForm.year" label="السنة (اختياري)" type="number" dir="ltr" />
+              <VTextField v-model="dueForm.year" label="السنة" type="number" dir="ltr" />
             </VCol>
             <VCol cols="12" md="4">
               <VTextField
                 v-model="dueForm.due_date"
-                label="تاريخ الاستحقاق (اختياري)"
+                label="تاريخ الاستحقاق"
                 type="date"
                 :min="!editingDue && !dueForm.allow_backdate ? todayIso : undefined"
               />
@@ -1270,6 +1277,7 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
             :loading="saveDueMutation.isPending.value"
             :disabled="saveDueMutation.isPending.value
               || (!editingDue && !dueForm.contractor_id)
+              || (!editingDue && (!dueForm.year || !dueForm.due_date))
               || (dueForm.allow_backdate && !dueForm.backdate_reason)"
             @click="saveDueMutation.mutate()"
           >

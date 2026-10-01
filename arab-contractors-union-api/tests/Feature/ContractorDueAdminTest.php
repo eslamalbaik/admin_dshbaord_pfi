@@ -47,6 +47,19 @@ class ContractorDueAdminTest extends TestCase
     //  #7 — تاريخ الاستحقاق
     // ─────────────────────────────────────────────────────────────────────────
 
+    /** المقاول يُبلَّغ بالذمة مع تاريخ استحقاقها — ذمة بلا تاريخ أو سنة لا تُقبل. */
+    public function test_due_date_and_year_are_required(): void
+    {
+        $this->actingAsAdmin();
+
+        $payload = $this->payload($this->contractor());
+        unset($payload['year']);
+
+        $this->postJson('/api/v1/dashboard/dues', $payload)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['due_date', 'year']);
+    }
+
     public function test_a_past_due_date_is_rejected_without_the_backdate_flag(): void
     {
         $this->actingAsAdmin();
