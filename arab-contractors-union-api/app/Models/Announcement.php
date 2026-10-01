@@ -11,13 +11,14 @@ class Announcement extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'title', 'number', 'category', 'body', 'image', 'attachment', 'is_published', 'is_pinned', 'published_at', 'created_by',
+        'title', 'number', 'category', 'body', 'image', 'attachment', 'is_published', 'is_pinned', 'published_at', 'expires_at', 'created_by',
     ];
 
     protected $casts = [
         'is_published' => 'boolean',
         'is_pinned'    => 'boolean',
         'published_at' => 'datetime',
+        'expires_at'   => 'datetime',
     ];
 
     protected $appends = ['effective_status'];
@@ -26,14 +27,18 @@ class Announcement extends Model
     {
         return $query->where('is_published', true)
                      ->whereNotNull('published_at')
-                     ->where('published_at', '<=', now());
+                     ->where('published_at', '<=', now())
+                     ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()));
     }
 
-    /** draft (لم يُنشر) | scheduled (مجدول لتاريخ مستقبلي) | published (منشور فعلاً الآن) */
+    /** draft (لم يُنشر) | scheduled (مجدول لتاريخ مستقبلي) | published (منشور فعلاً الآن) | archived (تجاوز تاريخ الانتهاء) */
     public function getEffectiveStatusAttribute(): string
     {
         if (! $this->is_published || ! $this->published_at)
             return 'draft';
+
+        if ($this->expires_at && $this->expires_at->isPast())
+            return 'archived';
 
         return $this->published_at->isFuture() ? 'scheduled' : 'published';
     }

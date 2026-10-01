@@ -32,8 +32,8 @@ const categoryFilter = ref('')
 const pinnedFilter = ref('')
 const publishedFilter = ref('')
 
-const statusColor: Record<string, string> = { draft: 'secondary', scheduled: 'warning', published: 'success' }
-const statusLabel: Record<string, string> = { draft: 'مسودة', scheduled: 'مجدول', published: 'منشور' }
+const statusColor: Record<string, string> = { draft: 'secondary', scheduled: 'warning', published: 'success', archived: 'grey-darken-1' }
+const statusLabel: Record<string, string> = { draft: 'مسودة', scheduled: 'مجدول', published: 'منشور', archived: 'مؤرشف' }
 
 const headers = [
   { title: 'التعميم', key: 'title' },
@@ -69,6 +69,29 @@ const fetchAnnouncements = async () => {
 
 watchEffect(() => fetchAnnouncements())
 
+// طريقة النشر: مباشرة (بدون تاريخ — الخادم يعتمد وقت الحفظ) / جدولة (التاريخ مطلوب) / مسودة.
+// نفس نمط صفحة الأخبار — بيلغي زر "نشر مباشرة" المستقل اللي كان يتصادم مع تاريخ النشر.
+type PublishMode = 'now' | 'schedule' | 'draft'
+
+const publishModeOptions = [
+  { value: 'now', label: 'نشر مباشرة', icon: 'tabler-send' },
+  { value: 'schedule', label: 'جدولة', icon: 'tabler-calendar-time' },
+  { value: 'draft', label: 'مسودة', icon: 'tabler-file-pencil' },
+]
+
+// تاريخ بصيغة YYYY-MM-DD بالتوقيت المحلي (toISOString كان يرجّع تاريخ UTC — غلط بعد منتصف الليل،
+// وهو سبب فشل الحفظ لما يكون التاريخ المختار بالفورم "أمس" فعلياً حسب توقيت الخادم)
+const localDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const todayStr = () => localDateStr(new Date())
+const yesterdayStr = () => localDateStr(new Date(Date.now() - 24 * 60 * 60 * 1000))
+
+const minPublishDate = computed(() => (isEditing.value ? yesterdayStr() : todayStr()))
+
+// حقل تاريخ النشر يظهر فقط بالجدولة، أو بتعديل تعميم منشور (لتصحيح تاريخه)
+const showPublishDate = computed(() =>
+  form.value.publishMode === 'schedule' || (isEditing.value && form.value.publishMode === 'now'),
+)
+
 // ── Create/Edit form ──────────────────────────────
 const emptyForm = () => ({
   id: null as number | null,
@@ -76,9 +99,10 @@ const emptyForm = () => ({
   number: '',
   category_id: null as number | null,
   body: '',
-  is_published: false,
+  publishMode: 'now' as PublishMode,
   is_pinned: false,
   published_at: '',
+  expires_at: '',
 })
 
 const formDialog = ref(false)
@@ -86,8 +110,14 @@ const formLoading = ref(false)
 const isEditing = ref(false)
 const form = ref(emptyForm())
 
+// حالة التعميم عند فتحه للتعديل — لتحديد شو لازم ينبعت للخادم عند الحفظ (مثل منطق الأخبار)
+const originalPublishMode = ref<PublishMode>('now')
+const originalPublishedAt = ref('')
+
 const openCreate = () => {
   form.value = emptyForm()
+  originalPublishMode.value = 'now'
+  originalPublishedAt.value = ''
   isEditing.value = false
   formDialog.value = true
 }
@@ -99,10 +129,15 @@ const openEdit = (item: any) => {
     number: item.number ?? '',
     category_id: item.category_id ?? null,
     body: item.body ?? '',
-    is_published: !!item.is_published,
+    publishMode: !item.is_published
+      ? 'draft'
+      : (item.published_at && new Date(item.published_at) > new Date() ? 'schedule' : 'now'),
     is_pinned: !!item.is_pinned,
     published_at: item.published_at ? item.published_at.substring(0, 10) : '',
+    expires_at: item.expires_at ? item.expires_at.substring(0, 10) : '',
   }
+  originalPublishMode.value = form.value.publishMode
+  originalPublishedAt.value = form.value.published_at
   isEditing.value = true
   formDialog.value = true
 }
@@ -121,17 +156,44 @@ const saveAnnouncement = async () => {
     notify('العنوان والمحتوى مطلوبان', 'error')
     return
   }
+  const mode = form.value.publishMode
+  if (mode === 'schedule' && !form.value.published_at) {
+    notify('حدد تاريخ النشر للتعميم المجدول', 'error')
+    return
+  }
+  if (showPublishDate.value && form.value.published_at
+    && form.value.published_at !== originalPublishedAt.value
+    && form.value.published_at < minPublishDate.value) {
+    notify(isEditing.value ? 'يجب أن يكون تاريخ النشر أمس أو بعده' : 'يجب أن يكون تاريخ النشر اليوم أو بعده', 'error')
+    return
+  }
+  if (form.value.expires_at && form.value.published_at && form.value.expires_at <= form.value.published_at) {
+    notify('يجب أن يكون تاريخ انتهاء التعميم بعد تاريخ النشر', 'error')
+    return
+  }
   formLoading.value = true
   try {
     const fd = new FormData()
     fd.append('title', form.value.title)
     fd.append('body', form.value.body)
-    fd.append('is_published', form.value.is_published ? '1' : '0')
+    fd.append('is_published', mode === 'draft' ? '0' : '1')
     fd.append('is_pinned', form.value.is_pinned ? '1' : '0')
     // رقم التعميم: يُترك فارغاً بالإنشاء لتوليده تلقائياً بالباك اند؛ التعديل يسمح بتصحيحه يدوياً
     if (isEditing.value && form.value.number) fd.append('number', form.value.number)
     if (form.value.category_id) fd.append('category_id', String(form.value.category_id))
-    if (form.value.published_at) fd.append('published_at', form.value.published_at)
+    if (form.value.expires_at) fd.append('expires_at', form.value.expires_at)
+
+    const dateChanged = form.value.published_at !== originalPublishedAt.value
+    if (mode === 'schedule') {
+      fd.append('published_at', form.value.published_at)
+    }
+    else if (mode === 'now' && isEditing.value) {
+      // تاريخ معدّل يدوياً يُرسل كما هو؛ غير هيك تعميم كان مسودة/مجدول يصير منشوراً من هلأ
+      if (form.value.published_at && dateChanged)
+        fd.append('published_at', form.value.published_at)
+      else if (originalPublishMode.value !== 'now')
+        fd.append('publish_now', '1')
+    }
 
     if (isEditing.value) {
       fd.append('_method', 'PUT')
@@ -145,7 +207,9 @@ const saveAnnouncement = async () => {
     fetchAnnouncements()
   } catch (err: any) {
     console.error(err)
-    notify(err?.response?.data?.message || 'تعذّر حفظ التعميم', 'error')
+    const fieldErrors = err?.response?.data?.errors
+    const reason = fieldErrors ? Object.values(fieldErrors).flat().join(' — ') : null
+    notify(reason || err?.response?.data?.message || 'تعذّر حفظ التعميم', 'error')
   } finally {
     formLoading.value = false
   }
@@ -331,15 +395,6 @@ const deleteAnnouncement = async () => {
                 style="font-family:Cairo,sans-serif"
               />
             </VCol>
-            <VCol cols="12" md="6">
-              <VTextField
-                v-model="form.published_at"
-                label="تاريخ النشر (اختياري — الآن افتراضياً)"
-                type="date"
-                :min="new Date().toISOString().slice(0, 10)"
-                style="font-family:Cairo,sans-serif"
-              />
-            </VCol>
             <VCol cols="12">
               <VTextarea v-model="form.body" label="نص التعميم" rows="6" style="font-family:Cairo,sans-serif" />
             </VCol>
@@ -347,8 +402,44 @@ const deleteAnnouncement = async () => {
             <VCol cols="12" md="6" class="d-flex align-center">
               <VSwitch v-model="form.is_pinned" label="عاجل وهام (تثبيت + Pop-up أول فتح)" color="error" style="font-family:Cairo,sans-serif" />
             </VCol>
-            <VCol cols="12" md="6" class="d-flex align-center">
-              <VSwitch v-model="form.is_published" label="نشر مباشرة" color="success" style="font-family:Cairo,sans-serif" />
+
+            <VCol cols="12" md="6">
+              <label class="text-body-2 font-weight-medium mb-2 d-block" style="font-family:Cairo,sans-serif">طريقة النشر</label>
+              <VBtnToggle
+                v-model="form.publishMode"
+                mandatory
+                color="primary"
+                variant="outlined"
+                divided
+                density="comfortable"
+                style="font-family:Cairo,sans-serif"
+              >
+                <VBtn v-for="opt in publishModeOptions" :key="opt.value" :value="opt.value" :prepend-icon="opt.icon">
+                  {{ opt.label }}
+                </VBtn>
+              </VBtnToggle>
+            </VCol>
+            <VCol v-if="showPublishDate" cols="12" md="6">
+              <VTextField
+                v-model="form.published_at"
+                :label="form.publishMode === 'schedule' ? 'تاريخ النشر المجدول' : 'تاريخ النشر'"
+                type="date"
+                :min="minPublishDate"
+                :hint="isEditing ? 'يمكن اختيار تاريخ أمس أو أي تاريخ بعده' : undefined"
+                persistent-hint
+                style="font-family:Cairo,sans-serif"
+              />
+            </VCol>
+            <VCol cols="12" md="6">
+              <VTextField
+                v-model="form.expires_at"
+                label="تاريخ انتهاء التعميم (اختياري — أرشفة تلقائية)"
+                type="date"
+                :min="form.published_at || todayStr()"
+                hint="بعد هذا التاريخ يصبح التعميم مؤرشفاً ويختفي من تطبيق المقاول"
+                persistent-hint
+                style="font-family:Cairo,sans-serif"
+              />
             </VCol>
           </VRow>
         </VCardText>
@@ -391,6 +482,10 @@ const deleteAnnouncement = async () => {
             <VCol cols="6" md="4">
               <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">تاريخ النشر</span>
               <span style="font-family:Cairo,sans-serif">{{ viewingItem.published_at ? new Date(viewingItem.published_at).toLocaleDateString('ar-PS') : '—' }}</span>
+            </VCol>
+            <VCol v-if="viewingItem.expires_at" cols="6" md="4">
+              <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">تاريخ الانتهاء</span>
+              <span style="font-family:Cairo,sans-serif">{{ new Date(viewingItem.expires_at).toLocaleDateString('ar-PS') }}</span>
             </VCol>
           </VRow>
 
