@@ -44,6 +44,15 @@ class ContractorDue extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    /**
+     * ذمم المقاولين غير المحذوفين فقط — حذف المقاول ناعم ولا يحذف ذممه،
+     * فبدون هذا القيد تظهر ذمم المحذوفين بالبطاقات وهي غائبة عن جدول المقاولين.
+     */
+    public function scopeOfActiveContractors($query)
+    {
+        return $query->whereHas('contractor');
+    }
+
     /** الذمم غير المسدَّدة بالكامل */
     public function scopeOutstanding($query)
     {
@@ -75,7 +84,7 @@ class ContractorDue extends Model
      */
     public static function registrationFeesSummary(?int $year = null): array
     {
-        $query = self::where('source', 'fee_engine')->whereNotNull('fee_breakdown');
+        $query = self::ofActiveContractors()->where('source', 'fee_engine')->whereNotNull('fee_breakdown');
 
         if ($year !== null) {
             $query->where('year', $year);

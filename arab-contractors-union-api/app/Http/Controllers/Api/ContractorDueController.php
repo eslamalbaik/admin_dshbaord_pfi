@@ -230,7 +230,7 @@ class ContractorDueController extends Controller
     /** GET /api/v1/dashboard/dues/summary */
     public function summary()
     {
-        $base = ContractorDue::query();
+        $base = ContractorDue::query()->ofActiveContractors();
 
         // ذمم سنة 2024 وما قبل تُجمّع تحت "رسوم متراكمة" بدون تفصيل بالسنة
         $byYear = (clone $base)
