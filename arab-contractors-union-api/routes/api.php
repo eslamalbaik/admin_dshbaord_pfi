@@ -473,6 +473,10 @@ Route::prefix('v1')->group(function () {
             Route::post('dashboard/dues/{due}/settle',  [\App\Http\Controllers\Api\ContractorDueController::class, 'settle']);
             Route::delete('dashboard/dues/{due}',       [\App\Http\Controllers\Api\ContractorDueController::class, 'destroy']);
 
+            // أرصدة المقاولين — صافي له/عليه لكل شركة
+            Route::get('dashboard/balances',            [\App\Http\Controllers\Api\ContractorBalanceController::class, 'index']);
+            Route::get('dashboard/balances/summary',    [\App\Http\Controllers\Api\ContractorBalanceController::class, 'summary']);
+
             // أسعار الصرف (عرض + override يدوي)
             Route::get('dashboard/exchange-rates',  [\App\Http\Controllers\Api\ExchangeRateController::class, 'index']);
             Route::post('dashboard/exchange-rates', [\App\Http\Controllers\Api\ExchangeRateController::class, 'store']);

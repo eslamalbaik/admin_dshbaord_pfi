@@ -46,6 +46,7 @@ menuItems.push({
   children: [
     { title: 'سجل المدفوعات', to: 'payments-transactions' },
     { title: 'الذمم المالية', to: 'dues' },
+    { title: 'أرصدة المقاولين', to: 'balances' },
     { title: 'الغرامات والمخالفات', to: 'contractors-penalties' },
     { title: 'الحسابات البنكية', to: 'settings-bank-accounts' },
   ],
