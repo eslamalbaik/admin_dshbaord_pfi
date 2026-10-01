@@ -26,8 +26,8 @@ const statusLabels: Record<string, { text: string; color: string }> = {
 
 const filters = [
   { value: 'all', title: 'الكل' },
-  { value: 'owes', title: 'عليهم (سالب)' },
-  { value: 'credit', title: 'لهم (موجب)' },
+  { value: 'owes', title: 'عليهم' },
+  { value: 'credit', title: 'لهم' },
   { value: 'zero', title: 'رصيد صفر' },
 ]
 
@@ -126,60 +126,74 @@ async function exportCsv() {
 
     <!-- ─── الإجماليات ─── -->
     <VRow class="mb-2">
-      <VCol cols="12" md="4">
+      <VCol
+        v-for="card in [
+          { label: 'إجمالي ما على الشركات', count: summary?.items?.debit_count, value: summary?.items?.debit_total_jod, color: 'error', icon: 'tabler-arrow-down-circle' },
+          { label: 'إجمالي ما للشركات', count: summary?.items?.credit_count, value: summary?.items?.credit_total_jod, color: 'success', icon: 'tabler-arrow-up-circle' },
+          { label: 'الصافي', count: null, value: summary?.items?.net_total_jod, color: (summary?.items?.net_total_jod ?? 0) < 0 ? 'error' : 'success', icon: 'tabler-scale' },
+        ]"
+        :key="card.label"
+        cols="12"
+        md="4"
+      >
         <VCard>
-          <VCardText>
-            <p class="text-body-2 text-medium-emphasis mb-1">
-              إجمالي ما على الشركات ({{ summary?.items?.debit_count ?? '—' }} شركة)
-            </p>
-            <h3 class="text-h5 text-error" dir="ltr">{{ money(summary?.items?.debit_total_jod) }} د.أ</h3>
-          </VCardText>
-        </VCard>
-      </VCol>
-      <VCol cols="12" md="4">
-        <VCard>
-          <VCardText>
-            <p class="text-body-2 text-medium-emphasis mb-1">
-              إجمالي ما للشركات ({{ summary?.items?.credit_count ?? '—' }} شركة)
-            </p>
-            <h3 class="text-h5 text-success" dir="ltr">{{ money(summary?.items?.credit_total_jod) }} د.أ</h3>
-          </VCardText>
-        </VCard>
-      </VCol>
-      <VCol cols="12" md="4">
-        <VCard>
-          <VCardText>
-            <p class="text-body-2 text-medium-emphasis mb-1">الصافي</p>
-            <h3 class="text-h5" :class="netColor(summary?.items?.net_total_jod ?? 0)" dir="ltr">
-              {{ money(summary?.items?.net_total_jod) }} د.أ
-            </h3>
+          <VCardText class="d-flex align-center gap-4">
+            <VAvatar :color="card.color" variant="tonal" rounded size="44">
+              <VIcon :icon="card.icon" size="26" />
+            </VAvatar>
+            <div>
+              <p class="text-body-2 text-medium-emphasis mb-1">
+                {{ card.label }}<span v-if="card.count !== null"> ({{ card.count ?? '—' }} شركة)</span>
+              </p>
+              <div class="d-flex align-baseline gap-2">
+                <span class="text-h5 font-weight-bold" :class="`text-${card.color}`" dir="ltr">{{ money(card.value) }}</span>
+                <span class="text-body-1 text-medium-emphasis">دينار أردني</span>
+              </div>
+            </div>
           </VCardText>
         </VCard>
       </VCol>
     </VRow>
 
     <VCard>
-      <VCardText class="d-flex gap-4 flex-wrap align-center">
-        <VTextField
-          v-model="search"
-          placeholder="بحث باسم الشركة أو رقم العضوية..."
-          prepend-inner-icon="tabler-search"
-          density="compact"
-          style="max-width: 320px;"
-        />
-        <VBtnToggle v-model="filter" mandatory density="compact" color="primary" variant="outlined">
-          <VBtn v-for="f in filters" :key="f.value" :value="f.value">
-            {{ f.title }}
-          </VBtn>
-        </VBtnToggle>
-        <VSelect
-          v-model="sort"
-          :items="[{ value: 'asc', title: 'الأكثر مديونية أولاً' }, { value: 'desc', title: 'الأكبر رصيداً أولاً' }]"
-          density="compact"
-          hide-details
-          style="max-width: 220px;"
-        />
+      <VCardText>
+        <VRow align="center">
+          <VCol cols="12" md="4">
+            <VTextField
+              v-model="search"
+              placeholder="بحث باسم الشركة أو رقم العضوية..."
+              prepend-inner-icon="tabler-search"
+              density="compact"
+              hide-details
+              clearable
+            />
+          </VCol>
+          <VCol cols="12" md="5">
+            <VChipGroup v-model="filter" mandatory selected-class="text-primary">
+              <VChip
+                v-for="f in filters"
+                :key="f.value"
+                :value="f.value"
+                variant="outlined"
+                filter
+              >
+                {{ f.title }}
+              </VChip>
+            </VChipGroup>
+          </VCol>
+          <VCol cols="12" md="3">
+            <VSelect
+              v-model="sort"
+              :items="[{ value: 'asc', title: 'الأكثر مديونية أولاً' }, { value: 'desc', title: 'الأكبر رصيداً أولاً' }]"
+              prepend-inner-icon="tabler-arrows-sort"
+              density="compact"
+              hide-details
+            />
+          </VCol>
+        </VRow>
       </VCardText>
+
+      <VDivider />
 
       <VProgressLinear v-if="isLoading" indeterminate color="primary" />
 
