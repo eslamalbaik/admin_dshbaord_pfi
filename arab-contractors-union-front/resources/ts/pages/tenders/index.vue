@@ -34,6 +34,18 @@ const tomorrowStr = () => {
   return localDateStr(d)
 }
 
+// حقل type=date يفتح التقويم فقط عند النقر على أيقونته الأصلية الصغيرة (وقد لا تظهر بـ RTL) —
+// نفتحه عند النقر على أي مكان بالحقل أو على أيقونة التقويم
+const openDatePicker = (e: Event) => {
+  const input = (e.target as HTMLElement).closest('.v-field')?.querySelector('input') as HTMLInputElement | null
+  try {
+    input?.showPicker?.()
+  }
+  catch {
+    // متصفح لا يدعم showPicker — يبقى الإدخال اليدوي متاحاً
+  }
+}
+
 const formatDeadline = (value: string | null | undefined) =>
   value
     ? new Date(value).toLocaleString('ar-PS', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
@@ -333,7 +345,7 @@ const newTender = ref({
 })
 
 // مرفق إضافي واحد فقط عند الإنشاء — تعدد المرفقات متاح من نافذة التعديل. يُرفع تلقائياً فور الإنشاء
-const newAttachmentStaged = ref<File | null>(null)
+const newAttachmentsStaged = ref<File[]>([])
 
 const createForm = ref<any>(null)
 const editForm = ref<any>(null)
@@ -341,7 +353,7 @@ const editForm = ref<any>(null)
 const emptyNewTender = () => ({ title: '', issuing_entity: '', description: '', union_notes: '', category: '', deadline_date: '', deadline_time: '', status: 'open', submission_types: [] as string[], submission_email: '', submission_phone: '', submission_file: null as File | null, external_url: '' })
 
 const openCreate = () => {
-  newAttachmentStaged.value = null
+  newAttachmentsStaged.value = []
   createDialog.value = true
 }
 
@@ -508,25 +520,26 @@ const createTender = async () => {
     const { data } = await api.post('/api/v1/tenders', formData)
     const created = data.items
 
-    // رفع المرفق الإضافي (إن اختير) تلقائياً فور الإنشاء
-    let attachmentFailed = false
-    if (newAttachmentStaged.value) {
+    // رفع المرفقات المختارة (واحد أو أكثر) تلقائياً فور الإنشاء — فشل أحدها لا يُلغي نشر العطاء
+    const failedAttachments: string[] = []
+    for (const file of newAttachmentsStaged.value) {
       const fd = new FormData()
-      fd.append('file', newAttachmentStaged.value)
-      fd.append('label', newAttachmentStaged.value.name)
+      fd.append('file', file)
+      fd.append('label', file.name)
       try {
         await api.post(`/api/v1/tenders/${created.id}/attachments`, fd)
       } catch (attachErr) {
         console.error(attachErr)
-        attachmentFailed = true
+        failedAttachments.push(file.name)
       }
     }
+    const attachmentFailed = failedAttachments.length > 0
 
     // إغلاق نافذة الإضافة بعد الحفظ مباشرة
     createDialog.value = false
     newTender.value = emptyNewTender()
-    newAttachmentStaged.value = null
-    notify(attachmentFailed ? 'تم نشر العطاء، لكن تعذّر رفع المرفق — أضفه من نافذة التعديل' : 'تم نشر العطاء بنجاح', attachmentFailed ? 'error' : 'success')
+    newAttachmentsStaged.value = []
+    notify(attachmentFailed ? `تم نشر العطاء، لكن تعذّر رفع: ${failedAttachments.join('، ')} — أضفها من نافذة التعديل` : 'تم نشر العطاء بنجاح', attachmentFailed ? 'error' : 'success')
     fetchTenders()
   }
   catch (err: any) {
@@ -788,6 +801,8 @@ onMounted(fetchCategories)
                 :min="tomorrowStr()"
                 :rules="deadlineRules"
                 prepend-inner-icon="tabler-calendar"
+                @click="openDatePicker"
+                @click:prepend-inner="openDatePicker"
                 style="font-family:Cairo,sans-serif"
               />
             </VCol>
@@ -881,18 +896,20 @@ onMounted(fetchCategories)
               />
             </VCol>
 
-            <!-- مرفق إضافي واحد عند الإنشاء — لإضافة المزيد استخدم نافذة التعديل -->
+            <!-- مرفقات العطاء عند الإنشاء — يمكن اختيار أكثر من ملف، وإضافة المزيد لاحقاً من نافذة التعديل -->
             <VCol cols="12">
               <VFileInput
-                label="مرفق العطاء (اختياري — ملف واحد)"
-                hint="يمكن إضافة مرفقات أخرى لاحقاً من نافذة تعديل العطاء"
+                label="مرفقات العطاء (اختياري — يمكن اختيار أكثر من ملف)"
+                hint="مستندات أو صور، حتى 10MB للملف"
                 persistent-hint
                 prepend-inner-icon="tabler-paperclip"
                 prepend-icon=""
+                multiple
+                chips
                 accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
                 style="font-family:Cairo,sans-serif"
-                :model-value="newAttachmentStaged"
-                @update:model-value="newAttachmentStaged = firstFile($event as any)"
+                :model-value="newAttachmentsStaged"
+                @update:model-value="newAttachmentsStaged = toFileArray($event)"
               />
             </VCol>
           </VRow>
@@ -957,8 +974,11 @@ onMounted(fetchCategories)
                 v-model="editTender.deadline_date"
                 label="تاريخ انتهاء العطاء"
                 type="date"
+                :min="tomorrowStr()"
                 :rules="editDeadlineRules"
                 prepend-inner-icon="tabler-calendar"
+                @click="openDatePicker"
+                @click:prepend-inner="openDatePicker"
                 style="font-family:Cairo,sans-serif"
               />
             </VCol>
@@ -1152,10 +1172,6 @@ onMounted(fetchCategories)
             <VCol cols="6" md="4">
               <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">التصنيف</span>
               <span style="font-family:Cairo,sans-serif">{{ viewingItem.category || '—' }}</span>
-            </VCol>
-            <VCol cols="6" md="4">
-              <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">الميزانية</span>
-              <span style="font-family:Cairo,sans-serif">{{ viewingItem.budget ?? '—' }}</span>
             </VCol>
             <VCol cols="6" md="4">
               <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">آخر موعد</span>
