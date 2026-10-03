@@ -56,35 +56,60 @@ class NewsAdminTest extends TestCase
         ])->assertStatus(200);
     }
 
-    public function test_update_allows_changing_published_at_to_yesterday(): void
+    public function test_update_rejects_changing_published_at_to_yesterday(): void
     {
         $this->actingAsAdmin();
 
         $news = News::create([
             'title' => 'خبر', 'slug' => 'news-y', 'body' => 'نص',
-            'is_published' => true, 'published_at' => now(),
+            'is_published' => true, 'published_at' => now()->addWeek(),
         ]);
 
-        $yesterday = now(config('app.local_timezone'))->subDay()->toDateString();
-
-        $this->putJson("/api/v1/admin/news/{$news->id}", ['published_at' => $yesterday])
-            ->assertStatus(200);
-
-        $this->assertSame($yesterday, $news->fresh()->published_at->toDateString());
+        $this->putJson("/api/v1/admin/news/{$news->id}", [
+            'published_at' => now(config('app.local_timezone'))->subDay()->toDateString(),
+        ])->assertStatus(422)->assertJsonValidationErrors(['published_at']);
     }
 
-    public function test_update_rejects_changing_published_at_to_before_yesterday(): void
+    public function test_update_allows_changing_published_at_to_today_or_later(): void
     {
         $this->actingAsAdmin();
 
         $news = News::create([
             'title' => 'خبر', 'slug' => 'news-z', 'body' => 'نص',
-            'is_published' => true, 'published_at' => now(),
+            'is_published' => true, 'published_at' => now()->addWeek(),
         ]);
 
-        $this->putJson("/api/v1/admin/news/{$news->id}", [
-            'published_at' => now(config('app.local_timezone'))->subDays(2)->toDateString(),
-        ])->assertStatus(422)->assertJsonValidationErrors(['published_at']);
+        $tomorrow = now(config('app.local_timezone'))->addDay()->toDateString();
+
+        $this->putJson("/api/v1/admin/news/{$news->id}", ['published_at' => $tomorrow])
+            ->assertStatus(200);
+
+        $this->assertSame($tomorrow, $news->fresh()->published_at->toDateString());
+    }
+
+    public function test_update_keeps_slug_when_title_unchanged(): void
+    {
+        $this->actingAsAdmin();
+
+        $news = News::create([
+            'title' => 'خبر ثابت', 'slug' => News::generateSlug('خبر ثابت'), 'body' => 'نص',
+            'is_published' => true, 'published_at' => now(),
+        ]);
+        $slug = $news->slug;
+
+        $this->putJson("/api/v1/admin/news/{$news->id}", ['title' => 'خبر ثابت'])->assertStatus(200);
+
+        $this->assertSame($slug, $news->fresh()->slug);
+    }
+
+    public function test_store_reuses_title_of_soft_deleted_news(): void
+    {
+        $this->actingAsAdmin();
+
+        $old = News::create(['title' => 'خبر مكرر', 'slug' => News::generateSlug('خبر مكرر'), 'body' => 'نص']);
+        $old->delete();
+
+        $this->postJson('/api/v1/admin/news', ['title' => 'خبر مكرر', 'body' => 'نص'])->assertStatus(201);
     }
 
     public function test_update_publish_now_moves_scheduled_news_to_now(): void

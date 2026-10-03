@@ -109,7 +109,21 @@ const galleryOverLimitMessage = computed(() =>
   galleryTotalCount.value > 5 ? [`تجاوزت الحد الأقصى (${galleryTotalCount.value}/5) — احذف صور قبل الإضافة`] : [],
 )
 
+// ── قيود الصور — نفس قيود الباك اند (jpg/png/webp، 5 ميجا) وتُفحص فور الاختيار
 const MAX_IMAGE_MB = 5
+const MAX_GALLERY = 5
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const IMAGE_ACCEPT = ALLOWED_IMAGE_TYPES.join(',')
+
+/** يرجّع سبب رفض الصورة (أو null لو مقبولة) */
+const imageProblem = (file: File, label: string): string | null => {
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type))
+    return `${label} "${file.name}" صيغتها غير مدعومة — المسموح: JPG أو PNG أو WEBP.`
+  if (file.size > MAX_IMAGE_MB * 1024 * 1024)
+    return `${label} "${file.name}" حجمها ${(file.size / 1024 / 1024).toFixed(1)} ميجابايت — يتجاوز الحد الأقصى ${MAX_IMAGE_MB} ميجابايت.`
+
+  return null
+}
 
 // معاينات الصور المُختارة حديثاً (لسه ما انرفعت) — تُبنى من كائنات File مباشرة، وتُحرَّر
 // (revokeObjectURL) عند تغيّر القائمة لمنع تسريب الذاكرة
@@ -124,31 +138,54 @@ const removeNewGalleryFile = (index: number) => {
   form.value.gallery = form.value.gallery.filter((_, i) => i !== index)
 }
 
-/** يرفض أي ملف أكبر من الحد المسموح قبل إضافته للفورم، ويعرض السبب — بدل الانتظار لرفض الخادم بعد الرفع بالكامل */
-const rejectOversizedFiles = (files: File[]): File[] => {
-  const oversized = files.filter(f => f.size > MAX_IMAGE_MB * 1024 * 1024)
-  if (oversized.length) {
-    notify(
-      `فشل رفع ${oversized.length > 1 ? 'الصور التالية' : 'الصورة'}: ${oversized.map(f => `"${f.name}" (${(f.size / 1024 / 1024).toFixed(1)} ميجابايت)`).join('، ')} — `
-      + `يتجاوز الحد الأقصى ${MAX_IMAGE_MB} ميجابايت للصورة الواحدة.`,
-      'error',
-    )
-  }
-  return files.filter(f => f.size <= MAX_IMAGE_MB * 1024 * 1024)
+// حقل اختيار صور المعرض مجرد "زر إضافة": كل اختيار جديد ينضاف فوق الصور المختارة قبله
+// (بدل ما يستبدلها)، وبعدها الحقل يرجع فاضي. القائمة الفعلية بـ form.gallery وبتنعرض بالمعاينة.
+const galleryPicker = ref<File[]>([])
+
+const onGalleryFilesSelected = async (files: File[]) => {
+  if (!files.length)
+    return
+
+  const problems: string[] = []
+  const isDuplicate = (f: File) => form.value.gallery.some(g => g.name === f.name && g.size === f.size && g.lastModified === f.lastModified)
+  const accepted = files.filter(f => {
+    const problem = imageProblem(f, 'الصورة')
+    if (problem)
+      problems.push(problem)
+
+    return !problem && !isDuplicate(f)
+  })
+
+  const room = MAX_GALLERY - galleryTotalCount.value
+  if (accepted.length > room)
+    problems.push(`الحد الأقصى ${MAX_GALLERY} صور للمعرض — انضاف ${Math.max(room, 0)} من ${accepted.length} صور.`)
+
+  form.value.gallery = [...form.value.gallery, ...accepted.slice(0, Math.max(room, 0))]
+  if (problems.length)
+    notify(problems.join(' — '), 'error')
+
+  await nextTick()
+  galleryPicker.value = []
 }
 
-const onGalleryFilesSelected = (files: File[]) => {
-  form.value.gallery = rejectOversizedFiles(files)
-}
+// معاينة الصورة الرئيسية المختارة حديثاً — بالإضافة والتعديل (مش بس الصورة المحفوظة بالتعديل)
+const mainImagePreview = ref('')
 
 const onMainImageSelected = (value: SingleFileModel) => {
   const file = firstFile(value)
-  if (file && rejectOversizedFiles([file]).length === 0) {
-    mainImageFile.value = null
-    return
-  }
-  mainImageFile.value = value
+  const problem = file ? imageProblem(file, 'الصورة الرئيسية') : null
+
+  if (problem)
+    notify(problem, 'error')
+  mainImageFile.value = file && !problem ? file : null
 }
+
+watch(mainImageFile, value => {
+  if (mainImagePreview.value)
+    URL.revokeObjectURL(mainImagePreview.value)
+  const file = firstFile(value)
+  mainImagePreview.value = file ? URL.createObjectURL(file) : ''
+})
 
 // طريقة النشر: مباشرة (بدون تاريخ — الخادم يعتمد وقت الحفظ) / جدولة (التاريخ مطلوب) / مسودة.
 // is_published يُرسل 1 للمباشر والمجدول معاً لأن scopePublished بالموديل يتطلبه، والجدولة
@@ -164,19 +201,14 @@ const publishModeOptions = [
 // تاريخ بصيغة YYYY-MM-DD بالتوقيت المحلي (toISOString كان يرجّع تاريخ UTC — غلط بعد منتصف الليل)
 const localDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const todayStr = () => localDateStr(new Date())
-const yesterdayStr = () => localDateStr(new Date(Date.now() - 24 * 60 * 60 * 1000))
-
-// أقل تاريخ مسموح: اليوم عند الإنشاء، وأمس (اليوم - 1) عند التعديل — نفس قيود الباك اند
-const minPublishDate = computed(() => (isEditing.value ? yesterdayStr() : todayStr()))
 
 // حالة الخبر عند فتحه للتعديل — لتحديد شو لازم ينبعت للخادم عند الحفظ
 const originalPublishMode = ref<PublishMode>('now')
 const originalPublishedAt = ref('')
 
-// حقل التاريخ يظهر فقط بالجدولة، أو بتعديل خبر منشور (لتصحيح تاريخه، مثلاً لأمس)
-const showPublishDate = computed(() =>
-  form.value.publishMode === 'schedule' || (isEditing.value && form.value.publishMode === 'now'),
-)
+// تاريخ النشر يظهر بالجدولة بس (نفس فورم الفعاليات) — "نشر مباشرة" بيعتمد وقت الحفظ.
+// أقل تاريخ مسموح اليوم، بالإضافة والتعديل؛ التاريخ المحفوظ أصلاً بيضل مقبول لو ما تغيّر.
+const showPublishDate = computed(() => form.value.publishMode === 'schedule')
 
 const openCreate = () => {
   form.value = emptyForm()
@@ -232,8 +264,8 @@ const saveNews = async () => {
   }
   if (showPublishDate.value && form.value.published_at
     && form.value.published_at !== originalPublishedAt.value
-    && form.value.published_at < minPublishDate.value) {
-    notify(isEditing.value ? 'يجب أن يكون تاريخ النشر أمس أو بعده' : 'يجب أن يكون تاريخ النشر اليوم أو بعده', 'error')
+    && form.value.published_at < todayStr()) {
+    notify('يجب أن يكون تاريخ النشر اليوم أو بعده', 'error')
 
     return
   }
@@ -250,27 +282,24 @@ const saveNews = async () => {
     fd.append('is_published', mode === 'draft' ? '0' : '1')
     if (form.value.video_url) fd.append('video_url', form.value.video_url)
     if (form.value.external_url) fd.append('external_url', form.value.external_url)
-    const dateChanged = form.value.published_at !== originalPublishedAt.value
-    if (mode === 'schedule') {
+    if (mode === 'schedule')
       fd.append('published_at', form.value.published_at)
-    }
-    else if (mode === 'now' && isEditing.value) {
-      // تاريخ معدّل يدوياً يُرسل كما هو؛ غير هيك خبر كان مسودة/مجدول يصير منشور من هلأ
-      if (form.value.published_at && dateChanged)
-        fd.append('published_at', form.value.published_at)
-      else if (originalPublishMode.value !== 'now')
-        fd.append('publish_now', '1')
-    }
+    // خبر كان مسودة/مجدول وصار "نشر مباشرة": تاريخ نشره يصير وقت الحفظ
+    else if (mode === 'now' && isEditing.value && originalPublishMode.value !== 'now')
+      fd.append('publish_now', '1')
     const mainImage = firstFile(mainImageFile.value)
     if (mainImage) fd.append('image', mainImage)
     form.value.gallery.forEach(f => fd.append('gallery[]', f))
 
+    // رفع 6 صور (رئيسية + معرض) على اتصال بطيء ممكن يتجاوز مهلة الـ60 ثانية العامة
+    // فينلغى الطلب (canceled) وما يوصل الخادم — مهلة أطول لطلب الحفظ بس
+    const config = { timeout: 300000 }
     if (isEditing.value) {
       fd.append('_method', 'PUT')
-      await api.post(`/api/v1/admin/news/${form.value.id}`, fd)
+      await api.post(`/api/v1/admin/news/${form.value.id}`, fd, config)
       notify('تم تحديث الخبر بنجاح')
     } else {
-      await api.post('/api/v1/admin/news', fd)
+      await api.post('/api/v1/admin/news', fd, config)
       notify('تم نشر الخبر بنجاح')
     }
     formDialog.value = false
@@ -281,7 +310,15 @@ const saveNews = async () => {
     // (حجم صورة، تاريخ نشر...) بمفتاح errors — عرض message وحدها كان يُخفي السبب عن الأدمن
     const fieldErrors = err?.response?.data?.errors
     const reason = fieldErrors ? Object.values(fieldErrors).flat().join(' — ') : null
-    notify(reason || err?.response?.data?.message || 'تعذّر حفظ الخبر', 'error')
+    const status = err?.response?.status
+    const fallback = status === 413
+      ? 'حجم الطلب كبير جداً — صغّر الصور وحاول مرة ثانية'
+      : status
+        ? `تعذّر حفظ الخبر (خطأ ${status})`
+        : err?.code === 'ECONNABORTED'
+          ? 'تعذّر حفظ الخبر — انتهت مهلة رفع الصور، تحقق من الاتصال أو صغّر الصور'
+          : 'تعذّر حفظ الخبر — تحقق من الاتصال'
+    notify(reason || err?.response?.data?.message || fallback, 'error')
   } finally {
     formLoading.value = false
   }
@@ -419,26 +456,30 @@ const deleteNews = async () => {
                 label="الصورة الرئيسية"
                 prepend-inner-icon="tabler-photo"
                 prepend-icon=""
-                accept="image/*"
-                :hint="`الحد الأقصى ${MAX_IMAGE_MB} ميجابايت`"
+                :accept="IMAGE_ACCEPT"
+                :hint="`JPG أو PNG أو WEBP — الحد الأقصى ${MAX_IMAGE_MB} ميجابايت`"
                 persistent-hint
                 style="font-family:Cairo,sans-serif"
                 :model-value="mainImageFile"
                 @update:model-value="onMainImageSelected"
               />
+              <VImg v-if="mainImagePreview" :src="mainImagePreview" max-height="140" class="mt-2 rounded border" cover />
             </VCol>
             <VCol cols="12" md="6">
               <VFileInput
-                label="إضافة صور للمعرض (الحد الأقصى 5 صور بالمجموع)"
+                :label="`إضافة صور للمعرض (${galleryTotalCount}/${MAX_GALLERY})`"
                 prepend-inner-icon="tabler-photo-plus"
                 prepend-icon=""
-                accept="image/*"
+                :accept="IMAGE_ACCEPT"
                 multiple
+                :disabled="galleryTotalCount >= MAX_GALLERY"
                 :error-messages="galleryOverLimitMessage"
-                :hint="`يمكن اختيار كل الصور دفعة واحدة — الحد الأقصى ${MAX_IMAGE_MB} ميجابايت لكل صورة`"
+                :hint="galleryTotalCount >= MAX_GALLERY
+                  ? `وصلت للحد الأقصى ${MAX_GALLERY} صور — احذف صورة لتضيف غيرها`
+                  : `كل اختيار جديد بينضاف للصور المختارة — الحد الأقصى ${MAX_IMAGE_MB} ميجابايت لكل صورة`"
                 persistent-hint
                 style="font-family:Cairo,sans-serif"
-                :model-value="form.gallery"
+                :model-value="galleryPicker"
                 @update:model-value="onGalleryFilesSelected(toFileArray($event))"
               />
             </VCol>
@@ -506,7 +547,7 @@ const deleteNews = async () => {
               <VTextField v-model="form.external_url" label="رابط خارجي (اختياري)" prepend-inner-icon="tabler-external-link" dir="ltr" />
             </VCol>
 
-            <VCol cols="12" md="6">
+            <VCol cols="12">
               <label class="text-body-2 font-weight-medium mb-2 d-block" style="font-family:Cairo,sans-serif">طريقة النشر</label>
               <VBtnToggle
                 v-model="form.publishMode"
@@ -515,6 +556,7 @@ const deleteNews = async () => {
                 variant="outlined"
                 divided
                 density="comfortable"
+                class="publish-mode-toggle"
                 style="font-family:Cairo,sans-serif"
               >
                 <VBtn v-for="opt in publishModeOptions" :key="opt.value" :value="opt.value" :prepend-icon="opt.icon">
@@ -522,13 +564,15 @@ const deleteNews = async () => {
                 </VBtn>
               </VBtnToggle>
             </VCol>
+            <!-- تاريخ النشر يظهر بالجدولة بس — "نشر مباشرة" بيعتمد وقت الحفظ -->
             <VCol v-if="showPublishDate" cols="12" md="6">
               <VTextField
                 v-model="form.published_at"
-                :label="form.publishMode === 'schedule' ? 'تاريخ النشر المجدول' : 'تاريخ النشر'"
+                label="تاريخ النشر المجدول"
                 type="date"
-                :min="minPublishDate"
-                :hint="isEditing ? 'يمكن اختيار تاريخ أمس أو أي تاريخ بعده' : undefined"
+                :min="todayStr()"
+                prepend-inner-icon="tabler-calendar"
+                hint="اليوم أو أي تاريخ بعده"
                 persistent-hint
                 style="font-family:Cairo,sans-serif"
               />
@@ -648,6 +692,16 @@ const deleteNews = async () => {
 </template>
 
 <style scoped>
+/* أزرار طريقة النشر بعرض الفورم كامل وبعروض متساوية — كانت محشورة بنص عمود ويقطع النص */
+.publish-mode-toggle {
+  display: flex;
+  inline-size: 100%;
+}
+
+.publish-mode-toggle .v-btn {
+  flex: 1 1 0;
+}
+
 .gallery-remove-btn {
   position: absolute;
   top: -8px;

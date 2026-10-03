@@ -124,14 +124,14 @@ class NewsController extends Controller
             'remove_gallery.*' => 'string',
             'is_published'     => 'boolean',
             'publish_now'      => 'boolean',
-            // بالتعديل مسموح لحد أمس (اليوم - 1) بالتوقيت المحلي. التاريخ المحفوظ أصلاً يمرّ حتى لو
-            // أقدم، حتى ما ينمنع حفظ تعديل على خبر قديم بدون ما يتغيّر تاريخه.
+            // تاريخ جديد لازم يكون اليوم أو بعده (بالتوقيت المحلي) — نفس قيد الإنشاء. التاريخ المحفوظ
+            // أصلاً يمرّ حتى لو أقدم، حتى ما ينمنع حفظ تعديل على خبر قديم بدون ما يتغيّر تاريخه.
             'published_at'     => ['nullable', 'date', function ($attribute, $value, $fail) use ($news) {
                 $date = Carbon::parse($value)->toDateString();
                 if ($news->published_at && $date === $news->published_at->toDateString())
                     return;
-                if ($date < now(config('app.local_timezone'))->subDay()->toDateString())
-                    $fail('يجب أن يكون تاريخ النشر أمس أو بعده.');
+                if ($date < now(config('app.local_timezone'))->toDateString())
+                    $fail('يجب أن يكون تاريخ النشر اليوم أو بعده.');
             }],
         ], [
             'image.max'     => 'حجم الصورة الرئيسية يتجاوز الحد الأقصى 5 ميجابايت.',
@@ -152,7 +152,7 @@ class NewsController extends Controller
         }
 
         if (isset($validated['title']))
-            $validated['slug'] = News::generateSlug($validated['title']);
+            $validated['slug'] = News::generateSlug($validated['title'], $news->id);
 
         $newlyPublished = ($validated['is_published'] ?? false) && ! $news->published_at;
         if (($publishNow || $newlyPublished) && empty($validated['published_at']))
