@@ -342,4 +342,79 @@ class EventAdminTest extends TestCase
             $this->assertIsBool($speaker['is_keynote']);
         }
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    //  slug — عنوان فعالية محذوفة (soft delete) ما لازم يرجّع 500
+    // ─────────────────────────────────────────────────────────────────────
+
+    public function test_store_reuses_title_of_soft_deleted_event(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/events', ['title' => 'ff', 'body' => 'نص'])->assertStatus(201);
+        Event::first()->delete();
+
+        $this->postJson('/api/v1/admin/events', ['title' => 'ff', 'body' => 'نص'])->assertStatus(201);
+
+        $this->assertSame(['ff', 'ff-1'], Event::withTrashed()->orderBy('id')->pluck('slug')->all());
+    }
+
+    public function test_update_keeping_same_title_keeps_slug(): void
+    {
+        $this->actingAsAdmin();
+
+        $event = Event::create(['title' => 'ff', 'body' => 'نص', 'slug' => 'ff']);
+
+        $this->putJson("/api/v1/admin/events/{$event->id}", ['title' => 'ff', 'body' => 'نص معدل'])->assertStatus(200);
+
+        $this->assertSame('ff', $event->fresh()->slug);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    //  event_date من بكرا وطالع عند الإنشاء + قيود الصورة الرئيسية
+    // ─────────────────────────────────────────────────────────────────────
+
+    public function test_store_rejects_event_date_today(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/events', [
+            'title' => 'فعالية', 'body' => 'نص', 'event_date' => now()->format('Y-m-d\TH:i'),
+        ])->assertStatus(422)->assertJsonValidationErrors(['event_date']);
+    }
+
+    public function test_store_accepts_event_date_tomorrow(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/events', [
+            'title' => 'فعالية', 'body' => 'نص', 'event_date' => now()->addDay()->startOfDay()->format('Y-m-d\TH:i'),
+        ])->assertStatus(201);
+    }
+
+    public function test_store_rejects_main_image_over_5mb(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->post('/api/v1/admin/events', [
+            'title' => 'فعالية', 'body' => 'نص',
+            'image' => UploadedFile::fake()->image('big.png')->size(6000),
+        ], ['Accept' => 'application/json'])->assertStatus(422)->assertJsonValidationErrors(['image']);
+    }
+
+    public function test_update_publish_now_moves_scheduled_event_to_now(): void
+    {
+        $this->actingAsAdmin();
+
+        $event = Event::create([
+            'title' => 'مجدولة', 'body' => 'نص', 'slug' => 'scheduled',
+            'is_published' => true, 'published_at' => now()->addWeek(),
+        ]);
+
+        $this->putJson("/api/v1/admin/events/{$event->id}", [
+            'is_published' => true, 'publish_now' => true,
+        ])->assertStatus(200);
+
+        $this->assertTrue($event->fresh()->published_at->lte(now()));
+    }
 }

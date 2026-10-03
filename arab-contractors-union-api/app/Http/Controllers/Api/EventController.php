@@ -218,12 +218,13 @@ class EventController extends Controller
     private function eventRules(bool $isCreate = false): array
     {
         return [
-            'image'          => 'nullable',
+            'image'          => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
             'video_url'      => 'nullable|url|max:500',
             'external_url'   => 'nullable|url|max:500',
             'is_published'   => 'boolean',
             'published_at'   => $isCreate ? 'nullable|date|after_or_equal:today' : 'nullable|date',
-            'event_date'     => 'nullable|date',
+            // موعد الفعالية من بكرا وطالع عند الإنشاء — التعديل بلا قيد (نفس منطق published_at)
+            'event_date'     => $isCreate ? 'nullable|date|after_or_equal:tomorrow' : 'nullable|date',
             // مكان الفعالية إلزامي لو نوع الحضور "وجاهي" أو "وجاهي + أونلاين" (بند 9ج) — hybrid
             // كان ناقصاً هون فيقدر الأدمن يحفظ فعالية hybrid بلا مكان رغم إنها تحتاجه فعلياً
             'event_location' => 'required_if:event_format,onsite,hybrid|nullable|string|max:255',
@@ -237,6 +238,25 @@ class EventController extends Controller
             'speakers.*.photo'          => 'nullable|string|max:500',
             'speakers.*.is_keynote'     => 'boolean',
             'speaker_photos.*'          => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
+        ];
+    }
+
+    // رسائل واضحة لأسباب رفض الصور/التواريخ — تُعرض للأدمن كما هي بالفرونت
+    private function eventMessages(): array
+    {
+        return [
+            'image.image'                     => 'الصورة الرئيسية لازم تكون صورة (JPG أو PNG أو WEBP).',
+            'image.mimes'                     => 'صيغة الصورة الرئيسية غير مدعومة — المسموح: JPG أو PNG أو WEBP.',
+            'image.max'                       => 'حجم الصورة الرئيسية يتجاوز الحد الأقصى 5 ميجابايت.',
+            'image.uploaded'                  => 'تعذّر رفع الصورة الرئيسية — تأكد إن حجمها أقل من 5 ميجابايت.',
+            'speaker_photos.*.image'          => 'صورة المتحدث لازم تكون صورة (JPG أو PNG أو WEBP).',
+            'speaker_photos.*.mimes'          => 'صيغة صورة المتحدث غير مدعومة — المسموح: JPG أو PNG أو WEBP.',
+            'speaker_photos.*.max'            => 'حجم صورة المتحدث يتجاوز الحد الأقصى 3 ميجابايت.',
+            'speaker_photos.*.uploaded'       => 'تعذّر رفع صورة المتحدث — تأكد إن حجمها أقل من 3 ميجابايت.',
+            'event_date.after_or_equal'       => 'موعد الفعالية لازم يكون من بكرا وطالع.',
+            'published_at.after_or_equal'     => 'يجب أن يكون تاريخ النشر اليوم أو بعده.',
+            'video_url.url'                   => 'رابط فيديو يوتيوب غير صالح.',
+            'external_url.url'                => 'الرابط الخارجي غير صالح.',
         ];
     }
 
@@ -275,7 +295,7 @@ class EventController extends Controller
             'excerpt' => 'nullable|string|max:500',
             'body' => 'required|string',
             'is_international' => 'boolean',
-        ], $this->eventRules(isCreate: true)));
+        ], $this->eventRules(isCreate: true)), $this->eventMessages());
 
         $this->handleMediaUploads($request, $validated, null, 'events', 'events/gallery');
         // فعاليات: صورة رئيسية واحدة فقط، لا معرض صور (بند 9د) — handleMediaUploads يقرأ الملفات من
@@ -314,7 +334,12 @@ class EventController extends Controller
             'excerpt' => 'nullable|string|max:500',
             'body' => 'sometimes|string',
             'is_international' => 'boolean',
-        ], $this->eventRules()));
+            'publish_now' => 'boolean',
+        ], $this->eventRules()), $this->eventMessages());
+
+        // "نشر مباشرة" لفعالية كانت مسودة أو مجدولة لتاريخ لاحق: تاريخ النشر يصير الآن (نفس نمط الأخبار)
+        $publishNow = $request->boolean('publish_now');
+        unset($validated['publish_now']);
 
         $this->handleMediaUploads($request, $validated, $event, 'events', 'events/gallery');
         unset($validated['gallery']);
@@ -322,10 +347,10 @@ class EventController extends Controller
         $this->mergeSpeakerPhotosAndEnforceSingleKeynote($request, $validated);
 
         if (isset($validated['title']))
-            $validated['slug'] = Event::generateSlug($validated['title']);
+            $validated['slug'] = Event::generateSlug($validated['title'], $event->id);
 
         $newlyPublished = ($validated['is_published'] ?? false) && ! $event->published_at;
-        if ($newlyPublished)
+        if (($publishNow || $newlyPublished) && empty($validated['published_at']))
             $validated['published_at'] = now();
 
         $event->update($validated);

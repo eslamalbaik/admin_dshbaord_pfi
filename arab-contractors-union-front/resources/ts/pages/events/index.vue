@@ -69,7 +69,42 @@ const fetchEvents = async () => {
 watchEffect(() => fetchEvents())
 
 // ── Create/Edit form ──────────────────────────────
-interface SpeakerForm { name: string; title: string; photo: string; is_keynote: boolean; photoFile: File | null }
+interface SpeakerForm { name: string; title: string; photo: string; is_keynote: boolean; photoFile: SingleFileModel; photoPreview: string }
+
+// طريقة النشر: مباشرة (بدون تاريخ — الخادم يعتمد وقت الحفظ) / جدولة (التاريخ مطلوب) / مسودة —
+// نفس نمط الأخبار. اختيار وحدة يخفي الثانية تلقائياً: "مباشرة" بلا حقل تاريخ، و"جدولة" بدل زر النشر المباشر.
+type PublishMode = 'now' | 'schedule' | 'draft'
+
+const publishModeOptions = [
+  { value: 'now', label: 'نشر مباشرة', icon: 'tabler-send' },
+  { value: 'schedule', label: 'جدولة', icon: 'tabler-calendar-time' },
+  { value: 'draft', label: 'مسودة', icon: 'tabler-file-pencil' },
+]
+
+// تاريخ بصيغة YYYY-MM-DD بالتوقيت المحلي (toISOString يرجّع تاريخ UTC — غلط بعد منتصف الليل)
+const localDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const todayStr = () => localDateStr(new Date())
+const tomorrowStr = () => localDateStr(new Date(Date.now() + 24 * 60 * 60 * 1000))
+
+// موعد الفعالية من بكرا وطالع (عند الإنشاء) — نفس قيد الباك اند
+const minEventDate = computed(() => `${tomorrowStr()}T00:00`)
+
+// ── قيود الصور — تُعرض قبل الرفع وتُفحص فور الاختيار (بدل انتظار رفض الخادم بعد رفع الطلب كاملاً)
+const MAX_IMAGE_MB = 5
+const MAX_SPEAKER_PHOTO_MB = 3
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const IMAGE_ACCEPT = ALLOWED_IMAGE_TYPES.join(',')
+const imageHint = (maxMb: number) => `JPG أو PNG أو WEBP — الحد الأقصى ${maxMb} ميجابايت`
+
+/** يرجّع سبب رفض الصورة (أو null لو مقبولة) */
+const imageProblem = (file: File, maxMb: number, label: string): string | null => {
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type))
+    return `${label} "${file.name}" صيغتها غير مدعومة — المسموح: JPG أو PNG أو WEBP.`
+  if (file.size > maxMb * 1024 * 1024)
+    return `${label} "${file.name}" حجمها ${(file.size / 1024 / 1024).toFixed(1)} ميجابايت — يتجاوز الحد الأقصى ${maxMb} ميجابايت.`
+
+  return null
+}
 
 const emptyForm = () => ({
   id: null as number | null,
@@ -85,11 +120,24 @@ const emptyForm = () => ({
   event_type: 'local' as string,
   stream_url: '',
   speakers: [] as SpeakerForm[],
-  is_published: false,
+  publishMode: 'now' as PublishMode,
   published_at: '',
 })
 
-const addSpeaker = () => form.value.speakers.push({ name: '', title: '', photo: '', is_keynote: false, photoFile: null })
+const addSpeaker = () => form.value.speakers.push({ name: '', title: '', photo: '', is_keynote: false, photoFile: null, photoPreview: '' })
+
+const onSpeakerPhotoSelected = (index: number, value: SingleFileModel) => {
+  const sp = form.value.speakers[index]
+  const file = firstFile(value)
+  const problem = file ? imageProblem(file, MAX_SPEAKER_PHOTO_MB, 'صورة المتحدث') : null
+
+  if (sp.photoPreview)
+    URL.revokeObjectURL(sp.photoPreview)
+  if (problem)
+    notify(problem, 'error')
+  sp.photoFile = file && !problem ? file : null
+  sp.photoPreview = sp.photoFile ? URL.createObjectURL(sp.photoFile) : ''
+}
 
 // متحدث رئيسي واحد بحد أقصى — تفعيل متحدث يُلغي تلقائياً أي متحدث رئيسي آخر (بند 9و)
 const onKeynoteToggle = (index: number, value: boolean) => {
@@ -120,9 +168,33 @@ const form = ref(emptyForm())
 // silently breaks Vuetify's internal proxied model. Single-file VFileInput emits
 // a bare `File` (not an array), so read it through firstFile().
 const mainImageFile = ref<SingleFileModel>(null)
+const mainImagePreview = ref('')
+
+const onMainImageSelected = (value: SingleFileModel) => {
+  const file = firstFile(value)
+  const problem = file ? imageProblem(file, MAX_IMAGE_MB, 'الصورة الرئيسية') : null
+
+  if (problem)
+    notify(problem, 'error')
+  mainImageFile.value = file && !problem ? file : null
+}
+
+// معاينة الصورة المختارة حديثاً (لسه ما انرفعت) — تُحرَّر عند تغيّرها لمنع تسريب الذاكرة
+watch(mainImageFile, value => {
+  if (mainImagePreview.value)
+    URL.revokeObjectURL(mainImagePreview.value)
+  const file = firstFile(value)
+  mainImagePreview.value = file ? URL.createObjectURL(file) : ''
+})
+
+// حالة الفعالية عند فتحها للتعديل — لتحديد شو لازم ينبعت للخادم عند الحفظ
+const originalPublishMode = ref<PublishMode>('now')
+const originalEventDate = ref('')
 
 const openCreate = () => {
   form.value = emptyForm()
+  originalPublishMode.value = 'now'
+  originalEventDate.value = ''
   mainImageFile.value = null
   isEditing.value = false
   formDialog.value = true
@@ -143,11 +215,15 @@ const openEdit = (item: any) => {
     event_type: item.event_type ?? 'local',
     stream_url: item.stream_url ?? '',
     speakers: Array.isArray(item.speakers) ? item.speakers.map((s: any) => ({
-      name: s.name ?? '', title: s.title ?? '', photo: s.photo ?? '', is_keynote: !!s.is_keynote, photoFile: null,
+      name: s.name ?? '', title: s.title ?? '', photo: s.photo ?? '', is_keynote: !!s.is_keynote, photoFile: null, photoPreview: '',
     })) : [],
-    is_published: !!item.is_published,
+    publishMode: !item.is_published
+      ? 'draft'
+      : (item.published_at && new Date(item.published_at) > new Date() ? 'schedule' : 'now'),
     published_at: item.published_at ? item.published_at.substring(0, 10) : '',
   }
+  originalPublishMode.value = form.value.publishMode
+  originalEventDate.value = form.value.event_date
   mainImageFile.value = null
   isEditing.value = true
   formDialog.value = true
@@ -174,16 +250,46 @@ const saveEvent = async () => {
     notify('مكان الفعالية مطلوب لأن نوع الحضور وجاهي أو وجاهي + أونلاين', 'error')
     return
   }
+  // التعديل ما بيمنع حفظ فعالية قديمة موعدها فات — القيد بس لو انكتب موعد جديد
+  const eventDateChanged = form.value.event_date !== originalEventDate.value
+  if (form.value.event_date && eventDateChanged && form.value.event_date < minEventDate.value) {
+    notify('موعد الفعالية لازم يكون من بكرا وطالع', 'error')
+    return
+  }
+  const mode = form.value.publishMode
+  if (mode === 'schedule' && !form.value.published_at) {
+    notify('حدد تاريخ النشر للفعالية المجدولة', 'error')
+    return
+  }
+  if (mode === 'schedule' && !isEditing.value && form.value.published_at < todayStr()) {
+    notify('يجب أن يكون تاريخ النشر اليوم أو بعده', 'error')
+    return
+  }
+  const mainImage = firstFile(mainImageFile.value)
+  const imageProblems = [
+    mainImage ? imageProblem(mainImage, MAX_IMAGE_MB, 'الصورة الرئيسية') : null,
+    ...form.value.speakers.map(s => {
+      const f = firstFile(s.photoFile)
+      return f ? imageProblem(f, MAX_SPEAKER_PHOTO_MB, 'صورة المتحدث') : null
+    }),
+  ].filter(Boolean)
+  if (imageProblems.length) {
+    notify(imageProblems.join(' — '), 'error')
+    return
+  }
   formLoading.value = true
   try {
     const fd = new FormData()
     fd.append('title', form.value.title)
     fd.append('excerpt', form.value.excerpt)
     fd.append('body', form.value.body)
-    fd.append('is_published', form.value.is_published ? '1' : '0')
+    fd.append('is_published', mode === 'draft' ? '0' : '1')
     if (form.value.video_url) fd.append('video_url', form.value.video_url)
     if (form.value.external_url) fd.append('external_url', form.value.external_url)
-    if (form.value.published_at) fd.append('published_at', form.value.published_at)
+    if (mode === 'schedule')
+      fd.append('published_at', form.value.published_at)
+    else if (mode === 'now' && isEditing.value && originalPublishMode.value !== 'now')
+      fd.append('publish_now', '1')
     if (form.value.event_date) fd.append('event_date', form.value.event_date)
     if (form.value.event_location) fd.append('event_location', form.value.event_location)
     if (form.value.event_format) fd.append('event_format', form.value.event_format)
@@ -194,9 +300,9 @@ const saveEvent = async () => {
       if (s.title) fd.append(`speakers[${i}][title]`, s.title)
       if (s.photo) fd.append(`speakers[${i}][photo]`, s.photo)
       fd.append(`speakers[${i}][is_keynote]`, s.is_keynote ? '1' : '0')
-      if (s.photoFile) fd.append(`speaker_photos[${i}]`, s.photoFile)
+      const photo = firstFile(s.photoFile)
+      if (photo) fd.append(`speaker_photos[${i}]`, photo)
     })
-    const mainImage = firstFile(mainImageFile.value)
     if (mainImage) fd.append('image', mainImage)
 
     if (isEditing.value) {
@@ -211,7 +317,14 @@ const saveEvent = async () => {
     fetchEvents()
   } catch (err: any) {
     console.error(err)
-    notify(err?.response?.data?.message || 'تعذّر حفظ الفعالية', 'error')
+    // تفاصيل السبب الفعلي (حجم صورة، تاريخ...) بمفتاح errors — نفس عرض الأخبار
+    const fieldErrors = err?.response?.data?.errors
+    const reason = fieldErrors ? Object.values(fieldErrors).flat().join(' — ') : null
+    const status = err?.response?.status
+    const fallback = status === 413
+      ? 'حجم الطلب كبير جداً — صغّر الصور وحاول مرة ثانية'
+      : status ? `تعذّر حفظ الفعالية (خطأ ${status})` : 'تعذّر حفظ الفعالية — تحقق من الاتصال'
+    notify(reason || err?.response?.data?.message || fallback, 'error')
   } finally {
     formLoading.value = false
   }
@@ -445,13 +558,14 @@ const deleteEvent = async () => {
                 label="الصورة الرئيسية"
                 prepend-inner-icon="tabler-photo"
                 prepend-icon=""
-                accept="image/*"
+                :accept="IMAGE_ACCEPT"
+                :hint="`${imageHint(MAX_IMAGE_MB)} — صورة واحدة فقط، لا يوجد معرض صور للفعاليات`"
+                persistent-hint
                 style="font-family:Cairo,sans-serif"
-                v-model="mainImageFile"
+                :model-value="mainImageFile"
+                @update:model-value="onMainImageSelected"
               />
-              <p class="text-caption text-medium-emphasis mt-1" style="font-family:Cairo,sans-serif">
-                صورة رئيسية واحدة فقط — لا يوجد معرض صور للفعاليات
-              </p>
+              <VImg v-if="mainImagePreview" :src="mainImagePreview" max-height="120" class="mt-2 rounded" cover />
             </VCol>
             <VCol cols="12" md="6">
               <VTextField v-model="form.video_url" label="رابط فيديو يوتيوب (اختياري)" prepend-inner-icon="tabler-brand-youtube" dir="ltr" />
@@ -461,7 +575,15 @@ const deleteEvent = async () => {
               <VTextField v-model="form.external_url" label="رابط خارجي (اختياري)" prepend-inner-icon="tabler-external-link" dir="ltr" />
             </VCol>
             <VCol cols="12" md="6">
-              <VTextField v-model="form.event_date" label="موعد الفعالية" type="datetime-local" style="font-family:Cairo,sans-serif" />
+              <VTextField
+                v-model="form.event_date"
+                label="موعد الفعالية"
+                type="datetime-local"
+                :min="isEditing ? undefined : minEventDate"
+                :hint="isEditing ? undefined : 'من بكرا وطالع'"
+                persistent-hint
+                style="font-family:Cairo,sans-serif"
+              />
             </VCol>
 
             <VCol cols="12" md="4">
@@ -517,17 +639,20 @@ const deleteEvent = async () => {
                   <VTextField v-model="sp.title" label="المسمى/الصفة" density="compact" style="font-family:Cairo,sans-serif" />
                 </VCol>
                 <VCol cols="12" md="3">
-                  <div v-if="sp.photo && !sp.photoFile" class="d-flex align-center gap-1 mb-1">
-                    <VImg :src="sp.photo" width="28" height="28" cover rounded />
-                    <span class="text-caption text-medium-emphasis" style="font-family:Cairo,sans-serif">صورة حالية</span>
+                  <div v-if="sp.photoPreview || sp.photo" class="d-flex align-center gap-1 mb-1">
+                    <VImg :src="sp.photoPreview || sp.photo" width="28" height="28" cover rounded />
+                    <span class="text-caption text-medium-emphasis" style="font-family:Cairo,sans-serif">{{ sp.photoPreview ? 'معاينة الصورة الجديدة' : 'صورة حالية' }}</span>
                   </div>
                   <VFileInput
-                    v-model="sp.photoFile"
+                    :model-value="sp.photoFile"
                     label="صورة المتحدث"
                     density="compact"
-                    accept="image/*"
+                    :accept="IMAGE_ACCEPT"
+                    :hint="imageHint(MAX_SPEAKER_PHOTO_MB)"
+                    persistent-hint
                     prepend-icon=""
                     style="font-family:Cairo,sans-serif"
+                    @update:model-value="onSpeakerPhotoSelected(i, $event)"
                   />
                 </VCol>
                 <VCol cols="12" md="2">
@@ -539,19 +664,18 @@ const deleteEvent = async () => {
                     @update:model-value="onKeynoteToggle(i, $event as boolean)"
                   />
                 </VCol>
+                <!-- زر الحذف مخفي (مش معطّل) لما يكون في متحدث واحد بس -->
                 <VCol cols="12" md="1" class="text-center">
                   <VBtn
+                    v-if="form.speakers.length > 1"
                     icon
                     size="small"
                     variant="text"
                     color="error"
-                    :disabled="form.speakers.length === 1"
                     @click="confirmRemoveSpeaker(i)"
                   >
                     <VIcon icon="tabler-trash" />
-                    <VTooltip v-if="form.speakers.length === 1" activator="parent">
-                      لازم يبقى متحدث واحد على الأقل — احذف الفعالية للمتحدث بالكامل بدل ما تصفّر القائمة
-                    </VTooltip>
+                    <VTooltip activator="parent">حذف المتحدث</VTooltip>
                   </VBtn>
                 </VCol>
               </VRow>
@@ -561,16 +685,30 @@ const deleteEvent = async () => {
             </VCol>
 
             <VCol cols="12" md="6">
+              <label class="text-body-2 font-weight-medium mb-2 d-block" style="font-family:Cairo,sans-serif">طريقة النشر</label>
+              <VBtnToggle
+                v-model="form.publishMode"
+                mandatory
+                color="primary"
+                variant="outlined"
+                divided
+                density="comfortable"
+                style="font-family:Cairo,sans-serif"
+              >
+                <VBtn v-for="opt in publishModeOptions" :key="opt.value" :value="opt.value" :prepend-icon="opt.icon">
+                  {{ opt.label }}
+                </VBtn>
+              </VBtnToggle>
+            </VCol>
+            <!-- تاريخ النشر يظهر بالجدولة بس — "نشر مباشرة" بيعتمد وقت الحفظ -->
+            <VCol v-if="form.publishMode === 'schedule'" cols="12" md="6">
               <VTextField
                 v-model="form.published_at"
-                label="تاريخ النشر (اختياري — الآن افتراضياً)"
+                label="تاريخ النشر المجدول"
                 type="date"
-                :min="isEditing ? undefined : new Date().toISOString().slice(0, 10)"
+                :min="isEditing ? undefined : todayStr()"
                 style="font-family:Cairo,sans-serif"
               />
-            </VCol>
-            <VCol cols="12" md="6" class="d-flex align-center">
-              <VSwitch v-model="form.is_published" label="نشر مباشرة" color="success" style="font-family:Cairo,sans-serif" />
             </VCol>
           </VRow>
         </VCardText>
