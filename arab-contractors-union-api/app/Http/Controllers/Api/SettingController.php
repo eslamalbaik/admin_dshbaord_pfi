@@ -45,13 +45,46 @@ class SettingController extends Controller
         return $path ? Storage::disk('public')->url($path) : null;
     }
 
+    /** مجلد صور أيقونات الخدمات على قرص public */
+    private const SERVICE_ICONS_DIR = 'union/services';
+
     /** الخدمات الرئيسية — مخزَّنة كـJSON بإعداد واحد union_services، كل عنصر {title, description, icon} */
-    private function services(): array
+    private function rawServices(?string $raw = null): array
     {
-        $raw = Setting::get('union_services', '');
+        $raw ??= Setting::get('union_services', '');
         $decoded = $raw ? json_decode($raw, true) : null;
 
-        return is_array($decoded) ? $decoded : [];
+        return is_array($decoded) ? array_values(array_filter($decoded, 'is_array')) : [];
+    }
+
+    /** هل القيمة مسار صورة مرفوعة (وليست نصاً قديماً حُفظ بحقل الأيقونة)؟ */
+    private function isServiceIconPath(mixed $icon): bool
+    {
+        return is_string($icon) && str_starts_with($icon, self::SERVICE_ICONS_DIR.'/');
+    }
+
+    /** الخدمات مع icon_url كامل — null إن لم تُرفع صورة للخدمة */
+    private function services(): array
+    {
+        return array_map(fn (array $service) => $service + [
+            'icon_url' => $this->isServiceIconPath($service['icon'] ?? null)
+                ? Storage::disk('public')->url($service['icon'])
+                : null,
+        ], $this->rawServices());
+    }
+
+    /** يحذف صور الأيقونات التي لم تعد مستخدمة بعد حفظ قائمة خدمات جديدة */
+    private function deleteOrphanServiceIcons(?string $newRaw): void
+    {
+        $icons = fn (array $services) => array_filter(
+            array_column($services, 'icon'),
+            fn ($icon) => $this->isServiceIconPath($icon),
+        );
+
+        $orphans = array_diff($icons($this->rawServices()), $icons($this->rawServices($newRaw ?? '')));
+        if ($orphans) {
+            Storage::disk('public')->delete(array_values($orphans));
+        }
     }
 
     /**
@@ -248,9 +281,16 @@ class SettingController extends Controller
         $data = $request->validate([
             'settings'               => 'required|array',
             'settings.*.key'         => 'required|string|max:100',
-            'settings.*.value'       => 'nullable|string|max:2000',
+            // union_services يحمل كل الخدمات كـJSON واحد (مع مسارات الأيقونات) فيتجاوز 2000 بسهولة؛ العمود text
+            'settings.*.value'       => 'nullable|string|max:10000',
             'settings.*.group'       => 'nullable|string|max:50',
         ]);
+
+        foreach ($data['settings'] as $item) {
+            if ($item['key'] === 'union_services') {
+                $this->deleteOrphanServiceIcons($item['value'] ?? '');
+            }
+        }
 
         foreach ($data['settings'] as $item) {
             Setting::set($item['key'], $item['value'] ?? '', $item['group'] ?? 'general');
@@ -308,5 +348,27 @@ class SettingController extends Controller
         AuditLogService::record(Auth::user(), 'settings.cover_image_uploaded');
 
         return $this->success(['cover_image_url' => Storage::disk('public')->url($path)], 'تم رفع صورة الغلاف بنجاح.');
+    }
+
+    /**
+     * POST /api/v1/dashboard/settings/service-icon
+     * رفع صورة أيقونة لخدمة من "الخدمات الرئيسية". لا تُربط بالخدمة هنا: الواجهة تضع
+     * المسار المُعاد في حقل icon ثم يُحفظ مع union_services عند "حفظ الإعدادات"،
+     * وعندها تُحذف الصورة القديمة التي لم تعد مستخدمة.
+     */
+    public function uploadServiceIcon(Request $request)
+    {
+        $request->validate([
+            'icon' => 'required|image|mimes:png,jpg,jpeg,svg,webp|max:2048',
+        ]);
+
+        $path = $request->file('icon')->store(self::SERVICE_ICONS_DIR, 'public');
+
+        AuditLogService::record(Auth::user(), 'settings.service_icon_uploaded');
+
+        return $this->success([
+            'path' => $path,
+            'url'  => Storage::disk('public')->url($path),
+        ], 'تم رفع الأيقونة بنجاح.');
     }
 }

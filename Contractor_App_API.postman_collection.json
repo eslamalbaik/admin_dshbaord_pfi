@@ -3716,7 +3716,7 @@
 								"about"
 							]
 						},
-						"description": "**GET** `/api/v1/app/about` — *عام (بدون توكن)*\n\nشاشة \"عن الاتحاد\": name, about, logo_url, cover_image_url, badge_label, vision, mission, stats ({members_count, founding_year, official_label, branches_count}), services[] ({title, description, icon}), social."
+						"description": "**GET** `/api/v1/app/about` — *عام (بدون توكن)*\n\nشاشة \"عن الاتحاد\": name, about, logo_url, cover_image_url, badge_label, vision, mission, stats ({members_count, founding_year, official_label, branches_count}), services[] ({title, description, icon, icon_url} — icon_url رابط صورة الأيقونة المرفوعة من لوحة التحكم أو null), social."
 					}
 				},
 				{

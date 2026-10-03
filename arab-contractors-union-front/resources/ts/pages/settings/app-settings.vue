@@ -61,6 +61,42 @@ const services = ref<ServiceItem[]>([])
 const addService = () => services.value.push({ title: '', description: '', icon: '' })
 const removeService = (i: number) => services.value.splice(i, 1)
 
+// ─── صورة أيقونة الخدمة: تُرفع فور الاختيار، ويُحفظ مسارها بـ svc.icon مع "حفظ الإعدادات" ───
+// قيم icon القديمة كانت نصاً حراً (قبل دعم الصور)، فلا تُعرض كصورة إلا إذا كانت مساراً مرفوعاً
+const SERVICE_ICONS_DIR = 'union/services/'
+const serviceIconUrl = (icon: string) =>
+  icon?.startsWith(SERVICE_ICONS_DIR) ? `${import.meta.env.VITE_API_BASE_URL || ''}/storage/${icon}` : null
+
+const uploadingServiceIcon = ref<number | null>(null)
+const serviceIconInputs = ref<HTMLInputElement[]>([])
+
+const pickServiceIcon = (i: number) => serviceIconInputs.value[i]?.click()
+
+const onServiceIconPicked = async (i: number, e: Event) => {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file)
+    return
+
+  const fd = new FormData()
+  fd.append('icon', file)
+  uploadingServiceIcon.value = i
+  try {
+    const d = (await api.post('/api/v1/dashboard/settings/service-icon', fd)).data
+    services.value[i].icon = d?.items?.path ?? ''
+    successMessage.value = 'تم رفع الأيقونة — اضغط "حفظ الإعدادات" لاعتمادها.'
+    errorMessage.value = ''
+    setTimeout(() => successMessage.value = '', 4000)
+  }
+  catch (err: any) {
+    errorMessage.value = err?.response?.data?.message || 'فشل رفع الأيقونة.'
+  }
+  finally {
+    uploadingServiceIcon.value = null
+  }
+}
+
 const { data, isLoading } = useQuery({
   queryKey: ['app-settings'],
   queryFn: async () => (await api.get('/api/v1/dashboard/settings')).data,
@@ -300,8 +336,36 @@ watch(coverImageFile, () => {
           <VCol cols="12" md="5">
             <VTextField v-model="svc.description" label="وصف الخدمة" density="compact" dir="rtl" />
           </VCol>
-          <VCol cols="12" md="3">
-            <VTextField v-model="svc.icon" label="أيقونة (اختياري)" density="compact" dir="ltr" />
+          <VCol cols="12" md="3" class="d-flex align-center gap-2">
+            <VAvatar size="40" rounded="lg" color="secondary" variant="tonal">
+              <VImg v-if="serviceIconUrl(svc.icon)" :src="serviceIconUrl(svc.icon)!" />
+              <VIcon v-else icon="tabler-photo" size="20" />
+            </VAvatar>
+            <input
+              :ref="(el) => { if (el) serviceIconInputs[i] = el as HTMLInputElement }"
+              type="file"
+              accept="image/png,image/jpeg,image/svg+xml,image/webp"
+              hidden
+              @change="onServiceIconPicked(i, $event)"
+            >
+            <VBtn
+              size="small"
+              variant="tonal"
+              prepend-icon="tabler-upload"
+              :loading="uploadingServiceIcon === i"
+              :disabled="uploadingServiceIcon !== null"
+              @click="pickServiceIcon(i)"
+            >
+              {{ serviceIconUrl(svc.icon) ? 'تغيير الأيقونة' : 'رفع أيقونة' }}
+            </VBtn>
+            <VBtn
+              v-if="svc.icon"
+              icon="tabler-x"
+              size="x-small"
+              variant="text"
+              title="إزالة الأيقونة"
+              @click="svc.icon = ''"
+            />
           </VCol>
           <VCol cols="12" md="1" class="text-center">
             <VBtn icon="tabler-trash" size="small" variant="text" color="error" @click="removeService(i)" />

@@ -412,6 +412,7 @@ Route::prefix('v1')->group(function () {
             Route::put('dashboard/settings',       [SettingController::class, 'update']);
             Route::post('dashboard/settings/logo', [SettingController::class, 'uploadLogo']);
             Route::post('dashboard/settings/cover-image', [SettingController::class, 'uploadCoverImage']);
+            Route::post('dashboard/settings/service-icon', [SettingController::class, 'uploadServiceIcon']);
         });
 
         // --------------------------------------------------------
