@@ -338,7 +338,7 @@ function openFile(url: string) {
         <VPagination
           v-model="page"
           :length="meta.last_page"
-          :total-visible="6"
+          :total-visible="$vuetify.display.xs ? 5 : 6"
         />
       </div>
     </div>

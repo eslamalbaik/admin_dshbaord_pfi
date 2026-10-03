@@ -408,6 +408,7 @@ const submit = async () => {
             :items="['معلومات العضوية والتأسيس', 'بيانات الإدارة والشركاء', 'العنوان وبيانات الاتصال', 'الوثائق والمستندات المطلوبة']"
             alt-labels
             hide-actions
+            mobile-breakpoint="sm"
             style="font-family:Cairo,sans-serif"
         />
       </VCardText>

@@ -32,10 +32,6 @@ onMounted(() => {
   fetchGovernorates()
 })
 
-watch(() => form.value.governorate_id, () => {
-  form.value.city_id = null
-})
-
 watch(isNewMembership, (newVal) => {
   if (newVal) {
     form.value.membership_number = nextMembershipNumber.value
@@ -96,6 +92,10 @@ const form = ref({
   partners_ids: null as File | null,
   authorization_letter: null as File | null,
   notes: '',
+})
+
+watch(() => form.value.governorate_id, () => {
+  form.value.city_id = null
 })
 
 const newPartnerName = ref('')
@@ -305,6 +305,7 @@ const submit = async () => {
             :items="['معلومات العضوية والتأسيس', 'بيانات الإدارة والشركاء', 'العنوان وبيانات الاتصال', 'الوثائق والمستندات المطلوبة']"
             alt-labels
             hide-actions
+            mobile-breakpoint="sm"
             style="font-family:Cairo,sans-serif"
         />
       </VCardText>

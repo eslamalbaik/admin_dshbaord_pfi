@@ -526,7 +526,7 @@ const setPrimary = async (img: any) => {
         <VPagination
           v-model="page"
           :length="Math.ceil(total / perPage)"
-          :total-visible="7"
+          :total-visible="$vuetify.display.xs ? 5 : 7"
         />
       </VCardText>
     </VCard>

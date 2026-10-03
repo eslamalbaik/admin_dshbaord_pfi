@@ -281,7 +281,7 @@ onMounted(fetchNotifications)
 
     <!-- ─── Pagination ─── -->
     <div v-if="totalPages > 1" class="d-flex justify-center mt-6">
-      <VPagination v-model="page" :length="totalPages" total-visible="7" />
+      <VPagination v-model="page" :length="totalPages" :total-visible="$vuetify.display.xs ? 5 : 7" />
     </div>
   </div>
 </template>

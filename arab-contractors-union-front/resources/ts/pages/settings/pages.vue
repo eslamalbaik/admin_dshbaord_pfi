@@ -84,7 +84,7 @@ function publicUrl(slug: string) {
 
 <template>
   <div>
-    <div class="d-flex align-center justify-space-between mb-6">
+    <div class="d-flex align-center justify-space-between flex-wrap gap-4 mb-6">
       <div>
         <h1 class="text-h4 font-weight-bold">الصفحات الديناميكية</h1>
         <p class="text-body-2 text-medium-emphasis mb-0">

@@ -80,10 +80,10 @@ const stats = computed(() => [
             />
           </VAvatar>
 
-          <div class="d-flex flex-column">
+          <div class="d-flex flex-column stats-card__body">
             <span class="text-body-2 text-medium-emphasis" style="font-family:Cairo,sans-serif">{{ stat.title }}</span>
-            <div class="d-flex align-center gap-2">
-              <h4 class="text-h4 font-weight-semibold">
+            <div class="d-flex align-center flex-wrap gap-x-2">
+              <h4 class="text-h4 font-weight-semibold stats-card__value">
                 {{ stat.value }}
               </h4>
               <VChip
@@ -110,6 +110,14 @@ const stats = computed(() => [
 <style scoped>
 .stats-card {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.stats-card__body {
+  /* بدون هذا العمود ما بيصغر عن عرض محتواه، فالقيم المالية الكبيرة والـ chip
+     بيطلعوا برّا الكرت لما تكون 6 كروت بسطر (xl) أو عالموبايل */
+  min-inline-size: 0;
+}
+.stats-card__value {
+  overflow-wrap: anywhere;
 }
 .stats-card:hover {
   transform: translateY(-2px);

@@ -248,7 +248,7 @@ function fmtDate(d: string | null) {
       </VCard>
 
       <div v-if="lastPage > 1" class="d-flex justify-center mt-4">
-        <VPagination v-model="page" :length="lastPage" total-visible="7" />
+        <VPagination v-model="page" :length="lastPage" :total-visible="$vuetify.display.xs ? 5 : 7" />
       </div>
     </template>
 

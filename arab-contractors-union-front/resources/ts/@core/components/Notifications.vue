@@ -65,7 +65,7 @@ const toggleReadUnread = (isSeen: boolean, Id: number | string) => {
 
     <VMenu
       activator="parent"
-      width="380px"
+      :width="$vuetify.display.smAndDown ? 330 : 380"
       :location="props.location"
       offset="12px"
       :close-on-content-click="false"

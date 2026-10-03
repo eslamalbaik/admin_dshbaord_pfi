@@ -383,7 +383,7 @@ const contractorStatusLabel: Record<string, string> = {
         </VTable>
 
         <div v-if="contractorsLastPage > 1" class="d-flex justify-center mt-4">
-          <VPagination v-model="contractorPage" :length="contractorsLastPage" total-visible="7" />
+          <VPagination v-model="contractorPage" :length="contractorsLastPage" :total-visible="$vuetify.display.xs ? 5 : 7" />
         </div>
       </VCardText>
 
@@ -543,7 +543,7 @@ const contractorStatusLabel: Record<string, string> = {
         </VTable>
 
         <div v-if="certsLastPage > 1" class="d-flex justify-center mt-4">
-          <VPagination v-model="certPage" :length="certsLastPage" total-visible="7" />
+          <VPagination v-model="certPage" :length="certsLastPage" :total-visible="$vuetify.display.xs ? 5 : 7" />
         </div>
       </VCardText>
     </VCard>

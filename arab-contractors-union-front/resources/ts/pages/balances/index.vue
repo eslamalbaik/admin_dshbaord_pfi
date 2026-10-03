@@ -220,7 +220,7 @@ async function exportCsv() {
       </div>
 
       <VCardText class="d-flex justify-center">
-        <VPagination v-model="page" :length="data?.meta?.last_page ?? 1" :total-visible="7" />
+        <VPagination v-model="page" :length="data?.meta?.last_page ?? 1" :total-visible="$vuetify.display.xs ? 5 : 7" />
       </VCardText>
     </VCard>
   </div>
