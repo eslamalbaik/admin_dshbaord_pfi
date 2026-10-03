@@ -262,6 +262,17 @@ class EventController extends Controller
         ];
     }
 
+    // روابط مكتوبة بدون بروتوكول (www.youtube.com/... أو youtu.be/...) كانت تنرفض بقاعدة url —
+    // نكمّلها بـ https:// قبل التحقق بدل ما نرفض رابط صحيح عملياً
+    private function normalizeUrls(Request $request): void
+    {
+        foreach (['video_url', 'external_url', 'stream_url'] as $field) {
+            $value = trim((string) $request->input($field, ''));
+            if ($value !== '' && ! preg_match('~^[a-z][a-z0-9+.-]*://~i', $value))
+                $request->merge([$field => 'https://' . ltrim($value, '/')]);
+        }
+    }
+
     // رسائل واضحة لأسباب رفض الصور/التواريخ — تُعرض للأدمن كما هي بالفرونت
     private function eventMessages(): array
     {
@@ -276,8 +287,9 @@ class EventController extends Controller
             'speaker_photos.*.uploaded'       => 'تعذّر رفع صورة المتحدث — تأكد إن حجمها أقل من 3 ميجابايت.',
             'event_date.after_or_equal'       => 'موعد الفعالية لازم يكون من بكرا وطالع.',
             'published_at.after_or_equal'     => 'يجب أن يكون تاريخ النشر اليوم أو بعده.',
-            'video_url.url'                   => 'رابط فيديو يوتيوب غير صالح.',
-            'external_url.url'                => 'الرابط الخارجي غير صالح.',
+            'video_url.url'                   => 'رابط فيديو يوتيوب غير صالح — انسخ الرابط كامل من المتصفح.',
+            'external_url.url'                => 'الرابط الخارجي غير صالح — انسخ الرابط كامل من المتصفح.',
+            'stream_url.url'                  => 'رابط البث المباشر غير صالح — انسخ الرابط كامل من المتصفح.',
         ];
     }
 
@@ -311,6 +323,8 @@ class EventController extends Controller
     // POST /api/v1/admin/events
     public function store(Request $request)
     {
+        $this->normalizeUrls($request);
+
         $validated = $request->validate(array_merge([
             'title' => 'required|string|max:255',
             'excerpt' => 'nullable|string|max:500',
@@ -349,6 +363,8 @@ class EventController extends Controller
     // PUT /api/v1/admin/events/{id}
     public function update(Request $request, Event $event)
     {
+        $this->normalizeUrls($request);
+
         $validated = $request->validate(array_merge([
             'title' => 'sometimes|string|max:255',
             'excerpt' => 'nullable|string|max:500',

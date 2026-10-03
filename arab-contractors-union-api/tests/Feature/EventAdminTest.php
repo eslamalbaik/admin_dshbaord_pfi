@@ -544,4 +544,16 @@ class EventAdminTest extends TestCase
 
         \Illuminate\Support\Facades\Bus::assertNotDispatched(\App\Jobs\SendEventPublishedPushJob::class);
     }
+
+    public function test_store_accepts_links_without_scheme(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/events', [
+            'title' => 'فعالية', 'body' => 'نص',
+            'video_url' => 'www.youtube.com/watch?v=abc', 'external_url' => 'youtu.be/abc',
+        ])->assertStatus(201)
+            ->assertJsonPath('items.video_url', 'https://www.youtube.com/watch?v=abc')
+            ->assertJsonPath('items.external_url', 'https://youtu.be/abc');
+    }
 }

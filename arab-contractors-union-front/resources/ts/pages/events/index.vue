@@ -95,6 +95,17 @@ const tomorrowStr = () => localDateStr(new Date(Date.now() + 24 * 60 * 60 * 1000
 // موعد الفعالية من بكرا وطالع (عند الإنشاء) — نفس قيد الباك اند
 const minEventDate = computed(() => `${tomorrowStr()}T00:00`)
 
+// رابط بدون بروتوكول (www.youtube.com/...) بيتكمّل بـ https:// — نفس ما بيعمل الخادم
+const withScheme = (v: string) => {
+  const t = v.trim()
+
+  return t && !/^[a-z][a-z0-9+.-]*:\/\//i.test(t) ? `https://${t.replace(/^\/+/, '')}` : t
+}
+
+const fixUrl = (field: 'video_url' | 'external_url' | 'stream_url') => {
+  form.value[field] = withScheme(form.value[field])
+}
+
 const publishModeHint = computed(() => form.value.publishMode === 'draft'
   ? 'الفعالية بتنحفظ مخفية عن التطبيق والموقع لحد ما تنشرها.'
   : 'الفعالية بتظهر فوراً، وبيوصل إشعار للمقاولين.')
@@ -319,8 +330,8 @@ const saveEvent = async () => {
     fd.append('excerpt', form.value.excerpt)
     fd.append('body', form.value.body)
     fd.append('is_published', mode === 'draft' ? '0' : '1')
-    if (form.value.video_url) fd.append('video_url', form.value.video_url)
-    if (form.value.external_url) fd.append('external_url', form.value.external_url)
+    if (form.value.video_url.trim()) fd.append('video_url', withScheme(form.value.video_url))
+    if (form.value.external_url.trim()) fd.append('external_url', withScheme(form.value.external_url))
     if (mode === 'schedule')
       fd.append('published_at', form.value.published_at)
     else if (mode === 'now' && isEditing.value && originalPublishMode.value !== 'now')
@@ -329,7 +340,7 @@ const saveEvent = async () => {
     if (form.value.event_location) fd.append('event_location', form.value.event_location)
     if (form.value.event_format) fd.append('event_format', form.value.event_format)
     fd.append('event_type', form.value.event_type)
-    if (form.value.stream_url) fd.append('stream_url', form.value.stream_url)
+    if (form.value.stream_url.trim()) fd.append('stream_url', withScheme(form.value.stream_url))
     form.value.speakers.forEach((s, i) => {
       fd.append(`speakers[${i}][name]`, s.name)
       if (s.title) fd.append(`speakers[${i}][title]`, s.title)
@@ -635,6 +646,8 @@ const deleteEvent = async () => {
                   dir="ltr"
                   hint="يظهر للمقاولين يوم الفعالية فقط"
                   persistent-hint
+                  placeholder="https://..."
+                  @blur="fixUrl('stream_url')"
                 />
               </VCol>
             </VRow>
@@ -678,10 +691,10 @@ const deleteEvent = async () => {
                 </div>
               </VCol>
               <VCol cols="12" md="6">
-                <VTextField v-model="form.video_url" label="رابط فيديو يوتيوب (اختياري)" prepend-inner-icon="tabler-brand-youtube" dir="ltr" />
+                <VTextField v-model="form.video_url" label="رابط فيديو يوتيوب (اختياري)" prepend-inner-icon="tabler-brand-youtube" dir="ltr" placeholder="https://..." @blur="fixUrl('video_url')" />
               </VCol>
               <VCol cols="12" md="6">
-                <VTextField v-model="form.external_url" label="رابط خارجي (اختياري)" prepend-inner-icon="tabler-external-link" dir="ltr" />
+                <VTextField v-model="form.external_url" label="رابط خارجي (اختياري)" prepend-inner-icon="tabler-external-link" dir="ltr" placeholder="https://..." @blur="fixUrl('external_url')" />
               </VCol>
             </VRow>
           </div>
