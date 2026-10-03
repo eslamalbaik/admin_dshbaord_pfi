@@ -473,6 +473,7 @@ Route::prefix('v1')->group(function () {
             Route::patch('dashboard/dues/{due}',        [\App\Http\Controllers\Api\ContractorDueController::class, 'update']);
             Route::post('dashboard/dues/{due}/settle',  [\App\Http\Controllers\Api\ContractorDueController::class, 'settle']);
             Route::delete('dashboard/dues/{due}',       [\App\Http\Controllers\Api\ContractorDueController::class, 'destroy']);
+            Route::post('dashboard/dues/bulk-delete',   [\App\Http\Controllers\Api\ContractorDueController::class, 'bulkDestroy']);
 
             // أرصدة المقاولين — صافي له/عليه لكل شركة
             Route::get('dashboard/balances',            [\App\Http\Controllers\Api\ContractorBalanceController::class, 'index']);
