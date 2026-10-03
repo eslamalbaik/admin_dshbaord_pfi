@@ -64,6 +64,12 @@ if (!isAccountant) {
     ],
   })
 
+  menuItems.push({
+    title: 'المكتبة القانونية',
+    icon: { icon: 'tabler-library' },
+    to: 'legal-library',
+  })
+
   menuItems.push({ heading: 'سوق الآليات' })
   menuItems.push({
     title: 'سوق الآليات',

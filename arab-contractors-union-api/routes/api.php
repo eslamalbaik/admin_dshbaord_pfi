@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\NewsController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\TermsController;
 use App\Http\Controllers\Api\LegalFileController;
+use App\Http\Controllers\Api\LegalFileCategoryController;
 use App\Http\Controllers\Api\BankAccountController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\CertificateRequestController;
@@ -363,6 +364,11 @@ Route::prefix('v1')->group(function () {
             Route::post('dashboard/legal-files',                 [LegalFileController::class, 'store']);
             Route::post('dashboard/legal-files/{legalFile}',     [LegalFileController::class, 'update']);
             Route::delete('dashboard/legal-files/{legalFile}',   [LegalFileController::class, 'destroy']);
+
+            Route::get('dashboard/legal-file-categories',                          [LegalFileCategoryController::class, 'index']);
+            Route::post('dashboard/legal-file-categories',                         [LegalFileCategoryController::class, 'store']);
+            Route::post('dashboard/legal-file-categories/{legalFileCategory}',     [LegalFileCategoryController::class, 'update']);
+            Route::delete('dashboard/legal-file-categories/{legalFileCategory}',   [LegalFileCategoryController::class, 'destroy']);
         });
 
         // --------------------------------------------------------

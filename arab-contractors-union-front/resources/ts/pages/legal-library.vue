@@ -12,13 +12,26 @@ const filterCategory = ref<string>('')
 const search = ref('')
 const page = ref(1)
 
-const categories = [
-  { key: 'legislation', label: 'تشريعات',         color: 'primary',  icon: 'tabler-scale' },
-  { key: 'mou',         label: 'مذكرات تفاهم',     color: 'success',  icon: 'tabler-handshake' },
-  { key: 'other',       label: 'أخرى',             color: 'secondary', icon: 'tabler-files' },
-]
+const catStyle: Record<string, { color: string; icon: string }> = {
+  legislation: { color: 'primary',   icon: 'tabler-scale' },
+  mou:         { color: 'success',   icon: 'tabler-handshake' },
+  other:       { color: 'secondary', icon: 'tabler-files' },
+}
+const customStyle = { color: 'info', icon: 'tabler-folder' }
 
-const catMap = Object.fromEntries(categories.map(c => [c.key, c]))
+// ─── Categories (DB-backed; admin can add custom ones) ────────────────────
+const { data: catData } = useQuery({
+  queryKey: ['legal-file-categories'],
+  queryFn: async () => (await api.get('/api/v1/dashboard/legal-file-categories')).data,
+})
+
+const categories = computed(() =>
+  (catData.value?.items ?? []).map((c: any) => ({
+    ...c,
+    ...(catStyle[c.key] ?? customStyle),
+  })),
+)
+const catMap = computed<Record<string, any>>(() => Object.fromEntries(categories.value.map((c: any) => [c.key, c])))
 
 // ─── Fetch list ───────────────────────────────────────────────────────────
 const { data, isLoading } = useQuery({
@@ -36,7 +49,7 @@ const files = computed(() => data.value?.items ?? [])
 const meta  = computed(() => data.value?.meta  ?? null)
 
 // ─── Form ─────────────────────────────────────────────────────────────────
-const emptyForm = () => ({
+const emptyForm = (): any => ({
   title: '', title_en: '',
   description: '', description_en: '',
   category: 'legislation',
@@ -56,6 +69,7 @@ const openCreate = () => {
   isEditing.value = false; editingId.value = null
   form.value = emptyForm()
   form.value.sort = files.value.length
+  if (filterCategory.value) form.value.category = filterCategory.value
   formError.value = ''; tab.value = 'ar'; isFormOpen.value = true
 }
 const openEdit = (f: any) => {
@@ -83,7 +97,6 @@ const saveMutation = useMutation({
     if (form.value.file)           fd.append('file', form.value.file)
 
     if (isEditing.value) {
-      fd.append('_method', 'PUT')
       return (await api.post(`/api/v1/dashboard/legal-files/${editingId.value}`, fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })).data
@@ -110,6 +123,39 @@ const confirmDelete = (f: any) => {
   if (confirm(`هل تريد حذف "${f.title}"؟`)) deleteMutation.mutate(f.id)
 }
 
+// ─── Manage categories dialog ─────────────────────────────────────────────
+const isCatOpen   = ref(false)
+const catEditId   = ref<number | null>(null)
+const catForm     = ref({ label: '', label_en: '' })
+const catError    = ref('')
+
+const resetCatForm = () => { catEditId.value = null; catForm.value = { label: '', label_en: '' }; catError.value = '' }
+const openCats = () => { resetCatForm(); isCatOpen.value = true }
+const editCat = (c: any) => { catEditId.value = c.id; catForm.value = { label: c.label, label_en: c.label_en ?? '' }; catError.value = '' }
+
+const invalidateCats = () => {
+  queryClient.invalidateQueries({ queryKey: ['legal-file-categories'] })
+  queryClient.invalidateQueries({ queryKey: ['legal-files'] })
+}
+
+const saveCatMutation = useMutation({
+  mutationFn: async () => {
+    const url = '/api/v1/dashboard/legal-file-categories'
+    return (await api.post(catEditId.value ? `${url}/${catEditId.value}` : url, catForm.value)).data
+  },
+  onSuccess: () => { invalidateCats(); resetCatForm() },
+  onError: (e: any) => { catError.value = e?.response?.data?.message || 'فشل حفظ التصنيف.' },
+})
+
+const deleteCatMutation = useMutation({
+  mutationFn: async (id: number) => (await api.delete(`/api/v1/dashboard/legal-file-categories/${id}`)).data,
+  onSuccess: () => { invalidateCats(); catError.value = '' },
+  onError: (e: any) => { catError.value = e?.response?.data?.message || 'فشل حذف التصنيف.' },
+})
+const confirmDeleteCat = (c: any) => {
+  if (confirm(`هل تريد حذف التصنيف "${c.label}"؟`)) deleteCatMutation.mutate(c.id)
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────
 function mimeIcon(mime: string) {
   if (!mime) return 'tabler-file'
@@ -131,12 +177,17 @@ function openFile(url: string) {
       <div>
         <h1 class="text-h4 font-weight-bold">المكتبة القانونية</h1>
         <p class="text-body-2 text-medium-emphasis mb-0">
-          إدارة الملفات والوثائق القانونية (تشريعات، مذكرات تفاهم، أخرى)
+          إدارة الملفات والوثائق القانونية حسب التصنيف
         </p>
       </div>
-      <VBtn color="primary" prepend-icon="tabler-upload" @click="openCreate">
-        رفع ملف جديد
-      </VBtn>
+      <div class="d-flex gap-2">
+        <VBtn variant="tonal" prepend-icon="tabler-category" @click="openCats">
+          إدارة التصنيفات
+        </VBtn>
+        <VBtn color="primary" prepend-icon="tabler-upload" @click="openCreate">
+          رفع ملف جديد
+        </VBtn>
+      </div>
     </div>
 
     <!-- ─── Filter Bar ────────────────────────────────────────── -->
@@ -311,7 +362,7 @@ function openFile(url: string) {
               <VSelect
                 v-model="form.category"
                 label="التصنيف *"
-                :items="categories.map(c => ({ title: c.label, value: c.key }))"
+                :items="categories.map((c: any) => ({ title: c.label, value: c.key }))"
               />
             </VCol>
             <VCol cols="6" sm="3">
@@ -407,6 +458,57 @@ function openFile(url: string) {
             @click="saveMutation.mutate()"
           >
             حفظ
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- ─── Categories Dialog ─────────────────────────────────── -->
+    <VDialog v-model="isCatOpen" max-width="560" scrollable>
+      <VCard>
+        <VCardTitle class="pt-4 pb-0 d-flex align-center gap-2">
+          <VIcon icon="tabler-category" />
+          <span>إدارة التصنيفات</span>
+        </VCardTitle>
+        <VCardText class="pt-4">
+          <VAlert v-if="catError" type="error" variant="tonal" class="mb-4">{{ catError }}</VAlert>
+
+          <VList density="compact" class="mb-4">
+            <VListItem v-for="c in categories" :key="c.id">
+              <template #prepend><VIcon :icon="c.icon" :color="c.color" class="me-2" /></template>
+              <VListItemTitle>{{ c.label }}</VListItemTitle>
+              <VListItemSubtitle>{{ c.files_count }} ملف{{ c.is_system ? ' — أساسي' : '' }}</VListItemSubtitle>
+              <template #append>
+                <VBtn icon="tabler-edit" size="small" variant="text" @click="editCat(c)" />
+                <VBtn
+                  v-if="!c.is_system"
+                  icon="tabler-trash"
+                  size="small"
+                  variant="text"
+                  color="error"
+                  @click="confirmDeleteCat(c)"
+                />
+              </template>
+            </VListItem>
+          </VList>
+
+          <VDivider class="mb-4" />
+          <p class="text-caption font-weight-bold mb-2">{{ catEditId ? 'تعديل التصنيف' : 'إضافة تصنيف جديد' }}</p>
+          <VTextField v-model="catForm.label" label="اسم التصنيف (عربي) *" class="mb-3" dir="rtl" />
+          <VTextField v-model="catForm.label_en" label="Name (English)" dir="ltr" />
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn v-if="catEditId" variant="text" @click="resetCatForm">إلغاء التعديل</VBtn>
+          <VBtn variant="text" @click="isCatOpen = false">إغلاق</VBtn>
+          <VBtn
+            color="primary"
+            :prepend-icon="catEditId ? 'tabler-device-floppy' : 'tabler-plus'"
+            :loading="saveCatMutation.isPending.value"
+            :disabled="!catForm.label.trim()"
+            @click="saveCatMutation.mutate()"
+          >
+            {{ catEditId ? 'حفظ' : 'إضافة' }}
           </VBtn>
         </VCardActions>
       </VCard>

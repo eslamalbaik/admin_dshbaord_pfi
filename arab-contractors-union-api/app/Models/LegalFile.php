@@ -30,9 +30,6 @@ class LegalFile extends Model
         'size'        => 'integer',
     ];
 
-    /** تصنيفات الملفات */
-    public static array $categories = ['legislation', 'mou', 'other'];
-
     /** عنوان URL الكامل للملف */
     public function getUrlAttribute(): string
     {
