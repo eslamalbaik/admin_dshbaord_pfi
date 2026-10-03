@@ -25,6 +25,7 @@ declare global {
   const computedInject: typeof import('@vueuse/core')['computedInject']
   const computedWithControl: typeof import('@vueuse/core')['computedWithControl']
   const confirmedValidator: typeof import('./resources/ts/@core/utils/validators')['confirmedValidator']
+  const contractorDocumentLabels: typeof import('./resources/ts/utils/contractorDocuments')['contractorDocumentLabels']
   const controlledComputed: typeof import('@vueuse/core')['controlledComputed']
   const controlledRef: typeof import('@vueuse/core')['controlledRef']
   const createApp: typeof import('vue')['createApp']
@@ -406,6 +407,7 @@ declare module 'vue' {
     readonly computedInject: UnwrapRef<typeof import('@vueuse/core')['computedInject']>
     readonly computedWithControl: UnwrapRef<typeof import('@vueuse/core')['computedWithControl']>
     readonly confirmedValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['confirmedValidator']>
+    readonly contractorDocumentLabels: UnwrapRef<typeof import('./resources/ts/utils/contractorDocuments')['contractorDocumentLabels']>
     readonly controlledComputed: UnwrapRef<typeof import('@vueuse/core')['controlledComputed']>
     readonly controlledRef: UnwrapRef<typeof import('@vueuse/core')['controlledRef']>
     readonly createApp: UnwrapRef<typeof import('vue')['createApp']>
