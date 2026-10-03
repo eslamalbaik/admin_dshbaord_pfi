@@ -77,19 +77,19 @@ class NewsController extends Controller
             'title'        => 'required|string|max:255',
             'excerpt'      => 'nullable|string|max:500',
             'body'         => 'required|string',
-            'image'        => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
+            'image'        => 'nullable|image|mimes:jpg,jpeg,png,webp|max:10240',
             'video_url'    => 'nullable|url|max:500',
             'external_url' => 'nullable|url|max:500',
             'gallery'      => 'nullable|array|max:5',
-            'gallery.*'    => 'image|mimes:jpg,jpeg,png,webp|max:5120',
+            'gallery.*'    => 'image|mimes:jpg,jpeg,png,webp|max:10240',
             'is_published' => 'boolean',
             // لازم اليوم أو بعده عند الإنشاء (REQ-10 #2) — التعديل يبقى بلا قيد (نفس نمط
             // Tenders/Announcement/Event) حتى لا يُمنع تصحيح خبر قديم تاريخ نشره بالماضي فعلياً.
             'published_at' => 'nullable|date|after_or_equal:today',
         ], [
-            'image.max'          => 'حجم الصورة الرئيسية يتجاوز الحد الأقصى 5 ميجابايت.',
+            'image.max'          => 'حجم الصورة الرئيسية يتجاوز الحد الأقصى 10 ميجابايت.',
             'gallery.max'        => 'الحد الأقصى 5 صور للمعرض.',
-            'gallery.*.max'      => 'حجم إحدى صور المعرض يتجاوز الحد الأقصى 5 ميجابايت.',
+            'gallery.*.max'      => 'حجم إحدى صور المعرض يتجاوز الحد الأقصى 10 ميجابايت.',
             'published_at.after_or_equal' => 'يجب أن يكون تاريخ النشر اليوم أو بعده.',
         ]);
 
@@ -115,11 +115,11 @@ class NewsController extends Controller
             'title'            => 'sometimes|string|max:255',
             'excerpt'          => 'nullable|string|max:500',
             'body'             => 'sometimes|string',
-            'image'            => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
+            'image'            => 'nullable|image|mimes:jpg,jpeg,png,webp|max:10240',
             'video_url'        => 'nullable|url|max:500',
             'external_url'     => 'nullable|url|max:500',
             'gallery'          => 'nullable|array',
-            'gallery.*'        => 'image|mimes:jpg,jpeg,png,webp|max:5120',
+            'gallery.*'        => 'image|mimes:jpg,jpeg,png,webp|max:10240',
             'remove_gallery'   => 'nullable|array',
             'remove_gallery.*' => 'string',
             'is_published'     => 'boolean',
@@ -134,8 +134,8 @@ class NewsController extends Controller
                     $fail('يجب أن يكون تاريخ النشر اليوم أو بعده.');
             }],
         ], [
-            'image.max'     => 'حجم الصورة الرئيسية يتجاوز الحد الأقصى 5 ميجابايت.',
-            'gallery.*.max' => 'حجم إحدى صور المعرض يتجاوز الحد الأقصى 5 ميجابايت.',
+            'image.max'     => 'حجم الصورة الرئيسية يتجاوز الحد الأقصى 10 ميجابايت.',
+            'gallery.*.max' => 'حجم إحدى صور المعرض يتجاوز الحد الأقصى 10 ميجابايت.',
         ]);
 
         // "نشر مباشرة" لخبر كان مسودة أو مجدول لتاريخ لاحق: تاريخ النشر يصير الآن

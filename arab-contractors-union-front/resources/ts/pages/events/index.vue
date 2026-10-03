@@ -103,7 +103,7 @@ const saveButtonLabel = computed(() => {
 const saveButtonIcon = computed(() => publishModeOptions.find(o => o.value === form.value.publishMode)?.icon)
 
 // ── قيود الصور — تُعرض قبل الرفع وتُفحص فور الاختيار (بدل انتظار رفض الخادم بعد رفع الطلب كاملاً)
-const MAX_IMAGE_MB = 5
+const MAX_IMAGE_MB = 10
 const MAX_SPEAKER_PHOTO_MB = 3
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const IMAGE_ACCEPT = ALLOWED_IMAGE_TYPES.join(',')

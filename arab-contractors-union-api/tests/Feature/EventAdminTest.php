@@ -392,13 +392,13 @@ class EventAdminTest extends TestCase
         ])->assertStatus(201);
     }
 
-    public function test_store_rejects_main_image_over_5mb(): void
+    public function test_store_rejects_main_image_over_10mb(): void
     {
         $this->actingAsAdmin();
 
         $this->post('/api/v1/admin/events', [
             'title' => 'فعالية', 'body' => 'نص',
-            'image' => UploadedFile::fake()->image('big.png')->size(6000),
+            'image' => UploadedFile::fake()->image('big.png')->size(11000),
         ], ['Accept' => 'application/json'])->assertStatus(422)->assertJsonValidationErrors(['image']);
     }
 

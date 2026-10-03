@@ -109,8 +109,9 @@ const galleryOverLimitMessage = computed(() =>
   galleryTotalCount.value > 5 ? [`تجاوزت الحد الأقصى (${galleryTotalCount.value}/5) — احذف صور قبل الإضافة`] : [],
 )
 
-// ── قيود الصور — نفس قيود الباك اند (jpg/png/webp، 5 ميجا) وتُفحص فور الاختيار
-const MAX_IMAGE_MB = 5
+// ── قيود الصور — نفس قيود الباك اند (jpg/png/webp، 10 ميجا) وتُفحص فور الاختيار
+const MAX_IMAGE_MB = 10
+const MAX_TOTAL_UPLOAD_MB = 55
 const MAX_GALLERY = 5
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const IMAGE_ACCEPT = ALLOWED_IMAGE_TYPES.join(',')
@@ -271,6 +272,14 @@ const saveNews = async () => {
   }
   if (galleryTotalCount.value > 5) {
     notify('تجاوزت الحد الأقصى لصور المعرض (5 صور)', 'error')
+    return
+  }
+  // الخادم (post_max_size) بيقبل 60 ميجا للطلب كله — فوقها بيوصل الطلب فاضي وبيرجع خطأ بدون سبب واضح
+  const totalUploadMb = [firstFile(mainImageFile.value), ...form.value.gallery]
+    .reduce((sum, f) => sum + (f?.size ?? 0), 0) / 1024 / 1024
+  if (totalUploadMb > MAX_TOTAL_UPLOAD_MB) {
+    notify(`مجموع حجم الصور ${totalUploadMb.toFixed(1)} ميجابايت — الحد الأقصى ${MAX_TOTAL_UPLOAD_MB} ميجابايت بالمرة الواحدة. صغّر بعض الصور أو ضيفها بتعديل لاحق.`, 'error')
+
     return
   }
   formLoading.value = true

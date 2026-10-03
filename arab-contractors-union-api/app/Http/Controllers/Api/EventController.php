@@ -219,7 +219,7 @@ class EventController extends Controller
     private function eventRules(bool $isCreate = false): array
     {
         return [
-            'image'          => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
+            'image'          => 'nullable|image|mimes:jpg,jpeg,png,webp|max:10240',
             'video_url'      => 'nullable|url|max:500',
             'external_url'   => 'nullable|url|max:500',
             'is_published'   => 'boolean',
@@ -248,8 +248,8 @@ class EventController extends Controller
         return [
             'image.image'                     => 'الصورة الرئيسية لازم تكون صورة (JPG أو PNG أو WEBP).',
             'image.mimes'                     => 'صيغة الصورة الرئيسية غير مدعومة — المسموح: JPG أو PNG أو WEBP.',
-            'image.max'                       => 'حجم الصورة الرئيسية يتجاوز الحد الأقصى 5 ميجابايت.',
-            'image.uploaded'                  => 'تعذّر رفع الصورة الرئيسية — تأكد إن حجمها أقل من 5 ميجابايت.',
+            'image.max'                       => 'حجم الصورة الرئيسية يتجاوز الحد الأقصى 10 ميجابايت.',
+            'image.uploaded'                  => 'تعذّر رفع الصورة الرئيسية — تأكد إن حجمها أقل من 10 ميجابايت.',
             'speaker_photos.*.image'          => 'صورة المتحدث لازم تكون صورة (JPG أو PNG أو WEBP).',
             'speaker_photos.*.mimes'          => 'صيغة صورة المتحدث غير مدعومة — المسموح: JPG أو PNG أو WEBP.',
             'speaker_photos.*.max'            => 'حجم صورة المتحدث يتجاوز الحد الأقصى 3 ميجابايت.',
