@@ -69,15 +69,25 @@ git -C "$MONOREPO_DIR" reset --hard "origin/$MONOREPO_BRANCH"
 
 # storage/app/private مستثنى مثل public: يحوي ملف اعتماد Firebase (متجاهَل في git)،
 # فبدون الاستثناء كان --delete يمسحه كل نشرة وترتدّ إشعارات Push لوضع log بصمت.
+# storage/logs وstorage/framework وbootstrap/cache كمان مستثناة: بالمونوريبو فيها .gitignore بس،
+# فكان --delete يمسح كل نشرة laravel.log وملف وضع الصيانة (framework/down) وكاش الحزم،
+# ويرجّع ملكية المجلدات لـ root لحد الـ chown بآخر السكربت — وبهالفترة (دقائق composer/npm)
+# أي خطأ كان يطلع 500 بجسم فاضي لأن Laravel ما بيقدر يكتب السجل ولا يعيد بناء bootstrap/cache.
 echo "==> مزامنة arab-contractors-union-api/ إلى $APP_DIR"
 rsync -a --delete \
   --exclude='.env' \
   --exclude='storage/app/public' \
   --exclude='storage/app/private' \
+  --exclude='storage/logs' \
+  --exclude='storage/framework' \
+  --exclude='bootstrap/cache' \
   --exclude='vendor' \
   --exclude='node_modules' \
   --exclude='.git' \
   "$MONOREPO_DIR/arab-contractors-union-api/" "$APP_DIR/"
+
+mkdir -p "$APP_DIR/storage/logs" "$APP_DIR/storage/framework/"{cache/data,sessions,views} "$APP_DIR/bootstrap/cache"
+chown -R www-data:www-data "$APP_DIR/storage/logs" "$APP_DIR/storage/framework" "$APP_DIR/bootstrap/cache"
 
 echo "==> تثبيت حزم Composer (بدون dev)"
 composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs

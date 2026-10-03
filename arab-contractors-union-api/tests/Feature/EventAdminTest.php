@@ -417,4 +417,74 @@ class EventAdminTest extends TestCase
 
         $this->assertTrue($event->fresh()->published_at->lte(now()));
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    //  إشعار "فعالية جديدة" — وقت ما تبين الفعالية، مش وقت الحفظ
+    // ─────────────────────────────────────────────────────────────────────
+
+    public function test_store_publish_now_sends_push_immediately(): void
+    {
+        \Illuminate\Support\Facades\Bus::fake([\App\Jobs\SendEventPublishedPushJob::class]);
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/events', ['title' => 'فعالية', 'body' => 'نص', 'is_published' => true])->assertStatus(201);
+
+        \Illuminate\Support\Facades\Bus::assertDispatched(\App\Jobs\SendEventPublishedPushJob::class, fn ($job) => $job->delay === null);
+    }
+
+    public function test_store_scheduled_event_delays_push_until_publish_date(): void
+    {
+        \Illuminate\Support\Facades\Bus::fake([\App\Jobs\SendEventPublishedPushJob::class]);
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/events', [
+            'title' => 'فعالية', 'body' => 'نص', 'is_published' => true,
+            'published_at' => now()->addDays(3)->toDateString(),
+        ])->assertStatus(201)->assertJsonPath('message', 'تمت جدولة الفعالية بنجاح.');
+
+        \Illuminate\Support\Facades\Bus::assertDispatched(\App\Jobs\SendEventPublishedPushJob::class, fn ($job) => $job->delay !== null);
+    }
+
+    public function test_store_draft_sends_no_push(): void
+    {
+        \Illuminate\Support\Facades\Bus::fake([\App\Jobs\SendEventPublishedPushJob::class]);
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/events', ['title' => 'فعالية', 'body' => 'نص', 'is_published' => false])->assertStatus(201);
+
+        \Illuminate\Support\Facades\Bus::assertNotDispatched(\App\Jobs\SendEventPublishedPushJob::class);
+    }
+
+    public function test_delayed_push_is_skipped_when_event_was_rescheduled_or_unpublished(): void
+    {
+        \Illuminate\Support\Facades\Bus::fake([\App\Jobs\SendPushToContractorsJob::class]);
+
+        $event = Event::create([
+            'title' => 'مجدولة', 'body' => 'نص', 'slug' => 'sched',
+            'is_published' => true, 'published_at' => now()->subMinute(),
+        ]);
+        $stale = new \App\Jobs\SendEventPublishedPushJob($event->id, now()->subDay()->toIso8601String());
+        $stale->handle();
+        \Illuminate\Support\Facades\Bus::assertNotDispatched(\App\Jobs\SendPushToContractorsJob::class);
+
+        (new \App\Jobs\SendEventPublishedPushJob($event->id, $event->published_at->toIso8601String()))->handle();
+        \Illuminate\Support\Facades\Bus::assertDispatched(\App\Jobs\SendPushToContractorsJob::class);
+    }
+
+    public function test_editing_an_already_announced_event_does_not_push_again(): void
+    {
+        \Illuminate\Support\Facades\Bus::fake([\App\Jobs\SendEventPublishedPushJob::class]);
+        $this->actingAsAdmin();
+
+        $event = Event::create([
+            'title' => 'منشورة', 'body' => 'نص', 'slug' => 'live',
+            'is_published' => true, 'published_at' => now()->subDays(2),
+        ]);
+
+        $this->putJson("/api/v1/admin/events/{$event->id}", [
+            'is_published' => true, 'published_at' => now()->subDays(3)->toDateString(),
+        ])->assertStatus(200);
+
+        \Illuminate\Support\Facades\Bus::assertNotDispatched(\App\Jobs\SendEventPublishedPushJob::class);
+    }
 }

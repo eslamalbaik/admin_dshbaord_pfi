@@ -89,6 +89,19 @@ const tomorrowStr = () => localDateStr(new Date(Date.now() + 24 * 60 * 60 * 1000
 // موعد الفعالية من بكرا وطالع (عند الإنشاء) — نفس قيد الباك اند
 const minEventDate = computed(() => `${tomorrowStr()}T00:00`)
 
+const publishModeHint = computed(() => form.value.publishMode === 'draft'
+  ? 'الفعالية بتنحفظ مخفية عن التطبيق والموقع لحد ما تنشرها.'
+  : 'الفعالية بتظهر فوراً، وبيوصل إشعار للمقاولين.')
+
+const saveButtonLabel = computed(() => {
+  if (isEditing.value)
+    return 'حفظ التعديلات'
+
+  return { now: 'نشر', schedule: 'جدولة', draft: 'حفظ كمسودة' }[form.value.publishMode]
+})
+
+const saveButtonIcon = computed(() => publishModeOptions.find(o => o.value === form.value.publishMode)?.icon)
+
 // ── قيود الصور — تُعرض قبل الرفع وتُفحص فور الاختيار (بدل انتظار رفض الخادم بعد رفع الطلب كاملاً)
 const MAX_IMAGE_MB = 5
 const MAX_SPEAKER_PHOTO_MB = 3
@@ -238,6 +251,16 @@ const openView = (item: any) => {
   viewDialog.value = true
 }
 
+// منشورة / مجدولة (منشورة بتاريخ لسا ما إجا — مخفية عن التطبيق لحد تاريخها) / مسودة
+const statusOf = (item: any) => {
+  if (!item.is_published)
+    return { label: 'مسودة', color: 'secondary' }
+  if (item.published_at && new Date(item.published_at) > new Date())
+    return { label: `مجدولة ${new Date(item.published_at).toLocaleDateString('ar-PS')}`, color: 'warning' }
+
+  return { label: 'منشور', color: 'success' }
+}
+
 const eventTypeLabel = (t: string) => eventTypeOptions.find(o => o.value === t)?.title ?? t
 const eventFormatLabel = (f: string) => eventFormatOptions.find(o => o.value === f)?.title ?? f
 
@@ -254,6 +277,12 @@ const saveEvent = async () => {
   const eventDateChanged = form.value.event_date !== originalEventDate.value
   if (form.value.event_date && eventDateChanged && form.value.event_date < minEventDate.value) {
     notify('موعد الفعالية لازم يكون من بكرا وطالع', 'error')
+    return
+  }
+  // متحدث فاضي بالكامل (انضاف بالغلط) بيتشال لحاله — زر الحذف مخفي لما يكون في متحدث واحد
+  form.value.speakers = form.value.speakers.filter(s => s.name.trim() || s.title.trim() || s.photo || firstFile(s.photoFile))
+  if (form.value.speakers.some(s => !s.name.trim())) {
+    notify('اكتب اسم كل متحدث', 'error')
     return
   }
   const mode = form.value.publishMode
@@ -311,7 +340,7 @@ const saveEvent = async () => {
       notify('تم تحديث الفعالية بنجاح')
     } else {
       await api.post('/api/v1/admin/events', fd)
-      notify('تم نشر الفعالية بنجاح')
+      notify({ now: 'تم نشر الفعالية بنجاح', schedule: 'تمت جدولة الفعالية بنجاح', draft: 'تم حفظ الفعالية كمسودة' }[mode])
     }
     formDialog.value = false
     fetchEvents()
@@ -493,8 +522,8 @@ const deleteEvent = async () => {
         </template>
 
         <template #item.is_published="{ item }">
-          <VChip :color="item.is_published ? 'success' : 'secondary'" size="small" label style="font-family:Cairo,sans-serif">
-            {{ item.is_published ? 'منشور' : 'مسودة' }}
+          <VChip :color="statusOf(item).color" size="small" label style="font-family:Cairo,sans-serif">
+            {{ statusOf(item).label }}
           </VChip>
         </template>
 
@@ -533,116 +562,150 @@ const deleteEvent = async () => {
     </VCard>
 
     <!-- Create/Edit Dialog -->
-    <VDialog v-model="formDialog" max-width="680" scrollable>
-      <VCard>
-        <VCardTitle style="font-family:Cairo,sans-serif">{{ isEditing ? 'تعديل الفعالية' : 'فعالية جديدة' }}</VCardTitle>
-        <VCardText>
-          <VRow>
-            <VCol cols="12">
-              <VTextField v-model="form.title" label="العنوان" style="font-family:Cairo,sans-serif" />
-            </VCol>
-            <VCol cols="12">
-              <VTextarea v-model="form.excerpt" label="مقتطف مختصر (يظهر في القائمة)" rows="2" style="font-family:Cairo,sans-serif" />
-            </VCol>
-            <VCol cols="12">
-              <label class="text-body-2 font-weight-medium mb-2 d-block" style="font-family:Cairo,sans-serif">المحتوى الكامل</label>
-              <TiptapEditor v-model="form.body" placeholder="اكتب تفاصيل الفعالية هنا..." class="border rounded" />
-            </VCol>
+    <VDialog v-model="formDialog" max-width="880" scrollable>
+      <VCard class="event-form">
+        <VCardTitle class="d-flex align-center gap-2 pa-5" style="font-family:Cairo,sans-serif">
+          <VIcon icon="tabler-calendar-event" color="primary" />
+          {{ isEditing ? 'تعديل الفعالية' : 'فعالية جديدة' }}
+        </VCardTitle>
+        <VDivider />
+        <VCardText class="pa-5">
+          <!-- ── 1. معلومات الفعالية ── -->
+          <div class="form-section">
+            <div class="form-section__title">
+              <VIcon icon="tabler-file-text" size="18" />
+              معلومات الفعالية
+            </div>
+            <VRow>
+              <VCol cols="12">
+                <VTextField v-model="form.title" label="العنوان *" />
+              </VCol>
+              <VCol cols="12">
+                <VTextarea v-model="form.excerpt" label="مقتطف مختصر (يظهر في القائمة)" rows="2" auto-grow />
+              </VCol>
+              <VCol cols="12">
+                <label class="text-body-2 font-weight-medium mb-2 d-block">المحتوى الكامل *</label>
+                <TiptapEditor v-model="form.body" placeholder="اكتب تفاصيل الفعالية هنا..." class="border rounded" />
+              </VCol>
+            </VRow>
+          </div>
 
-            <VCol cols="12" md="6">
-              <div v-if="form.imagePreview && !mainImageFile" class="d-flex align-center gap-2 mb-2">
-                <VImg :src="form.imagePreview" width="48" height="48" cover rounded />
-                <span class="text-caption text-medium-emphasis" style="font-family:Cairo,sans-serif">الصورة الحالية — اختر صورة جديدة لاستبدالها</span>
-              </div>
-              <VFileInput
-                label="الصورة الرئيسية"
-                prepend-inner-icon="tabler-photo"
-                prepend-icon=""
-                :accept="IMAGE_ACCEPT"
-                :hint="`${imageHint(MAX_IMAGE_MB)} — صورة واحدة فقط، لا يوجد معرض صور للفعاليات`"
-                persistent-hint
-                style="font-family:Cairo,sans-serif"
-                :model-value="mainImageFile"
-                @update:model-value="onMainImageSelected"
-              />
-              <VImg v-if="mainImagePreview" :src="mainImagePreview" max-height="120" class="mt-2 rounded" cover />
-            </VCol>
-            <VCol cols="12" md="6">
-              <VTextField v-model="form.video_url" label="رابط فيديو يوتيوب (اختياري)" prepend-inner-icon="tabler-brand-youtube" dir="ltr" />
-            </VCol>
+          <!-- ── 2. الموعد والمكان ── -->
+          <div class="form-section">
+            <div class="form-section__title">
+              <VIcon icon="tabler-map-pin" size="18" />
+              الموعد والمكان
+            </div>
+            <VRow>
+              <VCol cols="12" md="6">
+                <VTextField
+                  v-model="form.event_date"
+                  label="موعد الفعالية"
+                  type="datetime-local"
+                  :min="isEditing ? undefined : minEventDate"
+                  :hint="isEditing ? undefined : 'من بكرا وطالع'"
+                  persistent-hint
+                />
+              </VCol>
+              <VCol cols="12" md="6">
+                <VSelect v-model="form.event_type" :items="eventTypeOptions" label="نوع الفعالية *" />
+              </VCol>
+              <VCol cols="12" md="6">
+                <VSelect v-model="form.event_format" :items="eventFormatOptions" label="نوع الحضور" clearable />
+              </VCol>
+              <VCol v-if="form.event_format === 'onsite' || form.event_format === 'hybrid'" cols="12" md="6">
+                <VTextField
+                  v-model="form.event_location"
+                  label="مكان الفعالية *"
+                  prepend-inner-icon="tabler-map-pin"
+                  :rules="[v => !!v || 'مطلوب لأن نوع الحضور وجاهي أو وجاهي + أونلاين']"
+                />
+              </VCol>
+              <VCol v-if="form.event_format !== 'onsite'" cols="12" md="6">
+                <VTextField
+                  v-model="form.stream_url"
+                  label="رابط البث المباشر (Zoom)"
+                  prepend-inner-icon="tabler-video"
+                  dir="ltr"
+                  hint="يظهر للمقاولين يوم الفعالية فقط"
+                  persistent-hint
+                />
+              </VCol>
+            </VRow>
+          </div>
 
-            <VCol cols="12" md="6">
-              <VTextField v-model="form.external_url" label="رابط خارجي (اختياري)" prepend-inner-icon="tabler-external-link" dir="ltr" />
-            </VCol>
-            <VCol cols="12" md="6">
-              <VTextField
-                v-model="form.event_date"
-                label="موعد الفعالية"
-                type="datetime-local"
-                :min="isEditing ? undefined : minEventDate"
-                :hint="isEditing ? undefined : 'من بكرا وطالع'"
-                persistent-hint
-                style="font-family:Cairo,sans-serif"
-              />
-            </VCol>
-
-            <VCol cols="12" md="4">
-              <VSelect
-                v-model="form.event_type"
-                :items="eventTypeOptions"
-                label="نوع الفعالية *"
-                style="font-family:Cairo,sans-serif"
-              />
-            </VCol>
-            <VCol cols="12" md="4">
-              <VSelect
-                v-model="form.event_format"
-                :items="eventFormatOptions"
-                label="نوع الحضور"
-                clearable
-                style="font-family:Cairo,sans-serif"
-              />
-            </VCol>
-            <VCol v-if="form.event_format === 'onsite' || form.event_format === 'hybrid'" cols="12" md="4">
-              <VTextField
-                v-model="form.event_location"
-                label="مكان الفعالية *"
-                prepend-inner-icon="tabler-map-pin"
-                :rules="[v => !!v || 'مطلوب لأن نوع الحضور وجاهي أو وجاهي + أونلاين']"
-                style="font-family:Cairo,sans-serif"
-              />
-            </VCol>
-
-            <VCol v-if="form.event_format !== 'onsite'" cols="12" md="6">
-              <VTextField
-                v-model="form.stream_url"
-                label="رابط البث المباشر (Zoom)"
-                prepend-inner-icon="tabler-video"
-                dir="ltr"
-                hint="يظهر للمقاولين يوم الفعالية فقط"
-                persistent-hint
-              />
-            </VCol>
-
-            <VCol cols="12">
-              <div class="d-flex justify-space-between align-center mb-2">
-                <span class="text-body-2 font-weight-medium" style="font-family:Cairo,sans-serif">المتحدثون</span>
-                <VBtn size="small" variant="tonal" prepend-icon="tabler-plus" @click="addSpeaker">
-                  إضافة متحدث
-                </VBtn>
-              </div>
-              <VRow v-for="(sp, i) in form.speakers" :key="i" align="center" class="mb-1">
-                <VCol cols="12" md="3">
-                  <VTextField v-model="sp.name" label="الاسم" density="compact" style="font-family:Cairo,sans-serif" />
-                </VCol>
-                <VCol cols="12" md="3">
-                  <VTextField v-model="sp.title" label="المسمى/الصفة" density="compact" style="font-family:Cairo,sans-serif" />
-                </VCol>
-                <VCol cols="12" md="3">
-                  <div v-if="sp.photoPreview || sp.photo" class="d-flex align-center gap-1 mb-1">
-                    <VImg :src="sp.photoPreview || sp.photo" width="28" height="28" cover rounded />
-                    <span class="text-caption text-medium-emphasis" style="font-family:Cairo,sans-serif">{{ sp.photoPreview ? 'معاينة الصورة الجديدة' : 'صورة حالية' }}</span>
+          <!-- ── 3. الصورة والروابط ── -->
+          <div class="form-section">
+            <div class="form-section__title">
+              <VIcon icon="tabler-photo" size="18" />
+              الصورة والروابط
+            </div>
+            <VRow>
+              <VCol cols="12" md="6">
+                <VFileInput
+                  label="الصورة الرئيسية"
+                  prepend-inner-icon="tabler-photo"
+                  prepend-icon=""
+                  :accept="IMAGE_ACCEPT"
+                  :hint="imageHint(MAX_IMAGE_MB)"
+                  persistent-hint
+                  :model-value="mainImageFile"
+                  @update:model-value="onMainImageSelected"
+                />
+              </VCol>
+              <VCol cols="12" md="6">
+                <div class="image-preview">
+                  <VImg
+                    v-if="mainImagePreview || form.imagePreview"
+                    :src="mainImagePreview || form.imagePreview"
+                    height="120"
+                    cover
+                    class="rounded"
+                  />
+                  <div v-else class="image-preview__empty d-none d-md-flex">
+                    <VIcon icon="tabler-photo" size="28" />
+                    <span>صورة واحدة للفعالية — بتظهر معاينتها هون</span>
                   </div>
+                  <span v-if="form.imagePreview && !mainImagePreview" class="text-caption text-medium-emphasis">
+                    الصورة الحالية — اختر صورة جديدة لاستبدالها
+                  </span>
+                </div>
+              </VCol>
+              <VCol cols="12" md="6">
+                <VTextField v-model="form.video_url" label="رابط فيديو يوتيوب (اختياري)" prepend-inner-icon="tabler-brand-youtube" dir="ltr" />
+              </VCol>
+              <VCol cols="12" md="6">
+                <VTextField v-model="form.external_url" label="رابط خارجي (اختياري)" prepend-inner-icon="tabler-external-link" dir="ltr" />
+              </VCol>
+            </VRow>
+          </div>
+
+          <!-- ── 4. المتحدثون ── -->
+          <div class="form-section">
+            <div class="form-section__title justify-space-between">
+              <span class="d-flex align-center gap-2">
+                <VIcon icon="tabler-users" size="18" />
+                المتحدثون
+                <VChip v-if="form.speakers.length" size="x-small" label>{{ form.speakers.length }}</VChip>
+              </span>
+              <VBtn size="small" variant="tonal" prepend-icon="tabler-plus" @click="addSpeaker">
+                إضافة متحدث
+              </VBtn>
+            </div>
+
+            <div v-for="(sp, i) in form.speakers" :key="i" class="speaker-card">
+              <VAvatar size="56" color="secondary" variant="tonal" class="flex-shrink-0">
+                <VImg v-if="sp.photoPreview || sp.photo" :src="sp.photoPreview || sp.photo" cover />
+                <VIcon v-else icon="tabler-user" />
+              </VAvatar>
+              <VRow class="flex-grow-1" dense>
+                <VCol cols="12" sm="6">
+                  <VTextField v-model="sp.name" label="الاسم *" density="compact" />
+                </VCol>
+                <VCol cols="12" sm="6">
+                  <VTextField v-model="sp.title" label="المسمى/الصفة" density="compact" />
+                </VCol>
+                <VCol cols="12" sm="6">
                   <VFileInput
                     :model-value="sp.photoFile"
                     label="صورة المتحدث"
@@ -651,71 +714,86 @@ const deleteEvent = async () => {
                     :hint="imageHint(MAX_SPEAKER_PHOTO_MB)"
                     persistent-hint
                     prepend-icon=""
-                    style="font-family:Cairo,sans-serif"
+                    prepend-inner-icon="tabler-camera"
                     @update:model-value="onSpeakerPhotoSelected(i, $event)"
                   />
                 </VCol>
-                <VCol cols="12" md="2">
+                <VCol cols="12" sm="6" class="d-flex align-center">
                   <VSwitch
                     :model-value="sp.is_keynote"
                     label="متحدث رئيسي"
                     density="compact"
-                    style="font-family:Cairo,sans-serif"
+                    color="primary"
+                    hide-details
                     @update:model-value="onKeynoteToggle(i, $event as boolean)"
                   />
                 </VCol>
-                <!-- زر الحذف مخفي (مش معطّل) لما يكون في متحدث واحد بس -->
-                <VCol cols="12" md="1" class="text-center">
-                  <VBtn
-                    v-if="form.speakers.length > 1"
-                    icon
-                    size="small"
-                    variant="text"
-                    color="error"
-                    @click="confirmRemoveSpeaker(i)"
-                  >
-                    <VIcon icon="tabler-trash" />
-                    <VTooltip activator="parent">حذف المتحدث</VTooltip>
-                  </VBtn>
-                </VCol>
               </VRow>
-              <p v-if="!form.speakers.length" class="text-body-2 text-medium-emphasis" style="font-family:Cairo,sans-serif">
-                لا يوجد متحدثون مضافون.
-              </p>
-            </VCol>
-
-            <VCol cols="12" md="6">
-              <label class="text-body-2 font-weight-medium mb-2 d-block" style="font-family:Cairo,sans-serif">طريقة النشر</label>
-              <VBtnToggle
-                v-model="form.publishMode"
-                mandatory
-                color="primary"
-                variant="outlined"
-                divided
-                density="comfortable"
-                style="font-family:Cairo,sans-serif"
+              <!-- زر الحذف مخفي (مش معطّل) لما يكون في متحدث واحد بس -->
+              <VBtn
+                v-if="form.speakers.length > 1"
+                icon
+                size="small"
+                variant="text"
+                color="error"
+                class="flex-shrink-0"
+                @click="confirmRemoveSpeaker(i)"
               >
-                <VBtn v-for="opt in publishModeOptions" :key="opt.value" :value="opt.value" :prepend-icon="opt.icon">
-                  {{ opt.label }}
-                </VBtn>
-              </VBtnToggle>
-            </VCol>
-            <!-- تاريخ النشر يظهر بالجدولة بس — "نشر مباشرة" بيعتمد وقت الحفظ -->
-            <VCol v-if="form.publishMode === 'schedule'" cols="12" md="6">
-              <VTextField
-                v-model="form.published_at"
-                label="تاريخ النشر المجدول"
-                type="date"
-                :min="isEditing ? undefined : todayStr()"
-                style="font-family:Cairo,sans-serif"
-              />
-            </VCol>
-          </VRow>
+                <VIcon icon="tabler-trash" />
+                <VTooltip activator="parent">حذف المتحدث</VTooltip>
+              </VBtn>
+            </div>
+            <p v-if="!form.speakers.length" class="text-body-2 text-medium-emphasis mb-0">
+              لا يوجد متحدثون مضافون.
+            </p>
+          </div>
+
+          <!-- ── 5. النشر ── -->
+          <div class="form-section mb-0">
+            <div class="form-section__title">
+              <VIcon icon="tabler-send" size="18" />
+              النشر
+            </div>
+            <VRow align="center">
+              <VCol cols="12" md="6">
+                <VBtnToggle
+                  v-model="form.publishMode"
+                  mandatory
+                  color="primary"
+                  variant="outlined"
+                  divided
+                  class="publish-toggle"
+                >
+                  <VBtn v-for="opt in publishModeOptions" :key="opt.value" :value="opt.value">
+                    <VIcon :icon="opt.icon" size="18" class="me-1" />
+                    {{ opt.label }}
+                  </VBtn>
+                </VBtnToggle>
+              </VCol>
+              <!-- تاريخ النشر يظهر بالجدولة بس — "نشر مباشرة" بيعتمد وقت الحفظ -->
+              <VCol v-if="form.publishMode === 'schedule'" cols="12" md="6">
+                <VTextField
+                  v-model="form.published_at"
+                  label="تاريخ النشر المجدول *"
+                  type="date"
+                  :min="isEditing ? undefined : todayStr()"
+                  hint="الفعالية والإشعار بيوصلوا للمقاولين بهالتاريخ"
+                  persistent-hint
+                />
+              </VCol>
+              <VCol v-else cols="12" md="6">
+                <p class="text-body-2 text-medium-emphasis mb-0">{{ publishModeHint }}</p>
+              </VCol>
+            </VRow>
+          </div>
         </VCardText>
-        <VCardActions>
+        <VDivider />
+        <VCardActions class="pa-4">
           <VSpacer />
           <VBtn variant="tonal" @click="formDialog = false">إلغاء</VBtn>
-          <VBtn color="primary" :loading="formLoading" @click="saveEvent">{{ isEditing ? 'حفظ التعديلات' : 'نشر' }}</VBtn>
+          <VBtn color="primary" variant="elevated" :loading="formLoading" :prepend-icon="saveButtonIcon" @click="saveEvent">
+            {{ saveButtonLabel }}
+          </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
@@ -725,8 +803,8 @@ const deleteEvent = async () => {
       <VCard v-if="viewingItem">
         <VCardTitle class="d-flex align-center justify-space-between" style="font-family:Cairo,sans-serif">
           <span>{{ viewingItem.title }}</span>
-          <VChip :color="viewingItem.is_published ? 'success' : 'secondary'" size="small" label>
-            {{ viewingItem.is_published ? 'منشور' : 'مسودة' }}
+          <VChip :color="statusOf(viewingItem).color" size="small" label>
+            {{ statusOf(viewingItem).label }}
           </VChip>
         </VCardTitle>
         <VCardText>
@@ -891,3 +969,60 @@ const deleteEvent = async () => {
     </VSnackbar>
   </div>
 </template>
+
+<style scoped>
+.event-form {
+  font-family: Cairo, sans-serif;
+}
+
+.form-section {
+  padding: 16px;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 8px;
+  margin-block-end: 16px;
+}
+
+.form-section__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  margin-block-end: 12px;
+}
+
+.image-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.image-preview__empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  block-size: 120px;
+  border: 1px dashed rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 6px;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+  font-size: 0.8125rem;
+}
+
+.speaker-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(var(--v-theme-on-surface), 0.03);
+  margin-block-end: 12px;
+}
+
+.publish-toggle {
+  inline-size: 100%;
+}
+
+.publish-toggle .v-btn {
+  flex: 1 1 0;
+}
+</style>

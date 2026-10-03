@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Http\Traits\HandlesMediaUploads;
+use App\Jobs\SendEventPublishedPushJob;
 use App\Models\Contractor;
 use App\Models\Event;
 use App\Models\EventRegistration;
@@ -314,16 +315,14 @@ class EventController extends Controller
 
         AuditLogService::record($request->user(), 'event.created', $event, ['title' => $event->title]);
 
-        if ($event->is_published) {
-            \App\Jobs\SendPushToContractorsJob::dispatch(
-                Contractor::whereNotNull('fcm_token')->pluck('id')->all(),
-                'فعالية جديدة',
-                $event->title,
-                ['type' => 'event', 'news_id' => (string) $event->id],
-            );
-        }
+        // الإشعار يوصل وقت ما تبين الفعالية: فوراً للنشر المباشر، وبتاريخ النشر للمجدولة
+        SendEventPublishedPushJob::dispatchFor($event);
 
-        return $this->success($event->toArray(), 'تم نشر الفعالية بنجاح.', 201);
+        $message = ! $event->is_published
+            ? 'تم حفظ الفعالية كمسودة.'
+            : ($event->published_at?->isFuture() ? 'تمت جدولة الفعالية بنجاح.' : 'تم نشر الفعالية بنجاح.');
+
+        return $this->success($event->toArray(), $message, 201);
     }
 
     // PUT /api/v1/admin/events/{id}
@@ -353,18 +352,17 @@ class EventController extends Controller
         if (($publishNow || $newlyPublished) && empty($validated['published_at']))
             $validated['published_at'] = now();
 
+        // فعالية ما وصل إشعارها بعد = مسودة، أو مجدولة لتاريخ لسا ما إجا
+        $notYetAnnounced = ! $event->is_published || ! $event->published_at || $event->published_at->isFuture();
+
         $event->update($validated);
 
         AuditLogService::record($request->user(), 'event.updated', $event, ['title' => $event->title]);
 
-        if ($newlyPublished) {
-            \App\Jobs\SendPushToContractorsJob::dispatch(
-                Contractor::whereNotNull('fcm_token')->pluck('id')->all(),
-                'فعالية جديدة',
-                $event->title,
-                ['type' => 'event', 'news_id' => (string) $event->id],
-            );
-        }
+        // نشر أول مرة، أو تغيير تاريخ فعالية مجدولة (لقدّام أو "نشر مباشرة") — الـ job القديم
+        // بتاريخه القديم بيتجاهل حاله لحاله. تصحيح تاريخ فعالية منشورة أصلاً ما بيعيد الإشعار.
+        if ($notYetAnnounced && ($newlyPublished || $event->wasChanged(['published_at', 'is_published'])))
+            SendEventPublishedPushJob::dispatchFor($event);
 
         return $this->success($event->fresh()->toArray(), 'تم تحديث الفعالية بنجاح.');
     }
