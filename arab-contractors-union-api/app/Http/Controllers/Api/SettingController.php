@@ -48,6 +48,9 @@ class SettingController extends Controller
     /** مجلد صور أيقونات الخدمات على قرص public */
     private const SERVICE_ICONS_DIR = 'union/services';
 
+    /** الحد الأقصى لحجم أيقونة الخدمة (SVG) بالكيلوبايت */
+    private const SERVICE_ICON_MAX_KB = 1024;
+
     /** الخدمات الرئيسية — مخزَّنة كـJSON بإعداد واحد union_services، كل عنصر {title, description, icon} */
     private function rawServices(?string $raw = null): array
     {
@@ -333,8 +336,15 @@ class SettingController extends Controller
      */
     public function uploadCoverImage(Request $request)
     {
+        // نفس قيود صور الأخبار والفعاليات (10 ميجا) مع رسائل تذكر السبب والحد بوضوح
         $request->validate([
-            'cover_image' => 'required|image|mimes:png,jpg,jpeg,webp|max:4096',
+            'cover_image' => 'required|image|mimes:png,jpg,jpeg,webp|max:10240',
+        ], [
+            'cover_image.required' => 'لم تصل صورة الغلاف — غالباً حجمها أكبر من المسموح. الحد الأقصى 10 ميجابايت.',
+            'cover_image.uploaded' => 'تعذّر رفع صورة الغلاف — غالباً حجمها أكبر من المسموح. الحد الأقصى 10 ميجابايت.',
+            'cover_image.image'    => 'صورة الغلاف لازم تكون صورة بصيغة JPG أو PNG أو WEBP.',
+            'cover_image.mimes'    => 'صورة الغلاف لازم تكون صورة بصيغة JPG أو PNG أو WEBP.',
+            'cover_image.max'      => 'حجم صورة الغلاف أكبر من الحد الأقصى المسموح (10 ميجابايت).',
         ]);
 
         $old = Setting::get('union_cover_image', '');
@@ -358,11 +368,30 @@ class SettingController extends Controller
      */
     public function uploadServiceIcon(Request $request)
     {
+        // SVG فقط: أيقونة متجهة تظهر بنفس الوضوح بأي حجم بالتطبيق. قاعدة image لا تقبل SVG
+        // في Laravel 12، فيُفحص الامتداد والمحتوى يدوياً، ويُرفض أي SVG فيه سكربت لأنه يُخدَم من storage العام
         $request->validate([
-            'icon' => 'required|image|mimes:png,jpg,jpeg,svg,webp|max:2048',
+            'icon' => [
+                'required', 'file', 'extensions:svg', 'max:'.self::SERVICE_ICON_MAX_KB,
+                function (string $attribute, mixed $file, \Closure $fail) {
+                    $content = (string) @file_get_contents($file->getRealPath());
+                    if (! preg_match('/<svg[\s>]/i', $content)) {
+                        $fail('الملف المختار ليس أيقونة SVG صالحة.');
+                    } elseif (preg_match('/<script|<foreignObject|\son\w+\s*=|javascript:/i', $content)) {
+                        $fail('أيقونة SVG تحتوي على سكربت أو أكواد غير مسموحة — صدّرها من جديد كـSVG عادي.');
+                    }
+                },
+            ],
+        ], [
+            'icon.required'   => 'لم تصل الأيقونة — تأكد من اختيار ملف SVG بحجم أقل من 1 ميجابايت.',
+            'icon.uploaded'   => 'تعذّر رفع الأيقونة — تأكد من اختيار ملف SVG بحجم أقل من 1 ميجابايت.',
+            'icon.file'       => 'تعذّر رفع الأيقونة — تأكد من اختيار ملف SVG بحجم أقل من 1 ميجابايت.',
+            'icon.extensions' => 'أيقونة الخدمة لازم تكون ملف SVG فقط.',
+            'icon.max'        => 'حجم أيقونة SVG أكبر من الحد الأقصى المسموح (1 ميجابايت).',
         ]);
 
-        $path = $request->file('icon')->store(self::SERVICE_ICONS_DIR, 'public');
+        // الامتداد ثابت svg: guessExtension قد يعطي xml/txt لملف SVG بدون ترويسة XML
+        $path = $request->file('icon')->storeAs(self::SERVICE_ICONS_DIR, \Illuminate\Support\Str::random(40).'.svg', 'public');
 
         AuditLogService::record(Auth::user(), 'settings.service_icon_uploaded');
 

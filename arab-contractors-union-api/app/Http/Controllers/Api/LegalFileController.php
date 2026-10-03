@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\LegalFile;
+use App\Models\LegalFileCategory;
 use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,12 +15,13 @@ class LegalFileController extends Controller
 {
     use ApiResponseTrait;
 
-    // ─── Label maps ──────────────────────────────────────────────────────────
-    private array $categoryLabels = [
-        'legislation' => 'تشريعات',
-        'mou'         => 'مذكرات تفاهم',
-        'other'       => 'أخرى',
-    ];
+    // ─── Category labels (DB-backed, admin-editable) ─────────────────────────
+    private ?array $labelCache = null;
+
+    private function categoryLabels(): array
+    {
+        return $this->labelCache ??= LegalFileCategory::orderBy('sort')->orderBy('id')->pluck('label', 'key')->all();
+    }
 
     // ─── Helper: format a LegalFile for API response ─────────────────────────
     private function format(LegalFile $f): array
@@ -31,7 +33,7 @@ class LegalFileController extends Controller
             'description'    => $f->description,
             'description_en' => $f->description_en,
             'category'       => $f->category,
-            'category_label' => $this->categoryLabels[$f->category] ?? $f->category,
+            'category_label' => $this->categoryLabels()[$f->category] ?? $f->category,
             'url'            => $f->url,
             'mime_type'      => $f->mime_type,
             'size'           => $f->size,
@@ -77,7 +79,7 @@ class LegalFileController extends Controller
             ->groupBy('category')
             ->pluck('count', 'category');
 
-        $categories = collect($this->categoryLabels)->map(fn($label, $cat) => [
+        $categories = collect($this->categoryLabels())->map(fn($label, $cat) => [
             'value' => $cat,
             'label' => $label,
             'count' => (int) ($counts[$cat] ?? 0),
@@ -125,7 +127,7 @@ class LegalFileController extends Controller
             'title_en'       => 'nullable|string|max:300',
             'description'    => 'nullable|string|max:1000',
             'description_en' => 'nullable|string|max:1000',
-            'category'       => 'required|in:legislation,mou,other',
+            'category'       => 'required|exists:legal_file_categories,key',
             'sort'           => 'nullable|integer|min:0',
             'is_active'      => 'boolean',
             'is_featured'    => 'boolean',
@@ -164,7 +166,7 @@ class LegalFileController extends Controller
             'title_en'       => 'nullable|string|max:300',
             'description'    => 'nullable|string|max:1000',
             'description_en' => 'nullable|string|max:1000',
-            'category'       => 'required|in:legislation,mou,other',
+            'category'       => 'required|exists:legal_file_categories,key',
             'sort'           => 'nullable|integer|min:0',
             'is_active'      => 'boolean',
             'is_featured'    => 'boolean',

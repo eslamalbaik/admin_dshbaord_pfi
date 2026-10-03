@@ -94,11 +94,6 @@ const uploadAvatar = async () => {
               :to="{ name: 'settings-privacy-policy' }"
             />
             <VListItem
-              prepend-icon="tabler-library"
-              title="المكتبة القانونية"
-              :to="{ name: 'settings-legal-library' }"
-            />
-            <VListItem
               prepend-icon="tabler-adjustments"
               title="إعدادات التطبيق"
               :to="{ name: 'settings-app-settings' }"

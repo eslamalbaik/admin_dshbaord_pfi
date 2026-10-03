@@ -24,6 +24,7 @@ use App\Services\LegacyDuesImporter;
 use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
@@ -390,12 +391,52 @@ class ContractorDueController extends Controller
     {
         $contractorId = $due->contractor_id;
 
+        // حذف ذمة عليها سداد يُضيّع المبلغ المسدَّد: الدفعة تبقى "مستخدمة" ولا تعود رصيداً للمقاول
+        if ((float) $due->paid_jod > 0) {
+            return $this->error('لا يمكن حذف ذمة عليها مبالغ مسدَّدة (' . $due->paid_jod . ' د.أ).', 422);
+        }
+
         $due->delete();
 
         $this->financeLog('due.deleted', ['due_id' => $due->id, 'contractor_id' => $contractorId]);
         AuditLogService::record(Auth::user(), 'due.deleted', null, ['due_id' => $due->id, 'contractor_id' => $contractorId]);
 
         return $this->success(message: 'تم حذف الذمة.');
+    }
+
+    /**
+     * POST /api/v1/dashboard/dues/bulk-delete
+     * حذف عدة ذمم دفعة واحدة — يُستخدم لسطر "إجمالي الرسوم المتراكمة" الذي يجمع ذمم 2025 وما قبل.
+     * الكل أو لا شيء: إن كانت أي ذمة عليها سداد لا يُحذف شيء.
+     */
+    public function bulkDestroy(Request $request)
+    {
+        $data = $request->validate([
+            'ids'   => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'distinct'],
+        ]);
+
+        $dues = ContractorDue::whereIn('id', $data['ids'])->get();
+
+        if ($dues->count() !== count($data['ids'])) {
+            return $this->error('بعض الذمم المحدَّدة غير موجودة أو محذوفة مسبقاً.', 404);
+        }
+
+        $paid = $dues->filter(fn (ContractorDue $d) => (float) $d->paid_jod > 0);
+        if ($paid->isNotEmpty()) {
+            return $this->error(
+                'لا يمكن الحذف: ' . $paid->count() . ' من الذمم المحدَّدة عليها مبالغ مسدَّدة (' . number_format($paid->sum('paid_jod'), 2, '.', '') . ' د.أ).',
+                422,
+            );
+        }
+
+        DB::transaction(fn () => ContractorDue::whereIn('id', $dues->pluck('id'))->delete());
+
+        $context = ['due_ids' => $dues->pluck('id')->all(), 'contractor_ids' => $dues->pluck('contractor_id')->unique()->values()->all()];
+        $this->financeLog('due.deleted_bulk', $context);
+        AuditLogService::record(Auth::user(), 'due.deleted_bulk', null, $context);
+
+        return $this->success(['deleted_count' => $dues->count()], 'تم حذف ' . $dues->count() . ' ذمة.');
     }
 
     /** POST /api/v1/dashboard/contractors/{contractor}/dues/calculate-fee */

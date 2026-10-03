@@ -28,8 +28,16 @@ class ServiceIconUploadTest extends TestCase
     private function uploadIcon(): string
     {
         return $this->post('/api/v1/dashboard/settings/service-icon', [
-            'icon' => UploadedFile::fake()->image('icon.png', 64, 64),
+            'icon' => $this->svg(),
         ])->assertOk()->json('items.path');
+    }
+
+    private function svg(string $body = '<path d="M0 0h24v24H0z"/>', string $name = 'icon.svg'): UploadedFile
+    {
+        return UploadedFile::fake()->createWithContent(
+            $name,
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'.$body.'</svg>',
+        );
     }
 
     private function saveServices(array $services): void
@@ -46,7 +54,58 @@ class ServiceIconUploadTest extends TestCase
         $path = $this->uploadIcon();
 
         $this->assertStringStartsWith('union/services/', $path);
+        $this->assertStringEndsWith('.svg', $path);
         Storage::disk('public')->assertExists($path);
+    }
+
+    public function test_upload_rejects_raster_images(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/dashboard/settings/service-icon', [
+            'icon' => UploadedFile::fake()->image('icon.png', 64, 64),
+        ])->assertStatus(422)->assertJsonPath('message', 'أيقونة الخدمة لازم تكون ملف SVG فقط.');
+    }
+
+    public function test_upload_rejects_svg_with_script(): void
+    {
+        $this->actingAsAdmin();
+
+        foreach (['<script>alert(1)</script>', '<rect onload="alert(1)"/>', '<a href="javascript:alert(1)"/>'] as $body) {
+            $this->postJson('/api/v1/dashboard/settings/service-icon', ['icon' => $this->svg($body)])
+                ->assertStatus(422)->assertJsonValidationErrors(['icon']);
+        }
+    }
+
+    public function test_upload_rejects_svg_extension_without_svg_content(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/dashboard/settings/service-icon', [
+            'icon' => UploadedFile::fake()->createWithContent('icon.svg', 'not an svg'),
+        ])->assertStatus(422)->assertJsonValidationErrors(['icon']);
+    }
+
+    public function test_upload_rejects_oversized_svg(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/dashboard/settings/service-icon', [
+            'icon' => $this->svg(str_repeat('<path d="M0 0h24v24H0z"/>', 45000)),
+        ])->assertStatus(422)->assertJsonPath('message', 'حجم أيقونة SVG أكبر من الحد الأقصى المسموح (1 ميجابايت).');
+    }
+
+    public function test_cover_image_accepts_up_to_10mb_and_explains_larger(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->post('/api/v1/dashboard/settings/cover-image', [
+            'cover_image' => UploadedFile::fake()->image('cover.jpg', 1200, 600)->size(9000),
+        ])->assertOk();
+
+        $this->postJson('/api/v1/dashboard/settings/cover-image', [
+            'cover_image' => UploadedFile::fake()->image('cover.jpg', 1200, 600)->size(11000),
+        ])->assertStatus(422)->assertJsonPath('message', 'حجم صورة الغلاف أكبر من الحد الأقصى المسموح (10 ميجابايت).');
     }
 
     public function test_upload_rejects_non_image(): void

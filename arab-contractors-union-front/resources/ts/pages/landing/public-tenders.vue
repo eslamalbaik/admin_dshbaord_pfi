@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
-import { Search, Calendar, ChevronLeft, Filter, DollarSign, ExternalLink, FileText } from 'lucide-vue-next'
+import { Search, Calendar, ChevronLeft, Filter, ExternalLink, FileText } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
@@ -18,7 +18,6 @@ interface Tender {
   title: string
   description: string | null
   category: string | null
-  budget: string | null
   deadline: string | null
   published_at: string | null
   status: 'open' | 'closed' | 'cancelled'
@@ -55,7 +54,6 @@ const sorts = [
   { value: 'latest', label: 'الأحدث إضافة' },
   { value: 'updated_desc', label: 'آخر تحديث' },
   { value: 'deadline_asc', label: 'الأقرب موعداً' },
-  { value: 'budget_desc', label: 'الأعلى ميزانية' },
 ]
 
 // الفئات المتاحة تُجمع من النتائج (لا endpoint مخصص لها)
@@ -123,11 +121,6 @@ function resetFilters() {
   filterCategory.value = ''
   filterUpdatedFrom.value = ''
   sort.value = 'latest'
-}
-
-function fmtBudget(b: string | null) {
-  if (!b) return '—'
-  return `${Number(b).toLocaleString('ar-EG')} $`
 }
 
 function fmtDate(d: string | null) {
@@ -209,10 +202,6 @@ function openTender(t: Tender) {
                     <span v-if="t.closing_soon" class="tender-status status-closing">ينتهي قريباً</span>
                   </div>
                   <h3 class="tender-title">{{ t.title }}</h3>
-                </div>
-                <div class="tender-budget">
-                  <DollarSign :size="16" style="color:#f9a825" />
-                  <span>{{ fmtBudget(t.budget) }}</span>
                 </div>
               </div>
               <div class="tender-info">
@@ -327,7 +316,6 @@ function openTender(t: Tender) {
 .status-closing { background: #fff8e1; color: #e65100; }
 .status-closed  { background: #f3f4f6; color: #9ca3af; }
 .tender-title { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: 1rem; font-weight: 800; color: #0d1b3e; line-height: 1.5; }
-.tender-budget { display: flex; align-items: center; gap: .35rem; font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: .95rem; font-weight: 900; color: #0d1b3e; white-space: nowrap; }
 .tender-info { display: flex; gap: 1.25rem; flex-wrap: wrap; }
 .tender-info span { display: flex; align-items: center; gap: .35rem; font-size: .8rem; color: #6b7280; }
 .tender-pub { background: #f3f4f6; border-radius: 50px; padding: .15rem .65rem; }

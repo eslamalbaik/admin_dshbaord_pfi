@@ -72,12 +72,26 @@ const serviceIconInputs = ref<HTMLInputElement[]>([])
 
 const pickServiceIcon = (i: number) => serviceIconInputs.value[i]?.click()
 
+// قيود الأيقونة — نفس قيود الباك اند (SVG فقط، 1 ميجا) وتُفحص قبل الرفع
+const MAX_SERVICE_ICON_KB = 1024
+
 const onServiceIconPicked = async (i: number, e: Event) => {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
   if (!file)
     return
+
+  if (!file.name.toLowerCase().endsWith('.svg')) {
+    errorMessage.value = `الملف "${file.name}" مش SVG — أيقونة الخدمة لازم تكون ملف SVG فقط.`
+
+    return
+  }
+  if (file.size > MAX_SERVICE_ICON_KB * 1024) {
+    errorMessage.value = `حجم الأيقونة ${(file.size / 1024).toFixed(0)} كيلوبايت — الحد الأقصى ${MAX_SERVICE_ICON_KB / 1024} ميجابايت.`
+
+    return
+  }
 
   const fd = new FormData()
   fd.append('icon', file)
@@ -171,6 +185,9 @@ watch(logoFile, () => {
 })
 
 // ─── رفع صورة الغلاف (شاشة "عن الاتحاد" بالتطبيق) — تلقائي فور اختيار الملف ───
+// قيود الغلاف — نفس قيود الباك اند (jpg/png/webp، 10 ميجا) وتُفحص قبل الرفع
+const MAX_COVER_MB = 10
+const COVER_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const coverImageFile = ref<SingleFileModel>(null)
 const coverImageMutation = useMutation({
   mutationFn: async () => {
@@ -195,8 +212,25 @@ const coverImageMutation = useMutation({
   },
 })
 watch(coverImageFile, () => {
-  if (firstFile(coverImageFile.value))
-    coverImageMutation.mutate()
+  const file = firstFile(coverImageFile.value)
+  if (!file)
+    return
+
+  if (!COVER_TYPES.includes(file.type)) {
+    errorMessage.value = `صورة الغلاف "${file.name}" لازم تكون بصيغة JPG أو PNG أو WEBP.`
+    coverImageFile.value = null
+
+    return
+  }
+  if (file.size > MAX_COVER_MB * 1024 * 1024) {
+    errorMessage.value = `صورة الغلاف "${file.name}" حجمها ${(file.size / 1024 / 1024).toFixed(1)} ميجابايت — يتجاوز الحد الأقصى ${MAX_COVER_MB} ميجابايت. صغّر الصورة وجرّب مرة ثانية.`
+    coverImageFile.value = null
+
+    return
+  }
+
+  errorMessage.value = ''
+  coverImageMutation.mutate()
 })
 </script>
 
@@ -251,12 +285,12 @@ watch(coverImageFile, () => {
             <VFileInput
               v-model="coverImageFile"
               label="صورة الغلاف (شاشة عن الاتحاد بالتطبيق)"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               density="compact"
               prepend-icon="tabler-upload"
               :loading="coverImageMutation.isPending.value"
               :disabled="coverImageMutation.isPending.value"
-              hint="تُرفع تلقائيًا فور الاختيار"
+              :hint="`JPG أو PNG أو WEBP — الحد الأقصى ${MAX_COVER_MB} ميجابايت. تُرفع تلقائيًا فور الاختيار`"
               persistent-hint
             />
           </VCol>
@@ -278,10 +312,10 @@ watch(coverImageFile, () => {
                 <VTextField v-model="form.union_email" label="البريد الإلكتروني" prepend-inner-icon="tabler-mail" dir="ltr" />
               </VCol>
               <VCol cols="12" md="6">
-                <VTextField v-model="form.union_phone" label="رقم الهاتف" prepend-inner-icon="tabler-phone" dir="ltr" />
+                <VTextField v-model="form.union_phone" label="رقم الهاتف" prepend-inner-icon="tabler-phone" dir="ltr" hint="يظهر بشاشة &quot;عن الاتحاد&quot; بالتطبيق وبالموقع" persistent-hint />
               </VCol>
               <VCol cols="12" md="6">
-                <VTextField v-model="form.union_phone2" label="رقم هاتف إضافي" prepend-inner-icon="tabler-phone" dir="ltr" />
+                <VTextField v-model="form.union_phone2" label="رقم هاتف إضافي" prepend-inner-icon="tabler-phone" dir="ltr" hint="يظهر بشاشة &quot;عن الاتحاد&quot; بالتطبيق وبالموقع" persistent-hint />
               </VCol>
             </VRow>
           </VCol>
@@ -329,6 +363,10 @@ watch(coverImageFile, () => {
           </VBtn>
         </div>
 
+        <p class="text-body-2 text-medium-emphasis mb-3">
+          أيقونة كل خدمة تُرفع كملف SVG فقط (الحد الأقصى 1 ميجابايت) — بتظهر جنب الخدمة بشاشة "عن الاتحاد" بالتطبيق.
+        </p>
+
         <VRow v-for="(svc, i) in services" :key="i" class="mb-1" align="center">
           <VCol cols="12" md="3">
             <VTextField v-model="svc.title" label="عنوان الخدمة" density="compact" dir="rtl" />
@@ -344,7 +382,7 @@ watch(coverImageFile, () => {
             <input
               :ref="(el) => { if (el) serviceIconInputs[i] = el as HTMLInputElement }"
               type="file"
-              accept="image/png,image/jpeg,image/svg+xml,image/webp"
+              accept=".svg,image/svg+xml"
               hidden
               @change="onServiceIconPicked(i, $event)"
             >
@@ -356,7 +394,7 @@ watch(coverImageFile, () => {
               :disabled="uploadingServiceIcon !== null"
               @click="pickServiceIcon(i)"
             >
-              {{ serviceIconUrl(svc.icon) ? 'تغيير الأيقونة' : 'رفع أيقونة' }}
+              {{ serviceIconUrl(svc.icon) ? 'تغيير الأيقونة' : 'رفع أيقونة SVG' }}
             </VBtn>
             <VBtn
               v-if="svc.icon"
@@ -385,6 +423,10 @@ watch(coverImageFile, () => {
         <span>التواصل والدعم الفني</span>
       </VCardTitle>
       <VCardText>
+        <VAlert type="info" variant="tonal" density="compact" class="mb-4">
+          أرقام هذا القسم تظهر بشاشة "الدعم الفني / تواصل معنا" بالتطبيق. رقم الواتساب كمان بيظهر بشاشة "عن الاتحاد".
+          أما "رقم الهاتف" و"رقم هاتف إضافي" بقسم بيانات الاتحاد فبيظهروا بشاشة "عن الاتحاد" فقط.
+        </VAlert>
         <VRow>
           <VCol cols="12" md="4">
             <VTextField v-model="form.support_whatsapp" label="رقم واتساب الدعم" prepend-inner-icon="tabler-brand-whatsapp" dir="ltr" hint="مثال: +970599123456" persistent-hint />
@@ -445,8 +487,13 @@ watch(coverImageFile, () => {
       <VCardTitle class="d-flex align-center gap-2 pt-4">
         <VIcon icon="tabler-chart-bar" color="primary" />
         <span>أرقام الصفحة الرئيسية (الإحصائيات التسويقية)</span>
+        <VChip size="small" color="info" variant="tonal" prepend-icon="tabler-world" class="ms-2">الموقع فقط</VChip>
       </VCardTitle>
       <VCardText>
+        <VAlert type="info" variant="tonal" density="compact" class="mb-4">
+          هذه الأرقام تظهر بالصفحة الرئيسية للموقع الإلكتروني (الويب) فقط، وما بتظهر بالتطبيق.
+          أرقام شاشة "عن الاتحاد" بالتطبيق (عدد الأعضاء، سنة التأسيس، عدد الفروع) موجودة بقسم شاشة "عن الاتحاد" بالتطبيق فوق.
+        </VAlert>
         <VRow>
           <VCol cols="12" md="4">
             <VTextField v-model="form.stat_years" label="سنوات الخبرة" type="number" dir="ltr" />

@@ -113,6 +113,8 @@ async function loadDues(contractorId: number) {
 function refreshAll() {
   queryClient.invalidateQueries({ queryKey: ['dues-by-contractor'] })
   queryClient.invalidateQueries({ queryKey: ['dashboard-dues-summary'] })
+  queryClient.invalidateQueries({ queryKey: ['contractor-balances'] })
+  queryClient.invalidateQueries({ queryKey: ['contractor-balances-summary'] })
   if (expandedId.value)
     loadDues(expandedId.value)
 }
@@ -343,9 +345,12 @@ const saveDueMutation = useMutation({
 })
 
 const deleteDueMutation = useMutation({
-  mutationFn: async (id: number) => (await api.delete(`/api/v1/dashboard/dues/${id}`)).data,
-  onSuccess: () => {
-    flash('تم حذف الذمة.')
+  // سطر "إجمالي الرسوم المتراكمة" يجمع عدة ذمم فيُحذف بطلب واحد (الكل أو لا شيء)
+  mutationFn: async (ids: number[]) => (ids.length === 1
+    ? await api.delete(`/api/v1/dashboard/dues/${ids[0]}`)
+    : await api.post('/api/v1/dashboard/dues/bulk-delete', { ids })).data,
+  onSuccess: (res: any) => {
+    flash(res?.message || 'تم حذف الذمة.')
     refreshAll()
   },
   // بدون هذا كان فشل الحذف صامتاً تماماً — وهو تحديداً الشكل الذي يُقنع المستخدم أن
@@ -354,18 +359,20 @@ const deleteDueMutation = useMutation({
 })
 
 const deleteDueDialog = ref(false)
-const deletingDueId = ref<number | null>(null)
+const deletingDueIds = ref<number[]>([])
+const deletingDueLabel = ref('')
 
-function confirmDeleteDue(id: number) {
-  deletingDueId.value = id
+function confirmDeleteDue(ids: number[], label = '') {
+  deletingDueIds.value = ids
+  deletingDueLabel.value = label
   deleteDueDialog.value = true
 }
 
 function deleteDueConfirmed() {
-  if (deletingDueId.value !== null)
-    deleteDueMutation.mutate(deletingDueId.value)
+  if (deletingDueIds.value.length)
+    deleteDueMutation.mutate(deletingDueIds.value)
   deleteDueDialog.value = false
-  deletingDueId.value = null
+  deletingDueIds.value = []
 }
 
 const statusColor: Record<string, string> = {
@@ -934,7 +941,18 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
                           {{ accumulatedRow.status_label }}
                         </VChip>
                       </td>
-                      <td />
+                      <td class="text-end text-no-wrap">
+                        <span :title="Number(accumulatedRow.paid_jod) > 0 ? 'لا يمكن حذف ذمم عليها مبالغ مسدَّدة' : 'حذف الرسوم المتراكمة'">
+                          <VBtn
+                            icon="tabler-trash"
+                            size="x-small"
+                            variant="text"
+                            color="error"
+                            :disabled="Number(accumulatedRow.paid_jod) > 0"
+                            @click="confirmDeleteDue(accumulatedRow.ids, `إجمالي الرسوم المتراكمة (2025 وما قبل): ${accumulatedRow.ids.length} ذمة بمبلغ ${accumulatedRow.amount_jod} د.أ`)"
+                          />
+                        </span>
+                      </td>
                     </tr>
                     <tr v-for="d in detailedDues" :key="d.id">
                       <td><VCheckboxBtn v-model="selectedDueIds" :value="d.id" /></td>
@@ -956,13 +974,16 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
                       </td>
                       <td class="text-end text-no-wrap">
                         <VBtn icon="tabler-edit" size="x-small" variant="text" @click="openEditDue(d)" />
-                        <VBtn
-                          icon="tabler-trash"
-                          size="x-small"
-                          variant="text"
-                          color="error"
-                          @click="confirmDeleteDue(d.id)"
-                        />
+                        <span :title="Number(d.paid_jod) > 0 ? 'لا يمكن حذف ذمة عليها مبالغ مسدَّدة' : 'حذف الذمة'">
+                          <VBtn
+                            icon="tabler-trash"
+                            size="x-small"
+                            variant="text"
+                            color="error"
+                            :disabled="Number(d.paid_jod) > 0"
+                            @click="confirmDeleteDue([d.id])"
+                          />
+                        </span>
                       </td>
                     </tr>
                   </tbody>
@@ -1519,7 +1540,11 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
           تأكيد الحذف
         </VCardTitle>
         <VCardText>
-          هل أنت متأكد من حذف هذه الذمة؟ لا يمكن التراجع عن هذا الإجراء.
+          <template v-if="deletingDueLabel">
+            سيتم حذف {{ deletingDueLabel }}.
+            <br>
+          </template>
+          هل أنت متأكد من حذف {{ deletingDueIds.length > 1 ? 'هذه الذمم' : 'هذه الذمة' }}؟ لا يمكن التراجع عن هذا الإجراء.
         </VCardText>
         <VCardActions class="justify-end pb-4 px-6">
           <VBtn variant="tonal" color="secondary" @click="deleteDueDialog = false">إلغاء</VBtn>
