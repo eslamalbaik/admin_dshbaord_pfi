@@ -1270,7 +1270,6 @@ async function deleteTenderDocument(id: number) {
                 <div class="fc-meta">
                   <span><CalendarDays :size="14"/> نُشر: {{ t.published_at ? new Date(t.published_at).toLocaleDateString('ar-EG') : '—' }}</span>
                   <span><CalendarDays :size="14"/> إغلاق: {{ t.deadline ? new Date(t.deadline).toLocaleDateString('ar-EG') : '—' }}</span>
-                  <span v-if="t.budget"><Wallet :size="14"/> {{ Number(t.budget).toLocaleString() }} $</span>
                   <span v-if="t.attachments?.length"><Paperclip :size="14"/> {{ t.attachments.length }} مرفق</span>
                 </div>
               </a>

@@ -101,7 +101,6 @@ const sortOptions = [
   { title: 'الأحدث إضافة', value: 'latest' },
   { title: 'آخر تحديث', value: 'updated_desc' },
   { title: 'الأقرب موعداً', value: 'deadline_asc' },
-  { title: 'الأعلى ميزانية', value: 'budget_desc' },
 ]
 const page = ref(1)
 const total = ref(0)
@@ -131,6 +130,7 @@ const openEdit = async (item: any) => {
   originalDeadline.value = item.deadline ? new Date(item.deadline).toISOString() : ''
   existingSubmissionFile.value = item.submission_file || ''
   attachments.value = Array.isArray(item.attachments) ? item.attachments.map(normalizeAttachment) : []
+  newAttachmentFiles.value = []
   editDialog.value = true
 
   // القائمة الإدارية ما بترجّع attachments (تفادياً لتحميل زايد على كل صف) — نجيبها وقت فتح التعديل
@@ -163,6 +163,50 @@ const normalizeAttachment = (a: any) => ({ ...a, url: a.url ?? a.file_url })
 
 const attachments = ref<any[]>([])
 const newAttachmentFiles = ref<File[]>([])
+
+// ── اختيار المرفقات (إضافة ونافذة التعديل) ──
+// كل اختيار جديد بينضاف على الملفات المختارة قبل (بدل ما يستبدلها)، والحقل يرجع فاضي بعدها.
+// النوع والحجم بيتفحصوا وقت الاختيار بنفس حدود الباك اند (storeAttachment: 10MB)
+const MAX_ATTACHMENT_MB = 10
+const ATTACHMENT_EXTENSIONS = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'webp']
+const attachmentPicker = ref<File[]>([])
+
+// بالقالب الـ refs بتنفك تلقائياً، فبنمرّر اسم القائمة بدل الـ ref نفسه
+type StagedList = 'create' | 'edit'
+const stagedRef = (list: StagedList) => list === 'create' ? newAttachmentsStaged : newAttachmentFiles
+
+const appendAttachmentFiles = (list: StagedList, picked: File | File[] | null | undefined) => {
+  const target = stagedRef(list)
+  const problems: string[] = []
+  const isDuplicate = (f: File) => target.value.some(g => g.name === f.name && g.size === f.size && g.lastModified === f.lastModified)
+  const accepted = toFileArray(picked).filter(f => {
+    const ext = f.name.split('.').pop()?.toLowerCase() ?? ''
+    if (!ATTACHMENT_EXTENSIONS.includes(ext)) {
+      problems.push(`"${f.name}" نوعه غير مدعوم`)
+
+      return false
+    }
+    if (f.size > MAX_ATTACHMENT_MB * 1024 * 1024) {
+      problems.push(`"${f.name}" أكبر من ${MAX_ATTACHMENT_MB} ميجابايت`)
+
+      return false
+    }
+
+    return !isDuplicate(f)
+  })
+
+  target.value = [...target.value, ...accepted]
+  attachmentPicker.value = []
+  if (problems.length)
+    notify(problems.join('، '), 'error')
+}
+
+const removeStagedFile = (list: StagedList, index: number) => {
+  const target = stagedRef(list)
+  target.value = target.value.filter((_, i) => i !== index)
+}
+
+const fileSizeLabel = (f: File) => f.size >= 1024 * 1024 ? `${(f.size / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(f.size / 1024))} KB`
 const attachmentUploading = ref(false)
 const attachmentDeletingId = ref<number | null>(null)
 
@@ -170,19 +214,27 @@ const uploadAttachments = async () => {
   if (!editTender.value.id || !newAttachmentFiles.value.length)
     return
   attachmentUploading.value = true
+  // الملف اللي فشل بيضل بالقائمة عشان تقدر تعيد المحاولة، والباقي بيكمل رفعه
+  const failed: File[] = []
   try {
     for (const file of newAttachmentFiles.value) {
       const fd = new FormData()
       fd.append('file', file)
       fd.append('label', file.name)
-      const { data } = await api.post(`/api/v1/tenders/${editTender.value.id}/attachments`, fd)
-      attachments.value.push(data.items)
+      try {
+        const { data } = await api.post(`/api/v1/tenders/${editTender.value.id}/attachments`, fd)
+        attachments.value.push(normalizeAttachment(data.items))
+      }
+      catch (err) {
+        console.error(err)
+        failed.push(file)
+      }
     }
-    newAttachmentFiles.value = []
-    notify('تمت إضافة المرفقات بنجاح')
-  } catch (err) {
-    console.error(err)
-    notify('تعذّر رفع أحد المرفقات', 'error')
+    newAttachmentFiles.value = failed
+    if (failed.length)
+      notify(`تعذّر رفع: ${failed.map(f => f.name).join('، ')}`, 'error')
+    else
+      notify('تمت إضافة المرفقات بنجاح')
   } finally {
     attachmentUploading.value = false
   }
@@ -344,7 +396,7 @@ const newTender = ref({
   external_url:     '',
 })
 
-// مرفق إضافي واحد فقط عند الإنشاء — تعدد المرفقات متاح من نافذة التعديل. يُرفع تلقائياً فور الإنشاء
+// مرفقات العطاء عند الإنشاء (واحد أو أكثر) — تُرفع تلقائياً فور حفظ العطاء
 const newAttachmentsStaged = ref<File[]>([])
 
 const createForm = ref<any>(null)
@@ -899,18 +951,33 @@ onMounted(fetchCategories)
             <!-- مرفقات العطاء عند الإنشاء — يمكن اختيار أكثر من ملف، وإضافة المزيد لاحقاً من نافذة التعديل -->
             <VCol cols="12">
               <VFileInput
-                label="مرفقات العطاء (اختياري — يمكن اختيار أكثر من ملف)"
-                hint="مستندات أو صور، حتى 10MB للملف"
+                :label="newAttachmentsStaged.length ? `إضافة مرفقات أخرى (${newAttachmentsStaged.length} مختارة)` : 'مرفقات العطاء (اختياري — يمكن إضافة أكثر من ملف)'"
+                :hint="`مستندات أو صور، حتى ${MAX_ATTACHMENT_MB} ميجابايت للملف — كل اختيار جديد بينضاف للملفات المختارة`"
                 persistent-hint
                 prepend-inner-icon="tabler-paperclip"
                 prepend-icon=""
                 multiple
-                chips
                 accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
                 style="font-family:Cairo,sans-serif"
-                :model-value="newAttachmentsStaged"
-                @update:model-value="newAttachmentsStaged = toFileArray($event)"
+                :model-value="attachmentPicker"
+                @update:model-value="appendAttachmentFiles('create', $event)"
               />
+              <div v-if="newAttachmentsStaged.length" class="d-flex flex-column gap-2 mt-3">
+                <div
+                  v-for="(f, i) in newAttachmentsStaged"
+                  :key="`${f.name}-${f.size}-${f.lastModified}`"
+                  class="d-flex align-center gap-2 pa-2"
+                  style="border:1px solid rgba(var(--v-border-color),var(--v-border-opacity));border-radius:8px"
+                >
+                  <VIcon :icon="f.type.startsWith('image/') ? 'tabler-photo' : 'tabler-file-text'" size="18" color="secondary" />
+                  <span class="text-body-2 text-truncate flex-grow-1" dir="auto">{{ f.name }}</span>
+                  <span class="text-caption text-medium-emphasis" dir="ltr">{{ fileSizeLabel(f) }}</span>
+                  <VBtn icon size="x-small" variant="text" color="error" @click="removeStagedFile('create', i)">
+                    <VIcon icon="tabler-x" size="14" />
+                    <VTooltip activator="parent">إزالة</VTooltip>
+                  </VBtn>
+                </div>
+              </div>
             </VCol>
           </VRow>
           </VForm>
@@ -1111,17 +1178,34 @@ onMounted(fetchCategories)
                 </div>
               </div>
 
+              <div v-if="newAttachmentFiles.length" class="d-flex flex-column gap-2 mb-3">
+                <div
+                  v-for="(f, i) in newAttachmentFiles"
+                  :key="`${f.name}-${f.size}-${f.lastModified}`"
+                  class="d-flex align-center gap-2 pa-2"
+                  style="border:1px dashed rgba(var(--v-border-color),var(--v-border-opacity));border-radius:8px"
+                >
+                  <VIcon :icon="f.type.startsWith('image/') ? 'tabler-photo' : 'tabler-file-text'" size="18" color="secondary" />
+                  <span class="text-body-2 text-truncate flex-grow-1" dir="auto">{{ f.name }}</span>
+                  <span class="text-caption text-medium-emphasis" dir="ltr">{{ fileSizeLabel(f) }}</span>
+                  <VBtn icon size="x-small" variant="text" color="error" :disabled="attachmentUploading" @click="removeStagedFile('edit', i)">
+                    <VIcon icon="tabler-x" size="14" />
+                    <VTooltip activator="parent">إزالة</VTooltip>
+                  </VBtn>
+                </div>
+              </div>
+
               <div class="d-flex align-center gap-2">
                 <VFileInput
-                  label="إضافة مرفقات جديدة"
+                  :label="newAttachmentFiles.length ? `إضافة ملفات أخرى (${newAttachmentFiles.length} بانتظار الرفع)` : 'إضافة مرفقات جديدة'"
                   prepend-inner-icon="tabler-paperclip"
                   prepend-icon=""
                   multiple
                   accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
                   density="compact"
                   style="font-family:Cairo,sans-serif;flex:1"
-                  :model-value="newAttachmentFiles"
-                  @update:model-value="newAttachmentFiles = toFileArray($event)"
+                  :model-value="attachmentPicker"
+                  @update:model-value="appendAttachmentFiles('edit', $event)"
                 />
                 <VBtn
                   :disabled="!newAttachmentFiles.length"
