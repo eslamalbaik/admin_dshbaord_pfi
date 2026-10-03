@@ -1015,7 +1015,7 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
       </div>
 
       <VCardText v-if="(data?.last_page ?? 1) > 1" class="d-flex justify-center">
-        <VPagination v-model="page" :length="data?.last_page ?? 1" :total-visible="7" />
+        <VPagination v-model="page" :length="data?.last_page ?? 1" :total-visible="$vuetify.display.xs ? 5 : 7" />
       </VCardText>
     </VCard>
 

@@ -28,7 +28,7 @@ const handleRefresh = () => {
 
 <template>
   <div>
-    <div class="d-flex justify-space-between align-center mb-6">
+    <div class="d-flex justify-space-between align-center flex-wrap gap-4 mb-6">
       <div>
         <h1 class="text-h4 font-weight-bold" style="font-family: Cairo, sans-serif;">
           لوحة تحكم الاتحاد

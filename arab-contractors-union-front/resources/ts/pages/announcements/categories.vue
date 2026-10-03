@@ -101,7 +101,7 @@ const toggleActive = async (category: any) => {
 <template>
   <div>
     <!-- Header -->
-    <div class="d-flex align-center justify-space-between mb-6">
+    <div class="d-flex align-center justify-space-between flex-wrap gap-4 mb-6">
       <div>
         <h1 class="text-h4 font-weight-bold" style="font-family:Cairo,sans-serif">تصنيفات التعميمات</h1>
         <p class="text-body-2 text-medium-emphasis mb-0" style="font-family:Cairo,sans-serif">

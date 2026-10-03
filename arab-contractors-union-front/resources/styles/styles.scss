@@ -39,3 +39,33 @@ body,
     background: rgb(var(--v-theme-surface));
   }
 }
+
+// ─── Responsive (mobile < 600px) ────────────────────────────────────────────
+// قواعد عامة صغيرة لأنماط متكررة بالصفحات، بدل تعديل كل صفحة لحالها.
+@media (max-width: 599.98px) {
+  // شريط الفلاتر (VCardText d-flex flex-wrap فيه حقول بحث/اختيار): الحقول عليها
+  // max-width inline للديسكتوب، فعلى الموبايل بتنضغط جنب بعض وبتنقص الـ labels.
+  // هون كل حقل بياخذ سطر كامل. !important لأنه لازم يغلب الـ style inline.
+  .v-card-text.d-flex.flex-wrap > .v-input {
+    flex: 1 1 100%;
+    max-inline-size: 100% !important;
+  }
+
+  // خلايا الجداول ما تنكسر كلمة كلمة (اسم الشركة على 4 أسطر، المبلغ وعملته
+  // بسطرين): الجدول بيصير أعرض وبيعمل scroll جوّا .v-table__wrapper
+  // (overflow: auto من Vuetify) والصفحة نفسها بتضل بعرض الشاشة.
+  // الجداول اللي بتتحول لكروت (mobile-breakpoint) مستثناة.
+  .v-table:not(.v-data-table--mobile) > .v-table__wrapper > table > :is(thead, tbody) > tr > :is(th, td) {
+    white-space: nowrap;
+  }
+}
+
+// VBtnToggle: ستايل Vuexy بيثبّت عرض كل زر على 36/44/52px (!important) لأنه مصمم
+// لأزرار أيقونات بس. الأزرار اللي فيها نص (مثل فلاتر صفحة الأرصدة) بتطلع أعرض من
+// هيك فبيتداخل النص فوق الزر اللي جنبه — على كل المقاسات. نرجّع عرضها طبيعي؛
+// وإذا المجموعة أعرض من مكانها، Vuetify أصلاً عاملها overflow-x: auto فبتعمل
+// scroll جوّاها هي بس.
+// (.layout-wrapper بس لرفع الـ specificity فوق قاعدة Vuexy اللي فيها density.)
+.layout-wrapper .v-btn-group.v-btn-toggle .v-btn:not(.v-btn--icon) {
+  inline-size: auto !important;
+}
