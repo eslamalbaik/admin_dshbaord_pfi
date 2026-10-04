@@ -101,6 +101,41 @@ class EventAdminTest extends TestCase
         ])->assertStatus(201);
     }
 
+    public function test_switching_to_online_clears_the_stale_location(): void
+    {
+        $this->actingAsAdmin();
+
+        $event = Event::create([
+            'title' => 'فعالية', 'body' => 'نص', 'slug' => 'fmt-event',
+            'event_format' => 'onsite', 'event_location' => 'gaza',
+            'is_published' => true, 'published_at' => now()->subDay(),
+        ]);
+
+        // الفورم بيخفي حقل المكان للأونلاين بس بيضل يبعت القيمة القديمة
+        $this->putJson("/api/v1/admin/events/{$event->id}", [
+            'event_format' => 'online', 'event_location' => 'gaza',
+        ])->assertStatus(200);
+
+        $this->assertNull($event->fresh()->event_location);
+    }
+
+    public function test_contractor_app_hides_location_of_online_event_with_legacy_value(): void
+    {
+        // صف قديم انحفظ قبل التصليح: أونلاين ومعه مكان
+        $event = Event::create([
+            'title' => 'فعالية', 'body' => 'نص', 'slug' => 'legacy-online',
+            'event_format' => 'online', 'event_location' => 'gaza',
+            'is_published' => true, 'published_at' => now()->subDay(), 'event_date' => now()->addDay(),
+        ]);
+
+        Sanctum::actingAs($this->createContractor(), ['*']);
+
+        $this->getJson("/api/v1/contractor/events/{$event->id}")
+            ->assertStatus(200)
+            ->assertJsonPath('items.event_format', 'online')
+            ->assertJsonPath('items.event_location', null);
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     //  speaker photo — uploaded file persists and is returned as a full URL (Application Problem #1)
     // ─────────────────────────────────────────────────────────────────────

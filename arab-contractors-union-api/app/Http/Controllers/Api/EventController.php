@@ -104,7 +104,8 @@ class EventController extends Controller
             'gallery'           => $e->gallery,
             'event_date'        => $e->event_date,
             'is_archived'       => $e->is_archived,
-            'event_location'    => $e->event_location,
+            // فعالية أونلاين ما إلها مكان — حتى لو ضل بالعمود قيمة قديمة من قبل تغيير نوع الحضور
+            'event_location'    => $e->event_format === 'online' ? null : $e->event_location,
             // نوع الحضور: onsite (وجاهي) | online (أونلاين) | hybrid (وجاهي + أونلاين)
             'event_format'      => $e->event_format,
             'is_international'  => (bool) $e->is_international,
@@ -183,6 +184,8 @@ class EventController extends Controller
         $streamAvailable = $event->event_date && now()->isSameDay($event->event_date);
         $data = $event->toArray();
         $data['stream_url'] = $streamAvailable ? $event->stream_url : null;
+        if ($event->event_format === 'online')
+            $data['event_location'] = null;
         $data['stream_available'] = $streamAvailable;
         $data['speakers'] = $this->normalizeSpeakers($data['speakers'] ?? []);
 
@@ -211,6 +214,18 @@ class EventController extends Controller
         }
 
         return $this->paginated($query->paginate(15));
+    }
+
+    // الحقل اللي بينخفى بالفورم حسب نوع الحضور بيضل محتفظ بقيمته القديمة (مثلاً مكان "gaza" بعد
+    // تحويل الفعالية لأونلاين) — نصفّره هون بدل ما نعتمد على الفرونت يبعته فاضي
+    private function clearFieldsHiddenByFormat(array &$validated, ?Event $event = null): void
+    {
+        $format = array_key_exists('event_format', $validated) ? $validated['event_format'] : $event?->event_format;
+
+        if ($format === 'online')
+            $validated['event_location'] = null;
+        elseif ($format === 'onsite')
+            $validated['stream_url'] = null;
     }
 
     // القواعد المشتركة بين store/update لحقول الفعالية (باستثناء title/body اللي تختلف required/sometimes)
@@ -304,6 +319,7 @@ class EventController extends Controller
         unset($validated['gallery']);
 
         $this->mergeSpeakerPhotosAndEnforceSingleKeynote($request, $validated);
+        $this->clearFieldsHiddenByFormat($validated);
 
         $validated['slug']       = Event::generateSlug($validated['title']);
         $validated['created_by'] = $request->user()->id;
@@ -344,6 +360,7 @@ class EventController extends Controller
         unset($validated['gallery']);
 
         $this->mergeSpeakerPhotosAndEnforceSingleKeynote($request, $validated);
+        $this->clearFieldsHiddenByFormat($validated, $event);
 
         if (isset($validated['title']))
             $validated['slug'] = Event::generateSlug($validated['title'], $event->id);
