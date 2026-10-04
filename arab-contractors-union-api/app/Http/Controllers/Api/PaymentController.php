@@ -11,6 +11,9 @@ use App\Notifications\PaymentRejectedNotification;
 use App\Notifications\PaymentSubmittedNotification;
 use App\Http\Requests\Payment\SubmitTransferRequest;
 use App\Http\Requests\Payment\StorePaymentRequest;
+use App\Http\Requests\Payment\StoreManualPaymentRequest;
+use App\Models\Contractor;
+use App\Services\DuesPaymentService;
 use App\Http\Requests\Payment\ConfirmPaymentRequest;
 use App\Http\Requests\Payment\UploadReceiptImageRequest;
 use App\Http\Requests\Payment\RejectPaymentRequest;
@@ -249,6 +252,61 @@ class PaymentController extends Controller
         AuditLogService::record($request->user(), 'payment.created', $payment, ['contractor_id' => $payment->contractor_id, 'amount' => $payment->amount, 'currency' => $payment->currency]);
 
         return $this->success($payment->toArray(), 'تم تسجيل المعاملة بنجاح.', 201);
+    }
+
+    /**
+     * POST /api/v1/payments/transactions/manual
+     * دفعة يُدخلها الأدمن/المحاسب نيابةً عن المقاول (مع صورة الإشعار) — تُسجَّل مؤكَّدة
+     * مباشرة وتوزَّع على أقدم الذمم، والزائد يبقى رصيداً متاحاً في الدفعة (amount_jod - used_amount_jod).
+     */
+    public function storeManual(StoreManualPaymentRequest $request, DuesPaymentService $duesPaymentService)
+    {
+        $data       = $request->validated();
+        $contractor = Contractor::findOrFail($data['contractor_id']);
+
+        if ($request->hasFile('receipt_image')) {
+            $data['receipt_image'] = $request->file('receipt_image')->store('payment-receipts', 'public');
+        }
+
+        try {
+            $result = $duesPaymentService->processPayment($contractor, $data, Auth::id());
+        } catch (\Exception $e) {
+            if (! empty($data['receipt_image'])) {
+                Storage::disk('public')->delete($data['receipt_image']);
+            }
+            return $this->error($e->getMessage(), 422);
+        }
+
+        $payment = Payment::with('contractor')->findOrFail($result['payment_id']);
+
+        \App\Jobs\GeneratePaymentReceiptJob::dispatch($payment->id);
+
+        AuditLogService::record(
+            $request->user(),
+            'payment.manual_created',
+            $payment,
+            ['amount' => $payment->amount, 'currency' => $payment->currency, 'amount_jod' => $payment->amount_jod],
+        );
+
+        Log::channel('finance')->info('payment.manual_created', [
+            'user_id'       => Auth::id(),
+            'payment_id'    => $payment->id,
+            'contractor_id' => $contractor->id,
+            'amount'        => $payment->amount,
+            'currency'      => $payment->currency,
+            'exchange_rate' => $payment->exchange_rate,
+            'amount_jod'    => $payment->amount_jod,
+            'applied'       => $result['applied'],
+        ]);
+
+        $contractor->notify(new PaymentConfirmedNotification($payment));
+
+        return $this->success([
+            'payment'             => new PaymentResource($payment),
+            'applied'             => $result['applied'],
+            'unapplied_jod'       => $result['unapplied_jod'],
+            'remaining_total_jod' => app(\App\Services\ContractorFinancialService::class)->outstandingDuesTotal($contractor),
+        ], 'تمت إضافة الدفعة وتوزيعها على الذمم بنجاح.', 201);
     }
 
     /**

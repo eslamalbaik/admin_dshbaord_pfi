@@ -396,6 +396,8 @@ Route::prefix('v1')->group(function () {
         // --------------------------------------------------------
         Route::get('payments/transactions',  [PaymentController::class, 'index']);
         Route::post('payments/transactions', [PaymentController::class, 'store']);
+        Route::post('payments/transactions/manual', [PaymentController::class, 'storeManual'])
+             ->middleware('role:admin,accountant');
         Route::post('payments/transactions/{payment}/confirm', [PaymentController::class, 'confirm']);
         Route::post('payments/transactions/{payment}/reject',  [PaymentController::class, 'reject']);
         Route::post('payments/transactions/{payment}/receipt-image', [PaymentController::class, 'uploadReceiptImage']);
