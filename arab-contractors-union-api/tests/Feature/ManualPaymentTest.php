@@ -92,7 +92,7 @@ class ManualPaymentTest extends TestCase
 
     public function test_foreign_currency_is_converted_to_jod_with_the_given_rate(): void
     {
-        $this->actingAs_('accountant');
+        $this->actingAs_('admin');
         $contractor = $this->contractor();
         $this->due($contractor, 2025, 100);
 
@@ -120,7 +120,7 @@ class ManualPaymentTest extends TestCase
 
     public function test_other_staff_roles_cannot_add_payments(): void
     {
-        $this->actingAs_('editor');
+        $this->actingAs_('instructor');
 
         $this->postJson('/api/v1/payments/transactions/manual', [
             'contractor_id' => $this->contractor()->id,
