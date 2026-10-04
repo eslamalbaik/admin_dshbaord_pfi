@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\Contractor;
+use App\Notifications\Channels\FcmChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -25,14 +26,9 @@ class SubscriptionPaymentReminderNotification extends Notification implements Sh
      */
     public function via(object $notifiable): array
     {
-        $channels = ['database'];
-
-        // Add FCM channel if contractor has device token
-        if ($notifiable->fcm_token) {
-            $channels[] = 'fcm';
-        }
-
-        return $channels;
+        // FcmChannel::class لا 'fcm' — ما في قناة مسجّلة بهالاسم، فكانت مهمة الـ push بالطابور
+        // تفشل بـ "Driver [fcm] not supported". القناة نفسها بتتخطّى المقاول بلا fcm_token.
+        return ['database', FcmChannel::class];
     }
 
     /**

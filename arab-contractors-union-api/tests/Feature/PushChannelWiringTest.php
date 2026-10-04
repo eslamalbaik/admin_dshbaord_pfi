@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Announcement;
 use App\Models\CertificateRequest;
 use App\Models\Contractor;
 use App\Models\Membership;
@@ -9,6 +10,9 @@ use App\Models\Payment;
 use App\Models\SupportTicket;
 use App\Models\Tender;
 use App\Notifications\AdminBroadcastNotification;
+use App\Notifications\AnnouncementNotification;
+use App\Notifications\SubscriptionExpiryReminderNotification;
+use App\Notifications\SubscriptionPaymentReminderNotification;
 use App\Notifications\CertificateRequestStatusNotification;
 use App\Notifications\Channels\FcmChannel;
 use App\Notifications\CompleteProfileNotification;
@@ -53,6 +57,10 @@ class PushChannelWiringTest extends TestCase
             'grace reminder'     => [fn () => new MembershipGracePeriodReminderNotification(new Membership(), 'start', now())],
             'admin broadcast'       => [fn () => new AdminBroadcastNotification('عنوان', 'نص')],
             'new tender published'  => [fn () => new NewTenderPublishedNotification(new Tender(['title' => 'عطاء اختبار']))],
+            // كانت تستخدم 'fcm' كنص بدل FcmChannel::class فتفشل بـ "Driver [fcm] not supported"
+            'announcement'                  => [fn () => new AnnouncementNotification(new Announcement(['title' => 'إعلان']))],
+            'subscription expiry reminder'  => [fn () => new SubscriptionExpiryReminderNotification(new Contractor(), now()->addWeek())],
+            'subscription payment reminder' => [fn () => new SubscriptionPaymentReminderNotification(new Contractor())],
         ];
     }
 
