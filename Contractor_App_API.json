@@ -596,6 +596,99 @@
         "operationId": "renewalEligibility"
       }
     },
+    "/contractor/balance": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "رصيد المقاول (له / عليه / الصافي)",
+        "operationId": "contractorBalance",
+        "description": "رصيد المقاول الصافي مع الاتحاد بالدينار الأردني — نفس حسبة شاشة \"أرصدة المقاولين\" بالداشبورد، ويُحسب لحظياً. credit_jod (له) = الأرصدة الدائنة غير المستخدمة + فائض دفعات الذمم غير الموزَّع. debit_jod (عليه) = dues_jod + penalties_jod (المتبقي غير المسدَّد). net_jod = credit_jod − debit_jod (سالب = مطلوب من الشركة). position: credit | owes | settled.",
+        "responses": {
+          "200": {
+            "description": "رصيد المقاول",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "contractor_id": {
+                          "type": "integer"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "membership_number": {
+                          "type": "string"
+                        },
+                        "credit_jod": {
+                          "type": "number",
+                          "format": "float"
+                        },
+                        "dues_jod": {
+                          "type": "number",
+                          "format": "float"
+                        },
+                        "penalties_jod": {
+                          "type": "number",
+                          "format": "float"
+                        },
+                        "debit_jod": {
+                          "type": "number",
+                          "format": "float"
+                        },
+                        "net_jod": {
+                          "type": "number",
+                          "format": "float"
+                        },
+                        "position": {
+                          "type": "string",
+                          "enum": ["credit", "owes", "settled"]
+                        },
+                        "currency": {
+                          "type": "string",
+                          "enum": ["JOD"]
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "status": true,
+                  "message": "تمت العملية بنجاح",
+                  "status_code": 200,
+                  "items": {
+                    "contractor_id": 940,
+                    "name": "شركة المثال للمقاولات",
+                    "membership_number": "940_g",
+                    "credit_jod": 40.0,
+                    "dues_jod": 100.0,
+                    "penalties_jod": 15.0,
+                    "debit_jod": 115.0,
+                    "net_jod": -75.0,
+                    "position": "owes",
+                    "currency": "JOD"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "غير مصرَّح"
+          }
+        }
+      }
+    },
     "/contractor/subscription": {
       "get": {
         "tags": ["Dashboard"],

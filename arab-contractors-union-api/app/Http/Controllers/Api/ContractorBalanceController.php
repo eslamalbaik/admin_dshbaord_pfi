@@ -49,19 +49,32 @@ class ContractorBalanceController extends Controller
 
         $paginator = $query->orderBy('net_jod', $direction)->orderBy('id')
             ->paginate(min($request->integer('per_page', 15), 500))
-            ->through(fn ($row) => [
-                'contractor_id'     => $row->id,
-                'name'              => $row->name,
-                'membership_number' => $row->membership_number,
-                'status'            => $row->status,
-                'credit_jod'        => round((float) $row->credit_jod, 2),
-                'dues_jod'          => round((float) $row->dues_jod, 2),
-                'penalties_jod'     => round((float) $row->penalties_jod, 2),
-                'debit_jod'         => round((float) $row->dues_jod + (float) $row->penalties_jod, 2),
-                'net_jod'           => round((float) $row->net_jod, 2),
-            ]);
+            ->through(fn ($row) => $this->formatRow($row));
 
         return $this->paginated($paginator);
+    }
+
+    /**
+     * GET /api/v1/contractor/balance
+     * رصيد المقاول نفسه بتطبيق المقاول — نفس حسبة شاشة الأرصدة بالداشبورد حرفياً
+     * حتى ما يطلع رقم مختلف بين ما يشوفه المقاول وما يشوفه المحاسب.
+     */
+    public function mine(Request $request)
+    {
+        $row = $this->balancesQuery()->where('contractors.id', $request->user()->id)->first();
+
+        $balance = $this->formatRow($row);
+        unset($balance['status']);
+
+        // له / عليه / متوازن — لتلوين البطاقة بالتطبيق بدون ما يقارن الرقم بصفر بنفسه
+        $balance['position'] = match (true) {
+            $balance['net_jod'] > 0 => 'credit',
+            $balance['net_jod'] < 0 => 'owes',
+            default                 => 'settled',
+        };
+        $balance['currency'] = 'JOD';
+
+        return $this->success($balance);
     }
 
     /** GET /api/v1/dashboard/balances/summary */
@@ -84,6 +97,21 @@ class ContractorBalanceController extends Controller
             'debit_count'      => (int) $totals->debit_count,
             'zero_count'       => (int) $totals->zero_count,
         ]);
+    }
+
+    private function formatRow(object $row): array
+    {
+        return [
+            'contractor_id'     => $row->id,
+            'name'              => $row->name,
+            'membership_number' => $row->membership_number,
+            'status'            => $row->status,
+            'credit_jod'        => round((float) $row->credit_jod, 2),
+            'dues_jod'          => round((float) $row->dues_jod, 2),
+            'penalties_jod'     => round((float) $row->penalties_jod, 2),
+            'debit_jod'         => round((float) $row->dues_jod + (float) $row->penalties_jod, 2),
+            'net_jod'           => round((float) $row->net_jod, 2),
+        ];
     }
 
     private function balancesQuery(): Builder

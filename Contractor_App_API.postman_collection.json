@@ -1752,6 +1752,62 @@
 						},
 						"description": "GET /api/v1/contractor/subscription"
 					}
+				},
+				{
+					"name": "Contractor Balance",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/balance",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"balance"
+							]
+						},
+						"description": "GET /api/v1/contractor/balance\n\nرصيد المقاول الصافي مع الاتحاد بالدينار الأردني — نفس حسبة شاشة \"أرصدة المقاولين\" بالداشبورد، ويُحسب لحظياً.\n\n- credit_jod (له): الأرصدة الدائنة غير المستخدمة + فائض دفعات الذمم غير الموزَّع على ذمم\n- dues_jod: المتبقي من الذمم غير المسدَّدة\n- penalties_jod: المتبقي من الغرامات غير المسدَّدة/المسدَّدة جزئياً\n- debit_jod (عليه) = dues_jod + penalties_jod\n- net_jod (الصافي) = credit_jod − debit_jod — سالب يعني مطلوب من الشركة\n- position: credit (له رصيد) | owes (عليه) | settled (متوازن)"
+					},
+					"response": [
+						{
+							"name": "Balance (owes)",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/contractor/balance",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"contractor",
+										"balance"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": true,\n  \"message\": \"تمت العملية بنجاح\",\n  \"status_code\": 200,\n  \"items\": {\n    \"contractor_id\": 940,\n    \"name\": \"شركة المثال للمقاولات\",\n    \"membership_number\": \"940_g\",\n    \"credit_jod\": 40.0,\n    \"dues_jod\": 100.0,\n    \"penalties_jod\": 15.0,\n    \"debit_jod\": 115.0,\n    \"net_jod\": -75.0,\n    \"position\": \"owes\",\n    \"currency\": \"JOD\"\n  }\n}"
+						}
+					]
 				}
 			]
 		},

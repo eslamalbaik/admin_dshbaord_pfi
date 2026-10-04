@@ -120,6 +120,9 @@ Route::prefix('v1')->group(function () {
         // كائن موحّد لتفاصيل الاشتراك ووضعه — لإعادة الاستخدام بأكثر من شاشة
         Route::get('subscription', [ContractorDashboardController::class, 'subscription']);
 
+        // رصيد المقاول الصافي (له − عليه) — نفس حسبة شاشة الأرصدة بالداشبورد
+        Route::get('balance', [\App\Http\Controllers\Api\ContractorBalanceController::class, 'mine']);
+
         // شاشة العطاءات — تصفح موثَّق (فعّال/مؤرشف/مجالاتي) + حفظ بالمفضلة (REQ-09/11/13)
         Route::get('tenders',                   [TenderController::class, 'contractorIndex']);
         Route::get('tenders/bookmarked',         [TenderController::class, 'bookmarked']);
