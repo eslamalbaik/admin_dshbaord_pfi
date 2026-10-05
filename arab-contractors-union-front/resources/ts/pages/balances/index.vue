@@ -167,11 +167,12 @@ async function exportCsv() {
           density="compact"
           style="max-width: 320px;"
         />
-        <VBtnToggle v-model="filter" mandatory density="compact" color="primary" variant="outlined">
-          <VBtn v-for="f in filters" :key="f.value" :value="f.value">
+        <!-- شرائح بتلف لسطر جديد بدل أزرار متلاصقة كانت تنضغط وتتداخل نصوصها -->
+        <VChipGroup v-model="filter" mandatory column selected-class="text-primary">
+          <VChip v-for="f in filters" :key="f.value" :value="f.value" variant="outlined" filter>
             {{ f.title }}
-          </VBtn>
-        </VBtnToggle>
+          </VChip>
+        </VChipGroup>
         <VSelect
           v-model="sort"
           :items="[{ value: 'asc', title: 'الأكثر مديونية أولاً' }, { value: 'desc', title: 'الأكبر رصيداً أولاً' }]"
