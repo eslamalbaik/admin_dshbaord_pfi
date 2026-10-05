@@ -2646,6 +2646,22 @@
                                 "settled"
                               ]
                             },
+                            "subscription_status": {
+                              "type": "string",
+                              "enum": [
+                                "active",
+                                "expired",
+                                "pending",
+                                "suspended"
+                              ],
+                              "example": "expired",
+                              "description": "Subscription status, same rule as the dashboard balances and contractors pages.\nFor an active account it follows the balance only: `net_jod` < 0 (owes dues or\npenalties) → `expired`, otherwise `active`. `pending` / `suspended` are the admin\naccount state, returned as is.\n"
+                            },
+                            "subscription_status_label": {
+                              "type": "string",
+                              "example": "منتهية",
+                              "description": "Arabic label as shown on the dashboard (فعّالة / منتهية / قيد المراجعة / موقوفة)."
+                            },
                             "currency": {
                               "type": "string",
                               "example": "JOD"

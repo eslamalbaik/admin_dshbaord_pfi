@@ -67,6 +67,8 @@ class ContractorBalanceTest extends TestCase
             ->assertJsonPath('items.debit_jod', 115)
             ->assertJsonPath('items.net_jod', -75)
             ->assertJsonPath('items.position', 'owes')
+            ->assertJsonPath('items.subscription_status', 'expired')
+            ->assertJsonPath('items.subscription_status_label', 'منتهية')
             ->assertJsonPath('items.currency', 'JOD');
     }
 
@@ -84,6 +86,7 @@ class ContractorBalanceTest extends TestCase
         foreach (['credit_jod', 'dues_jod', 'penalties_jod', 'debit_jod', 'net_jod'] as $key) {
             $this->assertEquals($admin[$key], $mine[$key], $key);
         }
+        $this->assertSame($admin['status'], $mine['subscription_status']);
     }
 
     public function test_contractor_with_nothing_on_record_is_settled(): void
@@ -93,7 +96,9 @@ class ContractorBalanceTest extends TestCase
         $this->getJson('/api/v1/contractor/balance')
             ->assertOk()
             ->assertJsonPath('items.net_jod', 0)
-            ->assertJsonPath('items.position', 'settled');
+            ->assertJsonPath('items.position', 'settled')
+            ->assertJsonPath('items.subscription_status', 'active')
+            ->assertJsonPath('items.subscription_status_label', 'فعّالة');
     }
 
     /** الحالة حسب الرصيد بس: عضوية قديمة منتهية بدون ذمم = "فعّالة"، وعليه ذمم = "منتهية" */

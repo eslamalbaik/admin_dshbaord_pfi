@@ -26,6 +26,14 @@ class ContractorBalanceController extends Controller
     /** فائض دفعات الذمم غير الموزَّع يُعتبر رصيداً للشركة */
     public const CREDIT_PAYMENT_TYPES = ['dues_payment'];
 
+    /** نفس تسميات عمود "حالة العضوية" بصفحة الأرصدة */
+    public const STATUS_LABELS = [
+        'active'    => 'فعّالة',
+        'expired'   => 'منتهية',
+        'pending'   => 'قيد المراجعة',
+        'suspended' => 'موقوفة',
+    ];
+
     /** GET /api/v1/dashboard/balances */
     public function index(Request $request)
     {
@@ -65,6 +73,11 @@ class ContractorBalanceController extends Controller
 
         $balance = $this->formatRow($row);
         unset($balance['status']);
+
+        // حالة الاشتراك بنفس قاعدة الداشبورد (عليه ذمم = منتهية)، حتى يعرض التطبيق نفس اللي بيشوفه المحاسب
+        $balance['subscription_status'] = $this->membershipStatus($row);
+        $balance['subscription_status_label'] = self::STATUS_LABELS[$balance['subscription_status']]
+            ?? $balance['subscription_status'];
 
         // له / عليه / متوازن — لتلوين البطاقة بالتطبيق بدون ما يقارن الرقم بصفر بنفسه
         $balance['position'] = match (true) {
