@@ -28,6 +28,11 @@ interface Payment {
   created_at: string
 }
 
+// VFileInput (بدون multiple) يرجّع File واحد مش مصفوفة — نطبّع القيمتين
+function firstFile(v: File | File[] | null | undefined): File | null {
+  return (Array.isArray(v) ? v[0] : v) ?? null
+}
+
 function fmtDateTime(d: string | null) {
   return d ? new Date(d).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' }) : '—'
 }
@@ -73,7 +78,7 @@ const { data: rates } = useQuery({
 const confirmDialog = ref(false)
 const confirming = ref<Payment | null>(null)
 const confirmRate = ref('')
-const confirmReceiptFile = ref<File[]>([])
+const confirmReceiptFile = ref<File | File[] | null>(null)
 const confirmReceiptPreview = ref('')
 
 function openConfirm(p: Payment) {
@@ -81,7 +86,7 @@ function openConfirm(p: Payment) {
   confirmRate.value = p.currency !== 'JOD'
     ? String(rates.value?.items?.latest?.[p.currency]?.rate_to_jod ?? '')
     : ''
-  confirmReceiptFile.value = []
+  confirmReceiptFile.value = null
   confirmReceiptPreview.value = ''
   confirmDialog.value = true
 }
@@ -90,7 +95,7 @@ watch(confirmReceiptFile, files => {
   if (confirmReceiptPreview.value)
     URL.revokeObjectURL(confirmReceiptPreview.value)
 
-  const file = files[0]
+  const file = firstFile(files)
   confirmReceiptPreview.value = file && file.type.startsWith('image/') ? URL.createObjectURL(file) : ''
 })
 
@@ -107,8 +112,9 @@ const confirmMutation = useMutation({
     const form = new FormData()
     if (confirming.value!.currency !== 'JOD' && confirmRate.value)
       form.append('exchange_rate', confirmRate.value)
-    if (confirmReceiptFile.value[0])
-      form.append('receipt_image', confirmReceiptFile.value[0])
+    const receipt = firstFile(confirmReceiptFile.value)
+    if (receipt)
+      form.append('receipt_image', receipt)
 
     return (await api.post(`/api/v1/payments/transactions/${confirming.value!.id}/confirm`, form, {
       headers: { 'Content-Type': 'multipart/form-data' },
@@ -159,7 +165,7 @@ const emptyNewPayment = () => ({
 })
 
 const newPayment = ref(emptyNewPayment())
-const newReceiptFile = ref<File[]>([])
+const newReceiptFile = ref<File | File[] | null>(null)
 const newReceiptPreview = ref('')
 
 // اختيار المقاول بالبحث أثناء الكتابة (نفس نمط شاشة الغرامات)
@@ -198,7 +204,7 @@ watch(contractorSearch, q => {
 
 function openAdd() {
   newPayment.value = emptyNewPayment()
-  newReceiptFile.value = []
+  newReceiptFile.value = null
   contractorSearch.value = ''
   contractorOptions.value = []
   addDialog.value = true
@@ -215,7 +221,7 @@ watch(newReceiptFile, files => {
   if (newReceiptPreview.value)
     URL.revokeObjectURL(newReceiptPreview.value)
 
-  const file = files?.[0]
+  const file = firstFile(files)
 
   newReceiptPreview.value = file && file.type.startsWith('image/') ? URL.createObjectURL(file) : ''
 })
@@ -237,7 +243,7 @@ const canSubmitNew = computed(() =>
   !!newPayment.value.contractor_id
   && Number(newPayment.value.amount) > 0
   && (newPayment.value.currency === 'JOD' || Number(newPayment.value.exchange_rate) > 0)
-  && (newPayment.value.method !== 'bank_transfer' || !!newReceiptFile.value?.[0]),
+  && (newPayment.value.method !== 'bank_transfer' || !!firstFile(newReceiptFile.value)),
 )
 
 const addMutation = useMutation({
@@ -255,8 +261,9 @@ const addMutation = useMutation({
       form.append('reference_number', p.reference_number)
     if (p.notes)
       form.append('notes', p.notes)
-    if (newReceiptFile.value?.[0])
-      form.append('receipt_image', newReceiptFile.value[0])
+    const receipt = firstFile(newReceiptFile.value)
+    if (receipt)
+      form.append('receipt_image', receipt)
 
     return (await api.post('/api/v1/payments/transactions/manual', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
