@@ -12,24 +12,33 @@ use App\Models\Payment;
 class MembershipRenewalService
 {
     /**
-     * يُرسي starts_at/expires_at على تاريخ آخر عضوية سابقة للمقاول (لا على تاريخ المعالجة نفسه)
-     * حتى لا ينزاح موعد الاستحقاق السنوي عند تأخر المعالجة الإدارية.
+     * كل العضويات سنوية على السنة الميلادية وتنتهي 31/12 (قرار الإدارة 2026-10-05): من يدفع
+     * يوم 30/12 تنتهي عضويته بعد يوم واحد، فالانتهاء لا يُحسب من تاريخ الدفع ولا من التسجيل.
+     *
+     * السنة المغطّاة = السنة الحالية، إلا إن كانت عضوية سابقة تغطيها أصلاً (دفع مسبق للسنة
+     * القادمة) فتصير السنة التالية لآخر سنة مغطّاة — حتى لا تُدفع نفس السنة مرتين.
      */
     public function applyRenewal(Membership $membership, ?int $reviewerId = null): Membership
     {
         $previous = $membership->contractor
             ->memberships()
             ->where('id', '!=', $membership->id)
+            ->where('status', 'active')
             ->whereNotNull('expires_at')
             ->orderByDesc('expires_at')
             ->first();
 
-        $anchor = $previous?->expires_at ?? $membership->starts_at ?? now();
+        $coveredYear = max(now()->year, ($previous?->expires_at?->year ?? 0) + 1);
+
+        // داخل السنة الحالية تبدأ من يوم المعالجة؛ الدفع المسبق لسنة قادمة يبدأ من 1/1 تبعها
+        $startsAt = $coveredYear === now()->year
+            ? now()->startOfDay()
+            : \Carbon\Carbon::create($coveredYear, 1, 1)->startOfDay();
 
         $membership->update([
             'status'      => 'active',
-            'starts_at'   => $anchor,
-            'expires_at'  => $anchor->copy()->addYear(),
+            'starts_at'   => $startsAt,
+            'expires_at'  => \Carbon\Carbon::create($coveredYear, 12, 31)->startOfDay(),
             'reviewed_by' => $reviewerId,
             'reviewed_at' => now(),
         ]);
