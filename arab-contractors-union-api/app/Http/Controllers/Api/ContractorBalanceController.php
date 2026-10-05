@@ -7,7 +7,6 @@ use App\Http\Traits\ApiResponseTrait;
 use App\Models\Contractor;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -116,10 +115,10 @@ class ContractorBalanceController extends Controller
     }
 
     /**
-     * حالة العضوية الفعلية لحساب "فعّال" إدارياً:
-     * - آخر عضوية إله انتهت (وما جدّد) ← "منتهية".
-     * - عليه رصيد صافي سالب (ذمم/غرامات ما بيغطيها رصيده) ← "منتهية" كمان، لأن مقاول عليه
-     *   رسوم ما بيصير ينعرض "فعّالة" (طلب الإدارة 2026-10-05).
+     * حالة العضوية الفعلية لحساب "فعّال" إدارياً، حسب الرصيد بس (قرار الإدارة 2026-10-05):
+     * - عليه رصيد صافي سالب (ذمم/غرامات ما بيغطيها رصيده) ← "منتهية".
+     * - رصيده صفر أو له ← "فعّالة"، حتى لو تاريخ آخر عضوية مسجّلة فات، لأن الرسوم السنوية
+     *   بتنزل كذمم، فمقاول ما عليه ذمم يعتبر مسدّد.
      * باقي الحالات الإدارية (معلّق، موقوف، منتهي) بتنعرض كما هي.
      */
     public function membershipStatus(object $row): string
@@ -128,15 +127,7 @@ class ContractorBalanceController extends Controller
             return $row->status;
         }
 
-        $ended = $row->membership_expires_at
-            && now()->startOfDay()->gt(Carbon::parse($row->membership_expires_at));
-
-        // عضوية انتهت، أو عليه رسوم ما بيغطيها رصيده (صافي سالب): كلاهما "منتهية"
-        if ($ended || (float) $row->net_jod < 0) {
-            return 'expired';
-        }
-
-        return 'active';
+        return (float) $row->net_jod < 0 ? 'expired' : 'active';
     }
 
     public function balancesQuery(): Builder
@@ -157,8 +148,6 @@ class ContractorBalanceController extends Controller
         ])->selectRaw("ROUND({$credit}, 2) AS credit_jod")
             ->selectRaw("ROUND({$dues}, 2) AS dues_jod")
             ->selectRaw("ROUND({$penalties}, 2) AS penalties_jod")
-            ->selectRaw("ROUND({$credit} - {$dues} - {$penalties}, 2) AS net_jod")
-            ->selectRaw("(SELECT MAX(m.expires_at) FROM memberships m
-                          WHERE m.contractor_id = contractors.id AND m.status IN ('active', 'expired')) AS membership_expires_at");
+            ->selectRaw("ROUND({$credit} - {$dues} - {$penalties}, 2) AS net_jod");
     }
 }

@@ -96,8 +96,8 @@ class ContractorBalanceTest extends TestCase
             ->assertJsonPath('items.position', 'settled');
     }
 
-    /** حساب فعّال إدارياً بس عضويته انتهت (عليه ذمم وما جدّد) بينعرض "منتهية" */
-    public function test_admin_screen_shows_expired_when_last_membership_ended(): void
+    /** الحالة حسب الرصيد بس: عضوية قديمة منتهية بدون ذمم = "فعّالة"، وعليه ذمم = "منتهية" */
+    public function test_admin_screen_status_follows_balance_not_old_expiry(): void
     {
         $expired = $this->contractor('944_g');
         $this->seedLedger($expired);
@@ -114,11 +114,21 @@ class ContractorBalanceTest extends TestCase
 
         $noMembership = $this->contractor('946_g');
 
+        $endedNoDues = $this->contractor('952_g'); // متل "شركة عياد": عضوية 2025 منتهية، ورصيدها له
+        Membership::create([
+            'contractor_id' => $endedNoDues->id, 'type' => 'renewal', 'status' => 'active',
+            'starts_at' => now()->subYear()->startOfYear(), 'expires_at' => now()->subYear()->endOfYear(),
+        ]);
+        ContractorCredit::create([
+            'contractor_id' => $endedNoDues->id, 'amount_jod' => 4400, 'used_jod' => 0, 'description' => 'رصيد',
+        ]);
+
         Sanctum::actingAs(User::factory()->create(['role' => 'admin']), ['*']);
 
         $this->getJson('/api/v1/dashboard/balances?search=944_g')->assertOk()->assertJsonPath('items.0.status', 'expired');
         $this->getJson('/api/v1/dashboard/balances?search=945_g')->assertOk()->assertJsonPath('items.0.status', 'active');
         $this->getJson('/api/v1/dashboard/balances?search=946_g')->assertOk()->assertJsonPath('items.0.status', 'active');
+        $this->getJson('/api/v1/dashboard/balances?search=952_g')->assertOk()->assertJsonPath('items.0.status', 'active');
     }
 
     /** عضويته سارية بس عليه رسوم (صافي سالب) بينعرض "منتهية" مش "فعّالة" */
@@ -152,11 +162,8 @@ class ContractorBalanceTest extends TestCase
     /** صفحة المقاولين بتعرض نفس "حالة العضوية" تبع صفحة الأرصدة، مش حالة الحساب الإدارية */
     public function test_contractors_list_shows_same_membership_status_as_balances(): void
     {
-        $ended = $this->contractor('950_g'); // رصيده صفر بس آخر عضوية إله خلصت
-        Membership::create([
-            'contractor_id' => $ended->id, 'type' => 'renewal', 'status' => 'active',
-            'starts_at' => now()->subYear()->startOfYear(), 'expires_at' => now()->subYear()->endOfYear(),
-        ]);
+        $owes = $this->contractor('950_g');
+        $this->seedLedger($owes); // صافي سالب
         $paid = $this->contractor('951_g');
         Membership::create([
             'contractor_id' => $paid->id, 'type' => 'renewal', 'status' => 'active',
