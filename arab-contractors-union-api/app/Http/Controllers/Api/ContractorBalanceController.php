@@ -7,6 +7,7 @@ use App\Http\Traits\ApiResponseTrait;
 use App\Models\Contractor;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -105,13 +106,27 @@ class ContractorBalanceController extends Controller
             'contractor_id'     => $row->id,
             'name'              => $row->name,
             'membership_number' => $row->membership_number,
-            'status'            => $row->status,
+            'status'            => $this->membershipStatus($row),
             'credit_jod'        => round((float) $row->credit_jod, 2),
             'dues_jod'          => round((float) $row->dues_jod, 2),
             'penalties_jod'     => round((float) $row->penalties_jod, 2),
             'debit_jod'         => round((float) $row->dues_jod + (float) $row->penalties_jod, 2),
             'net_jod'           => round((float) $row->net_jod, 2),
         ];
+    }
+
+    /**
+     * حالة العضوية الفعلية: حساب "فعّال" إدارياً بس آخر عضوية إله انتهت (وما جدّد —
+     * غالباً بسبب الذمم اللي بتمنع التجديد) بينعرض "منتهية" بدل ما يضل "فعّالة".
+     */
+    private function membershipStatus(object $row): string
+    {
+        if ($row->status === 'active' && $row->membership_expires_at
+            && now()->startOfDay()->gt(Carbon::parse($row->membership_expires_at))) {
+            return 'expired';
+        }
+
+        return $row->status;
     }
 
     private function balancesQuery(): Builder
@@ -132,6 +147,8 @@ class ContractorBalanceController extends Controller
         ])->selectRaw("ROUND({$credit}, 2) AS credit_jod")
             ->selectRaw("ROUND({$dues}, 2) AS dues_jod")
             ->selectRaw("ROUND({$penalties}, 2) AS penalties_jod")
-            ->selectRaw("ROUND({$credit} - {$dues} - {$penalties}, 2) AS net_jod");
+            ->selectRaw("ROUND({$credit} - {$dues} - {$penalties}, 2) AS net_jod")
+            ->selectRaw("(SELECT MAX(m.expires_at) FROM memberships m
+                          WHERE m.contractor_id = contractors.id AND m.status IN ('active', 'expired')) AS membership_expires_at");
     }
 }
