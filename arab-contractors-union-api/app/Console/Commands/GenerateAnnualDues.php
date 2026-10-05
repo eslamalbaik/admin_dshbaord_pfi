@@ -12,7 +12,8 @@ use Illuminate\Support\Facades\Log;
  * الأرصدة والمقاولين صارت حسب الرصيد بس، فلازم ذمة السنة الجديدة تنزل بأول يوم، وإلا كل
  * اللي رصيده صفر بيضل "فعّال" لحد ما حدا يكبس "توليد الرسوم".
  *
- * نفس محرّك صفحة الذمم (generateFeeBulk)، بس على المقاولين الفعّالين إدارياً فقط، ومستثنى منهم
+ * نفس محرّك صفحة الذمم (generateFeeBulk)، على كل المقاولين بغض النظر عن حالتهم الإدارية
+ * (نشط/معلّق/منتهي/موقوف — قرار الإدارة 2026-10-05: العضوية بتنولّد بكل الحالات)، ومستثنى منهم
  * اللي عنده عضوية مدفوعة مسبقاً بتغطي السنة، حتى ما تنحسب عليه السنة مرتين. المكرّر لنفس
  * السنة بيتخطّاه المحرّك أصلاً، فإعادة التشغيل آمنة.
  */
@@ -20,14 +21,13 @@ class GenerateAnnualDues extends Command
 {
     protected $signature = 'dues:generate-annual {--year= : السنة (افتراضياً السنة الحالية)} {--dry-run}';
 
-    protected $description = 'توليد رسوم الاشتراك السنوية للمقاولين الفعّالين';
+    protected $description = 'توليد رسوم الاشتراك السنوية لكل المقاولين';
 
     public function handle(DuesGenerationService $service): int
     {
         $year = (int) ($this->option('year') ?: now()->year);
 
         $ids = Contractor::query()
-            ->where('status', 'active')
             ->whereNotNull('specialties')
             ->whereDoesntHave('memberships', fn ($q) => $q
                 ->where('status', 'active')

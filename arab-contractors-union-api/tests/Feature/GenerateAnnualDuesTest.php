@@ -10,7 +10,7 @@ use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 /**
- * dues:generate-annual — رسوم السنة الجديدة بتنزل لحالها كل 1/1 على المقاولين الفعّالين.
+ * dues:generate-annual — رسوم السنة الجديدة بتنزل لحالها كل 1/1 على كل المقاولين بكل الحالات.
  */
 class GenerateAnnualDuesTest extends TestCase
 {
@@ -41,13 +41,14 @@ class GenerateAnnualDuesTest extends TestCase
         return ContractorDue::where('contractor_id', $c->id)->where('year', $year)->where('source', 'fee_engine');
     }
 
-    public function test_generates_new_year_fees_for_active_contractors_only(): void
+    public function test_generates_new_year_fees_for_contractors_in_every_status(): void
     {
         Carbon::setTestNow('2027-01-01 00:30:00');
 
         $active    = $this->contractor('960_g');
         $pending   = $this->contractor('961_g', 'pending');
         $suspended = $this->contractor('962_g', 'suspended');
+        $expired   = $this->contractor('965_g', 'expired');
         $prepaid   = $this->contractor('963_g'); // دفع 2027 مسبقاً
         Membership::create([
             'contractor_id' => $prepaid->id, 'type' => 'renewal', 'status' => 'active',
@@ -64,8 +65,9 @@ class GenerateAnnualDuesTest extends TestCase
         $this->assertSame(1, $this->dues($active, 2027)->count());
         $this->assertGreaterThan(0, (float) $this->dues($active, 2027)->value('amount_jod'));
         $this->assertSame(1, $this->dues($lastYear, 2027)->count());
-        $this->assertSame(0, $this->dues($pending, 2027)->count());
-        $this->assertSame(0, $this->dues($suspended, 2027)->count());
+        $this->assertSame(1, $this->dues($pending, 2027)->count());
+        $this->assertSame(1, $this->dues($suspended, 2027)->count());
+        $this->assertSame(1, $this->dues($expired, 2027)->count());
         $this->assertSame(0, $this->dues($prepaid, 2027)->count());
 
         // إعادة التشغيل ما بتكرّر الذمة

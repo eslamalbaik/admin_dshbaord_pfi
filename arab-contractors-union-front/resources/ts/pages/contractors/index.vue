@@ -220,7 +220,7 @@ const statusChangeOptions = [
 const statusUpdating = ref<number | null>(null)
 
 // ── تأكيد تغيير الحالة — كل تغيير يمر عبر نافذة تشرح أثره قبل الحفظ.
-// التأثيرات مأخوذة من منطق السيرفر: GenerateAnnualDues (status=active فقط)،
+// التأثيرات مأخوذة من منطق السيرفر: GenerateAnnualDues (كل الحالات — ما بتتأثر بالتغيير)،
 // NotificationHelper (الإعلانات لـ active فقط، تذكيرات الذمم/التجديد لـ active+suspended)،
 // ContractorRequirements::renewalBlockers (suspended يمنع التجديد)،
 // MembershipRenewalService (الموافقة على تجديد ترجّع pending/expired لـ active بس مش suspended)،
@@ -233,7 +233,6 @@ const statusImpacts = (from: string, to: string): StatusImpact[] => {
   const list: StatusImpact[] = []
   if (to === 'active') {
     list.push({ level: 'info', text: 'حالة العضوية المعروضة رح تصير حسب الرصيد: إذا عليه ذمم بتظهر "منتهية"، وإذا ما عليه بتظهر "فعّالة".' })
-    list.push({ level: 'success', text: 'رح يدخل بتوليد الرسوم السنوية التلقائي (كل 1/1) إذا ما عنده عضوية مدفوعة للسنة.' })
     list.push({ level: 'success', text: 'رح توصله إشعارات الإعلانات وتذكيرات الذمم والتجديد، وبينحسب بعدد الأعضاء بالموقع.' })
     if (from === 'suspended')
       list.push({ level: 'success', text: 'بيرتفع منع تجديد العضوية من التطبيق.' })
@@ -241,7 +240,6 @@ const statusImpacts = (from: string, to: string): StatusImpact[] => {
   }
 
   if (from === 'active') {
-    list.push({ level: 'warning', text: 'ما رح تنولّد له الرسوم السنوية التلقائية بـ 1/1 طول ما هو بهالحالة، ولازم تنضاف يدوياً إذا لزم.' })
     list.push({ level: 'warning', text: 'ما رح توصله إشعارات الإعلانات، وما رح ينحسب بعدد الأعضاء بالموقع.' })
   }
 
@@ -256,6 +254,7 @@ const statusImpacts = (from: string, to: string): StatusImpact[] => {
     list.push({ level: 'info', text: 'إذا دفع رسوم عضوية وتمت الموافقة عليها، حالته بترجع "نشط" تلقائياً.' })
   }
 
+  list.push({ level: 'info', text: 'الرسوم السنوية التلقائية (كل 1/1) بتضل تنولّد له بكل الحالات، إلا إذا عنده عضوية مدفوعة بتغطي السنة.' })
   list.push({ level: 'info', text: 'الحالة رح تنعرض كما هي ("' + getStatusLabel(to) + '") بدل ما تنحسب من الرصيد.' })
   list.push({ level: 'info', text: 'هالتغيير ما بيقفل دخوله للتطبيق. لقفل الدخول استخدم "تجميد الحساب".' })
   return list
