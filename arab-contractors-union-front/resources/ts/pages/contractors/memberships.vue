@@ -31,6 +31,17 @@ const fetchRequests = async () => {
   }
 }
 
+// تأكيد قبل قبول/رفض الطلب — القرار بيغيّر حالة عضوية المقاول وما في تراجع عنه من الداشبورد.
+const confirmAction = ref<{ item: any; action: 'approve' | 'reject' } | null>(null)
+
+const runConfirmedAction = async () => {
+  if (!confirmAction.value) return
+  const { item, action } = confirmAction.value
+  if (action === 'approve') await approve(item.id)
+  else await reject(item.id)
+  confirmAction.value = null
+}
+
 const approve = async (id: number) => {
   actionLoading.value = id
   try {
@@ -143,7 +154,7 @@ onMounted(fetchRequests)
               color="success"
               size="small"
               :loading="actionLoading === item.id"
-              @click="approve(item.id)"
+              @click="confirmAction = { item, action: 'approve' }"
               style="font-family:Cairo,sans-serif"
             >
               قبول
@@ -153,7 +164,7 @@ onMounted(fetchRequests)
               size="small"
               variant="tonal"
               :loading="actionLoading === item.id"
-              @click="reject(item.id)"
+              @click="confirmAction = { item, action: 'reject' }"
               style="font-family:Cairo,sans-serif"
             >
               رفض
@@ -170,5 +181,57 @@ onMounted(fetchRequests)
         </template>
       </VDataTable>
     </VCard>
+
+    <!-- Approve / Reject Confirm Dialog -->
+    <VDialog :model-value="!!confirmAction" max-width="500" @update:model-value="confirmAction = null">
+      <VCard v-if="confirmAction" style="font-family:Cairo,sans-serif">
+        <VCardTitle style="font-family:Cairo,sans-serif">
+          {{ confirmAction.action === 'approve' ? 'تأكيد قبول طلب العضوية' : 'تأكيد رفض طلب العضوية' }}
+        </VCardTitle>
+        <VCardText style="font-family:Cairo,sans-serif">
+          <div class="mb-3">
+            {{ confirmAction.action === 'approve' ? 'قبول' : 'رفض' }} طلب
+            <strong>{{ confirmAction.item.contractor_name || confirmAction.item.contractor?.name || '—' }}</strong>
+            ({{ confirmAction.item.type === 'new' ? 'عضوية جديدة' : confirmAction.item.type === 'renewal' ? 'تجديد' : confirmAction.item.type }})
+          </div>
+          <div class="text-body-2 font-weight-medium mb-2">شو رح يصير بعد التغيير:</div>
+          <template v-if="confirmAction.action === 'approve'">
+            <div class="d-flex align-start gap-2 mb-2">
+              <VIcon size="18" class="mt-1 flex-shrink-0" color="success" icon="tabler-circle-check" />
+              <span class="text-body-2">العضوية بتصير فعّالة وبتنتهي 31/12 من السنة المغطّاة (السنة الحالية، أو اللي بعد آخر عضوية مدفوعة).</span>
+            </div>
+            <div class="d-flex align-start gap-2 mb-2">
+              <VIcon size="18" class="mt-1 flex-shrink-0" color="success" icon="tabler-circle-check" />
+              <span class="text-body-2">إذا حالة المقاول "معلّق" أو "منتهي" بترجع "نشط" تلقائياً (الموقوف بيضل موقوف).</span>
+            </div>
+            <div class="d-flex align-start gap-2 mb-2">
+              <VIcon size="18" class="mt-1 flex-shrink-0" color="warning" icon="tabler-alert-triangle" />
+              <span class="text-body-2">ما في زر تراجع عن القبول من الداشبورد.</span>
+            </div>
+          </template>
+          <template v-else>
+            <div class="d-flex align-start gap-2 mb-2">
+              <VIcon size="18" class="mt-1 flex-shrink-0" color="warning" icon="tabler-alert-triangle" />
+              <span class="text-body-2">الطلب بيتسجّل "مرفوض" وما بتنضاف أو بتتجدد العضوية، وما في تراجع عنه من الداشبورد.</span>
+            </div>
+            <div class="d-flex align-start gap-2 mb-2">
+              <VIcon size="18" class="mt-1 flex-shrink-0" color="info" icon="tabler-info-circle" />
+              <span class="text-body-2">حالة المقاول نفسها ما بتتغير؛ بيقدر يقدّم طلب جديد.</span>
+            </div>
+          </template>
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" @click="confirmAction = null">إلغاء</VBtn>
+          <VBtn
+            :color="confirmAction.action === 'approve' ? 'success' : 'error'"
+            :loading="actionLoading === confirmAction.item.id"
+            @click="runConfirmedAction"
+          >
+            {{ confirmAction.action === 'approve' ? 'قبول' : 'رفض' }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
   </div>
 </template>

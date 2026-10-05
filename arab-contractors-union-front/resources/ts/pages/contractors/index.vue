@@ -219,6 +219,64 @@ const statusChangeOptions = [
 
 const statusUpdating = ref<number | null>(null)
 
+// ── تأكيد تغيير الحالة — كل تغيير يمر عبر نافذة تشرح أثره قبل الحفظ.
+// التأثيرات مأخوذة من منطق السيرفر: GenerateAnnualDues (status=active فقط)،
+// NotificationHelper (الإعلانات لـ active فقط، تذكيرات الذمم/التجديد لـ active+suspended)،
+// ContractorRequirements::renewalBlockers (suspended يمنع التجديد)،
+// MembershipRenewalService (الموافقة على تجديد ترجّع pending/expired لـ active بس مش suspended)،
+// ContractorBalanceController::membershipStatus (active بتنعرض حسب الرصيد).
+const statusConfirm = ref<{ contractor: any; status: string } | null>(null)
+
+type StatusImpact = { text: string; level: 'warning' | 'info' | 'success' }
+
+const statusImpacts = (from: string, to: string): StatusImpact[] => {
+  const list: StatusImpact[] = []
+  if (to === 'active') {
+    list.push({ level: 'info', text: 'حالة العضوية المعروضة رح تصير حسب الرصيد: إذا عليه ذمم بتظهر "منتهية"، وإذا ما عليه بتظهر "فعّالة".' })
+    list.push({ level: 'success', text: 'رح يدخل بتوليد الرسوم السنوية التلقائي (كل 1/1) إذا ما عنده عضوية مدفوعة للسنة.' })
+    list.push({ level: 'success', text: 'رح توصله إشعارات الإعلانات وتذكيرات الذمم والتجديد، وبينحسب بعدد الأعضاء بالموقع.' })
+    if (from === 'suspended')
+      list.push({ level: 'success', text: 'بيرتفع منع تجديد العضوية من التطبيق.' })
+    return list
+  }
+
+  if (from === 'active') {
+    list.push({ level: 'warning', text: 'ما رح تنولّد له الرسوم السنوية التلقائية بـ 1/1 طول ما هو بهالحالة، ولازم تنضاف يدوياً إذا لزم.' })
+    list.push({ level: 'warning', text: 'ما رح توصله إشعارات الإعلانات، وما رح ينحسب بعدد الأعضاء بالموقع.' })
+  }
+
+  if (to === 'suspended') {
+    list.push({ level: 'warning', text: 'رح ينمنع من تجديد العضوية من التطبيق (بتظهر له رسالة "حسابك موقوف إدارياً").' })
+    list.push({ level: 'warning', text: 'ما رح يرجع "نشط" تلقائياً حتى لو دفع؛ لازم ترجّعه يدوياً.' })
+    list.push({ level: 'info', text: 'تذكيرات الذمم المتأخرة والتجديد الجماعية بتوصله عادي.' })
+  }
+  else {
+    // pending / expired
+    list.push({ level: 'warning', text: 'جزء من تذكيرات الذمم والتجديد التلقائية ما رح يوصله.' })
+    list.push({ level: 'info', text: 'إذا دفع رسوم عضوية وتمت الموافقة عليها، حالته بترجع "نشط" تلقائياً.' })
+  }
+
+  list.push({ level: 'info', text: 'الحالة رح تنعرض كما هي ("' + getStatusLabel(to) + '") بدل ما تنحسب من الرصيد.' })
+  list.push({ level: 'info', text: 'هالتغيير ما بيقفل دخوله للتطبيق. لقفل الدخول استخدم "تجميد الحساب".' })
+  return list
+}
+
+const statusConfirmImpacts = computed(() =>
+  statusConfirm.value ? statusImpacts(statusConfirm.value.contractor.status, statusConfirm.value.status) : [],
+)
+
+const requestStatusChange = (contractor: any, status: string) => {
+  if (contractor.status === status) return
+  statusConfirm.value = { contractor, status }
+}
+
+const confirmStatusChange = async () => {
+  if (!statusConfirm.value) return
+  const { contractor, status } = statusConfirm.value
+  await changeStatus(contractor, status)
+  statusConfirm.value = null
+}
+
 const changeStatus = async (contractor: any, status: string) => {
   if (contractor.status === status) return
   statusUpdating.value = contractor.id
@@ -560,7 +618,7 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
                 </VChip>
               </template>
               <VList density="compact">
-                <VListItem v-for="opt in statusChangeOptions" :key="opt.value" :active="opt.value === item.status" @click="changeStatus(item, opt.value)">
+                <VListItem v-for="opt in statusChangeOptions" :key="opt.value" :active="opt.value === item.status" @click="requestStatusChange(item, opt.value)">
                   <VListItemTitle style="font-family:Cairo,sans-serif">{{ opt.title }}</VListItemTitle>
                 </VListItem>
               </VList>
@@ -883,6 +941,35 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
           <VSpacer />
           <VBtn variant="tonal" @click="deleteDialog = false">إلغاء</VBtn>
           <VBtn color="error" :loading="deleteLoading" @click="confirmDelete">حذف</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- Status Change Confirm Dialog -->
+    <VDialog :model-value="!!statusConfirm" max-width="520" @update:model-value="statusConfirm = null">
+      <VCard v-if="statusConfirm" style="font-family:Cairo,sans-serif">
+        <VCardTitle style="font-family:Cairo,sans-serif">تأكيد تغيير الحالة</VCardTitle>
+        <VCardText style="font-family:Cairo,sans-serif">
+          <div class="mb-3">
+            تغيير حالة <strong>{{ statusConfirm.contractor.name }}</strong>
+            من <VChip size="x-small" label :color="getStatusColor(statusConfirm.contractor.status)">{{ getStatusLabel(statusConfirm.contractor.status) }}</VChip>
+            إلى <VChip size="x-small" label :color="getStatusColor(statusConfirm.status)">{{ getStatusLabel(statusConfirm.status) }}</VChip>
+          </div>
+          <div class="text-body-2 font-weight-medium mb-2">شو رح يصير بعد التغيير:</div>
+          <div v-for="(impact, i) in statusConfirmImpacts" :key="i" class="d-flex align-start gap-2 mb-2">
+            <VIcon
+              size="18"
+              class="mt-1 flex-shrink-0"
+              :color="impact.level"
+              :icon="impact.level === 'warning' ? 'tabler-alert-triangle' : impact.level === 'success' ? 'tabler-circle-check' : 'tabler-info-circle'"
+            />
+            <span class="text-body-2">{{ impact.text }}</span>
+          </div>
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" @click="statusConfirm = null">إلغاء</VBtn>
+          <VBtn :color="statusConfirm.status === 'active' ? 'success' : 'warning'" :loading="statusUpdating === statusConfirm.contractor.id" @click="confirmStatusChange">تأكيد التغيير</VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
