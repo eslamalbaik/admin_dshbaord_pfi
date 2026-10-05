@@ -121,6 +121,34 @@ class ContractorBalanceTest extends TestCase
         $this->getJson('/api/v1/dashboard/balances?search=946_g')->assertOk()->assertJsonPath('items.0.status', 'active');
     }
 
+    /** عضويته سارية بس عليه رسوم (صافي سالب) بينعرض "غير مسدَّدة" مش "فعّالة" */
+    public function test_admin_screen_shows_unpaid_when_contractor_owes(): void
+    {
+        $owes = $this->contractor('947_g');
+        $this->seedLedger($owes); // صافي -35
+        Membership::create([
+            'contractor_id' => $owes->id, 'type' => 'renewal', 'status' => 'active',
+            'starts_at' => now()->startOfYear(), 'expires_at' => now()->endOfYear(),
+        ]);
+
+        $noMembershipOwes = $this->contractor('948_g');
+        ContractorDue::create([
+            'contractor_id' => $noMembershipOwes->id, 'description' => 'رسوم 2026', 'year' => 2026,
+            'amount_jod' => 300, 'paid_jod' => 0, 'status' => 'unpaid',
+        ]);
+
+        $pendingOwes = Contractor::create([
+            'name' => 'شركة معلّقة', 'membership_number' => '949_g', 'status' => 'pending', 'is_frozen' => false,
+        ]);
+        $this->seedLedger($pendingOwes);
+
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']), ['*']);
+
+        $this->getJson('/api/v1/dashboard/balances?search=947_g')->assertOk()->assertJsonPath('items.0.status', 'unpaid');
+        $this->getJson('/api/v1/dashboard/balances?search=948_g')->assertOk()->assertJsonPath('items.0.status', 'unpaid');
+        $this->getJson('/api/v1/dashboard/balances?search=949_g')->assertOk()->assertJsonPath('items.0.status', 'pending');
+    }
+
     public function test_requires_authentication(): void
     {
         $this->getJson('/api/v1/contractor/balance')->assertUnauthorized();
