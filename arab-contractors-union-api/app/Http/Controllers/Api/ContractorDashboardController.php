@@ -273,7 +273,6 @@ class ContractorDashboardController extends Controller
                 ->where('direction', 'debit')
                 ->where('status', '!=', 'rejected')
                 ->values(),
-            'statement'   => $statement,
         ]);
     }
 

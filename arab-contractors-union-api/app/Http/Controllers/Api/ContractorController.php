@@ -48,6 +48,15 @@ class ContractorController extends Controller
 
         $perPage = (int) $request->get('per_page', 10);
 
+        // القايمة (وتصدير CSV اللي بيضرب نفس الـ endpoint بـ per_page=10000) بيستخدموا
+        // الأعمدة دي بس — تفاصيل المقاول الكاملة (14 حقل ملف + notes + ...) بتتجاب من
+        // show() بـ endpoint منفصل، فمفيش داعٍ نحمّلها هنا على كل صف بكل صفحة.
+        $query->select([
+            'id', 'name', 'email', 'phone', 'membership_number', 'commercial_register',
+            'status', 'is_frozen', 'password', 'phone_verified_at', 'created_at',
+            'specialties', 'classification', 'authorized_person', 'authorized_person_id_number', 'city',
+        ]);
+
         $page = $query->latest()->paginate($perPage);
 
         // نفس "حالة العضوية" المعروضة بصفحة الأرصدة، حتى ما تطلع الشركة "منتهية" هناك و"فعّالة" هون

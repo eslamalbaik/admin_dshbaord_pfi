@@ -49,12 +49,17 @@ class ContractorHomeController extends Controller
         // فإضافة العدّ الكلي كانت ستعيد بناء الخلاصة (7 استعلامات) مرة ثانية بلا داعٍ.
         $feed = $this->buildFeed($contractor);
 
+        // يُحسب مرة واحدة ويُمرَّر لكلا البطاقتين — كان كل من financialSummary()
+        // وctaCertificate() يستدعي totalObligations() (3 استعلامات SUM) بشكل منفصل
+        // على أكثر endpoint زيارة في التطبيق.
+        $balance = $this->financialService->totalObligations($contractor);
+
         return $this->success([
             'contractor'                 => $this->contractorCard($contractor),
             'membership'                 => $this->membershipStatus($contractor),
-            'financial'                  => $this->financialSummary($contractor),
+            'financial'                  => $this->financialSummary($contractor, $balance),
             'stats'                      => $this->statsCard($contractor),
-            'cta_certificate'            => $this->ctaCertificate($contractor),
+            'cta_certificate'            => $this->ctaCertificate($contractor, $balance),
             'unread_notifications_count' => $contractor->unreadNotifications()->count(),
             'latest_updates'             => $this->presentFeed($feed->take(self::HOME_UPDATES_LIMIT)),
             // إشارة زر "عرض المزيد" — التطبيق يحوّل بها إلى contractor/home/updates.
@@ -123,10 +128,8 @@ class ContractorHomeController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
     //  الذمم المالية — نفس حسبة "ما عليه" المستخدمة في شاشة الملف المالي
     // ─────────────────────────────────────────────────────────────────────────
-    private function financialSummary(Contractor $contractor): array
+    private function financialSummary(Contractor $contractor, float $balance): array
     {
-        $balance = $this->financialService->totalObligations($contractor);
-
         $hasOverdue = $contractor->dues()
             ->outstanding()
             ->whereNotNull('due_date')
@@ -168,14 +171,14 @@ class ContractorHomeController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
     //  زر "طلب شهادة انتساب" — يظهر دائماً، لكن يُنبَّه المستخدم بالذمم قبل المتابعة
     // ─────────────────────────────────────────────────────────────────────────
-    private function ctaCertificate(Contractor $contractor): array
+    private function ctaCertificate(Contractor $contractor, float $balance): array
     {
         $issues = \App\Support\ContractorRequirements::issues($contractor);
 
         return [
             'show'               => true,
             'has_pending_dues'   => count($issues) > 0,
-            'outstanding_amount' => $this->financialService->totalObligations($contractor),
+            'outstanding_amount' => $balance,
         ];
     }
 
@@ -218,6 +221,7 @@ class ContractorHomeController extends Controller
     private function tenderUpdates(): Collection
     {
         return Tender::where('status', 'open')
+            ->select(['id', 'title', 'category', 'submission_file', 'created_at'])
             ->latest()
             ->limit(self::FEED_POOL_LIMIT)
             ->get()
@@ -236,6 +240,7 @@ class ContractorHomeController extends Controller
     private function newsUpdates(): Collection
     {
         return News::published()
+            ->select(['id', 'title', 'excerpt', 'image', 'published_at'])
             ->latest('published_at')
             ->limit(self::FEED_POOL_LIMIT)
             ->get()
@@ -260,6 +265,7 @@ class ContractorHomeController extends Controller
 
         return Announcement::published()
             ->where('is_pinned', true)
+            ->select(['id', 'title', 'image', 'published_at'])
             ->latest('published_at')
             ->limit(self::FEED_POOL_LIMIT)
             ->get()
@@ -279,6 +285,7 @@ class ContractorHomeController extends Controller
     private function financeUpdates(Contractor $contractor): Collection
     {
         return $contractor->dues()
+            ->select(['id', 'contractor_id', 'description', 'year', 'amount_jod', 'paid_jod', 'status', 'due_date', 'created_at'])
             ->latest('created_at')
             ->limit(self::FEED_POOL_LIMIT)
             ->get()
@@ -298,6 +305,7 @@ class ContractorHomeController extends Controller
     private function memberUpdates(Contractor $contractor): Collection
     {
         $memberships = $contractor->memberships()
+            ->select(['id', 'contractor_id', 'type', 'status', 'document_url', 'expires_at', 'updated_at'])
             ->latest('updated_at')
             ->limit(self::FEED_POOL_LIMIT)
             ->get()
@@ -314,6 +322,7 @@ class ContractorHomeController extends Controller
             ]);
 
         $certificates = CertificateRequest::where('contractor_id', $contractor->id)
+            ->select(['id', 'contractor_id', 'type', 'status', 'attachment', 'updated_at'])
             ->latest('updated_at')
             ->limit(self::FEED_POOL_LIMIT)
             ->get()

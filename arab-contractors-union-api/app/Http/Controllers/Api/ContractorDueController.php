@@ -340,40 +340,52 @@ class ContractorDueController extends Controller
     {
         $data = $request->validated();
 
-        if ($due->status === 'paid') {
-            return $this->error('هذه الذمة مسدَّدة بالكامل مسبقاً.', 409);
-        }
+        $amount = DB::transaction(function () use ($data, $due) {
+            // قفل الذمة لمنع تسويتين متزامنتين لنفس المبلغ المتبقي
+            $due = ContractorDue::query()->lockForUpdate()->findOrFail($due->id);
 
-        if (! empty($data['payment_id'])) {
-            $payment = Payment::find($data['payment_id']);
-
-            if ($payment->contractor_id !== $due->contractor_id) {
-                return $this->error('معاملة الدفع لا تعود لنفس المقاول.', 422);
+            if ($due->status === 'paid') {
+                abort(409, 'هذه الذمة مسدَّدة بالكامل مسبقاً.');
             }
-            if ($payment->status !== 'paid') {
-                return $this->error('لا يمكن التسوية بمعاملة دفع غير مؤكّدة.', 422);
+
+            $payment = null;
+
+            if (! empty($data['payment_id'])) {
+                // قفل الدفعة لمنع تسوية ذمتين من نفس الرصيد في نفس اللحظة
+                $payment = Payment::query()->lockForUpdate()->find($data['payment_id']);
+
+                if ($payment->contractor_id !== $due->contractor_id) {
+                    abort(422, 'معاملة الدفع لا تعود لنفس المقاول.');
+                }
+                if ($payment->status !== 'paid') {
+                    abort(422, 'لا يمكن التسوية بمعاملة دفع غير مؤكّدة.');
+                }
             }
-        }
 
-        $amount = (float) ($data['amount_jod'] ?? $due->remaining_jod);
+            $amount = (float) ($data['amount_jod'] ?? $due->remaining_jod);
 
-        if ($amount > $due->remaining_jod) {
-            return $this->error('المبلغ المراد تسويته يتجاوز المتبقي على هذه الذمة.', 422);
-        }
-
-        if (isset($payment)) {
-            $available = $payment->amount_jod - $payment->used_amount_jod;
-            if ($amount > $available) {
-                return $this->error('المبلغ المراد تسويته يتجاوز الرصيد المتاح في الدفعة.', 422);
+            if ($amount > $due->remaining_jod) {
+                abort(422, 'المبلغ المراد تسويته يتجاوز المتبقي على هذه الذمة.');
             }
-            $payment->increment('used_amount_jod', $amount);
-        }
 
-        $due->applyPayment($amount);
+            if ($payment) {
+                $available = $payment->amount_jod - $payment->used_amount_jod;
+                if ($amount > $available) {
+                    abort(422, 'المبلغ المراد تسويته يتجاوز الرصيد المتاح في الدفعة.');
+                }
+                $payment->increment('used_amount_jod', $amount);
+            }
 
-        if (! empty($data['notes'])) {
-            $due->update(['notes' => trim($due->notes . "\n" . $data['notes'])]);
-        }
+            $due->applyPayment($amount);
+
+            if (! empty($data['notes'])) {
+                $due->update(['notes' => trim($due->notes . "\n" . $data['notes'])]);
+            }
+
+            return $amount;
+        });
+
+        $due->refresh();
 
         $this->financeLog('due.settled', [
             'due_id'     => $due->id,
