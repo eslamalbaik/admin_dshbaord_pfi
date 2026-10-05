@@ -27,13 +27,18 @@ return new class extends Migration
         ]);
 
         // التصنيف صار مفتوحاً (تصنيفات مخصصة) بدل enum ثابت
-        DB::statement("ALTER TABLE legal_files MODIFY category VARCHAR(50) NOT NULL DEFAULT 'other'");
+        // SQLite (بيئة التستات) ما بيدعم MODIFY، وعموده enum أصلاً نص عادي هناك
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement("ALTER TABLE legal_files MODIFY category VARCHAR(50) NOT NULL DEFAULT 'other'");
+        }
     }
 
     public function down(): void
     {
         DB::table('legal_files')->whereNotIn('category', ['legislation', 'mou', 'other'])->update(['category' => 'other']);
-        DB::statement("ALTER TABLE legal_files MODIFY category ENUM('legislation','mou','other') NOT NULL DEFAULT 'other'");
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement("ALTER TABLE legal_files MODIFY category ENUM('legislation','mou','other') NOT NULL DEFAULT 'other'");
+        }
         Schema::dropIfExists('legal_file_categories');
     }
 };

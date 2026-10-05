@@ -61,6 +61,8 @@ class PaymentConfirmationService
 
             $payment->update($updateData);
 
+            $this->settleLinkedDue($payment, $authUser);
+
             // إطلاق حدث للمكونات الأخرى (Membership, Equipment) للتفاعل مع الدفعة باستقلالية
             \App\Events\PaymentConfirmed::dispatch($payment, $authUser->id);
 
@@ -74,6 +76,38 @@ class PaymentConfirmationService
                 ['amount' => $payment->amount, 'currency' => $currency, 'amount_jod' => $payment->amount_jod],
             );
         });
+    }
+
+    /**
+     * تحويل مرفوع من التطبيق لتسديد ذمة محددة: يُسدَّد من الذمة نفسها فور الاعتماد (بحدود
+     * المتبقي عليها)، وأي فائض يضل رصيداً للمقاول (used_amount_jod أقل من amount_jod).
+     */
+    private function settleLinkedDue(Payment $payment, User $authUser): void
+    {
+        if ($payment->type !== 'dues_payment' || ! $payment->contractor_due_id) {
+            return;
+        }
+
+        $due = $payment->due()->lockForUpdate()->first();
+        if (! $due || $due->status === 'paid') {
+            return;
+        }
+
+        $available = round((float) $payment->amount_jod - (float) $payment->used_amount_jod, 2);
+        $amount    = min($available, $due->remaining_jod);
+        if ($amount <= 0) {
+            return;
+        }
+
+        $payment->increment('used_amount_jod', $amount);
+        $due->applyPayment($amount);
+
+        AuditLogService::record(
+            $authUser,
+            'due.settled',
+            $due,
+            ['contractor_id' => $due->contractor_id, 'amount_jod' => $amount, 'payment_id' => $payment->id],
+        );
     }
 
     /**
