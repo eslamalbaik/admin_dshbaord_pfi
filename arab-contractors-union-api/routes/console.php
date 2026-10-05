@@ -96,3 +96,11 @@ $alertOnFailure(
     Schedule::command('events:archive')->dailyAt('01:05'),
     'events:archive'
 );
+
+// توليد رسوم الاشتراك السنوية تلقائياً أول دقيقة من 1/1 بتوقيت غزة — الحالة صارت حسب الرصيد،
+// فذمة السنة الجديدة لازم تنزل بأول يوم (قرار الإدارة 2026-10-05)
+$alertOnFailure(
+    Schedule::command('dues:generate-annual')->yearlyOn(1, 1, '00:30')->timezone('Asia/Gaza'),
+    'dues:generate-annual',
+    'finance'
+);

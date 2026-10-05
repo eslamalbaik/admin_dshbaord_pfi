@@ -97,7 +97,7 @@ class DuesGenerationService
     /**
      * توليد الرسوم بشكل جماعي
      */
-    public function generateFeeBulk(array $contractorIds, int $year, bool $dryRun, int $authId): array
+    public function generateFeeBulk(array $contractorIds, int $year, bool $dryRun, ?int $authId): array
     {
         $query = Contractor::query()->whereNotNull('specialties');
         if (! empty($contractorIds)) {
