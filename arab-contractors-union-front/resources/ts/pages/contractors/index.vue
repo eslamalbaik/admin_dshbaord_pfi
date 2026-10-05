@@ -142,7 +142,7 @@ const exportContractors = async () => {
         c.phone ?? '',
         c.email ?? '',
         c.city ?? '',
-        getStatusLabel(c.status),
+        getStatusLabel(c.membership_status ?? c.status),
         c.created_at ? new Date(c.created_at).toLocaleDateString('ar-EG') : '',
       ]),
     ]
@@ -169,7 +169,7 @@ const getStatusColor = (status: string) => {
     case 'active': return 'success'
     case 'pending': return 'warning'
     case 'suspended': return 'error'
-    case 'expired': return 'secondary'
+    case 'expired': return 'error'
     default: return 'secondary'
   }
 }
@@ -225,6 +225,8 @@ const changeStatus = async (contractor: any, status: string) => {
   try {
     await api.patch(`/api/v1/contractors/${contractor.id}/status`, { status })
     contractor.status = status
+    // حالة العضوية المعروضة مشتقة بالسيرفر (انتهاء العضوية + الذمم)، فنعيد جلبها
+    fetchContractors()
   }
   catch (err: any) {
     console.error(err)
@@ -552,8 +554,8 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
           <div class="d-flex align-center gap-1">
             <VMenu>
               <template #activator="{ props: menuProps }">
-                <VChip v-bind="menuProps" :color="getStatusColor(item.status)" :loading="statusUpdating === item.id" size="small" label style="cursor:pointer">
-                  {{ getStatusLabel(item.status) }}
+                <VChip v-bind="menuProps" :color="getStatusColor(item.membership_status ?? item.status)" :loading="statusUpdating === item.id" size="small" label style="cursor:pointer">
+                  {{ getStatusLabel(item.membership_status ?? item.status) }}
                   <VIcon icon="tabler-chevron-down" size="14" class="ms-1" />
                 </VChip>
               </template>
@@ -627,8 +629,8 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
                 <VIcon icon="tabler-id-badge-2" size="14" start />
                 عضوية {{ detailsTarget.membership_number }}
               </VChip>
-              <VChip :color="getStatusColor(detailsTarget.status)" size="small" label style="font-family:Cairo,sans-serif">
-                {{ getStatusLabel(detailsTarget.status) }}
+              <VChip :color="getStatusColor(detailsTarget.membership_status ?? detailsTarget.status)" size="small" label style="font-family:Cairo,sans-serif">
+                {{ getStatusLabel(detailsTarget.membership_status ?? detailsTarget.status) }}
               </VChip>
               <VChip :color="detailsTarget.has_app_account ? 'success' : 'secondary'" variant="flat" size="small" label style="font-family:Cairo,sans-serif">
                 <VIcon :icon="detailsTarget.has_app_account ? 'tabler-device-mobile-check' : 'tabler-device-mobile-off'" size="14" start />

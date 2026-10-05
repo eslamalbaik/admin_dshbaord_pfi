@@ -122,7 +122,7 @@ class ContractorBalanceController extends Controller
      *   رسوم ما بيصير ينعرض "فعّالة" (طلب الإدارة 2026-10-05).
      * باقي الحالات الإدارية (معلّق، موقوف، منتهي) بتنعرض كما هي.
      */
-    private function membershipStatus(object $row): string
+    public function membershipStatus(object $row): string
     {
         if ($row->status !== 'active') {
             return $row->status;
@@ -139,7 +139,7 @@ class ContractorBalanceController extends Controller
         return 'active';
     }
 
-    private function balancesQuery(): Builder
+    public function balancesQuery(): Builder
     {
         $types = "'" . implode("','", self::CREDIT_PAYMENT_TYPES) . "'";
 

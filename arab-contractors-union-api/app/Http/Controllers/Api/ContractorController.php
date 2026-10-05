@@ -48,7 +48,18 @@ class ContractorController extends Controller
 
         $perPage = (int) $request->get('per_page', 10);
 
-        return $this->paginated($query->latest()->paginate($perPage));
+        $page = $query->latest()->paginate($perPage);
+
+        // نفس "حالة العضوية" المعروضة بصفحة الأرصدة، حتى ما تطلع الشركة "منتهية" هناك و"فعّالة" هون
+        $balances = app(ContractorBalanceController::class);
+        $rows = \Illuminate\Support\Facades\DB::query()->fromSub($balances->balancesQuery(), 'b')
+            ->whereIn('id', $page->getCollection()->pluck('id'))->get()->keyBy('id');
+        $page->getCollection()->each(fn ($c) => $c->setAttribute(
+            'membership_status',
+            isset($rows[$c->id]) ? $balances->membershipStatus($rows[$c->id]) : $c->status,
+        ));
+
+        return $this->paginated($page);
     }
 
     /**

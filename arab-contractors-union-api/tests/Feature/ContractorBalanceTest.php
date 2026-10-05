@@ -149,6 +149,30 @@ class ContractorBalanceTest extends TestCase
         $this->getJson('/api/v1/dashboard/balances?search=949_g')->assertOk()->assertJsonPath('items.0.status', 'pending');
     }
 
+    /** صفحة المقاولين بتعرض نفس "حالة العضوية" تبع صفحة الأرصدة، مش حالة الحساب الإدارية */
+    public function test_contractors_list_shows_same_membership_status_as_balances(): void
+    {
+        $ended = $this->contractor('950_g'); // رصيده صفر بس آخر عضوية إله خلصت
+        Membership::create([
+            'contractor_id' => $ended->id, 'type' => 'renewal', 'status' => 'active',
+            'starts_at' => now()->subYear()->startOfYear(), 'expires_at' => now()->subYear()->endOfYear(),
+        ]);
+        $paid = $this->contractor('951_g');
+        Membership::create([
+            'contractor_id' => $paid->id, 'type' => 'renewal', 'status' => 'active',
+            'starts_at' => now()->startOfYear(), 'expires_at' => now()->endOfYear(),
+        ]);
+
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']), ['*']);
+
+        foreach (['950_g' => 'expired', '951_g' => 'active'] as $number => $expected) {
+            $this->getJson("/api/v1/dashboard/balances?search={$number}")->assertJsonPath('items.0.status', $expected);
+            $this->getJson("/api/v1/contractors?search={$number}")->assertOk()
+                ->assertJsonPath('items.0.membership_status', $expected)
+                ->assertJsonPath('items.0.status', 'active');
+        }
+    }
+
     public function test_requires_authentication(): void
     {
         $this->getJson('/api/v1/contractor/balance')->assertUnauthorized();
