@@ -39,6 +39,32 @@ class ContractorDue extends Model
         return $this->belongsTo(Contractor::class);
     }
 
+    /** تحويلات التطبيق المرفوعة لتسديد هالذمة (pending/paid/rejected) */
+    public function payments()
+    {
+        return $this->hasMany(Payment::class, 'contractor_due_id');
+    }
+
+    /**
+     * تاريخ سند القبض المعروض بكرت الذمة بالتطبيق: رسوم الاشتراك السنوي سندها 31/12 من سنتها
+     * (العضوية تنتهي آخر السنة الميلادية)، وأي ذمة غيرها (رسوم متراكمة) بلا تاريخ.
+     */
+    public function getReceiptDateAttribute(): ?string
+    {
+        return $this->is_membership_fee ? "{$this->year}-12-31" : null;
+    }
+
+    /** ذمة رسوم اشتراك سنوي لسنة محددة (محرّك الاحتساب، أو بيانها "اشتراك/عضوية") */
+    public function getIsMembershipFeeAttribute(): bool
+    {
+        if (! $this->year) {
+            return false;
+        }
+
+        return $this->source === 'fee_engine'
+            || preg_match('/اشتراك|عضوية/u', (string) $this->description) === 1;
+    }
+
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by');

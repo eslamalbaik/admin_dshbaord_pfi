@@ -20,6 +20,8 @@ class SubmitTransferRequest extends FormRequest
             'bank_account_id'  => 'nullable|exists:bank_accounts,id',
             'membership_id'    => 'nullable|exists:memberships,id',
             'equipment_package_id' => 'nullable|exists:equipment_packages,id',
+            // الذمة اللي انضغط عليها "ادفع الآن" — بتفرض type=dues_payment
+            'contractor_due_id' => 'nullable|integer|exists:contractor_dues,id',
             'reference_number' => 'nullable|string|max:100',
             'notes'            => 'nullable|string|max:500',
             'type'             => 'nullable|string|max:50',

@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Storage;
 class Payment extends Model
 {
     protected $fillable = [
-        'contractor_id', 'membership_id', 'equipment_package_id', 'bank_account_id', 'amount',
+        'contractor_id', 'membership_id', 'equipment_package_id', 'contractor_due_id', 'bank_account_id', 'amount',
         'currency', 'exchange_rate', 'amount_jod', 'used_amount_jod', 'rate_source',
         'type', 'status', 'method', 'reference_number', 'transaction_number', 'receipt_image',
         'notes', 'paid_at', 'submitted_at', 'confirmed_by', 'confirmed_at',
@@ -65,6 +65,12 @@ class Payment extends Model
     public function contractor()
     {
         return $this->belongsTo(Contractor::class);
+    }
+
+    /** الذمة اللي رُفع هالتحويل لتسديدها (تحويلات dues_payment من التطبيق) */
+    public function due()
+    {
+        return $this->belongsTo(ContractorDue::class, 'contractor_due_id');
     }
 
     public function membership()

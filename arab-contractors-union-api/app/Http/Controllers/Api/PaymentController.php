@@ -50,6 +50,25 @@ class PaymentController extends Controller
         $data = $request->validated();
 
         $type = $data['type'] ?? 'membership_fee';
+
+        // تحويل لتسديد ذمة محددة (زر "ادفع الآن" على كرت الذمة)
+        $due = null;
+        if (! empty($data['contractor_due_id'])) {
+            $due = \App\Models\ContractorDue::find($data['contractor_due_id']);
+
+            if ($due->contractor_id !== $contractor->id) {
+                return $this->error('هذه الذمة لا تعود لحسابك.', 403);
+            }
+            if ($due->status === 'paid') {
+                return $this->error('هذه الذمة مسدَّدة بالكامل مسبقاً.', 409);
+            }
+            if ($due->payments()->where('status', 'pending')->exists()) {
+                return $this->error('يوجد إشعار تحويل لهذه الذمة قيد المراجعة بالفعل.', 409);
+            }
+
+            $type = 'dues_payment';
+        }
+
         if ($type !== 'dues_payment') {
             $blockers = \App\Support\ContractorRequirements::renewalBlockers($contractor);
             if (count($blockers) > 0) {
@@ -70,6 +89,7 @@ class PaymentController extends Controller
             'contractor_id'        => $contractor->id,
             'membership_id'        => $data['membership_id'] ?? null,
             'equipment_package_id' => $data['equipment_package_id'] ?? null,
+            'contractor_due_id'    => $due?->id,
             'bank_account_id'      => $data['bank_account_id'] ?? null,
             'amount'               => $data['amount'],
             'currency'             => $data['currency'] ?? 'JOD',
@@ -78,7 +98,7 @@ class PaymentController extends Controller
             'method'               => 'bank_transfer',
             'reference_number'     => $data['reference_number'] ?? null,
             'receipt_image'        => $path,
-            'notes'                => $data['notes'] ?? null,
+            'notes'                => $data['notes'] ?? $due?->description,
             'submitted_at'         => now(),
         ]);
         $payment->update(['transaction_number' => Payment::generateTransactionNumber($payment)]);
