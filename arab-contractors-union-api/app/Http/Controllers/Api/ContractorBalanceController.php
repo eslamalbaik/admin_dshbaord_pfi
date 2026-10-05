@@ -116,17 +116,28 @@ class ContractorBalanceController extends Controller
     }
 
     /**
-     * حالة العضوية الفعلية: حساب "فعّال" إدارياً بس آخر عضوية إله انتهت (وما جدّد —
-     * غالباً بسبب الذمم اللي بتمنع التجديد) بينعرض "منتهية" بدل ما يضل "فعّالة".
+     * حالة العضوية الفعلية لحساب "فعّال" إدارياً:
+     * - آخر عضوية إله انتهت (وما جدّد) ← "منتهية".
+     * - عليه رصيد صافي سالب (ذمم/غرامات ما بيغطيها رصيده) ← "غير مسدَّدة"، لأن مقاول عليه
+     *   رسوم ما بيصير ينعرض "فعّالة" (طلب الإدارة 2026-10-05).
+     * باقي الحالات الإدارية (معلّق، موقوف، منتهي) بتنعرض كما هي.
      */
     private function membershipStatus(object $row): string
     {
-        if ($row->status === 'active' && $row->membership_expires_at
+        if ($row->status !== 'active') {
+            return $row->status;
+        }
+
+        if ($row->membership_expires_at
             && now()->startOfDay()->gt(Carbon::parse($row->membership_expires_at))) {
             return 'expired';
         }
 
-        return $row->status;
+        if ((float) $row->net_jod < 0) {
+            return 'unpaid';
+        }
+
+        return 'active';
     }
 
     private function balancesQuery(): Builder
