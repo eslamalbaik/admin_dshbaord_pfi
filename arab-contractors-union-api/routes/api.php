@@ -411,7 +411,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware('role:admin')->group(function () {
             Route::get('dashboard/bank-accounts',                [BankAccountController::class, 'index']);
             Route::post('dashboard/bank-accounts',               [BankAccountController::class, 'store']);
-            Route::post('dashboard/bank-accounts/{bankAccount}', [BankAccountController::class, 'update']);
+            Route::match(['post', 'put'], 'dashboard/bank-accounts/{bankAccount}', [BankAccountController::class, 'update']);
             Route::delete('dashboard/bank-accounts/{bankAccount}',[BankAccountController::class, 'destroy']);
         });
 
