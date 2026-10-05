@@ -121,8 +121,8 @@ class ContractorBalanceTest extends TestCase
         $this->getJson('/api/v1/dashboard/balances?search=946_g')->assertOk()->assertJsonPath('items.0.status', 'active');
     }
 
-    /** عضويته سارية بس عليه رسوم (صافي سالب) بينعرض "غير مسدَّدة" مش "فعّالة" */
-    public function test_admin_screen_shows_unpaid_when_contractor_owes(): void
+    /** عضويته سارية بس عليه رسوم (صافي سالب) بينعرض "منتهية" مش "فعّالة" */
+    public function test_admin_screen_shows_expired_when_contractor_owes(): void
     {
         $owes = $this->contractor('947_g');
         $this->seedLedger($owes); // صافي -35
@@ -144,8 +144,8 @@ class ContractorBalanceTest extends TestCase
 
         Sanctum::actingAs(User::factory()->create(['role' => 'admin']), ['*']);
 
-        $this->getJson('/api/v1/dashboard/balances?search=947_g')->assertOk()->assertJsonPath('items.0.status', 'unpaid');
-        $this->getJson('/api/v1/dashboard/balances?search=948_g')->assertOk()->assertJsonPath('items.0.status', 'unpaid');
+        $this->getJson('/api/v1/dashboard/balances?search=947_g')->assertOk()->assertJsonPath('items.0.status', 'expired');
+        $this->getJson('/api/v1/dashboard/balances?search=948_g')->assertOk()->assertJsonPath('items.0.status', 'expired');
         $this->getJson('/api/v1/dashboard/balances?search=949_g')->assertOk()->assertJsonPath('items.0.status', 'pending');
     }
 

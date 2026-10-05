@@ -20,7 +20,6 @@ interface BalanceRow {
 const statusLabels: Record<string, { text: string; color: string }> = {
   active: { text: 'فعّالة', color: 'success' },
   expired: { text: 'منتهية', color: 'error' },
-  unpaid: { text: 'غير مسدَّدة', color: 'error' },
   pending: { text: 'قيد المراجعة', color: 'warning' },
   suspended: { text: 'موقوفة', color: 'secondary' },
 }

@@ -118,7 +118,7 @@ class ContractorBalanceController extends Controller
     /**
      * حالة العضوية الفعلية لحساب "فعّال" إدارياً:
      * - آخر عضوية إله انتهت (وما جدّد) ← "منتهية".
-     * - عليه رصيد صافي سالب (ذمم/غرامات ما بيغطيها رصيده) ← "غير مسدَّدة"، لأن مقاول عليه
+     * - عليه رصيد صافي سالب (ذمم/غرامات ما بيغطيها رصيده) ← "منتهية" كمان، لأن مقاول عليه
      *   رسوم ما بيصير ينعرض "فعّالة" (طلب الإدارة 2026-10-05).
      * باقي الحالات الإدارية (معلّق، موقوف، منتهي) بتنعرض كما هي.
      */
@@ -128,13 +128,12 @@ class ContractorBalanceController extends Controller
             return $row->status;
         }
 
-        if ($row->membership_expires_at
-            && now()->startOfDay()->gt(Carbon::parse($row->membership_expires_at))) {
-            return 'expired';
-        }
+        $ended = $row->membership_expires_at
+            && now()->startOfDay()->gt(Carbon::parse($row->membership_expires_at));
 
-        if ((float) $row->net_jod < 0) {
-            return 'unpaid';
+        // عضوية انتهت، أو عليه رسوم ما بيغطيها رصيده (صافي سالب): كلاهما "منتهية"
+        if ($ended || (float) $row->net_jod < 0) {
+            return 'expired';
         }
 
         return 'active';
