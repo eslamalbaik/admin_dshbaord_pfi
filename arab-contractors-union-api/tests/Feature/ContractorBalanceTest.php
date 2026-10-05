@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Contractor;
 use App\Models\ContractorCredit;
 use App\Models\ContractorDue;
+use App\Models\Membership;
 use App\Models\Payment;
 use App\Models\Penalty;
 use App\Models\User;
@@ -93,6 +94,31 @@ class ContractorBalanceTest extends TestCase
             ->assertOk()
             ->assertJsonPath('items.net_jod', 0)
             ->assertJsonPath('items.position', 'settled');
+    }
+
+    /** حساب فعّال إدارياً بس عضويته انتهت (عليه ذمم وما جدّد) بينعرض "منتهية" */
+    public function test_admin_screen_shows_expired_when_last_membership_ended(): void
+    {
+        $expired = $this->contractor('944_g');
+        $this->seedLedger($expired);
+        Membership::create([
+            'contractor_id' => $expired->id, 'type' => 'renewal', 'status' => 'active',
+            'starts_at' => now()->subYear()->startOfYear(), 'expires_at' => now()->subYear()->endOfYear(),
+        ]);
+
+        $current = $this->contractor('945_g');
+        Membership::create([
+            'contractor_id' => $current->id, 'type' => 'renewal', 'status' => 'active',
+            'starts_at' => now()->startOfYear(), 'expires_at' => now()->endOfYear(),
+        ]);
+
+        $noMembership = $this->contractor('946_g');
+
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']), ['*']);
+
+        $this->getJson('/api/v1/dashboard/balances?search=944_g')->assertOk()->assertJsonPath('items.0.status', 'expired');
+        $this->getJson('/api/v1/dashboard/balances?search=945_g')->assertOk()->assertJsonPath('items.0.status', 'active');
+        $this->getJson('/api/v1/dashboard/balances?search=946_g')->assertOk()->assertJsonPath('items.0.status', 'active');
     }
 
     public function test_requires_authentication(): void
