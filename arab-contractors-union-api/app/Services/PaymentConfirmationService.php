@@ -68,6 +68,7 @@ class PaymentConfirmationService
             $payment->update($updateData);
 
             $this->settleLinkedDue($payment, $authUser);
+            $this->settleOutstandingDues($payment, $authUser);
 
             // إطلاق حدث للمكونات الأخرى (Membership, Equipment) للتفاعل مع الدفعة باستقلالية
             \App\Events\PaymentConfirmed::dispatch($payment, $authUser->id);
@@ -115,6 +116,59 @@ class PaymentConfirmationService
             $due,
             ['contractor_id' => $due->contractor_id, 'amount_jod' => $amount, 'payment_id' => $payment->id],
         );
+    }
+
+    /**
+     * دفعة من التطبيق ما إلها ذمة محددة كانت تتأكد وتضل الذمم "غير مسدَّدة":
+     * - سداد ذمم بلا ذمة مربوطة ← بتتوزع على أقدم الذمم، متل الدفعة اليدوية (DuesPaymentService).
+     * - رسوم عضوية ← بتسدّد ذمم رسوم الاشتراك السنوي المفتوحة (الأقدم أولاً)، لأنها نفس الرسوم:
+     *   بدونها المقاول بيدفع ويتجدد اشتراكه وبتضل ذمة السنة عليه وحالته "منتهية".
+     * كل تسديد بينسجّل بـpayment_allocations حتى ينعكس لو الدفعة رجعت أو انرفضت.
+     */
+    private function settleOutstandingDues(Payment $payment, User $authUser): void
+    {
+        $dues = match (true) {
+            $payment->type === 'dues_payment' && ! $payment->contractor_due_id
+                => $payment->contractor?->dues()->outstanding(),
+            $payment->type === 'membership_fee'
+                => $payment->contractor?->dues()->outstanding()->whereNotNull('year'),
+            default => null,
+        };
+
+        if (! $dues) {
+            return;
+        }
+
+        $dues = $dues->orderByRaw('year IS NULL, year asc')->orderBy('id')->lockForUpdate()->get();
+
+        if ($payment->type === 'membership_fee') {
+            $dues = $dues->filter(fn ($due) => $due->is_membership_fee);
+        }
+
+        $available = round((float) $payment->amount_jod - (float) $payment->used_amount_jod, 2);
+
+        foreach ($dues as $due) {
+            if ($available <= 0) {
+                break;
+            }
+
+            $amount = min($available, $due->remaining_jod);
+            if ($amount <= 0) {
+                continue;
+            }
+
+            $payment->increment('used_amount_jod', $amount);
+            $due->applyPayment($amount);
+            PaymentAllocation::record($payment, $due, $amount);
+            $available = round($available - $amount, 2);
+
+            AuditLogService::record(
+                $authUser,
+                'due.settled',
+                $due,
+                ['contractor_id' => $due->contractor_id, 'amount_jod' => $amount, 'payment_id' => $payment->id],
+            );
+        }
     }
 
     /**
