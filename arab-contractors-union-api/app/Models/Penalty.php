@@ -53,4 +53,37 @@ class Penalty extends Model
             default          => ['paid_amount' => 0, 'paid_at' => null, 'reject_reason' => null],
         };
     }
+
+    /** المتبقي من الغرامة بالدينار (المرفوضة والمسدَّدة صفر) */
+    public function getRemainingAttribute(): float
+    {
+        if (! in_array($this->status, ['unpaid', 'partially_paid'], true)) {
+            return 0.0;
+        }
+
+        return round(max(0, (float) $this->amount - (float) $this->paid_amount), 2);
+    }
+
+    /** تسجيل سداد (كامل أو جزئي) من دفعة، وتحديث الحالة تبعاً للمتبقي */
+    public function applyPayment(float $amountJod): void
+    {
+        $this->setPaidAmount(min((float) $this->amount, (float) $this->paid_amount + $amountJod));
+    }
+
+    /** إلغاء جزء من السداد (لما الدفعة اللي سدّدته ترجع لقيد المراجعة أو تنرفض) */
+    public function reversePayment(float $amountJod): void
+    {
+        $this->setPaidAmount(max(0, (float) $this->paid_amount - $amountJod));
+    }
+
+    private function setPaidAmount(float $paid): void
+    {
+        $paid = round($paid, 2);
+
+        $this->update([
+            'paid_amount' => $paid,
+            'status'      => $paid >= (float) $this->amount && $paid > 0 ? 'paid' : ($paid > 0 ? 'partially_paid' : 'unpaid'),
+            'paid_at'     => $paid >= (float) $this->amount && $paid > 0 ? ($this->paid_at ?? now()) : null,
+        ]);
+    }
 }

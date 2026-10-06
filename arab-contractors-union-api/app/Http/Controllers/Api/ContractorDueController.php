@@ -7,6 +7,7 @@ use App\Http\Traits\ApiResponseTrait;
 use App\Models\Contractor;
 use App\Models\ContractorDue;
 use App\Models\Payment;
+use App\Models\Penalty;
 use App\Http\Requests\ContractorDue\PayContractorDueRequest;
 use App\Http\Requests\ContractorDue\ImportContractorDuesRequest;
 use App\Http\Requests\ContractorDue\StoreContractorDueRequest;
@@ -260,13 +261,26 @@ class ContractorDueController extends Controller
             ]);
         }
 
+        // الغرامات جزء من ذمم المقاول (نفس قاعدة جدول الذمم والأرصدة): المفتوحة بمتبقيها،
+        // والمرفوضة مستبعَدة. بدونها كانت غرامة 100 ما تبيّن بإجمالي الذمم القائمة.
+        $penalties = Penalty::query()->whereHas('contractor')->where('status', '!=', 'rejected');
+        $openPenalties = (clone $penalties)->whereIn('status', ['unpaid', 'partially_paid']);
+
+        $outstandingContractors = (clone $base)->outstanding()->distinct()->pluck('contractor_id')
+            ->merge((clone $openPenalties)->distinct()->pluck('contractor_id'))
+            ->unique();
+
         return $this->success([
             'outstanding_total_jod' => round((float) (clone $base)->outstanding()
-                ->selectRaw('COALESCE(SUM(amount_jod - paid_jod), 0) as t')->value('t'), 2),
+                ->selectRaw('COALESCE(SUM(amount_jod - paid_jod), 0) as t')->value('t')
+                + (float) (clone $openPenalties)
+                ->selectRaw('COALESCE(SUM(amount - COALESCE(paid_amount, 0)), 0) as t')->value('t'), 2),
             'collected_total_jod'   => round((float) (clone $base)
-                ->selectRaw('COALESCE(SUM(paid_jod), 0) as t')->value('t'), 2),
-            'contractors_with_dues' => (clone $base)->outstanding()
-                ->distinct('contractor_id')->count('contractor_id'),
+                ->selectRaw('COALESCE(SUM(paid_jod), 0) as t')->value('t')
+                + (float) (clone $penalties)
+                ->selectRaw('COALESCE(SUM(paid_amount), 0) as t')->value('t'), 2),
+            'contractors_with_dues' => $outstandingContractors->count(),
+            'open_penalties_count'  => (clone $openPenalties)->count(),
             'outstanding_dues_count' => (clone $base)->outstanding()->count(),
             'dues_count'             => (clone $base)->count(),
             'by_year' => $byYear,

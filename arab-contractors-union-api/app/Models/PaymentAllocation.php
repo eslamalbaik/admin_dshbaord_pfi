@@ -4,10 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-/** جزء من دفعة انصرف على ذمة معيّنة */
+/** جزء من دفعة انصرف على ذمة معيّنة أو غرامة */
 class PaymentAllocation extends Model
 {
-    protected $fillable = ['payment_id', 'contractor_due_id', 'amount_jod'];
+    protected $fillable = ['payment_id', 'contractor_due_id', 'penalty_id', 'amount_jod'];
 
     protected $casts = ['amount_jod' => 'decimal:2'];
 
@@ -21,6 +21,11 @@ class PaymentAllocation extends Model
         return $this->belongsTo(ContractorDue::class, 'contractor_due_id')->withTrashed();
     }
 
+    public function penalty()
+    {
+        return $this->belongsTo(Penalty::class);
+    }
+
     /** سجّل إن الدفعة سدّدت هالمبلغ من الذمة */
     public static function record(Payment $payment, ContractorDue $due, float $amountJod): void
     {
@@ -32,6 +37,20 @@ class PaymentAllocation extends Model
             'payment_id'        => $payment->id,
             'contractor_due_id' => $due->id,
             'amount_jod'        => round($amountJod, 2),
+        ]);
+    }
+
+    /** سجّل إن الدفعة سدّدت هالمبلغ من الغرامة */
+    public static function recordPenalty(Payment $payment, Penalty $penalty, float $amountJod): void
+    {
+        if ($amountJod <= 0) {
+            return;
+        }
+
+        static::create([
+            'payment_id' => $payment->id,
+            'penalty_id' => $penalty->id,
+            'amount_jod' => round($amountJod, 2),
         ]);
     }
 }

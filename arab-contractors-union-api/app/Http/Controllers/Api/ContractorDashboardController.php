@@ -151,7 +151,8 @@ class ContractorDashboardController extends Controller
                 'description' => $pen->reason ?: 'غرامة',
                 'type'        => 'penalty',
                 'direction'   => $pen->status === 'paid' ? 'credit' : 'debit',
-                'amount'      => (string) $pen->amount,
+                // المفتوحة بالمتبقي منها (زي الذمم)، بعد ما صارت الدفعات تسدّد الغرامات جزئياً
+                'amount'      => (string) ($pen->status === 'partially_paid' ? $pen->remaining : $pen->amount),
                 'status'      => $pen->status,
                 'reference'   => null,
             ]);
@@ -175,7 +176,8 @@ class ContractorDashboardController extends Controller
         // ─── الملخص ───
         $totalPaid          = (float) $payments->where('status', 'paid')->sum('amount');
         $pendingPayments    = (float) $payments->where('status', 'pending')->sum('amount');
-        $unpaidPenalties    = (float) $penalties->where('status', '!=', 'paid')->sum('amount');
+        // المتبقي من الغرامات المفتوحة بس (المرفوضة والمسدَّدة صفر) — نفس حسبة الأرصدة
+        $unpaidPenalties    = (float) $penalties->sum(fn ($pen) => $pen->remaining);
         $outstandingDues    = $this->financialService->outstandingDuesTotal($contractor);
         $totalObligations   = $this->financialService->totalObligations($contractor);
         $duesTotals         = $this->financialService->duesTotalsSummary($contractor);
