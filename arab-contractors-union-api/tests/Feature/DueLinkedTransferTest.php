@@ -163,6 +163,20 @@ class DueLinkedTransferTest extends TestCase
         $this->assertDatabaseCount('payment_allocations', 2);
     }
 
+    public function test_confirming_membership_fee_settles_a_plain_due_too(): void
+    {
+        $contractor = $this->contractor();
+        $due = $this->due($contractor, ['description' => 'رسوم خدمات', 'amount_jod' => 200]);
+        Sanctum::actingAs($contractor, ['*']);
+        $paymentId = $this->submitUnlinked(200, null)->assertStatus(201)
+            ->assertJsonPath('items.type', 'membership_fee')->json('items.id');
+
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']), ['*']);
+        $this->postJson("/api/v1/payments/transactions/{$paymentId}/confirm")->assertOk();
+
+        $this->assertSame('paid', $due->fresh()->status);
+    }
+
     public function test_confirming_membership_fee_settles_annual_fee_due_and_revert_undoes_it(): void
     {
         $contractor = $this->contractor();
@@ -175,7 +189,7 @@ class DueLinkedTransferTest extends TestCase
         Sanctum::actingAs(User::factory()->create(['role' => 'admin']), ['*']);
         $this->postJson("/api/v1/payments/transactions/{$paymentId}/confirm")->assertOk();
 
-        // رسوم العضوية بتسدّد ذمة الاشتراك بس، مش الذمم المتراكمة الثانية
+        // ذمة الاشتراك أولاً حتى لو في ذمة أقدم منها
         $this->assertSame('paid', $fee->fresh()->status);
         $this->assertSame('unpaid', $other->fresh()->status);
         $this->assertEquals(600, (float) Payment::find($paymentId)->used_amount_jod);
