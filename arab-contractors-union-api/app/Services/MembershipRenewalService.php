@@ -118,12 +118,19 @@ class MembershipRenewalService
                 'reviewed_by' => $snapshot['reviewed_by'],
                 'reviewed_at' => $snapshot['reviewed_at'],
             ]);
+            // عضوية كانت مرفوضة قبل هالتأكيد (من إرجاع سابق لنفس الدفعة) ما بتضل مربوطة فيها
+            if ($snapshot['status'] === 'rejected') {
+                $payment->membership_id = null;
+            }
         } else {
             $membership->update([
                 'status'     => 'rejected',
                 'starts_at'  => null,
                 'expires_at' => null,
             ]);
+            // العضوية انعملت تلقائياً من هالدفعة، فبنفكّ الربط: لو رجعت تتأكد بتتقرر من جديد
+            // (سداد ذمم لو عليه ذمم وقتها) بدل ما ترجع تفعّل العضوية المرفوضة نفسها
+            $payment->membership_id = null;
         }
 
         $contractor = $payment->contractor;

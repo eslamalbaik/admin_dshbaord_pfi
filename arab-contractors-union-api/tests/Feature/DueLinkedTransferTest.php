@@ -253,6 +253,46 @@ class DueLinkedTransferTest extends TestCase
         $this->assertDatabaseCount('payment_allocations', 0);
     }
 
+    public function test_reconfirming_a_reverted_renewal_while_owing_becomes_a_dues_payment(): void
+    {
+        $contractor = $this->contractor();
+        $payment = Payment::create([
+            'contractor_id' => $contractor->id,
+            'amount'        => 69,
+            'currency'      => 'JOD',
+            'type'          => 'membership_fee',
+            'status'        => 'pending',
+            'method'        => 'bank_transfer',
+            'submitted_at'  => now(),
+        ]);
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']), ['*']);
+        $this->postJson("/api/v1/payments/transactions/{$payment->id}/confirm")->assertOk();
+        $membership = $payment->fresh()->membership;
+        $this->assertSame('active', $membership->status);
+
+        // رجعت وتأكدت مرة قبل الإصلاح، فالعضوية المرفوضة رجعت تتفعّل من نفس الدفعة
+        $this->postJson("/api/v1/payments/transactions/{$payment->id}/status", ['status' => 'pending', 'reason' => 'تصحيح'])->assertOk();
+        $payment->refresh()->update(['membership_id' => $membership->id]);
+        $this->postJson("/api/v1/payments/transactions/{$payment->id}/status", ['status' => 'paid', 'reason' => 'تصحيح'])->assertOk();
+        $this->assertSame('active', $membership->fresh()->status);
+
+        // انضافت ذمة بعدين، والمحاسب رجّع الدفعة وأكّدها من جديد
+        $due = $this->due($contractor, ['amount_jod' => 11]);
+        $this->postJson("/api/v1/payments/transactions/{$payment->id}/status", ['status' => 'pending', 'reason' => 'تصحيح'])->assertOk();
+        $this->assertNull($payment->fresh()->membership_id);
+        $this->postJson("/api/v1/payments/transactions/{$payment->id}/status", ['status' => 'paid', 'reason' => 'تصحيح'])->assertOk();
+
+        $payment->refresh();
+        $this->assertSame('dues_payment', $payment->type);
+        $this->assertSame('rejected', $membership->fresh()->status);
+        $this->assertSame('paid', $due->fresh()->status);
+
+        Sanctum::actingAs($contractor, ['*']);
+        $this->getJson('/api/v1/contractor/balance')->assertOk()
+            ->assertJsonPath('items.credit_jod', 58)
+            ->assertJsonPath('items.net_jod', 58);
+    }
+
     public function test_receipt_date_and_discount_fields(): void
     {
         $contractor = $this->contractor();
