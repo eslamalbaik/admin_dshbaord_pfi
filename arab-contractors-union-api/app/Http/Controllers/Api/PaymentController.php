@@ -68,6 +68,10 @@ class PaymentController extends Controller
             }
 
             $type = 'dues_payment';
+        } elseif (empty($data['type']) && empty($data['membership_id'])
+            && $contractor->dues()->outstanding()->exists()) {
+            // بدون نوع والمقاول عليه ذمم = سداد ذمم (بتسدّد أقدمها والفائض رصيد له)، مش رسوم عضوية
+            $type = 'dues_payment';
         }
 
         if ($type !== 'dues_payment') {
