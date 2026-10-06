@@ -76,6 +76,14 @@ const openRequest = (r: any) => {
   isViewOpen.value = true
 }
 
+// فتح طلب من الرابط (‎?id=‎، مثلاً عند الضغط على إشعار)
+const route = useRoute()
+watch(() => route.query.id, (id) => {
+  const rId = Number(id)
+  if (Number.isInteger(rId) && rId > 0 && !(isViewOpen.value && selected.value?.id === rId))
+    openRequest({ id: rId })
+}, { immediate: true })
+
 const refresh = () => {
   queryClient.invalidateQueries({ queryKey: ['certificate-requests'] })
   queryClient.invalidateQueries({ queryKey: ['certificate-request'] })

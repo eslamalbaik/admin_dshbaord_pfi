@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import api from '@/plugins/axios'
+import { notificationLink } from '@/utils/notificationLink'
 
 definePage({
   meta: { requiresAdmin: true },
@@ -162,19 +163,10 @@ function handleClick(item: NotificationItem) {
   if (!rawNotif) return
 
   const d = rawNotif.data || {}
-  const type = d.type
 
-  // توجيه بناءً على نوع الإشعار
-  if (type === 'payment_submitted') {
-    // توجيه لصفحة الدفعات مع عرض التفاصيل
-    router.push(`/payments/transactions?id=${d.payment_id}`)
-  } else if (type === 'contractor_activated') {
-    // توجيه لصفحة تفاصيل المقاول
-    router.push(`/contractors/${d.contractor_id}/edit`)
-  } else if (type === 'event_joined') {
-    // توجيه لصفحة الفعاليات
-    router.push(`/events`)
-  }
+  const target = notificationLink(d)
+  if (target)
+    router.push(target)
 }
 
 watch(page, fetchNotifications)

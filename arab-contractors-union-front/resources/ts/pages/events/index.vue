@@ -19,7 +19,13 @@ const notify = (text: string, color: 'success' | 'error' = 'success') => {
   snackbar.value = true
 }
 
-const search = ref('')
+// يمكن فتح الصفحة مع بحث جاهز (‎?search=‎، مثلاً من إشعار تسجيل حضور)
+const route = useRoute()
+const search = ref((route.query.search as string) || '')
+watch(() => route.query.search, (v) => {
+  if (typeof v === 'string')
+    search.value = v
+})
 const publishedFilter = ref('')
 const scopeFilter = ref('')
 
