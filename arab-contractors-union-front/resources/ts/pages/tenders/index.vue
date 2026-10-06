@@ -210,9 +210,10 @@ const fileSizeLabel = (f: File) => f.size >= 1024 * 1024 ? `${(f.size / 1024 / 1
 const attachmentUploading = ref(false)
 const attachmentDeletingId = ref<number | null>(null)
 
-const uploadAttachments = async () => {
+// يرجّع أسماء الملفات اللي فشل رفعها. silent: بدون رسالة نجاح (لما ينادى من "حفظ التعديلات")
+const uploadAttachments = async (silent = false): Promise<string[]> => {
   if (!editTender.value.id || !newAttachmentFiles.value.length)
-    return
+    return []
   attachmentUploading.value = true
   // الملف اللي فشل بيضل بالقائمة عشان تقدر تعيد المحاولة، والباقي بيكمل رفعه
   const failed: File[] = []
@@ -233,8 +234,10 @@ const uploadAttachments = async () => {
     newAttachmentFiles.value = failed
     if (failed.length)
       notify(`تعذّر رفع: ${failed.map(f => f.name).join('، ')}`, 'error')
-    else
+    else if (!silent)
       notify('تمت إضافة المرفقات بنجاح')
+
+    return failed.map(f => f.name)
   } finally {
     attachmentUploading.value = false
   }
@@ -283,9 +286,14 @@ const saveTender = async () => {
     if (editTender.value.submission_file)
       formData.append('submission_file', editTender.value.submission_file)
     await api.post(`/api/v1/tenders/${editTender.value.id}`, formData)
+
+    // المرفقات المختارة وما انكبس "رفع" عليها كانت تنمسح مع إغلاق النافذة — الحفظ بيرفعها كمان
+    const failed = await uploadAttachments(true)
+    fetchTenders()
+    if (failed.length)
+      return // النافذة بتضل مفتوحة والملفات الفاشلة بالقائمة، ورسالة الخطأ طلعت من uploadAttachments
     editDialog.value = false
     notify('تم حفظ التعديلات بنجاح')
-    fetchTenders()
   } catch (err: any) { console.error(err); notify(firstError(err) || 'تعذّر حفظ التعديلات', 'error') }
   finally { editLoading.value = false }
 }
@@ -1198,6 +1206,8 @@ onMounted(fetchCategories)
               <div class="d-flex align-center gap-2">
                 <VFileInput
                   :label="newAttachmentFiles.length ? `إضافة ملفات أخرى (${newAttachmentFiles.length} بانتظار الرفع)` : 'إضافة مرفقات جديدة'"
+                  :hint="newAttachmentFiles.length ? 'بتنرفع لما تكبس رفع أو حفظ التعديلات' : ''"
+                  persistent-hint
                   prepend-inner-icon="tabler-paperclip"
                   prepend-icon=""
                   multiple
@@ -1212,7 +1222,7 @@ onMounted(fetchCategories)
                   :loading="attachmentUploading"
                   color="primary"
                   variant="tonal"
-                  @click="uploadAttachments"
+                  @click="uploadAttachments()"
                 >
                   رفع
                 </VBtn>
