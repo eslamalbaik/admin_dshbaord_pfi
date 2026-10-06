@@ -88,6 +88,17 @@ class Payment extends Model
         return $this->belongsTo(User::class, 'confirmed_by');
     }
 
+    /** سجل تغييرات الحالة اليدوية مع أسبابها */
+    public function statusChanges()
+    {
+        return $this->hasMany(PaymentStatusChange::class);
+    }
+
+    public function latestStatusChange()
+    {
+        return $this->hasOne(PaymentStatusChange::class)->latestOfMany();
+    }
+
     /** رقم العملية بصيغة TRX-<رقم الدفعة بـ6 خانات> — يُولَّد مرة واحدة عند الإنشاء، لعرضه بشاشة "تم الإرسال" */
     public static function generateTransactionNumber(self $payment): string
     {

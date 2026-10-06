@@ -17,6 +17,7 @@ use App\Services\DuesPaymentService;
 use App\Http\Requests\Payment\ConfirmPaymentRequest;
 use App\Http\Requests\Payment\UploadReceiptImageRequest;
 use App\Http\Requests\Payment\RejectPaymentRequest;
+use App\Http\Requests\Payment\ChangePaymentStatusRequest;
 use App\Http\Resources\PaymentResource;
 use App\Services\PaymentConfirmationService;
 use App\Services\ExchangeRateService;
@@ -209,7 +210,7 @@ class PaymentController extends Controller
     // GET /api/v1/payments/transactions
     public function index(Request $request)
     {
-        $query = Payment::with('contractor');
+        $query = Payment::with(['contractor', 'latestStatusChange.changer:id,name']);
 
         if ($request->filled('search')) {
             $q = $request->search;
@@ -384,12 +385,53 @@ class PaymentController extends Controller
      */
     public function reject(RejectPaymentRequest $request, Payment $payment)
     {
-        $this->confirmationService->reject($payment, $request->validated()['rejection_reason'], $request->user());
+        try {
+            $this->confirmationService->reject($payment, $request->validated()['rejection_reason'], $request->user());
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 422);
+        }
 
         if ($payment->contractor) {
             $payment->contractor->notify(new PaymentRejectedNotification($payment));
         }
 
         return $this->success(new PaymentResource($payment->fresh('contractor')), 'تم رفض إشعار التحويل.');
+    }
+
+    /**
+     * POST /api/v1/payments/transactions/{payment}/status
+     * "تغيير الحالة" من قائمة الإجراءات — السبب إجباري وبينحفظ مع مين غيّر وإيمتى.
+     */
+    public function changeStatus(ChangePaymentStatusRequest $request, Payment $payment)
+    {
+        $data = $request->validated();
+
+        try {
+            $this->confirmationService->changeStatus($payment, $data['status'], $data['reason'], $data, $request->user());
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 422);
+        }
+
+        $payment->refresh();
+
+        if ($payment->contractor) {
+            match ($payment->status) {
+                'paid'     => $payment->contractor->notify(new PaymentConfirmedNotification($payment)),
+                'rejected' => $payment->contractor->notify(new PaymentRejectedNotification($payment)),
+                default    => null,
+            };
+        }
+
+        Log::channel('finance')->info('payment.status_changed', [
+            'user_id'    => Auth::id(),
+            'payment_id' => $payment->id,
+            'to'         => $payment->status,
+            'reason'     => $data['reason'],
+        ]);
+
+        return $this->success(
+            new PaymentResource($payment->load(['contractor', 'latestStatusChange.changer:id,name'])),
+            'تم تغيير حالة الدفعة.',
+        );
     }
 }

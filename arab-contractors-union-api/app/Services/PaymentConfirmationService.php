@@ -22,6 +22,11 @@ class PaymentConfirmationService
      */
     public function confirm(Payment $payment, array $data, User $authUser): void
     {
+        // تأكيد دفعة مؤكَّدة أصلاً كان يعيد تجديد العضوية ويضاعف أثرها — ممنوع
+        if ($payment->status === 'paid') {
+            throw new \Exception('هذه الدفعة مؤكَّدة مسبقاً.');
+        }
+
         $currency   = strtoupper($payment->currency ?? 'JOD');
         $rate       = null;
         $rateSource = null;
@@ -111,14 +116,103 @@ class PaymentConfirmationService
     }
 
     /**
+     * سبب منع إرجاع دفعة مؤكَّدة (لقيد المراجعة أو مرفوضة)، أو null لو إرجاعها آمن.
+     *
+     * الإرجاع الآمن حالياً = دفعة ما إلها أي أثر غير رصيدها: الرصيد بيتحسب من الدفعات
+     * المؤكَّدة بس (ContractorBalanceController::balancesQuery)، فبمجرد ما تطلع من "paid"
+     * بينشال رصيدها لحاله. أما الدفعة اللي سدّدت ذمم أو جدّدت عضوية أو فعّلت اشتراك آليات،
+     * فما في سجل توزيع يخلّينا نرجّع أثرها بدقة، فبنمنعها لحد ما يتقرر كيف تنعكس.
+     */
+    public function revertBlocker(Payment $payment): ?string
+    {
+        if ($payment->status !== 'paid') {
+            return null;
+        }
+
+        if ((float) $payment->used_amount_jod > 0) {
+            return 'هذه الدفعة سدّدت ذمماً على المقاول، فلا يمكن تغيير حالتها قبل إلغاء التسديد.';
+        }
+
+        if ($payment->type === 'membership_fee' && $payment->membership_id) {
+            return 'هذه الدفعة جدّدت عضوية المقاول، فلا يمكن تغيير حالتها من هنا.';
+        }
+
+        if ($payment->type === 'equipment_subscription'
+            && ContractorEquipmentSubscription::where('payment_id', $payment->id)->exists()) {
+            return 'هذه الدفعة فعّلت اشتراكاً في سوق الآليات، فلا يمكن تغيير حالتها من هنا.';
+        }
+
+        return null;
+    }
+
+    /**
+     * "تغيير الحالة" من قائمة الإجراءات: ينفّذ الانتقال ويسجّل السبب ومين غيّر.
+     * - إلى مؤكَّدة: نفس مسار confirm() بكل آثاره.
+     * - إلى مرفوضة/قيد المراجعة: من مؤكَّدة بس لو revertBlocker() ما منع.
+     */
+    public function changeStatus(Payment $payment, string $to, string $reason, array $data, User $authUser): void
+    {
+        $from = $payment->status;
+
+        if ($from === $to) {
+            throw new \Exception('الدفعة بهذه الحالة أصلاً.');
+        }
+
+        if ($blocker = $this->revertBlocker($payment)) {
+            throw new \Exception($blocker);
+        }
+
+        DB::transaction(function () use ($payment, $from, $to, $reason, $data, $authUser) {
+            match ($to) {
+                'paid'     => $this->confirm($payment, $data, $authUser),
+                'rejected' => $this->reject($payment, $reason, $authUser),
+                'pending'  => $this->reopen($payment, $authUser),
+            };
+
+            $payment->statusChanges()->create([
+                'from_status' => $from,
+                'to_status'   => $to,
+                'reason'      => $reason,
+                'changed_by'  => $authUser->id,
+            ]);
+
+            AuditLogService::record(
+                $authUser,
+                'payment.status_changed',
+                $payment,
+                ['from' => $from, 'to' => $to, 'reason' => $reason],
+            );
+        });
+    }
+
+    /**
+     * إرجاع الدفعة لـ"قيد المراجعة"
+     */
+    private function reopen(Payment $payment, User $authUser): void
+    {
+        $payment->update([
+            'status'           => 'pending',
+            'confirmed_by'     => $authUser->id,
+            'confirmed_at'     => now(),
+            'paid_at'          => null,
+            'rejection_reason' => null,
+        ]);
+    }
+
+    /**
      * رفض الدفعة
      */
     public function reject(Payment $payment, string $reason, User $authUser): void
     {
+        if ($blocker = $this->revertBlocker($payment)) {
+            throw new \Exception($blocker);
+        }
+
         $payment->update([
             'status'           => 'rejected',
             'confirmed_by'     => $authUser->id,
             'confirmed_at'     => now(),
+            'paid_at'          => null,
             'rejection_reason' => $reason,
         ]);
 

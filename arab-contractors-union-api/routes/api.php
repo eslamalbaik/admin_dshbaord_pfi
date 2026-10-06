@@ -403,6 +403,7 @@ Route::prefix('v1')->group(function () {
              ->middleware('role:admin,accountant');
         Route::post('payments/transactions/{payment}/confirm', [PaymentController::class, 'confirm']);
         Route::post('payments/transactions/{payment}/reject',  [PaymentController::class, 'reject']);
+        Route::post('payments/transactions/{payment}/status',  [PaymentController::class, 'changeStatus']);
         Route::post('payments/transactions/{payment}/receipt-image', [PaymentController::class, 'uploadReceiptImage']);
 
         // --------------------------------------------------------
