@@ -121,28 +121,26 @@ class PaymentConfirmationService
     /**
      * دفعة من التطبيق ما إلها ذمة محددة كانت تتأكد وتضل الذمم "غير مسدَّدة":
      * - سداد ذمم بلا ذمة مربوطة ← بتتوزع على أقدم الذمم، متل الدفعة اليدوية (DuesPaymentService).
-     * - رسوم عضوية ← بتسدّد ذمم رسوم الاشتراك السنوي المفتوحة (الأقدم أولاً)، لأنها نفس الرسوم:
-     *   بدونها المقاول بيدفع ويتجدد اشتراكه وبتضل ذمة السنة عليه وحالته "منتهية".
+     * - رسوم عضوية ← بتسدّد ذمم رسوم الاشتراك السنوي أولاً (الأقدم أولاً)، والباقي على أقدم
+     *   الذمم الثانية: التطبيق بيبعت التحويل "رسوم عضوية" افتراضياً حتى لو المقاول بيدفع ذمة
+     *   عادية، وبدونها بيدفع وبتضل الذمة عليه وحالته "منتهية".
      * كل تسديد بينسجّل بـpayment_allocations حتى ينعكس لو الدفعة رجعت أو انرفضت.
      */
     private function settleOutstandingDues(Payment $payment, User $authUser): void
     {
-        $dues = match (true) {
-            $payment->type === 'dues_payment' && ! $payment->contractor_due_id
-                => $payment->contractor?->dues()->outstanding(),
-            $payment->type === 'membership_fee'
-                => $payment->contractor?->dues()->outstanding()->whereNotNull('year'),
-            default => null,
-        };
+        $applies = ($payment->type === 'dues_payment' && ! $payment->contractor_due_id)
+            || $payment->type === 'membership_fee';
 
-        if (! $dues) {
+        if (! $applies || ! $payment->contractor) {
             return;
         }
 
-        $dues = $dues->orderByRaw('year IS NULL, year asc')->orderBy('id')->lockForUpdate()->get();
+        $dues = $payment->contractor->dues()->outstanding()
+            ->orderByRaw('year IS NULL, year asc')->orderBy('id')->lockForUpdate()->get();
 
         if ($payment->type === 'membership_fee') {
-            $dues = $dues->filter(fn ($due) => $due->is_membership_fee);
+            [$fees, $others] = $dues->partition(fn ($due) => $due->is_membership_fee);
+            $dues = $fees->concat($others);
         }
 
         $available = round((float) $payment->amount_jod - (float) $payment->used_amount_jod, 2);

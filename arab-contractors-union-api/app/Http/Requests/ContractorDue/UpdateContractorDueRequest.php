@@ -27,6 +27,8 @@ class UpdateContractorDueRequest extends FormRequest
     {
         return [
             'amount_jod.min' => 'مبلغ الذمة لازم يكون أكبر من صفر.',
+            'year.between'  => 'السنة لازم تكون بين 1990 و2100 (مثلاً 2026).',
+            'year.integer'  => 'السنة لازم تكون رقم من 4 خانات (مثلاً 2026).',
         ];
     }
 }
