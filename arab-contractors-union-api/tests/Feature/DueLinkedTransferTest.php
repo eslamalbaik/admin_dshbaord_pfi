@@ -136,6 +136,59 @@ class DueLinkedTransferTest extends TestCase
         $this->assertEquals(100, (float) Payment::find($paymentId)->used_amount_jod);
     }
 
+    private function submitUnlinked(float $amount, ?string $type)
+    {
+        return $this->postJson('/api/v1/contractor/payments/transfer', array_filter([
+            'amount'        => $amount,
+            'type'          => $type,
+            'receipt_image' => UploadedFile::fake()->image('r.jpg'),
+        ]));
+    }
+
+    public function test_confirming_unlinked_dues_transfer_settles_oldest_dues(): void
+    {
+        $contractor = $this->contractor();
+        $old = $this->due($contractor, ['year' => 2025, 'description' => 'رسوم متراكمة', 'amount_jod' => 40]);
+        $fee = $this->due($contractor);
+        Sanctum::actingAs($contractor, ['*']);
+        $paymentId = $this->submitUnlinked(100, 'dues_payment')->assertStatus(201)->json('items.id');
+
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']), ['*']);
+        $this->postJson("/api/v1/payments/transactions/{$paymentId}/confirm")->assertOk();
+
+        $this->assertSame('paid', $old->fresh()->status);
+        $this->assertSame('partially_paid', $fee->fresh()->status);
+        $this->assertEquals(60, (float) $fee->fresh()->paid_jod);
+        $this->assertEquals(100, (float) Payment::find($paymentId)->used_amount_jod);
+        $this->assertDatabaseCount('payment_allocations', 2);
+    }
+
+    public function test_confirming_membership_fee_settles_annual_fee_due_and_revert_undoes_it(): void
+    {
+        $contractor = $this->contractor();
+        $fee = $this->due($contractor, ['amount_jod' => 600, 'source' => 'fee_engine', 'description' => 'رسوم اشتراك سنة 2026 (محرّك الاحتساب الآلي)']);
+        $other = $this->due($contractor, ['year' => 2025, 'description' => 'رسوم متراكمة', 'amount_jod' => 50]);
+        Sanctum::actingAs($contractor, ['*']);
+        $paymentId = $this->submitUnlinked(600, null)->assertStatus(201)
+            ->assertJsonPath('items.type', 'membership_fee')->json('items.id');
+
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']), ['*']);
+        $this->postJson("/api/v1/payments/transactions/{$paymentId}/confirm")->assertOk();
+
+        // رسوم العضوية بتسدّد ذمة الاشتراك بس، مش الذمم المتراكمة الثانية
+        $this->assertSame('paid', $fee->fresh()->status);
+        $this->assertSame('unpaid', $other->fresh()->status);
+        $this->assertEquals(600, (float) Payment::find($paymentId)->used_amount_jod);
+
+        $this->postJson("/api/v1/payments/transactions/{$paymentId}/status", [
+            'status' => 'pending',
+            'reason' => 'اختبار الإرجاع',
+        ])->assertOk();
+
+        $this->assertSame('unpaid', $fee->fresh()->status);
+        $this->assertDatabaseCount('payment_allocations', 0);
+    }
+
     public function test_receipt_date_and_discount_fields(): void
     {
         $contractor = $this->contractor();
