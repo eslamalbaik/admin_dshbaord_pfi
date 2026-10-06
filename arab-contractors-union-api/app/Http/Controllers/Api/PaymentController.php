@@ -212,6 +212,11 @@ class PaymentController extends Controller
     {
         $query = Payment::with(['contractor', 'latestStatusChange.changer:id,name']);
 
+        // فتح دفعة محددة من إشعار في لوحة التحكم
+        if ($request->filled('id')) {
+            $query->whereKey((int) $request->id);
+        }
+
         if ($request->filled('search')) {
             $q = $request->search;
             $query->whereHas('contractor', fn ($qb) => $qb->where('name', 'like', "%{$q}%"));

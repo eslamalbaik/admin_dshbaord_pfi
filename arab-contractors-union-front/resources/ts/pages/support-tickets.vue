@@ -79,15 +79,22 @@ watch([page, statusFilter, categoryFilter, search, isViewOpen], () => {
   router.replace({ query })
 })
 
-const isRestoring = ref(true)
-watch(tickets, (newTickets) => {
-  if (isRestoring.value && route.query.ticket) {
-    const tId = Number(route.query.ticket)
-    const t = newTickets.find((x: any) => x.id === tId)
-    if (t) {
+// فتح تذكرة من الرابط (‎?ticket=‎، مثلاً عند الضغط على إشعار). نجلبها مباشرة
+// حتى تفتح حتى لو لم تكن في الصفحة الحالية من الجدول.
+watch(() => route.query.ticket, async (ticket) => {
+  const tId = Number(ticket)
+  if (!Number.isInteger(tId) || tId <= 0)
+    return
+  if (isViewOpen.value && selected.value?.id === tId)
+    return
+  try {
+    const res = await api.get(`/api/v1/dashboard/support-tickets/${tId}`)
+    const t = res.data?.items ?? res.data
+    if (t?.id)
       openTicket(t)
-    }
-    isRestoring.value = false
+  }
+  catch (err) {
+    console.error('Error opening ticket from link:', err)
   }
 }, { immediate: true })
 

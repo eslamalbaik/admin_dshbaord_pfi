@@ -94,6 +94,7 @@ declare global {
   const markRaw: typeof import('vue')['markRaw']
   const nextTick: typeof import('vue')['nextTick']
   const normalizeUser: typeof import('./resources/ts/utils/normalizeUser')['normalizeUser']
+  const notificationLink: typeof import('./resources/ts/utils/notificationLink')['notificationLink']
   const onActivated: typeof import('vue')['onActivated']
   const onBeforeMount: typeof import('vue')['onBeforeMount']
   const onBeforeRouteLeave: typeof import('vue-router/auto')['onBeforeRouteLeave']
@@ -474,6 +475,7 @@ declare module 'vue' {
     readonly markRaw: UnwrapRef<typeof import('vue')['markRaw']>
     readonly nextTick: UnwrapRef<typeof import('vue')['nextTick']>
     readonly normalizeUser: UnwrapRef<typeof import('./resources/ts/utils/normalizeUser')['normalizeUser']>
+    readonly notificationLink: UnwrapRef<typeof import('./resources/ts/utils/notificationLink')['notificationLink']>
     readonly onActivated: UnwrapRef<typeof import('vue')['onActivated']>
     readonly onBeforeMount: UnwrapRef<typeof import('vue')['onBeforeMount']>
     readonly onBeforeRouteLeave: UnwrapRef<typeof import('vue-router/auto')['onBeforeRouteLeave']>

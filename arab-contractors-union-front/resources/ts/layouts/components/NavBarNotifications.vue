@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import { notificationLink } from '@/utils/notificationLink'
 import { computed } from 'vue'
 import type { Notification } from '@layouts/types'
 import { useRouter } from 'vue-router'
@@ -109,19 +110,10 @@ const handleNotificationClick = async (notification: Notification) => {
     return
 
   const d = dbN.data
-  const type = d.type
 
-  // توجيه بناءً على نوع الإشعار
-  if (type === 'payment_submitted') {
-    // توجيه لصفحة الدفعات مع عرض التفاصيل
-    router.push(`/payments/transactions?id=${d.payment_id}`)
-  } else if (type === 'contractor_activated') {
-    // توجيه لصفحة تفاصيل المقاول
-    router.push(`/contractors/${d.contractor_id}/edit`)
-  } else if (type === 'event_joined') {
-    // توجيه لصفحة الفعاليات
-    router.push(`/events`)
-  }
+  const target = notificationLink(d)
+  if (target)
+    router.push(target)
 }
 </script>
 

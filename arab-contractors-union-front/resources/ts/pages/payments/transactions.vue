@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
+import { useRoute, useRouter } from 'vue-router'
 import api from '@/plugins/axios'
 
 definePage({ meta: { requiresAdmin: true } })
@@ -63,12 +64,27 @@ const search = ref('')
 const statusFilter = ref('')
 const page = ref(1)
 
+// فتح الصفحة من إشعار (‎?id=‎) يعرض تلك الدفعة وحدها حتى يلغي المستخدم الفلتر
+const route = useRoute()
+const router = useRouter()
+const paymentIdFilter = ref<number | null>(null)
+watch(() => route.query.id, (id) => {
+  const n = Number(id)
+  paymentIdFilter.value = Number.isInteger(n) && n > 0 ? n : null
+  page.value = 1
+}, { immediate: true })
+const clearPaymentIdFilter = () => {
+  const { id: _id, ...rest } = route.query
+  router.replace({ query: rest })
+}
+
 watch([search, statusFilter], () => page.value = 1)
 
 const { data, isLoading } = useQuery({
-  queryKey: ['payments-transactions', search, statusFilter, page],
+  queryKey: ['payments-transactions', search, statusFilter, page, paymentIdFilter],
   queryFn: async () => (await api.get('/api/v1/payments/transactions', {
     params: {
+      id: paymentIdFilter.value || undefined,
       search: search.value || undefined,
       status: statusFilter.value || undefined,
       page: page.value,
@@ -357,6 +373,16 @@ function fmtDate(d: string | null) {
           density="compact"
           style="max-width: 170px;"
         />
+        <VChip
+          v-if="paymentIdFilter"
+          color="primary"
+          variant="tonal"
+          closable
+          class="align-self-center"
+          @click:close="clearPaymentIdFilter"
+        >
+          عرض الدفعة المرتبطة بالإشعار فقط
+        </VChip>
       </VCardText>
 
       <VProgressLinear v-if="isLoading" indeterminate color="primary" />
