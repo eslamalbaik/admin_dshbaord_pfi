@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Payment;
+use App\Models\PaymentAllocation;
 use App\Models\EquipmentPackage;
 use App\Models\ContractorEquipmentSubscription;
 use App\Models\User;
@@ -106,6 +107,7 @@ class PaymentConfirmationService
 
         $payment->increment('used_amount_jod', $amount);
         $due->applyPayment($amount);
+        PaymentAllocation::record($payment, $due, $amount);
 
         AuditLogService::record(
             $authUser,
@@ -129,8 +131,10 @@ class PaymentConfirmationService
             return null;
         }
 
-        if ((float) $payment->used_amount_jod > 0) {
-            return 'هذه الدفعة سدّدت ذمماً على المقاول، فلا يمكن تغيير حالتها قبل إلغاء التسديد.';
+        // التسديد بيترجع بس لو كله مسجّل بـpayment_allocations (دفعات من 6/10/2026 وطالع)
+        $used = round((float) $payment->used_amount_jod, 2);
+        if ($used > 0 && round((float) $payment->allocations()->sum('amount_jod'), 2) !== $used) {
+            return 'هذه الدفعة سدّدت ذمماً قبل تفعيل سجل التوزيع، فلا يمكن ترجيع تسديدها تلقائياً — ألغِ التسديد من شاشة الذمم أولاً.';
         }
 
         if ($payment->type === 'membership_fee' && $payment->membership_id) {
@@ -186,10 +190,37 @@ class PaymentConfirmationService
     }
 
     /**
+     * إلغاء تسديد الذمم اللي سدّدتها الدفعة، فترجع الذمم مستحقة والرصيد يرجع صفر
+     */
+    private function reverseAllocations(Payment $payment, User $authUser): void
+    {
+        foreach ($payment->allocations()->with('due')->lockForUpdate()->get() as $allocation) {
+            $due = $allocation->due;
+            if ($due) {
+                $due->reversePayment((float) $allocation->amount_jod);
+
+                AuditLogService::record(
+                    $authUser,
+                    'due.settlement_reversed',
+                    $due,
+                    ['contractor_id' => $due->contractor_id, 'amount_jod' => (float) $allocation->amount_jod, 'payment_id' => $payment->id],
+                );
+            }
+            $allocation->delete();
+        }
+
+        $payment->update(['used_amount_jod' => 0]);
+    }
+
+    /**
      * إرجاع الدفعة لـ"قيد المراجعة"
      */
     private function reopen(Payment $payment, User $authUser): void
     {
+        if ($payment->status === 'paid') {
+            $this->reverseAllocations($payment, $authUser);
+        }
+
         $payment->update([
             'status'           => 'pending',
             'confirmed_by'     => $authUser->id,
@@ -208,19 +239,25 @@ class PaymentConfirmationService
             throw new \Exception($blocker);
         }
 
-        $payment->update([
-            'status'           => 'rejected',
-            'confirmed_by'     => $authUser->id,
-            'confirmed_at'     => now(),
-            'paid_at'          => null,
-            'rejection_reason' => $reason,
-        ]);
+        DB::transaction(function () use ($payment, $reason, $authUser) {
+            if ($payment->status === 'paid') {
+                $this->reverseAllocations($payment, $authUser);
+            }
 
-        AuditLogService::record(
-            $authUser,
-            'payment.rejected',
-            $payment,
-            ['reason' => $reason],
-        );
+            $payment->update([
+                'status'           => 'rejected',
+                'confirmed_by'     => $authUser->id,
+                'confirmed_at'     => now(),
+                'paid_at'          => null,
+                'rejection_reason' => $reason,
+            ]);
+
+            AuditLogService::record(
+                $authUser,
+                'payment.rejected',
+                $payment,
+                ['reason' => $reason],
+            );
+        });
     }
 }

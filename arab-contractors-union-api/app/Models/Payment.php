@@ -88,6 +88,12 @@ class Payment extends Model
         return $this->belongsTo(User::class, 'confirmed_by');
     }
 
+    /** الذمم اللي سدّدتها هالدفعة وبأي مبلغ */
+    public function allocations()
+    {
+        return $this->hasMany(PaymentAllocation::class);
+    }
+
     /** سجل تغييرات الحالة اليدوية مع أسبابها */
     public function statusChanges()
     {

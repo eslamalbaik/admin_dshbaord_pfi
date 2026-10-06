@@ -138,6 +138,18 @@ class ContractorDue extends Model
         return ['dues_count' => $duesCount, 'total_jod' => round($totalJod, 2)];
     }
 
+    /** إلغاء جزء من السداد (لما دفعة مؤكَّدة ترجع لقيد المراجعة أو تنرفض) */
+    public function reversePayment(float $amountJod): void
+    {
+        $paid = round(max(0, (float) $this->paid_jod - $amountJod), 2);
+
+        $this->update([
+            'paid_jod' => $paid,
+            'status'   => $paid >= (float) $this->amount_jod && $paid > 0 ? 'paid'
+                        : ($paid > 0 ? 'partially_paid' : 'unpaid'),
+        ]);
+    }
+
     /** تسجيل سداد (كامل أو جزئي) وتحديث الحالة تبعاً للمتبقي */
     public function applyPayment(float $amountJod): void
     {
