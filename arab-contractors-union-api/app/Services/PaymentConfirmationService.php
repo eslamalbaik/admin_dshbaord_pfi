@@ -65,6 +65,13 @@ class PaymentConfirmationService
                 $updateData['receipt_image'] = $data['receipt_image']->store('payment-receipts', 'public');
             }
 
+            // التطبيق بيبعت التحويل "رسوم عضوية" افتراضياً. لو عليه ذمم وقت الاعتماد، الدفعة سداد
+            // ذمم: بتسدّد أقدم الذمم والفائض بيضل رصيداً له (رسوم العضوية ما بتنحسب رصيد أبداً، فكان
+            // اللي عليه 11 ودفع 69 يطلع رصيده صفر بدل 58)، وما بتجدّد عضوية — الحالة بتتبع الرصيد.
+            if (self::isDuesPaymentInDisguise($payment)) {
+                $updateData['type'] = 'dues_payment';
+            }
+
             $payment->update($updateData);
 
             $this->settleLinkedDue($payment, $authUser);
@@ -83,6 +90,17 @@ class PaymentConfirmationService
                 ['amount' => $payment->amount, 'currency' => $currency, 'amount_jod' => $payment->amount_jod],
             );
         });
+    }
+
+    /**
+     * تحويل "رسوم عضوية" مش مربوط بعضوية محددة، والمقاول عليه ذمم مفتوحة.
+     */
+    public static function isDuesPaymentInDisguise(Payment $payment): bool
+    {
+        return $payment->type === 'membership_fee'
+            && ! $payment->membership_id
+            && $payment->contractor
+            && $payment->contractor->dues()->outstanding()->exists();
     }
 
     /**
