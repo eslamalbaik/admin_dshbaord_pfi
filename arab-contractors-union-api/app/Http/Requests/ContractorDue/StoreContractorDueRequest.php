@@ -37,6 +37,7 @@ class StoreContractorDueRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'amount_jod.min'          => 'مبلغ الذمة لازم يكون أكبر من صفر.',
             'year.required'           => 'السنة إلزامية.',
             'due_date.required'       => 'تاريخ الاستحقاق إلزامي.',
             'due_date.after_or_equal' => 'تاريخ الاستحقاق لا يمكن أن يكون قبل تاريخ اليوم. لتسجيل ذمة متأخّرة سابقة، فعّل خيار «ذمة سابقة/متأخّرة» واذكر السبب.',
