@@ -45,7 +45,7 @@ class DiscardedRequestBodyTest extends TestCase
         $_POST  = [];
         $_FILES = [];
 
-        $response = $this->runMiddleware($this->multipartRequest(50_000_000));
+        $response = $this->runMiddleware($this->multipartRequest(\App\Support\UploadLimits::maxPostKb() * 1024 + 1));
 
         $this->assertEquals(413, $response->getStatusCode());
         $this->assertStringContainsString('حجم المرفقات', $response->getData()->message);
@@ -67,6 +67,17 @@ class DiscardedRequestBodyTest extends TestCase
         $_FILES = ['cr_file' => ['name' => 'a.pdf', 'error' => 0]];
 
         $response = $this->runMiddleware($this->multipartRequest(50_000_000));
+
+        $this->assertEquals('passed-through', $response->getContent());
+    }
+
+    /** FormData فارغ (لا حقول ولا ملفات) جسمه بضع بايتات فقط — PHP لم يُسقط شيئاً. */
+    public function test_passes_through_empty_multipart_form_under_the_limit(): void
+    {
+        $_POST  = [];
+        $_FILES = [];
+
+        $response = $this->runMiddleware($this->multipartRequest(44));
 
         $this->assertEquals('passed-through', $response->getContent());
     }

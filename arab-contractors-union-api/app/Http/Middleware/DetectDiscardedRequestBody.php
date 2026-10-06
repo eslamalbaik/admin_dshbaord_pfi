@@ -56,6 +56,14 @@ class DetectDiscardedRequestBody
         // يقتصر على multipart لأن JSON الخام يصل عبر php://input ولا يملأ $_POST أصلاً.
         $isMultipart = str_contains((string) $request->header('Content-Type'), 'multipart/form-data');
 
-        return $isMultipart && empty($_POST) && empty($_FILES);
+        if (! $isMultipart || ! empty($_POST) || ! empty($_FILES)) {
+            return false;
+        }
+
+        // PHP لا يُسقط الجسم إلا إذا تجاوز post_max_size. بدون هذا الشرط كان أي FormData
+        // فارغ (مثل تأكيد دفعة بالدينار بلا صورة إثبات) يُعرض خطأً كأنه تجاوز للحجم.
+        $maxPostBytes = UploadLimits::maxPostKb() * 1024;
+
+        return $maxPostBytes > 0 && $contentLength > $maxPostBytes;
     }
 }
