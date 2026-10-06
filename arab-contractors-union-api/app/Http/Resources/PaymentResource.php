@@ -36,6 +36,19 @@ class PaymentResource extends JsonResource
             'confirmed_at'      => $this->confirmed_at,
             'paid_at'           => $this->paid_at,
             'created_at'        => $this->created_at,
+            // آخر "تغيير حالة" يدوي مع سببه (بيظهر بتلميح على شارة الحالة بسجل المدفوعات)
+            'last_status_change' => $this->whenLoaded('latestStatusChange', fn () => $this->latestStatusChange ? [
+                'from_status' => $this->latestStatusChange->from_status,
+                'to_status'   => $this->latestStatusChange->to_status,
+                'reason'      => $this->latestStatusChange->reason,
+                'changed_by'  => $this->latestStatusChange->changer?->name,
+                'changed_at'  => $this->latestStatusChange->created_at,
+            ] : null),
+            // ليش ما بينفع ترجيع دفعة مؤكَّدة (null = مسموح)، عشان القائمة تعطّل الخيار وتشرح
+            'status_change_blocker' => $this->when(
+                $request->user() instanceof \App\Models\User,
+                fn () => app(\App\Services\PaymentConfirmationService::class)->revertBlocker($this->resource),
+            ),
         ];
     }
 }

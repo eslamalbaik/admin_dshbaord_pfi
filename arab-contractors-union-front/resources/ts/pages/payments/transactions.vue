@@ -23,6 +23,14 @@ interface Payment {
   receipt_image_url: string | null
   rejection_reason: string | null
   notes: string | null
+  last_status_change?: {
+    from_status: string
+    to_status: string
+    reason: string
+    changed_by: string | null
+    changed_at: string
+  } | null
+  status_change_blocker?: string | null
   submitted_at: string | null
   confirmed_at: string | null
   created_at: string
@@ -74,21 +82,39 @@ const { data: rates } = useQuery({
   queryFn: async () => (await api.get('/api/v1/dashboard/exchange-rates')).data,
 })
 
-// ─── تأكيد دفعة ───
-const confirmDialog = ref(false)
-const confirming = ref<Payment | null>(null)
+const statusColor: Record<string, string> = {
+  pending: 'warning', paid: 'success', rejected: 'error', refunded: 'info', failed: 'error',
+}
+
+const statusLabel: Record<string, string> = {
+  pending: 'قيد المراجعة', paid: 'مؤكّدة', rejected: 'مرفوضة', refunded: 'مُعادة', failed: 'فاشلة',
+}
+
+// ─── تغيير الحالة (من قائمة الثلاث نقاط) — السبب إجباري وبينحفظ مع مين غيّر ───
+const statusDialog = ref(false)
+const changing = ref<Payment | null>(null)
+const targetStatus = ref<string | null>(null)
+const changeReason = ref('')
 const confirmRate = ref('')
 const confirmReceiptFile = ref<File | File[] | null>(null)
 const confirmReceiptPreview = ref('')
 
-function openConfirm(p: Payment) {
-  confirming.value = p
+const statusTargets = computed(() => [
+  { title: 'مؤكّدة', value: 'paid' },
+  { title: 'قيد المراجعة', value: 'pending' },
+  { title: 'مرفوضة', value: 'rejected' },
+].filter(o => o.value !== changing.value?.status))
+
+function openStatusChange(p: Payment) {
+  changing.value = p
+  targetStatus.value = null
+  changeReason.value = ''
   confirmRate.value = p.currency !== 'JOD'
     ? String(rates.value?.items?.latest?.[p.currency]?.rate_to_jod ?? '')
     : ''
   confirmReceiptFile.value = null
   confirmReceiptPreview.value = ''
-  confirmDialog.value = true
+  statusDialog.value = true
 }
 
 watch(confirmReceiptFile, files => {
@@ -96,59 +122,55 @@ watch(confirmReceiptFile, files => {
     URL.revokeObjectURL(confirmReceiptPreview.value)
 
   const file = firstFile(files)
+
   confirmReceiptPreview.value = file && file.type.startsWith('image/') ? URL.createObjectURL(file) : ''
 })
 
 const jodEquivalent = computed(() => {
-  if (!confirming.value) return null
-  if (confirming.value.currency === 'JOD') return Number(confirming.value.amount)
+  if (!changing.value) return null
+  if (changing.value.currency === 'JOD') return Number(changing.value.amount)
   const rate = Number(confirmRate.value)
   if (!rate) return null
-  return Math.round(Number(confirming.value.amount) * rate * 100) / 100
+  return Math.round(Number(changing.value.amount) * rate * 100) / 100
 })
 
-const confirmMutation = useMutation({
+const canSubmitStatus = computed(() =>
+  !!changing.value
+  && !changing.value.status_change_blocker
+  && !!targetStatus.value
+  && !!changeReason.value.trim()
+  && (targetStatus.value !== 'paid' || changing.value.currency === 'JOD' || Number(confirmRate.value) > 0),
+)
+
+const statusMutation = useMutation({
   mutationFn: async () => {
     const form = new FormData()
-    if (confirming.value!.currency !== 'JOD' && confirmRate.value)
-      form.append('exchange_rate', confirmRate.value)
-    const receipt = firstFile(confirmReceiptFile.value)
-    if (receipt)
-      form.append('receipt_image', receipt)
 
-    return (await api.post(`/api/v1/payments/transactions/${confirming.value!.id}/confirm`, form, {
+    form.append('status', targetStatus.value!)
+    form.append('reason', changeReason.value.trim())
+    if (targetStatus.value === 'paid') {
+      if (changing.value!.currency !== 'JOD' && confirmRate.value)
+        form.append('exchange_rate', confirmRate.value)
+      const receipt = firstFile(confirmReceiptFile.value)
+      if (receipt)
+        form.append('receipt_image', receipt)
+    }
+
+    return (await api.post(`/api/v1/payments/transactions/${changing.value!.id}/status`, form, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })).data
   },
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ['payments-transactions'] })
-    confirmDialog.value = false
-    flash('تم تأكيد عملية الدفع بنجاح.')
+    statusDialog.value = false
+    flash(`تم تغيير حالة الدفعة إلى "${statusLabel[targetStatus.value!]}".`)
   },
-  onError: (e: any) => flash(e?.response?.data?.message || 'فشل تأكيد الدفعة.', true),
-})
+  onError: (e: any) => {
+    const errors = e?.response?.data?.errors
+    const first = errors ? Object.values(errors).flat()[0] : null
 
-// ─── رفض دفعة ───
-const rejectDialog = ref(false)
-const rejecting = ref<Payment | null>(null)
-const rejectReason = ref('')
-
-function openReject(p: Payment) {
-  rejecting.value = p
-  rejectReason.value = ''
-  rejectDialog.value = true
-}
-
-const rejectMutation = useMutation({
-  mutationFn: async () => (await api.post(`/api/v1/payments/transactions/${rejecting.value!.id}/reject`, {
-    rejection_reason: rejectReason.value,
-  })).data,
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['payments-transactions'] })
-    rejectDialog.value = false
-    flash('تم رفض إشعار التحويل.')
+    flash((first as string) || e?.response?.data?.message || 'فشل تغيير حالة الدفعة.', true)
   },
-  onError: (e: any) => flash(e?.response?.data?.message || 'فشل رفض الدفعة.', true),
 })
 
 // ─── إضافة دفعة يدوياً (نيابةً عن المقاول) — تُسجَّل مؤكَّدة وتوزَّع على أقدم الذمم ───
@@ -286,14 +308,6 @@ const addMutation = useMutation({
   },
 })
 
-const statusColor: Record<string, string> = {
-  pending: 'warning', paid: 'success', rejected: 'error', refunded: 'info', failed: 'error',
-}
-
-const statusLabel: Record<string, string> = {
-  pending: 'قيد المراجعة', paid: 'مؤكّدة', rejected: 'مرفوضة', refunded: 'مُعادة', failed: 'فاشلة',
-}
-
 const currencySymbol: Record<string, string> = { JOD: 'د.أ', ILS: '₪', USD: '$' }
 
 function fmtDate(d: string | null) {
@@ -383,17 +397,30 @@ function fmtDate(d: string | null) {
             <td>
               <VChip :color="statusColor[p.status]" size="small">
                 {{ statusLabel[p.status] ?? p.status }}
+                <VIcon v-if="p.last_status_change || p.rejection_reason" icon="tabler-info-circle" size="14" class="ms-1" />
+                <VTooltip v-if="p.last_status_change" activator="parent" max-width="320">
+                  <div>من "{{ statusLabel[p.last_status_change.from_status] ?? p.last_status_change.from_status }}" إلى "{{ statusLabel[p.last_status_change.to_status] ?? p.last_status_change.to_status }}"</div>
+                  <div>السبب: {{ p.last_status_change.reason }}</div>
+                  <div class="text-caption">{{ p.last_status_change.changed_by ?? '—' }} · {{ fmtDateTime(p.last_status_change.changed_at) }}</div>
+                </VTooltip>
+                <VTooltip v-else-if="p.rejection_reason" activator="parent" max-width="320">
+                  سبب الرفض: {{ p.rejection_reason }}
+                </VTooltip>
               </VChip>
             </td>
             <td>{{ fmtDate(p.submitted_at ?? p.created_at) }}</td>
             <td class="text-caption text-medium-emphasis">{{ p.status !== 'pending' ? fmtDateTime(p.confirmed_at) : '—' }}</td>
             <td class="text-end text-no-wrap">
-              <VBtn size="small" color="success" variant="tonal" class="me-1" @click="openConfirm(p)">
-                تأكيد
-              </VBtn>
-              <VBtn size="small" color="error" variant="tonal" @click="openReject(p)">
-                رفض
-              </VBtn>
+              <VMenu location="bottom end">
+                <template #activator="{ props }">
+                  <VBtn icon size="small" variant="text" v-bind="props" aria-label="إجراءات">
+                    <VIcon icon="tabler-dots-vertical" />
+                  </VBtn>
+                </template>
+                <VList density="compact" min-width="160">
+                  <VListItem prepend-icon="tabler-transfer" title="تغيير الحالة" @click="openStatusChange(p)" />
+                </VList>
+              </VMenu>
             </td>
           </tr>
           <tr v-if="!isLoading && !(data?.items ?? []).length">
@@ -409,61 +436,90 @@ function fmtDate(d: string | null) {
       </VCardText>
     </VCard>
 
-    <!-- ─── Dialog تأكيد ─── -->
-    <VDialog v-model="confirmDialog" max-width="480">
-      <VCard title="تأكيد استلام الدفعة">
+    <!-- ─── Dialog تغيير الحالة ─── -->
+    <VDialog v-model="statusDialog" max-width="500">
+      <VCard title="تغيير حالة الدفعة">
         <VCardText>
           <p class="text-body-2 mb-4">
-            {{ confirming?.contractor }} —
-            <strong dir="ltr">{{ confirming?.amount }} {{ currencySymbol[confirming?.currency ?? 'JOD'] }}</strong>
+            {{ changing?.contractor }} —
+            <strong dir="ltr">{{ changing?.amount }} {{ currencySymbol[changing?.currency ?? 'JOD'] }}</strong>
+            <span class="ms-2">الحالة الحالية:</span>
+            <VChip v-if="changing" :color="statusColor[changing.status]" size="small" class="ms-1">
+              {{ statusLabel[changing.status] ?? changing.status }}
+            </VChip>
           </p>
 
-          <template v-if="confirming && confirming.currency !== 'JOD'">
-            <VTextField
-              v-model="confirmRate"
-              :label="`سعر الصرف (1 ${confirming.currency} = ? د.أ)`"
-              type="number"
-              step="0.000001"
-              dir="ltr"
-              class="mb-2"
-              hint="السعر المقترح من آخر تحديث تلقائي — يمكن تعديله"
+          <VAlert v-if="changing?.status_change_blocker" type="warning" variant="tonal" density="compact" class="mb-4">
+            {{ changing.status_change_blocker }}
+          </VAlert>
+
+          <template v-else>
+            <VSelect
+              v-model="targetStatus"
+              :items="statusTargets"
+              label="الحالة الجديدة"
+              class="mb-3"
+            />
+
+            <VTextarea
+              v-model="changeReason"
+              label="سبب تغيير الحالة"
+              rows="3"
+              dir="rtl"
+              :hint="targetStatus === 'rejected' ? 'بيظهر للمقاول كسبب الرفض' : 'بينحفظ بسجل الدفعة مع اسمك والوقت'"
               persistent-hint
             />
-            <VAlert v-if="jodEquivalent" type="info" variant="tonal" density="compact" class="mt-3">
-              المعادل بالدينار الأردني: <strong>{{ jodEquivalent }} د.أ</strong>
-            </VAlert>
-            <VAlert v-else type="warning" variant="tonal" density="compact" class="mt-3">
-              لا يوجد سعر صرف معتمد — أدخل السعر يدوياً.
-            </VAlert>
-          </template>
 
-          <a v-if="confirming?.receipt_image_url" :href="confirming.receipt_image_url" target="_blank" rel="noopener" class="d-block mb-2 mt-3 text-body-2">
-            عرض صورة الإشعار الحالية
-          </a>
-          <VFileInput
-            v-model="confirmReceiptFile"
-            label="صورة إثبات الدفع (اختياري — لاستبدال/إضافة الصورة عند التأكيد)"
-            accept="image/png,image/jpeg,image/webp,application/pdf"
-            prepend-icon="tabler-photo"
-            show-size
-            class="mt-3"
-          />
-          <VImg
-            v-if="confirmReceiptPreview"
-            :src="confirmReceiptPreview"
-            max-height="220"
-            class="mt-2 rounded border"
-          />
+            <template v-if="targetStatus === 'paid'">
+              <template v-if="changing && changing.currency !== 'JOD'">
+                <VTextField
+                  v-model="confirmRate"
+                  :label="`سعر الصرف (1 ${changing.currency} = ? د.أ)`"
+                  type="number"
+                  step="0.000001"
+                  dir="ltr"
+                  class="mt-4"
+                  hint="السعر المقترح من آخر تحديث تلقائي — يمكن تعديله"
+                  persistent-hint
+                />
+                <VAlert v-if="jodEquivalent" type="info" variant="tonal" density="compact" class="mt-3">
+                  المعادل بالدينار الأردني: <strong>{{ jodEquivalent }} د.أ</strong>
+                </VAlert>
+                <VAlert v-else type="warning" variant="tonal" density="compact" class="mt-3">
+                  لا يوجد سعر صرف معتمد — أدخل السعر يدوياً.
+                </VAlert>
+              </template>
+
+              <a v-if="changing?.receipt_image_url" :href="changing.receipt_image_url" target="_blank" rel="noopener" class="d-block mb-2 mt-3 text-body-2">
+                عرض صورة الإشعار الحالية
+              </a>
+              <VFileInput
+                v-model="confirmReceiptFile"
+                label="صورة إثبات الدفع (اختياري — لاستبدال/إضافة الصورة عند التأكيد)"
+                accept="image/png,image/jpeg,image/webp,application/pdf"
+                prepend-icon="tabler-photo"
+                show-size
+                class="mt-3"
+              />
+              <VImg
+                v-if="confirmReceiptPreview"
+                :src="confirmReceiptPreview"
+                max-height="220"
+                class="mt-2 rounded border"
+              />
+            </template>
+          </template>
         </VCardText>
         <VCardActions class="justify-end pb-4 px-6">
-          <VBtn variant="tonal" color="secondary" @click="confirmDialog = false">إلغاء</VBtn>
+          <VBtn variant="tonal" color="secondary" @click="statusDialog = false">إلغاء</VBtn>
           <VBtn
-            color="success"
-            :loading="confirmMutation.isPending.value"
-            :disabled="confirming?.currency !== 'JOD' && !confirmRate"
-            @click="confirmMutation.mutate()"
+            v-if="!changing?.status_change_blocker"
+            :color="targetStatus ? statusColor[targetStatus] : 'primary'"
+            :loading="statusMutation.isPending.value"
+            :disabled="!canSubmitStatus"
+            @click="statusMutation.mutate()"
           >
-            تأكيد الدفع
+            حفظ
           </VBtn>
         </VCardActions>
       </VCard>
@@ -570,24 +626,5 @@ function fmtDate(d: string | null) {
       </VCard>
     </VDialog>
 
-    <!-- ─── Dialog رفض ─── -->
-    <VDialog v-model="rejectDialog" max-width="480">
-      <VCard title="رفض إشعار التحويل">
-        <VCardText>
-          <VTextarea v-model="rejectReason" label="سبب الرفض" rows="3" dir="rtl" />
-        </VCardText>
-        <VCardActions class="justify-end pb-4 px-6">
-          <VBtn variant="tonal" color="secondary" @click="rejectDialog = false">إلغاء</VBtn>
-          <VBtn
-            color="error"
-            :loading="rejectMutation.isPending.value"
-            :disabled="!rejectReason"
-            @click="rejectMutation.mutate()"
-          >
-            رفض
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
   </div>
 </template>
