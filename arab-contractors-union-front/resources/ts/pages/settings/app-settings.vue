@@ -59,7 +59,32 @@ interface ServiceItem { title: string; description: string; icon: string }
 const services = ref<ServiceItem[]>([])
 
 const addService = () => services.value.push({ title: '', description: '', icon: '' })
-const removeService = (i: number) => services.value.splice(i, 1)
+
+// ─── حذف الخدمة مع تأكيد ───
+const deleteConfirmDialog = ref(false)
+const serviceIndexToDelete = ref<number | null>(null)
+
+const confirmDeleteService = (i: number) => {
+  serviceIndexToDelete.value = i
+
+  deleteConfirmDialog.value = true
+}
+
+const deleteService = () => {
+  if (serviceIndexToDelete.value !== null) {
+    services.value.splice(serviceIndexToDelete.value, 1)
+    successMessage.value = 'تم حذف الخدمة بنجاح.'
+    setTimeout(() => successMessage.value = '', 4000)
+  }
+
+  deleteConfirmDialog.value = false
+  serviceIndexToDelete.value = null
+}
+
+const cancelDeleteService = () => {
+  deleteConfirmDialog.value = false
+  serviceIndexToDelete.value = null
+}
 
 // ─── صورة أيقونة الخدمة: تُرفع فور الاختيار، ويُحفظ مسارها بـ svc.icon مع "حفظ الإعدادات" ───
 // قيم icon القديمة كانت نصاً حراً (قبل دعم الصور)، فلا تُعرض كصورة إلا إذا كانت مساراً مرفوعاً
@@ -406,7 +431,7 @@ watch(coverImageFile, () => {
             />
           </VCol>
           <VCol cols="12" md="1" class="text-center">
-            <VBtn icon="tabler-trash" size="small" variant="text" color="error" @click="removeService(i)" />
+            <VBtn icon="tabler-trash" size="small" variant="text" color="error" @click="confirmDeleteService(i)" />
           </VCol>
         </VRow>
 
@@ -549,5 +574,26 @@ watch(coverImageFile, () => {
         حفظ الإعدادات
       </VBtn>
     </div>
+
+    <!-- ─── Dialog تأكيد حذف الخدمة ─── -->
+    <VDialog v-model="deleteConfirmDialog" max-width="400">
+      <VCard>
+        <VCardTitle class="d-flex align-center gap-2">
+          <VIcon icon="tabler-alert-circle" color="warning" />
+          <span>تأكيد حذف الخدمة</span>
+        </VCardTitle>
+        <VCardText class="pt-0">
+          هل أنت متأكد من حذف هذه الخدمة؟ هاد التعديل بينعمل عند حفظ الإعدادات.
+        </VCardText>
+        <VCardActions class="d-flex justify-end gap-2">
+          <VBtn variant="outlined" @click="cancelDeleteService">
+            الغاء
+          </VBtn>
+          <VBtn color="error" @click="deleteService">
+            حذف الخدمة
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
   </div>
 </template>
