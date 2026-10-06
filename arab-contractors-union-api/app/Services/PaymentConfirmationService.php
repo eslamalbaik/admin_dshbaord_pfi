@@ -120,10 +120,8 @@ class PaymentConfirmationService
     /**
      * سبب منع إرجاع دفعة مؤكَّدة (لقيد المراجعة أو مرفوضة)، أو null لو إرجاعها آمن.
      *
-     * الإرجاع الآمن حالياً = دفعة ما إلها أي أثر غير رصيدها: الرصيد بيتحسب من الدفعات
-     * المؤكَّدة بس (ContractorBalanceController::balancesQuery)، فبمجرد ما تطلع من "paid"
-     * بينشال رصيدها لحاله. أما الدفعة اللي سدّدت ذمم أو جدّدت عضوية أو فعّلت اشتراك آليات،
-     * فما في سجل توزيع يخلّينا نرجّع أثرها بدقة، فبنمنعها لحد ما يتقرر كيف تنعكس.
+     * الرصيد بينشال لحاله (balancesQuery بتحسب الدفعات المؤكَّدة بس)، وتسديد الذمم وتجديد
+     * العضوية بينعكسوا بـreverseEffects(). الممنوع: تسديد قديم ما إله سجل توزيع، واشتراك آليات.
      */
     public function revertBlocker(Payment $payment): ?string
     {
@@ -135,10 +133,6 @@ class PaymentConfirmationService
         $used = round((float) $payment->used_amount_jod, 2);
         if ($used > 0 && round((float) $payment->allocations()->sum('amount_jod'), 2) !== $used) {
             return 'هذه الدفعة سدّدت ذمماً قبل تفعيل سجل التوزيع، فلا يمكن ترجيع تسديدها تلقائياً — ألغِ التسديد من شاشة الذمم أولاً.';
-        }
-
-        if ($payment->type === 'membership_fee' && $payment->membership_id) {
-            return 'هذه الدفعة جدّدت عضوية المقاول، فلا يمكن تغيير حالتها من هنا.';
         }
 
         if ($payment->type === 'equipment_subscription'
@@ -190,10 +184,22 @@ class PaymentConfirmationService
     }
 
     /**
-     * إلغاء تسديد الذمم اللي سدّدتها الدفعة، فترجع الذمم مستحقة والرصيد يرجع صفر
+     * عكس آثار دفعة مؤكَّدة: تجديد العضوية (لو رسوم عضوية)، وتسديد الذمم اللي سدّدتها
+     * فترجع الذمم مستحقة والرصيد يرجع صفر
      */
-    private function reverseAllocations(Payment $payment, User $authUser): void
+    private function reverseEffects(Payment $payment, User $authUser): void
     {
+        if ($payment->type === 'membership_fee' && $payment->membership_id) {
+            app(MembershipRenewalService::class)->revertFromPayment($payment);
+
+            AuditLogService::record(
+                $authUser,
+                'membership.renewal_reversed',
+                $payment->membership,
+                ['payment_id' => $payment->id, 'contractor_id' => $payment->contractor_id],
+            );
+        }
+
         foreach ($payment->allocations()->with('due')->lockForUpdate()->get() as $allocation) {
             $due = $allocation->due;
             if ($due) {
@@ -218,7 +224,7 @@ class PaymentConfirmationService
     private function reopen(Payment $payment, User $authUser): void
     {
         if ($payment->status === 'paid') {
-            $this->reverseAllocations($payment, $authUser);
+            $this->reverseEffects($payment, $authUser);
         }
 
         $payment->update([
@@ -241,7 +247,7 @@ class PaymentConfirmationService
 
         DB::transaction(function () use ($payment, $reason, $authUser) {
             if ($payment->status === 'paid') {
-                $this->reverseAllocations($payment, $authUser);
+                $this->reverseEffects($payment, $authUser);
             }
 
             $payment->update([

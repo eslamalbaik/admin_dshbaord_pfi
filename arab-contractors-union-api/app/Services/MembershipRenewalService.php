@@ -63,6 +63,18 @@ class MembershipRenewalService
         }
 
         $membership = $payment->membership;
+        $contractor = $payment->contractor;
+
+        // لقطة قبل التجديد، عشان ترجيع الدفعة (revertFromPayment) يرجّع كل شي زي ما كان
+        $snapshot = [
+            'created'           => ! $membership,
+            'status'            => $membership?->status,
+            'starts_at'         => $membership?->starts_at?->toDateString(),
+            'expires_at'        => $membership?->expires_at?->toDateString(),
+            'reviewed_by'       => $membership?->reviewed_by,
+            'reviewed_at'       => $membership?->reviewed_at?->toDateTimeString(),
+            'contractor_status' => $contractor?->status,
+        ];
 
         if (! $membership) {
             $contractor = $payment->contractor;
@@ -77,6 +89,49 @@ class MembershipRenewalService
             $payment->update(['membership_id' => $membership->id]);
         }
 
+        $payment->update(['membership_snapshot' => $snapshot]);
+
         return $this->applyRenewal($membership, $reviewerId);
+    }
+
+    /**
+     * عكس renewFromPayment() لما دفعة رسوم عضوية مؤكَّدة ترجع لقيد المراجعة أو تنرفض:
+     * - عضوية أنشأتها الدفعة ← بتصير مرفوضة (ما بتغطي أي سنة).
+     * - طلب تجديد كان موجود ← بيرجع لحالته وتواريخه قبل التأكيد.
+     * - حالة المقاول بترجع لو التجديد هو اللي فعّله.
+     * دفعات أُكِّدت قبل اللقطة: العضوية بتصير مرفوضة وحالة المقاول ما بتتغيّر.
+     */
+    public function revertFromPayment(Payment $payment): void
+    {
+        if ($payment->type !== 'membership_fee' || ! $payment->membership) {
+            return;
+        }
+
+        $membership = $payment->membership;
+        $snapshot   = $payment->membership_snapshot;
+
+        if ($snapshot && ! $snapshot['created']) {
+            $membership->update([
+                'status'      => $snapshot['status'],
+                'starts_at'   => $snapshot['starts_at'],
+                'expires_at'  => $snapshot['expires_at'],
+                'reviewed_by' => $snapshot['reviewed_by'],
+                'reviewed_at' => $snapshot['reviewed_at'],
+            ]);
+        } else {
+            $membership->update([
+                'status'     => 'rejected',
+                'starts_at'  => null,
+                'expires_at' => null,
+            ]);
+        }
+
+        $contractor = $payment->contractor;
+        if ($snapshot && $contractor && $contractor->status === 'active'
+            && in_array($snapshot['contractor_status'], ['pending', 'expired'], true)) {
+            $contractor->update(['status' => $snapshot['contractor_status']]);
+        }
+
+        $payment->update(['membership_snapshot' => null]);
     }
 }
