@@ -14,7 +14,9 @@ class DuesPaymentService
     }
 
     /**
-     * معالجة دفعة جديدة وتوزيعها تلقائياً على الذمم الأقدم.
+     * معالجة دفعة جديدة وتوزيعها تلقائياً على الذمم الأقدم، ثم على الغرامات المفتوحة.
+     * الغرامات جزء من "المتبقي" بجدول الذمم وبالأرصدة، فلو ضل فائض الدفعة رصيد له
+     * والغرامة مفتوحة، بيطلع المتبقي بجدول الذمم أكبر من صافي الأرصدة.
      */
     public function processPayment(Contractor $contractor, array $data, int $authId): array
     {
@@ -86,6 +88,37 @@ class DuesPaymentService
                     'description' => $due->description,
                     'applied_jod' => $applied,
                     'status'      => $due->status,
+                ];
+            }
+
+            $penalties = $remaining > 0
+                ? $contractor->penalties()
+                    ->whereIn('status', ['unpaid', 'partially_paid'])
+                    ->orderBy('created_at')
+                    ->orderBy('id')
+                    ->get()
+                : collect();
+
+            foreach ($penalties as $penalty) {
+                if ($remaining <= 0) {
+                    break;
+                }
+
+                $applied = min($remaining, $penalty->remaining);
+                if ($applied <= 0) {
+                    continue;
+                }
+
+                $penalty->applyPayment($applied);
+                PaymentAllocation::recordPenalty($payment, $penalty, $applied);
+                $remaining = round($remaining - $applied, 2);
+
+                $settled[] = [
+                    'penalty_id'  => $penalty->id,
+                    'year'        => null,
+                    'description' => 'غرامة: ' . $penalty->reason,
+                    'applied_jod' => $applied,
+                    'status'      => $penalty->status,
                 ];
             }
 

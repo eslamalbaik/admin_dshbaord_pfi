@@ -171,28 +171,38 @@ class ContractorDue extends Model
      * سبق خصمها (TASK-17 #10).
      *
      * @return array{
-     *     original: float, effective_value: float, new_amount: float,
+     *     original: float, effective_type: string, effective_value: float, new_amount: float,
      *     discount_amount: float, blocked_reason: ?string
      * }
      */
     public function projectDiscount(string $type, float $value): array
     {
         $original = (float) ($this->original_amount_jod ?? $this->amount_jod);
+        $current  = (float) $this->amount_jod;
+        $previous = $this->discount_type;
 
-        // خصم إضافي من نفس النوع (نسبة/مبلغ) يتراكم مع الخصم السابق بدل ما يستبدله —
-        // مثلاً 30% ثم 30% تانية = 60% إجمالاً، مش 30% ثابتة
-        $effectiveValue = $this->discount_type === $type
-            ? $value + (float) $this->discount_value
-            : $value;
-
-        $newAmount = $type === 'percent'
-            ? $original * (1 - $effectiveValue / 100)
-            : $original - $effectiveValue;
+        if ($type === 'percent' && ($previous === null || $previous === 'percent')) {
+            // نسبة بعد نسبة تتراكم على المبلغ الأصلي (30% ثم 30% = 60%)
+            $effectiveType  = 'percent';
+            $effectiveValue = $value + (float) $this->discount_value;
+            $newAmount      = $original * (1 - $effectiveValue / 100);
+        } else {
+            // أي خصم غير هيك بينطبق على صافي الذمة الحالي بعد الخصومات السابقة:
+            // 100 ← 10% = 90 ← 20 د.أ = 70 (مش 80 محسوبة من الـ100). لما يختلط النوعان
+            // بينحفظ الخصم كمبلغ ثابت = إجمالي ما انخصم من الأصل.
+            $newAmount     = $type === 'percent' ? $current * (1 - $value / 100) : $current - $value;
+            $effectiveType = 'fixed';
+        }
 
         $newAmount = round(max(0, $newAmount), 2);
 
+        if ($effectiveType === 'fixed') {
+            $effectiveValue = round($original - $newAmount, 2);
+        }
+
         return [
             'original'        => $original,
+            'effective_type'  => $effectiveType,
             'effective_value' => $effectiveValue,
             'new_amount'      => $newAmount,
             'discount_amount' => round($original - $newAmount, 2),
@@ -216,16 +226,17 @@ class ContractorDue extends Model
             throw new \InvalidArgumentException($projection['blocked_reason']);
         }
 
+        $effectiveType  = $projection['effective_type'];
         $effectiveValue = $projection['effective_value'];
 
         // تحديث لاحقة "(بعد خصم ...)" بنص البيان لتعكس نسبة/مبلغ الخصم المتراكم الفعلي —
         // بدونه يضل النص القديم (مثلاً 50%) ظاهر حتى بعد ما يصير الخصم الحقيقي 70%.
-        $suffix = $type === 'percent' ? "(بعد خصم {$effectiveValue}%)" : "(بعد خصم {$effectiveValue} د.أ)";
+        $suffix = $effectiveType === 'percent' ? "(بعد خصم {$effectiveValue}%)" : "(بعد خصم {$effectiveValue} د.أ)";
         $baseDescription = trim(preg_replace('/\s*\(بعد خصم[^)]*\)\s*$/u', '', (string) $this->description));
 
         $this->update([
             'original_amount_jod' => $projection['original'],
-            'discount_type'       => $type,
+            'discount_type'       => $effectiveType,
             'discount_value'      => $effectiveValue,
             'discount_amount_jod' => $projection['discount_amount'],
             'discount_reason'     => $reason,

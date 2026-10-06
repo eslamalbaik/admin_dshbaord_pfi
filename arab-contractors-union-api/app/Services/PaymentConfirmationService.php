@@ -252,8 +252,18 @@ class PaymentConfirmationService
             );
         }
 
-        foreach ($payment->allocations()->with('due')->lockForUpdate()->get() as $allocation) {
+        foreach ($payment->allocations()->with(['due', 'penalty'])->lockForUpdate()->get() as $allocation) {
             $due = $allocation->due;
+            if ($penalty = $allocation->penalty) {
+                $penalty->reversePayment((float) $allocation->amount_jod);
+
+                AuditLogService::record(
+                    $authUser,
+                    'penalty.settlement_reversed',
+                    $penalty,
+                    ['contractor_id' => $penalty->contractor_id, 'amount_jod' => (float) $allocation->amount_jod, 'payment_id' => $payment->id],
+                );
+            }
             if ($due) {
                 $due->reversePayment((float) $allocation->amount_jod);
 

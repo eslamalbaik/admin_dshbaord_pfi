@@ -173,9 +173,11 @@ const payMutation = useMutation({
   })).data,
   onSuccess: (d: any) => {
     payDialog.value = false
-    const applied = (d.items?.applied ?? []).length
+    const appliedItems = d.items?.applied ?? []
+    const penalties = appliedItems.filter((a: any) => a.penalty_id).length
+    const dues = appliedItems.length - penalties
     const excess = d.items?.unapplied_jod ?? 0
-    flash(`تم تسجيل الدفعة وتوزيعها على ${applied} ذمة.${excess > 0 ? ` فائض غير موزَّع: ${excess} د.أ` : ''}`)
+    flash(`تم تسجيل الدفعة وتوزيعها على ${dues} ذمة${penalties ? ` و${penalties} غرامة` : ''}.${excess > 0 ? ` فائض غير موزَّع: ${excess} د.أ` : ''}`)
     refreshAll()
   },
   onError: (e: any) => flash(e?.response?.data?.message || 'فشل تسجيل الدفعة.', true),
@@ -783,7 +785,8 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
                  وهو ما قاد لظنّ أن كل الذمم حُذفت والبطاقة "لم تتحدّث" (TASK-17 #9). -->
             <p class="text-caption text-medium-emphasis mb-0">
               {{ summary?.items?.outstanding_dues_count ?? 0 }} ذمة قائمة من أصل
-              {{ summary?.items?.dues_count ?? 0 }} في النظام
+              {{ summary?.items?.dues_count ?? 0 }} في النظام<template v-if="summary?.items?.open_penalties_count">
+                + {{ summary?.items?.open_penalties_count }} غرامة مفتوحة</template>
             </p>
           </VCardText>
         </VCard>
@@ -886,7 +889,7 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
               </td>
               <td class="text-end text-no-wrap" @click.stop>
                 <VBtn
-                  v-if="c.remaining_jod - (c.penalties_remaining_jod ?? 0) > 0"
+                  v-if="c.remaining_jod > 0"
                   size="small"
                   color="success"
                   variant="tonal"
@@ -1066,7 +1069,7 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
             {{ paying?.name }} — المتبقي عليه:
             <strong>{{ paying?.remaining_jod }} د.أ</strong>
             <br>
-            <span class="text-medium-emphasis">تُوزَّع الدفعة تلقائياً على الذمم غير المسدَّدة، الأقدم أولاً.</span>
+            <span class="text-medium-emphasis">تُوزَّع الدفعة تلقائياً على الذمم غير المسدَّدة، الأقدم أولاً، ثم على الغرامات المفتوحة.</span>
           </p>
           <VRow>
             <VCol cols="12" md="6">
