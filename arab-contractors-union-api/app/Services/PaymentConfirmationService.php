@@ -93,14 +93,14 @@ class PaymentConfirmationService
     }
 
     /**
-     * تحويل "رسوم عضوية" مش مربوط بعضوية محددة، والمقاول عليه ذمم مفتوحة.
+     * تحويل "رسوم عضوية" مش مربوط بعضوية محددة، والمقاول عليه ذمم أو غرامات مفتوحة.
      */
     public static function isDuesPaymentInDisguise(Payment $payment): bool
     {
         return $payment->type === 'membership_fee'
             && ! $payment->membership_id
             && $payment->contractor
-            && $payment->contractor->dues()->outstanding()->exists();
+            && self::hasOpenObligations($payment->contractor);
     }
 
     /**
@@ -185,6 +185,46 @@ class PaymentConfirmationService
                 ['contractor_id' => $due->contractor_id, 'amount_jod' => $amount, 'payment_id' => $payment->id],
             );
         }
+
+        // سداد الذمم بعد الذمم بيسدّد الغرامات المفتوحة، متل الدفعة اليدوية (DuesPaymentService)،
+        // حتى ما يضل الفائض رصيداً والغرامة مفتوحة
+        if ($payment->type !== 'dues_payment' || $available <= 0) {
+            return;
+        }
+
+        $penalties = $payment->contractor->penalties()
+            ->whereIn('status', ['unpaid', 'partially_paid'])
+            ->orderBy('created_at')->orderBy('id')->lockForUpdate()->get();
+
+        foreach ($penalties as $penalty) {
+            if ($available <= 0) {
+                break;
+            }
+
+            $amount = min($available, $penalty->remaining);
+            if ($amount <= 0) {
+                continue;
+            }
+
+            $payment->increment('used_amount_jod', $amount);
+            $penalty->applyPayment($amount);
+            PaymentAllocation::recordPenalty($payment, $penalty, $amount);
+            $available = round($available - $amount, 2);
+
+            AuditLogService::record(
+                $authUser,
+                'penalty.settled',
+                $penalty,
+                ['contractor_id' => $penalty->contractor_id, 'amount_jod' => $amount, 'payment_id' => $payment->id],
+            );
+        }
+    }
+
+    /** عليه ذمم أو غرامات مفتوحة — الدفعة بلا نوع وقتها سداد ذمم، مش رسوم عضوية */
+    public static function hasOpenObligations(\App\Models\Contractor $contractor): bool
+    {
+        return $contractor->dues()->outstanding()->exists()
+            || $contractor->penalties()->whereIn('status', ['unpaid', 'partially_paid'])->exists();
     }
 
     /**
