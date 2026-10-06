@@ -203,10 +203,21 @@ const todayIso = new Date().toISOString().slice(0, 10)
 const isPositiveAmount = (v: unknown) => v !== '' && v !== null && Number(v) > 0
 const positiveAmountRule = (v: unknown) => isPositiveAmount(v) || 'المبلغ لازم يكون أكبر من صفر'
 
-// السنة تُعبّأ تلقائياً من تاريخ الاستحقاق إن كانت فارغة
+// السنة تُعبّأ تلقائياً من تاريخ الاستحقاق وبتلحقه طول ما المستخدم ما كتبها بنفسه. حقل التاريخ
+// بيبعت قيم ناقصة وقت كتابة السنة حرف حرف (0002-10-06 ثم 0020-...)، فكانت أول قيمة (2) تنحفظ
+// وتضل، والحفظ يرفض "السنة بين 1990 و2100". فبنتجاهل أي سنة مش منطقية.
+const isValidYear = (v: unknown) => Number.isInteger(Number(v)) && Number(v) >= 1990 && Number(v) <= 2100
+const yearRule = (v: unknown) => v === '' || v === null || isValidYear(v) || 'السنة لازم تكون بين 1990 و2100'
+let autoYear: number | null = null
+
 watch(() => dueForm.value.due_date, v => {
-  if (v && !dueForm.value.year)
-    dueForm.value.year = Number(v.slice(0, 4))
+  const y = Number((v ?? '').slice(0, 4))
+  if (!isValidYear(y))
+    return
+  if (!dueForm.value.year || Number(dueForm.value.year) === autoYear) {
+    dueForm.value.year = y
+    autoYear = y
+  }
 })
 
 const contractorSearch = ref('')
@@ -281,6 +292,7 @@ async function savePenalty() {
 
 function openCreateDue(c?: ContractorRow) {
   editingDue.value = null
+  autoYear = null
   dueForm.value = {
     contractor_id: c?.contractor_id ?? null,
     description: '',
@@ -299,6 +311,7 @@ function openCreateDue(c?: ContractorRow) {
 
 function openEditDue(d: DueItem) {
   editingDue.value = d
+  autoYear = null
   dueForm.value = {
     contractor_id: expandedId.value,
     description: d.description,
@@ -1267,7 +1280,7 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
               />
             </VCol>
             <VCol cols="12" md="4">
-              <VTextField v-model="dueForm.year" label="السنة" type="number" dir="ltr" />
+              <VTextField v-model="dueForm.year" label="السنة" type="number" dir="ltr" :rules="[yearRule]" />
             </VCol>
             <VCol cols="12" md="4">
               <VTextField
@@ -1313,6 +1326,7 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
               || (!editingDue && !dueForm.contractor_id)
               || !isPositiveAmount(dueForm.amount_jod)
               || (!editingDue && (!dueForm.year || !dueForm.due_date))
+              || (dueForm.year !== '' && dueForm.year !== null && !isValidYear(dueForm.year))
               || (dueForm.allow_backdate && !dueForm.backdate_reason)"
             @click="saveDueMutation.mutate()"
           >

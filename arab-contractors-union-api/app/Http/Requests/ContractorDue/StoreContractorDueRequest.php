@@ -39,6 +39,8 @@ class StoreContractorDueRequest extends FormRequest
         return [
             'amount_jod.min'          => 'مبلغ الذمة لازم يكون أكبر من صفر.',
             'year.required'           => 'السنة إلزامية.',
+            'year.between'  => 'السنة لازم تكون بين 1990 و2100 (مثلاً 2026).',
+            'year.integer'  => 'السنة لازم تكون رقم من 4 خانات (مثلاً 2026).',
             'due_date.required'       => 'تاريخ الاستحقاق إلزامي.',
             'due_date.after_or_equal' => 'تاريخ الاستحقاق لا يمكن أن يكون قبل تاريخ اليوم. لتسجيل ذمة متأخّرة سابقة، فعّل خيار «ذمة سابقة/متأخّرة» واذكر السبب.',
             'backdate_reason.required_if' => 'سبب التاريخ السابق إلزامي عند تسجيل ذمة متأخّرة.',
