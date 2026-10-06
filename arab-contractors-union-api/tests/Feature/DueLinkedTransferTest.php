@@ -184,6 +184,34 @@ class DueLinkedTransferTest extends TestCase
             ->assertJsonPath('items.net_jod', 58);
     }
 
+    public function test_untyped_transfer_settles_dues_then_open_penalties(): void
+    {
+        $contractor = $this->contractor();
+        $due = $this->due($contractor, ['amount_jod' => 11]);
+        $penalty = \App\Models\Penalty::create([
+            'contractor_id' => $contractor->id,
+            'amount'        => 20,
+            'reason'        => 'تأخير',
+            'status'        => 'unpaid',
+        ]);
+        Sanctum::actingAs($contractor, ['*']);
+        $paymentId = $this->submitUnlinked(69, null)->assertStatus(201)
+            ->assertJsonPath('items.type', 'dues_payment')->json('items.id');
+
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']), ['*']);
+        $this->postJson("/api/v1/payments/transactions/{$paymentId}/confirm")->assertOk();
+
+        $this->assertSame('paid', $due->fresh()->status);
+        $this->assertSame('paid', $penalty->fresh()->status);
+        $this->assertEquals(31, (float) Payment::find($paymentId)->used_amount_jod);
+
+        $this->postJson("/api/v1/payments/transactions/{$paymentId}/status", [
+            'status' => 'pending',
+            'reason' => 'اختبار الإرجاع',
+        ])->assertOk();
+        $this->assertSame('unpaid', $penalty->fresh()->status);
+    }
+
     public function test_untyped_transfer_with_no_dues_stays_a_membership_renewal(): void
     {
         $contractor = $this->contractor();

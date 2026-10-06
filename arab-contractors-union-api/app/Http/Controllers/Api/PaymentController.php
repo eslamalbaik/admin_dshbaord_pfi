@@ -69,7 +69,7 @@ class PaymentController extends Controller
 
             $type = 'dues_payment';
         } elseif (empty($data['type']) && empty($data['membership_id'])
-            && $contractor->dues()->outstanding()->exists()) {
+            && \App\Services\PaymentConfirmationService::hasOpenObligations($contractor)) {
             // بدون نوع والمقاول عليه ذمم = سداد ذمم (بتسدّد أقدمها والفائض رصيد له)، مش رسوم عضوية
             $type = 'dues_payment';
         }
