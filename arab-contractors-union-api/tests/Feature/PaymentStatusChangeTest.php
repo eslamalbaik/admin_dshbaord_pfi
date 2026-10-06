@@ -213,6 +213,57 @@ class PaymentStatusChangeTest extends TestCase
         $this->assertSame('unpaid', $due->fresh()->status);
     }
 
+    public function test_membership_fee_revert_cancels_membership_it_created(): void
+    {
+        $c = $this->contractor();
+        $c->update(['status' => 'expired']);
+        $p = $this->payment($c, ['type' => 'membership_fee']);
+
+        $this->change($p, 'paid')->assertOk();
+        $membership = $p->fresh()->membership;
+        $this->assertSame('active', $membership->status);
+        $this->assertSame('active', $c->fresh()->status);
+
+        $this->getJson('/api/v1/payments/transactions')->assertOk()
+            ->assertJsonPath('items.0.status_change_blocker', null);
+
+        $this->change($p, 'rejected', 'الحوالة ما وصلت')->assertOk();
+
+        $membership->refresh();
+        $this->assertSame('rejected', $membership->status);
+        $this->assertNull($membership->expires_at);
+        $this->assertSame('expired', $c->fresh()->status);
+    }
+
+    public function test_membership_fee_revert_restores_existing_renewal_request(): void
+    {
+        $c          = $this->contractor();
+        $membership = $c->memberships()->create(['type' => 'renewal', 'status' => 'pending', 'amount' => 100]);
+        $p          = $this->payment($c, ['type' => 'membership_fee', 'membership_id' => $membership->id]);
+
+        $this->change($p, 'paid')->assertOk();
+        $this->assertSame('active', $membership->fresh()->status);
+
+        $this->change($p, 'pending', 'تأكيد بالغلط')->assertOk();
+
+        $membership->refresh();
+        $this->assertSame('pending', $membership->status);
+        $this->assertNull($membership->expires_at);
+        $this->assertSame('active', $c->fresh()->status);
+    }
+
+    public function test_old_membership_payment_without_snapshot_can_still_be_reverted(): void
+    {
+        $c          = $this->contractor();
+        $membership = $c->memberships()->create([
+            'type' => 'renewal', 'status' => 'active', 'starts_at' => '2026-01-01', 'expires_at' => '2026-12-31',
+        ]);
+        $p = $this->payment($c, ['type' => 'membership_fee', 'status' => 'paid', 'membership_id' => $membership->id]);
+
+        $this->change($p, 'rejected')->assertOk();
+        $this->assertSame('rejected', $membership->fresh()->status);
+    }
+
     public function test_confirming_already_paid_payment_is_blocked(): void
     {
         $p = $this->payment($this->contractor(), ['status' => 'paid']);

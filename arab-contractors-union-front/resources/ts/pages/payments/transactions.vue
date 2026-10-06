@@ -469,6 +469,9 @@ function fmtDate(d: string | null) {
               class="mb-3"
             >
               أي ذمم سدّدتها هالدفعة رح ترجع مستحقة على المقاول، ورصيد الدفعة بينشال.
+              <template v-if="changing?.type === 'membership_fee'">
+                والعضوية اللي جدّدتها رح تنلغى وترجع زي ما كانت قبل التأكيد.
+              </template>
             </VAlert>
 
             <VTextarea
