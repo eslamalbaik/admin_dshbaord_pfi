@@ -378,6 +378,10 @@ class ContractorDueController extends Controller
 
             $due->applyPayment($amount);
 
+            if ($payment) {
+                \App\Models\PaymentAllocation::record($payment, $due, $amount);
+            }
+
             if (! empty($data['notes'])) {
                 $due->update(['notes' => trim($due->notes . "\n" . $data['notes'])]);
             }

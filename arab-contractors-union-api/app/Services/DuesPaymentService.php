@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Contractor;
 use App\Models\Payment;
+use App\Models\PaymentAllocation;
 use Illuminate\Support\Facades\DB;
 
 class DuesPaymentService
@@ -76,6 +77,7 @@ class DuesPaymentService
 
                 $applied = min($remaining, $due->remaining_jod);
                 $due->applyPayment($applied);
+                PaymentAllocation::record($payment, $due, $applied);
                 $remaining = round($remaining - $applied, 2);
 
                 $settled[] = [

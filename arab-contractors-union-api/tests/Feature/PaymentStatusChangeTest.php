@@ -148,6 +148,71 @@ class PaymentStatusChangeTest extends TestCase
         $this->assertDatabaseCount('payment_status_changes', 0);
     }
 
+    private function due(Contractor $c, float $amount = 100, int $year = 2026): ContractorDue
+    {
+        return ContractorDue::create([
+            'contractor_id' => $c->id, 'year' => $year, 'description' => "رسوم {$year}",
+            'amount_jod' => $amount, 'status' => 'unpaid', 'source' => 'manual',
+        ]);
+    }
+
+    public function test_linked_transfer_back_to_pending_reverses_due_settlement(): void
+    {
+        $c   = $this->contractor();
+        $due = $this->due($c);
+        $p   = $this->payment($c, ['contractor_due_id' => $due->id]);
+
+        $this->change($p, 'paid')->assertOk();
+        $this->assertSame('paid', $due->fresh()->status);
+
+        $this->getJson('/api/v1/payments/transactions')->assertOk()
+            ->assertJsonPath('items.0.status_change_blocker', null);
+
+        $this->change($p, 'pending', 'تأكيد بالغلط')->assertOk();
+
+        $due->refresh();
+        $this->assertSame('unpaid', $due->status);
+        $this->assertEquals(0, (float) $due->paid_jod);
+        $this->assertEquals(0, (float) $p->fresh()->used_amount_jod);
+        $this->assertDatabaseCount('payment_allocations', 0);
+    }
+
+    public function test_manual_payment_rejected_reverses_all_dues_it_settled(): void
+    {
+        $c  = $this->contractor();
+        $d1 = $this->due($c, 60, 2025);
+        $d2 = $this->due($c, 100, 2026);
+
+        // 100 د.أ: بتسدّد 2025 كاملة (60) و40 من 2026
+        $this->postJson('/api/v1/payments/transactions/manual', [
+            'contractor_id' => $c->id, 'amount' => 100, 'currency' => 'JOD', 'method' => 'cash',
+        ])->assertStatus(201);
+
+        $this->assertSame('paid', $d1->fresh()->status);
+        $this->assertSame('partially_paid', $d2->fresh()->status);
+
+        $p = Payment::latest('id')->first();
+        $this->change($p, 'rejected', 'دفعة مكررة')->assertOk();
+
+        $this->assertSame('unpaid', $d1->fresh()->status);
+        $this->assertSame('unpaid', $d2->fresh()->status);
+        $this->assertEquals(0, (float) $d2->fresh()->paid_jod);
+    }
+
+    public function test_settle_from_payment_credit_is_reversed_too(): void
+    {
+        $c   = $this->contractor();
+        $due = $this->due($c, 30);
+        $p   = $this->payment($c, ['status' => 'paid', 'used_amount_jod' => 0]);
+
+        $this->postJson("/api/v1/dashboard/dues/{$due->id}/settle", ['payment_id' => $p->id])->assertOk();
+        $this->assertSame('paid', $due->fresh()->status);
+
+        // المسار القديم (زر رفض) كمان بيرجّع التسديد
+        $this->postJson("/api/v1/payments/transactions/{$p->id}/reject", ['rejection_reason' => 'x'])->assertOk();
+        $this->assertSame('unpaid', $due->fresh()->status);
+    }
+
     public function test_confirming_already_paid_payment_is_blocked(): void
     {
         $p = $this->payment($this->contractor(), ['status' => 'paid']);

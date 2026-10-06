@@ -461,6 +461,16 @@ function fmtDate(d: string | null) {
               class="mb-3"
             />
 
+            <VAlert
+              v-if="changing?.status === 'paid' && targetStatus && targetStatus !== 'paid'"
+              type="warning"
+              variant="tonal"
+              density="compact"
+              class="mb-3"
+            >
+              أي ذمم سدّدتها هالدفعة رح ترجع مستحقة على المقاول، ورصيد الدفعة بينشال.
+            </VAlert>
+
             <VTextarea
               v-model="changeReason"
               label="سبب تغيير الحالة"
