@@ -22,4 +22,11 @@ class UpdateContractorDueRequest extends FormRequest
             'notes'       => 'nullable|string|max:2000',
         ];
     }
+
+    public function messages(): array
+    {
+        return [
+            'amount_jod.min' => 'مبلغ الذمة لازم يكون أكبر من صفر.',
+        ];
+    }
 }

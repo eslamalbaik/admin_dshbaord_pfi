@@ -199,6 +199,10 @@ const dueForm = ref({
 
 const todayIso = new Date().toISOString().slice(0, 10)
 
+// مبلغ الذمة/الغرامة لازم يكون أكبر من صفر — الرصيد الدائن يُسجَّل كدفعة، مش كذمة بالسالب.
+const isPositiveAmount = (v: unknown) => v !== '' && v !== null && Number(v) > 0
+const positiveAmountRule = (v: unknown) => isPositiveAmount(v) || 'المبلغ لازم يكون أكبر من صفر'
+
 // السنة تُعبّأ تلقائياً من تاريخ الاستحقاق إن كانت فارغة
 watch(() => dueForm.value.due_date, v => {
   if (v && !dueForm.value.year)
@@ -335,7 +339,8 @@ const saveDueMutation = useMutation({
     refreshAll()
   },
   onError: (e: any) => flash(
-    e?.response?.data?.errors?.due_date?.[0]
+    e?.response?.data?.errors?.amount_jod?.[0]
+    || e?.response?.data?.errors?.due_date?.[0]
     || e?.response?.data?.errors?.year?.[0]
     || e?.response?.data?.errors?.backdate_reason?.[0]
     || e?.response?.data?.message
@@ -1251,7 +1256,15 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
               <VTextField v-model="dueForm.description" label="البيان" dir="rtl" />
             </VCol>
             <VCol cols="12" md="4">
-              <VTextField v-model="dueForm.amount_jod" label="المبلغ (د.أ)" type="number" dir="ltr" />
+              <VTextField
+                v-model="dueForm.amount_jod"
+                label="المبلغ (د.أ)"
+                type="number"
+                min="0.01"
+                step="0.01"
+                dir="ltr"
+                :rules="[positiveAmountRule]"
+              />
             </VCol>
             <VCol cols="12" md="4">
               <VTextField v-model="dueForm.year" label="السنة" type="number" dir="ltr" />
@@ -1298,6 +1311,7 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
             :loading="saveDueMutation.isPending.value"
             :disabled="saveDueMutation.isPending.value
               || (!editingDue && !dueForm.contractor_id)
+              || !isPositiveAmount(dueForm.amount_jod)
               || (!editingDue && (!dueForm.year || !dueForm.due_date))
               || (dueForm.allow_backdate && !dueForm.backdate_reason)"
             @click="saveDueMutation.mutate()"
@@ -1703,7 +1717,15 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
       <VCard :title="`إضافة غرامة — ${penaltyTarget?.name ?? ''}`">
         <VCardText>
           <VTextField v-model="penaltyForm.reason" label="سبب الغرامة" class="mb-4" />
-          <VTextField v-model="penaltyForm.amount" label="المبلغ (د.أ)" type="number" class="mb-4" />
+          <VTextField
+            v-model="penaltyForm.amount"
+            label="المبلغ (د.أ)"
+            type="number"
+            min="0.01"
+            step="0.01"
+            class="mb-4"
+            :rules="[positiveAmountRule]"
+          />
           <VTextarea v-model="penaltyForm.notes" label="ملاحظات" rows="2" />
         </VCardText>
         <VCardActions>
@@ -1712,7 +1734,7 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
           <VBtn
             color="error"
             :loading="penaltySaving"
-            :disabled="penaltySaving || !penaltyForm.reason || !penaltyForm.amount"
+            :disabled="penaltySaving || !penaltyForm.reason || !isPositiveAmount(penaltyForm.amount)"
             @click="savePenalty"
           >
             حفظ
