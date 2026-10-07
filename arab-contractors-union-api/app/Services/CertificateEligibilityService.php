@@ -41,7 +41,7 @@ class CertificateEligibilityService
         if (! $contractor->profile_data_complete) {
             return [
                 'eligible' => false,
-                'reason' => 'يجب إكمال بيانات الملف الشخصي قبل تقديم طلب شهادة.',
+                'reason' => 'يجب إكمال بيانات الملف التعريفي قبل تقديم طلب شهادة.',
                 'code' => 'profile_incomplete',
                 'context' => ['missing_profile_fields' => $contractor->missing_profile_fields],
             ];

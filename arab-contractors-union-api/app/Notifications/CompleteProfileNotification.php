@@ -8,7 +8,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
- * تذكير للمقاول بإكمال بياناته الشخصية — يُرسَل مرة واحدة عند الدخول
+ * تذكير للمقاول بإكمال بيانات ملفه التعريفي — يُرسَل مرة واحدة عند الدخول
  * طالما لا يوجد إشعار سابق من نفس النوع لم تتم قراءته بعد.
  */
 class CompleteProfileNotification extends Notification implements ShouldQueue
@@ -24,8 +24,8 @@ class CompleteProfileNotification extends Notification implements ShouldQueue
     {
         return [
             'type'    => 'complete_profile',
-            'title'   => 'أكمل بيانات ملفك الشخصي',
-            'message' => 'يجب إكمال بيانات ملفك الشخصي ومرفقاته قبل التمكّن من طلب شهادة عضوية.',
+            'title'   => 'أكمل بيانات ملفك التعريفي',
+            'message' => 'يجب إكمال بيانات ملفك التعريفي ومرفقاته قبل التمكّن من طلب شهادة عضوية.',
         ];
     }
 }

@@ -221,7 +221,7 @@ Nothing below changes while `PROFILE_EDITS_REQUIRE_APPROVAL` is off.
   "status": true,
   "message": "تم إرسال طلب تعديل البيانات، وستبقى بياناتك الحالية سارية لحين المراجعة.",
   "items": {
-    "...": "الملف الشخصي كما هو الآن — بالقيم القديمة، غير معدَّلة",
+    "...": "الملف التعريفي كما هو الآن — بالقيم القديمة، غير معدَّلة",
     "pending_review": true,
     "pending_request": {
       "id": 41,

@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 /**
- * خدمة الملف الشخصي للمقاول — تجمع تنسيق الاستجابات ومنطق الأعمال المتعلق بالملف الشخصي.
+ * خدمة الملف التعريفي للمقاول — تجمع تنسيق الاستجابات ومنطق الأعمال المتعلق بالملف التعريفي.
  */
 class ContractorProfileService
 {
@@ -86,7 +86,7 @@ class ContractorProfileService
             'address'           => $contractor->address,
             'notes'             => $contractor->notes,
 
-            // اكتمال الملف الشخصي — مطلوب قبل السماح بطلب شهادة العضوية
+            // اكتمال الملف التعريفي — مطلوب قبل السماح بطلب شهادة العضوية
             'profile_data_complete' => $contractor->profile_data_complete,
             'missing_profile_fields' => $contractor->missing_profile_fields,
 

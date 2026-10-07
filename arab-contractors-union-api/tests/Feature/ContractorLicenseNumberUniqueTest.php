@@ -9,7 +9,7 @@ use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 /**
- * رقم رخصة البلدية المكرر من تعديل الملف الشخصي بالتطبيق يجب أن يرجع 422 برسالة
+ * رقم رخصة البلدية المكرر من تعديل الملف التعريفي بالتطبيق يجب أن يرجع 422 برسالة
  * واضحة — كان يصل لقيد الـ unique في قاعدة البيانات فيرجع 500 "حدث خطأ غير متوقع".
  */
 class ContractorLicenseNumberUniqueTest extends TestCase

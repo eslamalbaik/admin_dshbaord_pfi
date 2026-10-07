@@ -7,7 +7,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
 
 /**
- * إشعار الإدارة بأن مقاولاً عدّل بيانات ملفه الشخصي مباشرة (بدون مراجعة مسبقة) —
+ * إشعار الإدارة بأن مقاولاً عدّل بيانات ملفه التعريفي مباشرة (بدون مراجعة مسبقة) —
  * بديل طابور طلبات التعديل: التعديل يُطبَّق فوراً، والإدارة تُبلَّغ لاحقاً بما تغيّر.
  * لا يشمل الحقول المقفلة (name, membership_number, commercial_register, owner_name,
  * authorized_person*, partners, specialties, classification) لأنها أصلاً غير قابلة
@@ -38,7 +38,7 @@ class ContractorProfileUpdatedNotification extends Notification
             'membership_number' => $this->contractor->membership_number,
             'changed_fields'    => $this->changes,
             'title'             => 'تعديل بيانات ملف مقاول',
-            'message'           => "قام {$this->contractor->name} بتعديل بيانات ملفه الشخصي: {$fields}.",
+            'message'           => "قام {$this->contractor->name} بتعديل بيانات ملفه التعريفي: {$fields}.",
         ];
     }
 }

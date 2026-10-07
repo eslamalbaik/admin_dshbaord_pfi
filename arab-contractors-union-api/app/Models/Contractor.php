@@ -261,7 +261,7 @@ class Contractor extends Authenticatable
         'full_time_engineer_certificate', 'accountant_certificate_or_contract', 'secretary_contract',
     ];
 
-    /** أسماء الحقول والملفات الناقصة لإكمال الملف الشخصي (فارغة يعني الملف مكتمل). */
+    /** أسماء الحقول والملفات الناقصة لإكمال الملف التعريفي (فارغة يعني الملف مكتمل). */
     public function getMissingProfileFieldsAttribute(): array
     {
         $missing = [];

@@ -79,7 +79,7 @@ class ContractorAuthController extends Controller
             'fcm_token'     => $request->fcm_token ?: $contractor->fcm_token,
         ]);
 
-        // تذكير بإكمال الملف الشخصي — مرة واحدة فقط طالما التذكير السابق لم يُقرأ بعد
+        // تذكير بإكمال الملف التعريفي — مرة واحدة فقط طالما التذكير السابق لم يُقرأ بعد
         if (! $contractor->profile_data_complete) {
             $hasUnreadReminder = $contractor->unreadNotifications()
                 ->where('type', \App\Notifications\CompleteProfileNotification::class)
@@ -115,7 +115,7 @@ class ContractorAuthController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
     //  GET /api/contractor/auth/me
     //  GET /api/v1/contractor/auth/profile
-    //  نفس الملف الشخصي الكامل — مُوحّد بمسارين للتوافق مع العملاء الحاليين (REQ-03)
+    //  نفس الملف التعريفي الكامل — مُوحّد بمسارين للتوافق مع العملاء الحاليين (REQ-03)
     // ─────────────────────────────────────────────────────────────────────────
     public function profile(Request $request)
     {
@@ -128,7 +128,7 @@ class ContractorAuthController extends Controller
 
         return $this->success(
             $this->profileService->fullResource($contractor),
-            'تم جلب الملف الشخصي بنجاح',
+            'تم جلب الملف التعريفي بنجاح',
         );
     }
 
@@ -166,12 +166,12 @@ class ContractorAuthController extends Controller
 
         $this->notifyAdminsOfProfileChange($contractor, $before, $validated);
 
-        return $this->success($this->profileService->fullResource($contractor), 'تم تحديث الملف الشخصي بنجاح.');
+        return $this->success($this->profileService->fullResource($contractor), 'تم تحديث الملف التعريفي بنجاح.');
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     //  POST /api/v1/contractor/auth/profile/phone/request-otp
-    //  الخطوة 1: طلب رمز تحقق لرقم الجوال الجديد قبل تعديل الملف الشخصي
+    //  الخطوة 1: طلب رمز تحقق لرقم الجوال الجديد قبل تعديل الملف التعريفي
     // ─────────────────────────────────────────────────────────────────────────
     public function requestPhoneChangeOtp(RequestPhoneChangeOtpRequest $request)
     {
@@ -235,7 +235,7 @@ class ContractorAuthController extends Controller
      * عن المخزَّنة.
      *
      * الرفض صامت لا بـ422 عن قصد: نموذج الملف بالتطبيق يرسل حقوله كاملة في كل حفظ، فرفض
-     * الطلب كان سيُعطّل كل تعديل ملف شخصي في الإنتاج فوراً بدل أن يُغلق ثغرة واحدة.
+     * الطلب كان سيُعطّل كل تعديل ملف تعريفي في الإنتاج فوراً بدل أن يُغلق ثغرة واحدة.
      */
     private function rejectFeeRelevantFields(Request $request, Contractor $contractor): void
     {
@@ -264,7 +264,7 @@ class ContractorAuthController extends Controller
 
     // ─────────────────────────────────────────────────────────────────────────
     //  POST /api/v1/contractor/auth/profile/update
-    //  تحديث الملف الشخصي الكامل مع الملفات المرفقة
+    //  تحديث الملف التعريفي الكامل مع الملفات المرفقة
     // ─────────────────────────────────────────────────────────────────────────
     public function updateFullProfile(UpdateFullProfileRequest $request)
     {
@@ -315,7 +315,7 @@ class ContractorAuthController extends Controller
 
         $this->notifyAdminsOfProfileChange($contractor, $before, $textFields);
 
-        return $this->success($this->profileService->fullResource($contractor), 'تم تحديث الملف الشخصي والملفات المرفقة بنجاح.');
+        return $this->success($this->profileService->fullResource($contractor), 'تم تحديث الملف التعريفي والملفات المرفقة بنجاح.');
     }
 
     /**

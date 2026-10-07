@@ -338,7 +338,7 @@ function fmtMoney(v: string | number | null) {
           <div class="req-header">
             <AlertCircle :size="20" class="req-icon" />
             <div>
-              <h3 class="req-title">يجب إكمال الملف الشخصي أولاً</h3>
+              <h3 class="req-title">يجب إكمال الملف التعريفي أولاً</h3>
               <p class="req-desc">لا يمكن تقديم طلب شهادة قبل إكمال البيانات والمستندات التالية:</p>
             </div>
           </div>

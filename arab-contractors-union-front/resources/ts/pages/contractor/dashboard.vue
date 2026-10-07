@@ -742,11 +742,11 @@ async function deleteTenderDocument(id: number) {
           <!-- ══ Tab: Profile ══ -->
           <div v-if="activeTab === 'profile'" key="profile" class="tab-pane">
 
-            <!-- تنبيه اكتمال الملف الشخصي -->
+            <!-- تنبيه اكتمال الملف التعريفي -->
             <div v-if="!profileDataComplete" class="profile-incomplete-banner">
               <AlertCircle :size="18" />
               <div>
-                <strong>يجب إكمال ملفك الشخصي</strong>
+                <strong>يجب إكمال ملفك التعريفي</strong>
                 <p>لا يمكنك طلب شهادة عضوية قبل إكمال البيانات والمستندات التالية:</p>
                 <div class="missing-fields-list">
                   <span v-for="f in missingProfileFields" :key="f" class="missing-field-chip">{{ f }}</span>
@@ -767,7 +767,7 @@ async function deleteTenderDocument(id: number) {
                 <button
                   type="button" class="md-action-btn outline company-file-btn"
                   :disabled="!profileDataComplete || isDownloadingCompanyFile"
-                  :title="!profileDataComplete ? 'أكمل بيانات ملفك الشخصي أولاً' : ''"
+                  :title="!profileDataComplete ? 'أكمل بيانات ملفك التعريفي أولاً' : ''"
                   @click="downloadCompanyFile"
                 >
                   <Download :size="16" /> {{ isDownloadingCompanyFile ? 'جاري التحميل...' : 'تحميل ملف الشركة' }}
