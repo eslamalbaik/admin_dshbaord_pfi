@@ -195,6 +195,10 @@ class ContractorStatementService
                 'amount'                => $payment->amount,
                 'currency'              => $payment->currency ?? 'JOD',
                 'notes'                 => $payment->notes,
+                // وقت وصول الحوالة (رفع الإشعار) ووقت اعتمادها
+                'received_at'           => ($payment->submitted_at ?? $payment->created_at)?->toIso8601String(),
+                'received_time'         => ($payment->submitted_at ?? $payment->created_at)?->copy()->setTimezone(self::DISPLAY_TIMEZONE)->format('H:i'),
+                'confirmed_at'          => $payment->confirmed_at?->toIso8601String(),
                 'used_jod'              => round((float) $payment->used_amount_jod, 2),
                 'unused_jod'            => $payment->status === 'paid' && in_array($payment->type, Payment::CREDIT_TYPES, true)
                     ? round($amountJod - (float) $payment->used_amount_jod, 2) : 0.0,
@@ -238,6 +242,8 @@ class ContractorStatementService
         ));
     }
 
+    private const DISPLAY_TIMEZONE = 'Asia/Gaza';
+
     private const KIND_ORDER = ['due' => 0, 'penalty' => 1, 'credit' => 2, 'payment' => 3, 'settlement' => 4];
 
     private function entry($date, string $kind, int $id, string $title, ?string $reference, float $amount, float $delta,
@@ -247,6 +253,10 @@ class ContractorStatementService
             'kind'             => $kind,
             'id'               => $id,
             'date'             => $date?->toDateString(),
+            // التاريخ والوقت الكامل (UTC بإزاحة) — التطبيق/الداشبورد بيعرضه بتوقيت الجهاز
+            'datetime'         => $date?->toIso8601String(),
+            // الساعة:الدقيقة بتوقيت غزة، جاهزة للعرض
+            'time'             => $date?->copy()->setTimezone(self::DISPLAY_TIMEZONE)->format('H:i'),
             'title'            => $title,
             'reference_number' => $reference,
             // عليه = ذمة/غرامة، له = دفعة/رصيد/تسديد

@@ -305,6 +305,12 @@ class AppPaymentTypesAndCreditTest extends TestCase
         $payment = collect($statement['entries'])->firstWhere(fn ($e) => $e['kind'] === 'payment' && $e['id'] === $id);
         $this->assertSame('دفعة مقدمة', $payment['title']);
         $this->assertSame('BANK-77', $payment['bank_reference_number']);
+        // وقت وصول الحوالة بالساعة والدقيقة (توقيت غزة) + التاريخ الكامل
+        $submitted = Payment::find($id)->submitted_at;
+        $this->assertSame($submitted->copy()->setTimezone('Asia/Gaza')->format('H:i'), $payment['received_time']);
+        $this->assertSame($submitted->toIso8601String(), $payment['received_at']);
+        $this->assertNotNull($payment['confirmed_at']);
+        $this->assertMatchesRegularExpression('/^\d{2}:\d{2}$/', $statement['entries'][0]['time']);
         $this->assertNotEmpty($payment['reference_number']);
         $this->assertSame($due->id, $payment['allocations'][0]['id']);
         $this->assertEquals(70, $payment['allocations'][0]['amount_jod']);
