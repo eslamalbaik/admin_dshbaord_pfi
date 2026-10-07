@@ -221,4 +221,46 @@ class AnnouncementAdminTest extends TestCase
         $announcement->refresh();
         $this->assertTrue($announcement->published_at->isToday());
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    //  draft — no expiry date / "urgent" since it never reaches the app
+    // ─────────────────────────────────────────────────────────────────────
+
+    public function test_store_draft_ignores_expiry_and_pin(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->postJson('/api/v1/admin/announcements', [
+            'title'        => 'مسودة',
+            'body'         => 'نص',
+            'is_published' => false,
+            'is_pinned'    => true,
+            'expires_at'   => now()->subDay()->toDateString(),
+        ])->assertStatus(201);
+
+        $announcement = Announcement::find($response->json('items.id'));
+        $this->assertFalse($announcement->is_pinned);
+        $this->assertNull($announcement->expires_at);
+    }
+
+    public function test_update_to_draft_clears_expiry_and_pin(): void
+    {
+        $this->actingAsAdmin();
+
+        $announcement = Announcement::create([
+            'title' => 'تعميم', 'body' => 'نص', 'is_pinned' => true,
+            'is_published' => true, 'published_at' => now()->subDay(), 'expires_at' => now()->addWeek(),
+        ]);
+
+        $this->postJson("/api/v1/admin/announcements/{$announcement->id}", [
+            '_method'      => 'PUT',
+            'is_published' => false,
+            'is_pinned'    => true,
+            'expires_at'   => now()->subMonth()->toDateString(),
+        ])->assertStatus(200);
+
+        $announcement->refresh();
+        $this->assertFalse($announcement->is_pinned);
+        $this->assertNull($announcement->expires_at);
+    }
 }

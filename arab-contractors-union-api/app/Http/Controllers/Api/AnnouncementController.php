@@ -168,6 +168,9 @@ class AnnouncementController extends Controller
     // POST /api/v1/admin/announcements
     public function store(Request $request)
     {
+        // المسودة ما بتنشر بالتطبيق — تاريخ الانتهاء و"عاجل وهام" ما إلهم معنى، فما منتحقق منهم ومنصفّرهم
+        $isDraft = ! $request->boolean('is_published');
+
         $validated = $request->validate([
             'title'        => 'required|string|max:255',
             'number'       => 'nullable|string|max:100',
@@ -182,12 +185,18 @@ class AnnouncementController extends Controller
             // تصحيح حقول أخرى بتعميم قديم تاريخ نشره بالماضي فعلياً (نفس نمط Tenders/News).
             'published_at' => 'nullable|date|after_or_equal:today',
             // تاريخ انتهاء اختياري (أرشفة تلقائية) — لازم يكون بعد تاريخ النشر الفعلي (المُدخل أو now() الافتراضي)
-            'expires_at'   => ['nullable', 'date', function ($attribute, $value, $fail) use ($request) {
+            'expires_at'   => ['nullable', 'date', function ($attribute, $value, $fail) use ($request, $isDraft) {
+                if ($isDraft) return;
                 $publishedAt = $request->filled('published_at') ? now()->parse($request->published_at) : now();
                 if (now()->parse($value)->lessThanOrEqualTo($publishedAt))
                     $fail('يجب أن يكون تاريخ انتهاء التعميم بعد تاريخ النشر.');
             }],
         ]);
+
+        if ($isDraft) {
+            $validated['is_pinned'] = false;
+            $validated['expires_at'] = null;
+        }
 
         if (empty($validated['number'])) {
             $validated['number'] = $this->nextAnnouncementNumber();
@@ -240,6 +249,9 @@ class AnnouncementController extends Controller
         $currentDate = $announcement->published_at?->toDateString();
         $isDateChanged = $request->filled('published_at') && $request->date('published_at')->toDateString() !== $currentDate;
 
+        // مسودة بعد الحفظ (مُرسلة صراحةً، أو التعميم أصلاً مسودة وما انبعت is_published)
+        $isDraft = $request->has('is_published') ? ! $request->boolean('is_published') : ! $announcement->is_published;
+
         $validated = $request->validate([
             'title'        => 'sometimes|string|max:255',
             'number'       => 'nullable|string|max:100',
@@ -252,7 +264,8 @@ class AnnouncementController extends Controller
             'is_pinned'    => 'boolean',
             'publish_now'  => 'boolean',
             'published_at' => $isDateChanged ? 'nullable|date|after_or_equal:today' : 'nullable|date',
-            'expires_at'   => ['nullable', 'date', function ($attribute, $value, $fail) use ($request, $announcement) {
+            'expires_at'   => ['nullable', 'date', function ($attribute, $value, $fail) use ($request, $announcement, $isDraft) {
+                if ($isDraft) return;
                 $publishedAt = $request->filled('published_at')
                     ? now()->parse($request->published_at)
                     : ($announcement->published_at ?? now());
@@ -264,6 +277,11 @@ class AnnouncementController extends Controller
         // "نشر مباشرة" لتعميم كان مسودة أو مجدول لتاريخ لاحق: تاريخ النشر يصير الآن (نفس منطق News)
         $publishNow = $request->boolean('publish_now');
         unset($validated['publish_now']);
+
+        if ($isDraft) {
+            $validated['is_pinned'] = false;
+            $validated['expires_at'] = null;
+        }
 
         if (array_key_exists('category_id', $validated) && $validated['category_id']) {
             $validated['category'] = AnnouncementCategory::find($validated['category_id'])->name;

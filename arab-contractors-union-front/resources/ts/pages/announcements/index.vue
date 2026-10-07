@@ -74,10 +74,15 @@ watchEffect(() => fetchAnnouncements())
 type PublishMode = 'now' | 'schedule' | 'draft'
 
 const publishModeOptions = [
-  { value: 'now', label: 'نشر مباشرة', icon: 'tabler-send' },
-  { value: 'schedule', label: 'جدولة', icon: 'tabler-calendar-time' },
-  { value: 'draft', label: 'مسودة', icon: 'tabler-file-pencil' },
+  { value: 'draft', label: 'مسودة', icon: 'tabler-file-pencil', hint: 'يُحفظ بلوحة التحكم فقط ولا يظهر بتطبيق المقاول' },
+  { value: 'now', label: 'نشر مباشرة', icon: 'tabler-send', hint: 'يظهر بتطبيق المقاول فور الحفظ' },
+  { value: 'schedule', label: 'جدولة', icon: 'tabler-calendar-time', hint: 'يظهر بتطبيق المقاول بالتاريخ المحدد' },
 ]
+
+const publishModeHint = computed(() => publishModeOptions.find(o => o.value === form.value.publishMode)?.hint)
+
+// المسودة ما بتنشر بالتطبيق — تاريخ الانتهاء و"عاجل وهام" ما إلهم معنى معها فبيختفوا وبيتصفّروا عند الحفظ
+const isDraft = computed(() => form.value.publishMode === 'draft')
 
 // تاريخ بصيغة YYYY-MM-DD بالتوقيت المحلي (toISOString كان يرجّع تاريخ UTC — غلط بعد منتصف الليل،
 // وهو سبب فشل الحفظ لما يكون التاريخ المختار بالفورم "أمس" فعلياً حسب توقيت الخادم)
@@ -167,7 +172,7 @@ const saveAnnouncement = async () => {
     notify(isEditing.value ? 'يجب أن يكون تاريخ النشر أمس أو بعده' : 'يجب أن يكون تاريخ النشر اليوم أو بعده', 'error')
     return
   }
-  if (form.value.expires_at && form.value.published_at && form.value.expires_at <= form.value.published_at) {
+  if (!isDraft.value && form.value.expires_at && form.value.published_at && form.value.expires_at <= form.value.published_at) {
     notify('يجب أن يكون تاريخ انتهاء التعميم بعد تاريخ النشر', 'error')
     return
   }
@@ -177,11 +182,12 @@ const saveAnnouncement = async () => {
     fd.append('title', form.value.title)
     fd.append('body', form.value.body)
     fd.append('is_published', mode === 'draft' ? '0' : '1')
-    fd.append('is_pinned', form.value.is_pinned ? '1' : '0')
+    fd.append('is_pinned', !isDraft.value && form.value.is_pinned ? '1' : '0')
     // رقم التعميم: يُترك فارغاً بالإنشاء لتوليده تلقائياً بالباك اند؛ التعديل يسمح بتصحيحه يدوياً
     if (isEditing.value && form.value.number) fd.append('number', form.value.number)
     if (form.value.category_id) fd.append('category_id', String(form.value.category_id))
-    if (form.value.expires_at) fd.append('expires_at', form.value.expires_at)
+    // يُرسل دائماً (فاضي = null) حتى يقدر المستخدم يمسح تاريخ الانتهاء، والمسودة بتمسحه دائماً
+    fd.append('expires_at', isDraft.value ? '' : form.value.expires_at)
 
     const dateChanged = form.value.published_at !== originalPublishedAt.value
     if (mode === 'schedule') {
@@ -201,7 +207,7 @@ const saveAnnouncement = async () => {
       notify('تم تحديث التعميم بنجاح')
     } else {
       await api.post('/api/v1/admin/announcements', fd)
-      notify('تم نشر التعميم بنجاح')
+      notify(isDraft.value ? 'تم حفظ التعميم كمسودة' : 'تم نشر التعميم بنجاح')
     }
     formDialog.value = false
     fetchAnnouncements()
@@ -399,12 +405,10 @@ const deleteAnnouncement = async () => {
               <VTextarea v-model="form.body" label="نص التعميم" rows="6" style="font-family:Cairo,sans-serif" />
             </VCol>
 
-            <VCol cols="12" md="6" class="d-flex align-center">
-              <VSwitch v-model="form.is_pinned" label="عاجل وهام (تثبيت + Pop-up أول فتح)" color="error" style="font-family:Cairo,sans-serif" />
-            </VCol>
-
-            <VCol cols="12" md="6">
-              <label class="text-body-2 font-weight-medium mb-2 d-block" style="font-family:Cairo,sans-serif">طريقة النشر</label>
+            <!-- قسم النشر: الطريقة أولاً، بعدين التواريخ حسب الطريقة، بعدين "عاجل وهام" -->
+            <VCol cols="12">
+              <VDivider class="mb-4" />
+              <div class="text-subtitle-1 font-weight-bold mb-3" style="font-family:Cairo,sans-serif">طريقة النشر</div>
               <VBtnToggle
                 v-model="form.publishMode"
                 mandatory
@@ -412,41 +416,61 @@ const deleteAnnouncement = async () => {
                 variant="outlined"
                 divided
                 density="comfortable"
+                class="publish-mode-toggle"
                 style="font-family:Cairo,sans-serif"
               >
                 <VBtn v-for="opt in publishModeOptions" :key="opt.value" :value="opt.value" :prepend-icon="opt.icon">
                   {{ opt.label }}
                 </VBtn>
               </VBtnToggle>
+              <div class="text-caption text-medium-emphasis mt-2" style="font-family:Cairo,sans-serif">{{ publishModeHint }}</div>
             </VCol>
-            <VCol v-if="showPublishDate" cols="12" md="6">
-              <VTextField
-                v-model="form.published_at"
-                :label="form.publishMode === 'schedule' ? 'تاريخ النشر المجدول' : 'تاريخ النشر'"
-                type="date"
-                :min="minPublishDate"
-                :hint="isEditing ? 'يمكن اختيار تاريخ أمس أو أي تاريخ بعده' : undefined"
-                persistent-hint
-                style="font-family:Cairo,sans-serif"
-              />
-            </VCol>
-            <VCol cols="12" md="6">
-              <VTextField
-                v-model="form.expires_at"
-                label="تاريخ انتهاء التعميم (اختياري — أرشفة تلقائية)"
-                type="date"
-                :min="form.published_at || todayStr()"
-                hint="بعد هذا التاريخ يصبح التعميم مؤرشفاً ويختفي من تطبيق المقاول"
-                persistent-hint
-                style="font-family:Cairo,sans-serif"
-              />
+
+            <template v-if="!isDraft">
+              <VCol v-if="showPublishDate" cols="12" md="6">
+                <VTextField
+                  v-model="form.published_at"
+                  :label="form.publishMode === 'schedule' ? 'تاريخ النشر المجدول' : 'تاريخ النشر'"
+                  type="date"
+                  :min="minPublishDate"
+                  :hint="isEditing ? 'يمكن اختيار تاريخ أمس أو أي تاريخ بعده' : undefined"
+                  persistent-hint
+                  style="font-family:Cairo,sans-serif"
+                />
+              </VCol>
+              <VCol cols="12" md="6">
+                <VTextField
+                  v-model="form.expires_at"
+                  label="تاريخ انتهاء التعميم (اختياري — أرشفة تلقائية)"
+                  type="date"
+                  :min="form.published_at || todayStr()"
+                  hint="بعد هذا التاريخ يصبح التعميم مؤرشفاً ويختفي من تطبيق المقاول"
+                  persistent-hint
+                  clearable
+                  style="font-family:Cairo,sans-serif"
+                />
+              </VCol>
+              <VCol cols="12">
+                <VSwitch
+                  v-model="form.is_pinned"
+                  label="عاجل وهام (تثبيت + Pop-up أول فتح)"
+                  color="error"
+                  hide-details
+                  style="font-family:Cairo,sans-serif"
+                />
+              </VCol>
+            </template>
+            <VCol v-else cols="12">
+              <VAlert type="info" variant="tonal" density="compact" style="font-family:Cairo,sans-serif">
+                المسودة لا تُنشر في تطبيق المقاول، لذلك لا حاجة لتحديد تاريخ انتهاء أو تفعيل "عاجل وهام". يمكنك تحديدهما عند نشر التعميم.
+              </VAlert>
             </VCol>
           </VRow>
         </VCardText>
         <VCardActions>
           <VSpacer />
           <VBtn variant="tonal" @click="formDialog = false">إلغاء</VBtn>
-          <VBtn color="primary" :loading="formLoading" @click="saveAnnouncement">{{ isEditing ? 'حفظ التعديلات' : 'نشر' }}</VBtn>
+          <VBtn color="primary" :loading="formLoading" @click="saveAnnouncement">{{ isEditing ? 'حفظ التعديلات' : (isDraft ? 'حفظ كمسودة' : form.publishMode === 'schedule' ? 'جدولة' : 'نشر') }}</VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
@@ -539,3 +563,11 @@ const deleteAnnouncement = async () => {
     </VSnackbar>
   </div>
 </template>
+
+<style scoped>
+/* أزرار طريقة النشر بتلف على الشاشات الصغيرة بدل ما تطلع برا الحوار */
+.publish-mode-toggle {
+  flex-wrap: wrap;
+  block-size: auto !important;
+}
+</style>
