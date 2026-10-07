@@ -79,9 +79,8 @@ class LegalFileCategoryController extends Controller
     /** DELETE /api/v1/dashboard/legal-file-categories/{legalFileCategory} */
     public function destroy(LegalFileCategory $legalFileCategory)
     {
-        if (LegalFile::where('category', $legalFileCategory->key)->exists()) {
-            return $this->error('لا يمكن حذف تصنيف يحتوي ملفات. انقل الملفات أو احذفها أولاً.', 422);
-        }
+        // الملفات الموجودة بالتصنيف تبقى بدون تصنيف
+        LegalFile::where('category', $legalFileCategory->key)->update(['category' => null]);
 
         AuditLogService::record(Auth::user(), 'legal_file_category.deleted', $legalFileCategory, ['label' => $legalFileCategory->label]);
         $legalFileCategory->delete();

@@ -51,7 +51,7 @@ class LegalFileController extends Controller
             'description'    => $f->description,
             'description_en' => $f->description_en,
             'category'       => $f->category,
-            'category_label' => $this->categoryLabels()[$f->category] ?? $f->category,
+            'category_label' => $f->category === null ? 'بدون تصنيف' : ($this->categoryLabels()[$f->category] ?? $f->category),
             'url'            => $f->url,
             'mime_type'      => $f->mime_type,
             'size'           => $f->size,
@@ -120,7 +120,9 @@ class LegalFileController extends Controller
     {
         $query = LegalFile::orderBy('sort')->orderBy('id');
 
-        if ($request->filled('category')) {
+        if ($request->category === 'none') {
+            $query->whereNull('category');
+        } elseif ($request->filled('category')) {
             $query->where('category', $request->category);
         }
 
@@ -145,7 +147,7 @@ class LegalFileController extends Controller
             'title_en'       => 'nullable|string|max:300',
             'description'    => 'nullable|string|max:1000',
             'description_en' => 'nullable|string|max:1000',
-            'category'       => 'required|exists:legal_file_categories,key',
+            'category'       => 'nullable|exists:legal_file_categories,key',
             'sort'           => 'nullable|integer|min:0',
             'is_active'      => 'boolean',
             'is_featured'    => 'boolean',
@@ -153,14 +155,14 @@ class LegalFileController extends Controller
         ]);
 
         $file      = $request->file('file');
-        $filePath  = $file->store('legal-files/' . $data['category'], 'public');
+        $filePath  = $file->store('legal-files/' . ($data['category'] ?? 'uncategorized'), 'public');
 
         $legalFile = LegalFile::create([
             'title'          => $data['title'],
             'title_en'       => $data['title_en']       ?? null,
             'description'    => $data['description']    ?? null,
             'description_en' => $data['description_en'] ?? null,
-            'category'       => $data['category'],
+            'category'       => $data['category'] ?? null,
             'file_path'      => $filePath,
             'disk'           => 'public',
             'mime_type'      => $file->getMimeType(),
@@ -188,7 +190,7 @@ class LegalFileController extends Controller
             'title_en'       => 'nullable|string|max:300',
             'description'    => 'nullable|string|max:1000',
             'description_en' => 'nullable|string|max:1000',
-            'category'       => 'required|exists:legal_file_categories,key',
+            'category'       => 'nullable|exists:legal_file_categories,key',
             'sort'           => 'nullable|integer|min:0',
             'is_active'      => 'boolean',
             'is_featured'    => 'boolean',
@@ -199,7 +201,7 @@ class LegalFileController extends Controller
         if ($request->hasFile('file')) {
             Storage::disk($legalFile->disk)->delete($legalFile->file_path);
             $file     = $request->file('file');
-            $filePath = $file->store('legal-files/' . $data['category'], 'public');
+            $filePath = $file->store('legal-files/' . ($data['category'] ?? 'uncategorized'), 'public');
             $legalFile->file_path = $filePath;
             $legalFile->mime_type = $file->getMimeType();
             $legalFile->size      = $file->getSize();
@@ -210,7 +212,7 @@ class LegalFileController extends Controller
             'title_en'       => $data['title_en']       ?? null,
             'description'    => $data['description']    ?? null,
             'description_en' => $data['description_en'] ?? null,
-            'category'       => $data['category'],
+            'category'       => $data['category'] ?? null,
             'is_active'      => $data['is_active'] ?? $legalFile->is_active,
             'is_featured'    => $data['is_featured'] ?? $legalFile->is_featured,
         ]);

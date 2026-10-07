@@ -69,7 +69,7 @@ const openCreate = () => {
   isEditing.value = false; editingId.value = null
   form.value = emptyForm()
   form.value.sort = files.value.length
-  if (filterCategory.value) form.value.category = filterCategory.value
+  if (filterCategory.value && filterCategory.value !== 'none') form.value.category = filterCategory.value
   formError.value = ''; tab.value = 'ar'; isFormOpen.value = true
 }
 const openEdit = (f: any) => {
@@ -88,7 +88,7 @@ const saveMutation = useMutation({
   mutationFn: async () => {
     const fd = new FormData()
     fd.append('title',     form.value.title)
-    fd.append('category',  form.value.category)
+    fd.append('category',  form.value.category ?? '')
     fd.append('sort',      String(form.value.sort ?? 0))
     fd.append('is_active', form.value.is_active ? '1' : '0')
     if (form.value.title_en)       fd.append('title_en',       form.value.title_en)
@@ -153,7 +153,7 @@ const deleteCatMutation = useMutation({
   onError: (e: any) => { catError.value = e?.response?.data?.message || 'فشل حذف التصنيف.' },
 })
 const confirmDeleteCat = (c: any) => {
-  if (confirm(`هل تريد حذف التصنيف "${c.label}"؟`)) deleteCatMutation.mutate(c.id)
+  if (confirm(c.files_count ? `هل تريد حذف التصنيف "${c.label}"؟ الملفات (${c.files_count}) ستصبح بدون تصنيف.` : `هل تريد حذف التصنيف "${c.label}"؟`)) deleteCatMutation.mutate(c.id)
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -201,6 +201,15 @@ function openFile(url: string) {
           @click="filterCategory = ''; page = 1"
         >
           الكل
+        </VChip>
+        <VChip
+          :color="filterCategory === 'none' ? 'warning' : 'default'"
+          :variant="filterCategory === 'none' ? 'elevated' : 'tonal'"
+          prepend-icon="tabler-folder-off"
+          class="cursor-pointer"
+          @click="filterCategory = 'none'; page = 1"
+        >
+          بدون تصنيف
         </VChip>
         <VChip
           v-for="cat in categories"
@@ -361,8 +370,8 @@ function openFile(url: string) {
             <VCol cols="12" sm="5">
               <VSelect
                 v-model="form.category"
-                label="التصنيف *"
-                :items="categories.map((c: any) => ({ title: c.label, value: c.key }))"
+                label="التصنيف"
+                :items="[{ title: 'بدون تصنيف', value: null }, ...categories.map((c: any) => ({ title: c.label, value: c.key }))]"
               />
             </VCol>
             <VCol cols="6" sm="3">
@@ -454,7 +463,7 @@ function openFile(url: string) {
             color="primary"
             prepend-icon="tabler-device-floppy"
             :loading="saveMutation.isPending.value"
-            :disabled="!form.title || !form.category || (!isEditing && !form.file)"
+            :disabled="!form.title || (!isEditing && !form.file)"
             @click="saveMutation.mutate()"
           >
             حفظ
