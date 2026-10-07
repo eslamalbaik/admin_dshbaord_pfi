@@ -48,7 +48,9 @@ export function useNotifications() {
       return res.data?.items ?? res.data
     },
     staleTime: 30000, // 30s — treat data as fresh, dedupes rapid mounts
-    refetchInterval: 60000, // poll once a minute
+    // Live updates arrive over Reverb (useRealtimeAdminNotifications invalidates this
+    // query), so polling is only a fallback for a dropped socket — every 5 minutes.
+    refetchInterval: 300000,
     refetchIntervalInBackground: false, // pause polling when tab is hidden
     refetchOnWindowFocus: true, // refetch when user returns to the tab
     retry: 1,
