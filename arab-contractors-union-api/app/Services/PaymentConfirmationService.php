@@ -342,6 +342,8 @@ class PaymentConfirmationService
                     $due,
                     ['contractor_id' => $due->contractor_id, 'amount_jod' => (float) $allocation->amount_jod, 'payment_id' => $payment->id],
                 );
+
+                app(MembershipRenewalService::class)->deactivateForDue($due->fresh());
             }
             $allocation->delete();
         }

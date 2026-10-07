@@ -207,6 +207,36 @@ class AppPaymentTypesAndCreditTest extends TestCase
         $this->assertEquals(300, $this->balance()['credit_jod']);
     }
 
+    public function test_annual_fee_settled_from_credit_activates_membership_for_its_year(): void
+    {
+        $id = $this->submit(['amount' => 300, 'type' => 'advance_payment'])->json('items.id');
+        $this->confirm($id);
+
+        $due = $this->addDue(200, 2027);
+        $this->assertSame('paid', $due->status);
+
+        $membership = $this->contractor->memberships()->where('status', 'active')->sole();
+        $this->assertSame('2027-01-01', $membership->starts_at->toDateString());
+        $this->assertSame('2027-12-31', $membership->expires_at->toDateString());
+
+        // ترجيع الدفعة بيرجّع الذمة مستحقة وبيلغي العضوية اللي فعّلها الرصيد
+        $this->admin();
+        $this->postJson("/api/v1/payments/transactions/{$id}/status", ['status' => 'pending', 'reason' => 'خطأ بالمبلغ'])->assertOk();
+
+        $this->assertSame('unpaid', $due->fresh()->status);
+        $this->assertSame('rejected', $membership->fresh()->status);
+    }
+
+    public function test_partial_credit_on_annual_fee_does_not_activate_membership(): void
+    {
+        $id = $this->submit(['amount' => 50, 'type' => 'advance_payment'])->json('items.id');
+        $this->confirm($id);
+
+        $this->addDue(200, 2027);
+
+        $this->assertFalse($this->contractor->memberships()->where('status', 'active')->exists());
+    }
+
     public function test_reverting_the_payment_reverses_the_credit_settlement(): void
     {
         $id = $this->submit(['amount' => 100, 'type' => 'advance_payment'])->json('items.id');

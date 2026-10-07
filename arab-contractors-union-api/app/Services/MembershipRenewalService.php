@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ContractorDue;
 use App\Models\Membership;
 use App\Models\Payment;
 
@@ -38,6 +39,65 @@ class MembershipRenewalService
         }
 
         return $membership->fresh();
+    }
+
+    /**
+     * رسوم اشتراك سنة معيّنة انسدّت كاملة من رصيد المقاول (مثلاً لما تتولّد رسوم 1/1) ← عضوية
+     * فعّالة بتنتهي 31/12 من سنة الذمة. ما بتنعمل وحدة ثانية لو في عضوية فعّالة بتغطي السنة أصلاً.
+     * العضوية بتنعلّم بالذمة، عشان ترجيع الدفعة يلغيها (deactivateForDue).
+     */
+    public function activateForDue(ContractorDue $due, ?int $reviewerId = null): ?Membership
+    {
+        $contractor = $due->contractor;
+        $year       = (int) $due->year;
+
+        $covered = $contractor->memberships()
+            ->where('status', 'active')
+            ->whereYear('expires_at', $year)
+            ->exists();
+
+        if ($covered) {
+            return null;
+        }
+
+        $startsAt = $year === now()->year
+            ? now()->startOfDay()
+            : \Carbon\Carbon::create($year, 1, 1)->startOfDay();
+
+        $membership = $contractor->memberships()->create([
+            'type'        => $contractor->memberships()->exists() ? 'renewal' : 'new',
+            'status'      => 'active',
+            'amount'      => $due->amount_jod,
+            'starts_at'   => $startsAt,
+            'expires_at'  => \Carbon\Carbon::create($year, 12, 31)->startOfDay(),
+            'notes'       => self::creditDueMarker($due),
+            'reviewed_by' => $reviewerId,
+            'reviewed_at' => now(),
+        ]);
+
+        if (in_array($contractor->status, ['pending', 'expired'], true)) {
+            $contractor->update(['status' => 'active']);
+        }
+
+        return $membership;
+    }
+
+    /** الذمة رجعت مش مسدّدة (ترجيع الدفعة اللي سدّتها) ← العضوية اللي فعّلها الرصيد بتنرفض */
+    public function deactivateForDue(ContractorDue $due): void
+    {
+        if ($due->status === 'paid') {
+            return;
+        }
+
+        $due->contractor->memberships()
+            ->where('status', 'active')
+            ->where('notes', self::creditDueMarker($due))
+            ->update(['status' => 'rejected']);
+    }
+
+    private static function creditDueMarker(ContractorDue $due): string
+    {
+        return "تفعيل تلقائي من رصيد المقاول — ذمة #{$due->id}";
     }
 
     /**
