@@ -481,7 +481,6 @@ function openFile(url: string) {
               <template #append>
                 <VBtn icon="tabler-edit" size="small" variant="text" @click="editCat(c)" />
                 <VBtn
-                  v-if="!c.is_system"
                   icon="tabler-trash"
                   size="small"
                   variant="text"
