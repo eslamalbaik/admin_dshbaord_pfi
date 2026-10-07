@@ -12,28 +12,17 @@ use App\Models\Payment;
 class MembershipRenewalService
 {
     /**
-     * كل العضويات سنوية على السنة الميلادية وتنتهي 31/12 (قرار الإدارة 2026-10-05): من يدفع
-     * يوم 30/12 تنتهي عضويته بعد يوم واحد، فالانتهاء لا يُحسب من تاريخ الدفع ولا من التسجيل.
+     * كل العضويات سنوية على السنة الميلادية وتنتهي 31/12 من سنة الدفع (قرار الإدارة 2026-10-05):
+     * من يدفع يوم 30/12 تنتهي عضويته بعد يوم واحد، فالانتهاء لا يُحسب من تاريخ الدفع ولا من التسجيل.
      *
-     * السنة المغطّاة = السنة الحالية، إلا إن كانت عضوية سابقة تغطيها أصلاً (دفع مسبق للسنة
-     * القادمة) فتصير السنة التالية لآخر سنة مغطّاة — حتى لا تُدفع نفس السنة مرتين.
+     * السنة المغطّاة = سنة المعالجة دائماً، حتى لو في عضوية فعّالة تغطيها أصلاً: دفعة ثانية أو
+     * مبلغ كبير ما بيمدّ العضوية لسنة قادمة (eslam 2026-10-07، حساب 9541_g طلع 2027-12-31).
+     * عضوية السنة الجاية بتنعمل لما تندفع رسومها السنوية بسنتها.
      */
     public function applyRenewal(Membership $membership, ?int $reviewerId = null): Membership
     {
-        $previous = $membership->contractor
-            ->memberships()
-            ->where('id', '!=', $membership->id)
-            ->where('status', 'active')
-            ->whereNotNull('expires_at')
-            ->orderByDesc('expires_at')
-            ->first();
-
-        $coveredYear = max(now()->year, ($previous?->expires_at?->year ?? 0) + 1);
-
-        // داخل السنة الحالية تبدأ من يوم المعالجة؛ الدفع المسبق لسنة قادمة يبدأ من 1/1 تبعها
-        $startsAt = $coveredYear === now()->year
-            ? now()->startOfDay()
-            : \Carbon\Carbon::create($coveredYear, 1, 1)->startOfDay();
+        $coveredYear = now()->year;
+        $startsAt    = now()->startOfDay();
 
         $membership->update([
             'status'      => 'active',
