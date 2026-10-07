@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Notifications\EventJoinedNotification;
 use App\Services\AuditLogService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -145,6 +146,10 @@ class EventController extends Controller
     //  الموقع العام (Public) — بدون توثيق
     // ═════════════════════════════════════════════════════════════════════════
 
+    // فعالية أونلاين ما إلها مكان بالقوائم العامة كمان — نفس قاعدة formatEvent/show، لأن صفوف قديمة
+    // انحفظت قبل clearFieldsHiddenByFormat وضل فيها المكان (مثلاً "gaza" لفعالية event-event على staging)
+    private const PUBLIC_LOCATION_COLUMN = "CASE WHEN event_format = 'online' THEN NULL ELSE event_location END AS event_location";
+
     // GET /api/v1/events
     public function index(Request $request)
     {
@@ -154,7 +159,7 @@ class EventController extends Controller
             $query->where('title', 'like', '%' . $request->search . '%');
 
         $paginator = $query
-            ->select(['id', 'title', 'slug', 'excerpt', 'image', 'video_url', 'external_url', 'gallery', 'published_at', 'event_date', 'event_location'])
+            ->select(['id', 'title', 'slug', 'excerpt', 'image', 'video_url', 'external_url', 'gallery', 'published_at', 'event_date', DB::raw(self::PUBLIC_LOCATION_COLUMN)])
             ->paginate($request->integer('per_page', 9));
 
         return $this->paginated($paginator);
@@ -165,7 +170,7 @@ class EventController extends Controller
     {
         $events = Event::published()
             ->orderBy('event_date')
-            ->select(['id', 'title', 'slug', 'excerpt', 'image', 'video_url', 'external_url', 'gallery', 'published_at', 'event_date', 'event_location'])
+            ->select(['id', 'title', 'slug', 'excerpt', 'image', 'video_url', 'external_url', 'gallery', 'published_at', 'event_date', DB::raw(self::PUBLIC_LOCATION_COLUMN)])
             ->limit(3)
             ->get();
 

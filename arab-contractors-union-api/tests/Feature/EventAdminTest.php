@@ -136,6 +136,28 @@ class EventAdminTest extends TestCase
             ->assertJsonPath('items.event_location', null);
     }
 
+    public function test_public_event_lists_hide_location_of_online_event_with_legacy_value(): void
+    {
+        Event::create([
+            'title' => 'فعالية', 'body' => 'نص', 'slug' => 'legacy-online-public',
+            'event_format' => 'online', 'event_location' => 'gaza',
+            'is_published' => true, 'published_at' => now()->subDay(), 'event_date' => now()->addDay(),
+        ]);
+        Event::create([
+            'title' => 'وجاهية', 'body' => 'نص', 'slug' => 'onsite-public',
+            'event_format' => 'onsite', 'event_location' => 'rafah',
+            'is_published' => true, 'published_at' => now()->subDay(), 'event_date' => now()->addDays(2),
+        ]);
+
+        $listed = collect($this->getJson('/api/v1/events')->assertStatus(200)->json('items'))->pluck('event_location', 'slug');
+        $latest = collect($this->getJson('/api/v1/events/latest')->assertStatus(200)->json('items'))->pluck('event_location', 'slug');
+
+        foreach ([$listed, $latest] as $locations) {
+            $this->assertNull($locations['legacy-online-public']);
+            $this->assertSame('rafah', $locations['onsite-public']);
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     //  speaker photo — uploaded file persists and is returned as a full URL (Application Problem #1)
     // ─────────────────────────────────────────────────────────────────────
