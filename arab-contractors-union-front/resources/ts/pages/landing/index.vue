@@ -709,11 +709,11 @@ onUnmounted(() => clearInterval(clock))
 .hero-inner { position: relative; z-index: 1; width: 100%; padding-top: 58px; padding-bottom: 150px; color: #fff; }
 .hero-badge {
   display: inline-block; border: 1px solid rgba(255, 255, 255, .6); border-radius: 999px;
-  padding: 8px 22px; font-size: 16px; font-weight: 500; margin-bottom: 34px; backdrop-filter: blur(4px);
+  padding: 8px 22px; font-size: 16px; font-weight: 500; margin-bottom: 32px; backdrop-filter: blur(4px);
 }
-.hero-title { font-size: clamp(32px, 3.4vw, 48px); font-weight: 800; line-height: 1.5; margin-bottom: 26px; color: #fff; }
-.hero-title .accent { color: #ffbe1a; }
-.hero-desc { max-width: 540px; font-size: 22px; font-weight: 700; line-height: 2; margin-bottom: 36px; }
+.hero .hero-title { font-size: clamp(32px, 3.4vw, 48px); font-weight: 800; line-height: 1.45; margin-bottom: 24px; color: #fff; }
+.hero .hero-title .accent { color: #ffbe1a; }
+.hero .hero-desc { max-width: 560px; font-size: 22px; font-weight: 700; line-height: 1.85; margin-bottom: 48px; }
 .hero-btn {
   display: inline-flex; align-items: center; gap: 14px; color: #fff;
   border: 1.5px solid #fff; border-radius: 12px; padding: 16px 38px; font-size: 17px; font-weight: 600;
@@ -874,7 +874,7 @@ onUnmounted(() => clearInterval(clock))
 
 /* ══ APP ══ */
 .app-section { background: linear-gradient(180deg, #00008c 0%, #0000c8 60%, #0000d8 100%); color: #fff; padding: 110px 0 100px; overflow: hidden; }
-.app-inner { display: grid; grid-template-columns: 1.1fr 1fr; gap: 32px; align-items: center; }
+.app-inner { display: grid; grid-template-columns: 1.1fr 1fr; gap: 96px; align-items: center; }
 .app-badge { display: inline-block; background: var(--orange); color: #fff; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 8px 16px; margin-bottom: 26px; direction: ltr; }
 .app-text h2 { font-size: clamp(30px, 3.3vw, 46px); font-weight: 800; line-height: 1.6; margin-bottom: 20px; color: #fff; }
 .app-text > p { font-size: 19px; font-weight: 700; line-height: 1.8; color: rgba(255, 255, 255, .92); margin-bottom: 30px; max-width: 520px; }
@@ -921,6 +921,7 @@ onUnmounted(() => clearInterval(clock))
 /* ══ Responsive ══ */
 @media (max-width: 1000px) {
   .about-body, .app-inner { grid-template-columns: 1fr; }
+  .app-inner { gap: 48px; }
   .equip-grid, .media-grid, .testi-grid { grid-template-columns: repeat(2, 1fr); }
   .app-visual img { width: 100%; margin: 0; }
 }

@@ -24,6 +24,15 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
 const navLinks = [
   { label: 'الرئيسية', href: '/landing' },
   {
+    label: 'عن الاتحاد', href: '#',
+    children: [
+      { label: 'عن الاتحاد', href: '/landing/about' },
+      { label: 'مجلس الإدارة', href: '/landing/board' },
+      { label: 'اللجان والفروع', href: '/landing/committees' },
+      { label: 'أعضاء الاتحاد', href: '/landing/members' },
+    ],
+  },
+  {
     label: 'الخدمات الالكترونية', href: '#',
     children: [
       { label: 'خدمات الاتحاد', href: '/landing/services' },
@@ -31,15 +40,6 @@ const navLinks = [
       { label: 'التدريب', href: '/landing/training-center' },
       { label: 'التشريعات', href: '/landing/legislation' },
       { label: 'مكتبة الملفات', href: '/landing/library' },
-    ],
-  },
-  {
-    label: 'عن الاتحاد', href: '#',
-    children: [
-      { label: 'عن الاتحاد', href: '/landing/about' },
-      { label: 'مجلس الإدارة', href: '/landing/board' },
-      { label: 'اللجان والفروع', href: '/landing/committees' },
-      { label: 'أعضاء الاتحاد', href: '/landing/members' },
     ],
   },
   {
@@ -155,7 +155,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div>
+  <div class="pub-header">
     <!-- Top Bar -->
     <div class="pub-top-bar">
       <div class="pub-container pub-tb-inner">
@@ -184,6 +184,7 @@ onMounted(() => {
       <div class="pub-container pub-nb-inner">
         <RouterLink to="/landing" class="pub-brand">
           <img src="/logo.png" alt="اتحاد المقاولين الفلسطينيين" class="pub-brand-logo" />
+          <span class="pub-brand-name">اتحاد المقاولين<br>الفلسطينيين</span>
         </RouterLink>
 
         <div class="pub-nav-links">
@@ -296,6 +297,9 @@ onMounted(() => {
 
 div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
 
+/* display: contents so the sticky navbar sticks against the whole page, not this wrapper */
+.pub-header { display: contents; }
+
 .pub-top-bar { background: linear-gradient(90deg, #000080, #0000c8); padding: .35rem 0; }
 .pub-container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
 .pub-tb-inner { display: flex; align-items: center; justify-content: space-between; }
@@ -314,8 +318,13 @@ div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
 .pub-navbar.scrolled { box-shadow: 0 4px 24px rgba(0,0,80,.1); }
 .pub-nb-inner { display: flex; align-items: center; gap: 1rem; }
 
-.pub-brand { display: flex; align-items: center; text-decoration: none; flex-shrink: 0; }
+.pub-brand { display: flex; align-items: center; gap: .75rem; text-decoration: none; flex-shrink: 0; }
 .pub-brand-logo { height: 70px; width: auto; object-fit: contain; }
+/* Union name beside the logo only on wide screens (1920+); 1440 and below show the logo alone */
+.pub-brand-name { display: none; color: #000080; font-size: 1.05rem; font-weight: 800; line-height: 1.35; white-space: nowrap; }
+@media (min-width: 1920px) {
+  .pub-brand-name { display: block; }
+}
 
 .pub-nav-links { display: flex; gap: 1.6rem; margin-inline-start: 2.4rem; margin-inline-end: auto; }
 .pub-nav-item { position: relative; }
@@ -337,35 +346,42 @@ div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
 .pub-nav-chevron.open { transform: rotate(-180deg); }
 
 .pub-dropdown {
-  position: absolute; top: calc(100% + .5rem); right: 0;
-  background: #fff; border: 1.5px solid #e5e7eb; border-radius: 12px;
-  padding: .5rem; min-width: 160px;
-  box-shadow: 0 12px 36px rgba(0,0,0,.12);
+  position: absolute; top: calc(100% + .75rem); right: 0;
+  background: #fff; border: 1px solid #eceef3; border-radius: 14px;
+  padding: .5rem; min-width: 210px;
+  box-shadow: 0 16px 40px rgba(0,0,80,.12);
   z-index: 300;
+  animation: pub-dd-in .18s ease-out;
 }
+@keyframes pub-dd-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 .pub-dd-link {
-  display: block; padding: .5rem .875rem; color: #374151; font-size: .83rem;
-  font-weight: 600; text-decoration: none; border-radius: 8px;
+  display: block; padding: .7rem 1rem; color: #5b6474; font-size: .95rem;
+  font-weight: 500; text-decoration: none; border-radius: 10px;
+  border-inline-start: 3px solid transparent;
   transition: all .15s; white-space: nowrap;
 }
-.pub-dd-link:hover { background: #e8eaf6; color: #1a237e; }
+.pub-dd-link + .pub-dd-link { margin-top: .15rem; }
+.pub-dd-link:hover { background: #f2f3fc; color: #000090; border-inline-start-color: #d67a00; }
+.router-link-exact-active.pub-dd-link { background: #f2f3fc; color: #000090; font-weight: 700; border-inline-start-color: #d67a00; }
 
 .pub-btn-register {
   display: flex; align-items: center; gap: .4rem;
   background: linear-gradient(90deg, #000080, #0000e0);
-  color: #fff; border: none; border-radius: 9px;
-  padding: .5rem 1.2rem; font-size: .82rem; font-weight: 700;
+  color: #fff; border: none; border-radius: 10px;
+  min-height: 50px; padding: .75rem 1.6rem; font-size: .95rem; font-weight: 700;
   cursor: pointer; font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif; white-space: nowrap;
   flex-shrink: 0; text-decoration: none;
   transition: all .25s; box-shadow: 0 4px 14px rgba(13,27,75,.25);
 }
 .pub-btn-register:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(13,27,75,.3); }
 
-.pub-hamburger { display: none; background: none; border: none; cursor: pointer; padding: 4px; color: #374151; flex-shrink: 0; }
+.pub-hamburger { display: none; background: none; border: none; cursor: pointer; padding: 4px; color: #374151; flex-shrink: 0; margin-inline-start: auto; }
 
 .pub-mobile-menu {
   padding: .75rem 1.5rem 1.25rem; border-top: 1px solid #e5e7eb;
   display: flex; flex-direction: column; gap: .2rem; background: #fff;
+  /* the navbar is sticky now, so a long open menu scrolls inside itself */
+  max-height: calc(100vh - 86px); overflow-y: auto;
 }
 .pub-mob-link {
   padding: .6rem .875rem; color: #374151; font-size: .9rem; font-weight: 600;
