@@ -42,16 +42,46 @@ class EventAdminTest extends TestCase
         $this->assertDatabaseCount('events', 0);
     }
 
-    public function test_store_accepts_published_at_today(): void
+    public function test_store_rejects_published_at_today(): void
     {
         $this->actingAsAdmin();
 
         $this->postJson('/api/v1/admin/events', [
-            'title' => 'فعالية بتاريخ اليوم', 'body' => 'نص',
-            'published_at' => now()->toDateString(),
-        ])->assertStatus(201);
+            'title' => 'فعالية بتاريخ اليوم', 'body' => 'نص', 'is_published' => true,
+            'published_at' => now(config('app.local_timezone'))->toDateString(),
+        ])->assertStatus(422)->assertJsonValidationErrors(['published_at']);
 
-        $this->assertDatabaseCount('events', 1);
+        $this->assertDatabaseCount('events', 0);
+    }
+
+    public function test_store_accepts_scheduled_published_at_tomorrow(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/events', [
+            'title' => 'فعالية مجدولة لبكرا', 'body' => 'نص', 'is_published' => true,
+            'published_at' => now(config('app.local_timezone'))->addDay()->toDateString(),
+        ])->assertStatus(201);
+    }
+
+    public function test_update_keeps_old_event_date_but_rejects_new_date_before_tomorrow(): void
+    {
+        $this->actingAsAdmin();
+
+        $event = Event::create([
+            'title' => 'فعالية قديمة', 'body' => 'نص', 'slug' => 'old-dated',
+            'event_date' => now()->subMonth(),
+        ]);
+        $old = $event->event_date->format('Y-m-d\\TH:i');
+
+        // نفس الموعد القديم بيمرّ — تعديل عادي على فعالية قديمة
+        $this->putJson("/api/v1/admin/events/{$event->id}", ['title' => 'معدّلة', 'event_date' => $old])
+            ->assertStatus(200);
+
+        // موعد جديد اليوم بينرفض
+        $this->putJson("/api/v1/admin/events/{$event->id}", [
+            'event_date' => now(config('app.local_timezone'))->format('Y-m-d\\TH:i'),
+        ])->assertStatus(422)->assertJsonValidationErrors(['event_date']);
     }
 
     public function test_update_allows_past_published_at_unchanged(): void
@@ -436,7 +466,7 @@ class EventAdminTest extends TestCase
         $this->actingAsAdmin();
 
         $this->postJson('/api/v1/admin/events', [
-            'title' => 'فعالية', 'body' => 'نص', 'event_date' => now()->format('Y-m-d\TH:i'),
+            'title' => 'فعالية', 'body' => 'نص', 'event_date' => now(config('app.local_timezone'))->format('Y-m-d\TH:i'),
         ])->assertStatus(422)->assertJsonValidationErrors(['event_date']);
     }
 
@@ -445,7 +475,7 @@ class EventAdminTest extends TestCase
         $this->actingAsAdmin();
 
         $this->postJson('/api/v1/admin/events', [
-            'title' => 'فعالية', 'body' => 'نص', 'event_date' => now()->addDay()->startOfDay()->format('Y-m-d\TH:i'),
+            'title' => 'فعالية', 'body' => 'نص', 'event_date' => now(config('app.local_timezone'))->addDay()->startOfDay()->format('Y-m-d\TH:i'),
         ])->assertStatus(201);
     }
 
@@ -539,9 +569,38 @@ class EventAdminTest extends TestCase
         ]);
 
         $this->putJson("/api/v1/admin/events/{$event->id}", [
-            'is_published' => true, 'published_at' => now()->subDays(3)->toDateString(),
+            'title' => 'منشورة (معدّلة)', 'is_published' => true,
+            'published_at' => $event->published_at->toDateString(),
         ])->assertStatus(200);
 
         \Illuminate\Support\Facades\Bus::assertNotDispatched(\App\Jobs\SendEventPublishedPushJob::class);
+    }
+
+    public function test_store_accepts_links_without_scheme(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/events', [
+            'title' => 'فعالية', 'body' => 'نص',
+            'video_url' => 'www.youtube.com/watch?v=abc', 'external_url' => 'youtu.be/abc',
+        ])->assertStatus(201)
+            ->assertJsonPath('items.video_url', 'https://www.youtube.com/watch?v=abc')
+            ->assertJsonPath('items.external_url', 'https://youtu.be/abc');
+    }
+
+    public function test_update_with_empty_links_clears_them(): void
+    {
+        $this->actingAsAdmin();
+
+        $event = Event::create([
+            'title' => 'روابط', 'body' => 'نص', 'slug' => 'links',
+            'video_url' => 'https://youtu.be/abc', 'external_url' => 'https://example.com',
+        ]);
+
+        $this->putJson("/api/v1/admin/events/{$event->id}", ['video_url' => '', 'external_url' => ''])
+            ->assertStatus(200);
+
+        $this->assertNull($event->fresh()->video_url);
+        $this->assertNull($event->fresh()->external_url);
     }
 }
