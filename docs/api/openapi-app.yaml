@@ -985,8 +985,19 @@ paths:
                             properties:
                               balance:
                                 type: string
-                                description: Total obligations in JOD (dues + unpaid penalties + pending payments), 2 decimals.
-                                example: "150.00"
+                                description: |
+                                  Amount still owed in JOD after deducting the contractor's credit and previous payments
+                                  (0 when nothing is owed), 2 decimals. Same number as `amount_due_jod` of `/contractor/balance`.
+                                  Pending (unconfirmed) transfers are not counted.
+                                example: "70.00"
+                              amount_due_jod: { type: number, example: 70 }
+                              net_jod: { type: number, example: -70, description: "Negative = owes the union, positive = credit." }
+                              credit_jod: { type: number, example: 30 }
+                              dues_jod: { type: number, example: 100 }
+                              penalties_jod: { type: number, example: 0 }
+                              position: { type: string, enum: [credit, owes, settled] }
+                              currency: { type: string, example: JOD }
+                              pending_payments_jod: { type: number, description: Sum of transfers awaiting review (informational). }
                               has_overdue: { type: boolean }
                               last_invoice:
                                 type: object
@@ -1009,7 +1020,7 @@ paths:
                             properties:
                               show: { type: boolean, example: true }
                               has_pending_dues: { type: boolean }
-                              outstanding_amount: { type: number }
+                              outstanding_amount: { type: number, description: Same as `financial.amount_due_jod`. }
                           unread_notifications_count:
                             type: integer
                             description: Unread count of the Laravel inbox (`/contractor/auth/notifications`).
@@ -1220,6 +1231,19 @@ paths:
                               dues_total_jod: { type: string }
                               dues_paid_jod: { type: string }
                               dues_paid_percentage: { type: number }
+                              total_due_jod: { type: string, description: Remaining dues + remaining open penalties. }
+                              credit_jod: { type: string, description: Contractor credit (unallocated payments + credits). }
+                              amount_due_jod: { type: string, description: What is still owed after deducting the credit (0 if none). }
+                              net_jod: { type: string, description: Credit minus total due; negative = owes. }
+                              position: { type: string, enum: [credit, owes, settled] }
+                          payment_types:
+                            type: array
+                            description: Options for the payment-type picker on the transfer form.
+                            items:
+                              type: object
+                              properties:
+                                value: { $ref: "#/components/schemas/PaymentType" }
+                                label: { type: string, example: سداد ذمة }
                           current_year_fee_breakdown:
                             type: object
                             nullable: true
@@ -1230,6 +1254,7 @@ paths:
                             properties:
                               unpaid: { type: integer }
                               pending_review: { type: integer }
+                              penalties: { type: integer, description: Open (unpaid / partially paid) penalties. }
                           payment_history_counts:
                             type: object
                             properties:
@@ -1241,7 +1266,11 @@ paths:
                               type: object
                               properties:
                                 id: { type: integer }
+                                contractor_due_id: { type: integer, nullable: true }
+                                title: { type: string }
+                                type_label: { type: string }
                                 description: { type: string }
+                                notes: { type: string, nullable: true, description: The notes entered in the app. }
                                 amount: { type: number }
                                 currency: { $ref: "#/components/schemas/Currency" }
                                 reference_number: { type: string, nullable: true }
@@ -1250,6 +1279,12 @@ paths:
                           dues:
                             type: array
                             items: { $ref: "#/components/schemas/Due" }
+                          penalties:
+                            type: array
+                            description: |
+                              One card per penalty (rejected ones hidden, open ones first). "Pay now" on a card =
+                              `POST /contractor/payments/transfer` with `penalty_id`.
+                            items: { $ref: "#/components/schemas/PenaltyCard" }
                           obligations:
                             type: array
                             description: Statement lines with `direction = debit` and status not `rejected`.
@@ -1266,7 +1301,7 @@ paths:
       summary: Net balance (credit − debit) in JOD
       description: |
         Same calculation as the dashboard "Contractor balances" screen.
-        `credit_jod` = unused credits + unallocated surplus of confirmed dues payments.
+        `credit_jod` = unused credits + unallocated surplus of confirmed dues / penalty / advance payments.
         `debit_jod` = remaining unpaid dues + remaining unpaid penalties.
       operationId: getBalance
       responses:
@@ -1290,9 +1325,23 @@ paths:
                           penalties_jod: { type: number, example: 0 }
                           debit_jod: { type: number, example: 120.0 }
                           net_jod: { type: number, example: -70.0, description: Negative = contractor owes the union. }
+                          amount_due_jod: { type: number, example: 70.0, description: What is still owed after deducting the credit (0 when nothing is owed). }
                           position:
                             type: string
                             enum: [credit, owes, settled]
+                          subscription_status:
+                            type: string
+                            enum: [active, expired, pending, suspended]
+                            example: expired
+                            description: |
+                              Subscription status, same rule as the dashboard balances and contractors pages.
+                              For an active account it follows the balance only: `net_jod` < 0 (owes dues or
+                              penalties) → `expired`, otherwise `active`. `pending` / `suspended` are the admin
+                              account state, returned as is.
+                          subscription_status_label:
+                            type: string
+                            example: منتهية
+                            description: Arabic label as shown on the dashboard (فعّالة / منتهية / قيد المراجعة / موقوفة).
                           currency: { type: string, example: JOD }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/ForceLogout" }
@@ -1323,6 +1372,9 @@ paths:
                             id: { type: integer }
                             amount: { type: number }
                             type: { $ref: "#/components/schemas/PaymentType" }
+                            type_label: { type: string, example: دفعة مقدمة }
+                            title: { type: string, description: Card title (see `Payment.title`). }
+                            transaction_number: { type: string, nullable: true }
                             status: { $ref: "#/components/schemas/PaymentStatus" }
                             method: { type: string, nullable: true, example: bank_transfer }
                             reference_number: { type: string, nullable: true }
@@ -1373,8 +1425,12 @@ paths:
       description: |
         Creates a `pending` payment for the accountant to confirm. Accountants/admins are notified.
 
-        Unless `type` is `dues_payment`, the request is rejected with `403 dues_pending` when renewal
-        blockers exist (`errors.issues` lists them). Paying dues is always allowed.
+        `dues_payment`, `penalty_payment` and `advance_payment` are always accepted (an advance payment
+        needs no registered due: once confirmed it settles any open dues/penalties and the rest stays as
+        credit, which is applied automatically to any new due or penalty). Other types are rejected with
+        `403 dues_pending` when renewal blockers exist (`errors.issues` lists them).
+
+        `contractor_due_id` forces `dues_payment`; `penalty_id` forces `penalty_payment`.
       operationId: submitTransfer
       requestBody:
         required: true
@@ -1397,11 +1453,20 @@ paths:
                 membership_id: { type: integer, nullable: true }
                 equipment_package_id: { type: integer, nullable: true, description: When paying for a marketplace package. }
                 reference_number: { type: string, maxLength: 100, nullable: true }
-                notes: { type: string, maxLength: 500, nullable: true }
+                contractor_due_id: { type: integer, nullable: true, description: "`dues[].id` of the card whose \"Pay now\" was pressed." }
+                penalty_id: { type: integer, nullable: true, description: "`penalties[].id` of the card whose \"Pay now\" was pressed. 409 if already paid or a transfer for it is under review." }
+                notes:
+                  type: string
+                  maxLength: 500
+                  nullable: true
+                  description: Returned as entered. Also accepted under `note`, `description`, `comment`, `comments`, `remarks` or `notice`.
                 type:
                   allOf:
                     - $ref: "#/components/schemas/PaymentType"
-                  description: Defaults to `membership_fee`. Free text up to 50 chars server-side.
+                  description: |
+                    Without a type: `dues_payment` when the contractor owes dues or penalties, otherwise `membership_fee`.
+                    Aliases accepted: `penalty`/`fine` → `penalty_payment`, `advance`/`prepayment`/`credit` → `advance_payment`,
+                    `membership` → `membership_fee`. Unknown values are ignored.
       responses:
         "201":
           description: Transfer submitted.
@@ -1417,7 +1482,34 @@ paths:
         "403":
           description: "`dues_pending` with `errors.issues`, or forced logout."
           content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+        "409":
+          description: The linked due/penalty is already paid, or a transfer for it is under review.
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
         "422": { $ref: "#/components/responses/ValidationError" }
+
+  /contractor/payments/statement:
+    get:
+      tags: [Payments]
+      summary: Detailed payment log (account statement)
+      description: |
+        Every due, penalty, payment and credit of the contractor, newest first, with the running balance
+        after each movement. The latest `balance_after_jod` equals `summary.net_jod` (same as `/contractor/balance`).
+        Pending / rejected payments are listed with `counts_in_balance: false`. `kind = settlement` is an old
+        settlement recorded before 2026-10-06 without allocation details.
+      operationId: getPaymentStatement
+      responses:
+        "200":
+          description: Statement.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      items: { $ref: "#/components/schemas/PaymentStatement" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/ForceLogout" }
 
   /contractor/payments/{payment}:
     get:
@@ -3888,8 +3980,97 @@ components:
       enum: [pending, paid, rejected]
     PaymentType:
       type: string
-      description: "Known values: `membership_fee` (default), `dues_payment`, `penalty`. Legacy rows may contain `membership`. The server accepts any string up to 50 chars."
+      description: |
+        App values: `dues_payment` (سداد ذمة), `membership_fee` (رسوم اشتراك), `penalty_payment` (دفع غرامة),
+        `advance_payment` (دفعة مقدمة), plus `equipment_subscription`. Legacy rows may contain `membership` or `penalty`.
+      enum: [dues_payment, membership_fee, penalty_payment, advance_payment, equipment_subscription, membership, penalty]
       example: dues_payment
+    PenaltyCard:
+      type: object
+      properties:
+        id: { type: integer }
+        kind: { type: string, example: penalty }
+        title: { type: string, example: تأخير تسليم وثائق }
+        type_label: { type: string, example: غرامة }
+        amount_jod: { type: string, example: "40.00" }
+        paid_jod: { type: string, example: "0.00" }
+        remaining_jod: { type: number, example: 40 }
+        status: { type: string, enum: [unpaid, partially_paid, paid] }
+        status_label: { type: string }
+        notes: { type: string, nullable: true }
+        created_at: { type: string, format: date }
+        is_under_review: { type: boolean }
+        pending_payment:
+          type: object
+          nullable: true
+          properties:
+            id: { type: integer }
+            transaction_number: { type: string }
+            amount: { type: number }
+            currency: { $ref: "#/components/schemas/Currency" }
+            reference_number: { type: string, nullable: true }
+            notes: { type: string, nullable: true }
+            receipt_image_url: { type: string, format: uri, nullable: true }
+            submitted_at: { type: string, format: date-time, nullable: true }
+        last_rejection_reason: { type: string, nullable: true }
+    PaymentStatement:
+      type: object
+      properties:
+        contractor:
+          type: object
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            membership_number: { type: string }
+        summary:
+          type: object
+          properties:
+            total_dues_jod: { type: number }
+            total_penalties_jod: { type: number }
+            total_paid_jod: { type: number }
+            pending_payments_jod: { type: number }
+            dues_remaining_jod: { type: number }
+            penalties_remaining_jod: { type: number }
+            credit_jod: { type: number }
+            amount_due_jod: { type: number }
+            net_jod: { type: number }
+            position: { type: string, enum: [credit, owes, settled] }
+            currency: { type: string, example: JOD }
+        entries:
+          type: array
+          items:
+            type: object
+            properties:
+              kind: { type: string, enum: [due, penalty, payment, credit, settlement] }
+              id: { type: integer }
+              date: { type: string, format: date, nullable: true }
+              title: { type: string }
+              reference_number: { type: string, nullable: true, description: "Due: INV number. Payment: TRX transaction number." }
+              bank_reference_number: { type: string, nullable: true, description: Payments only. Bank transfer reference. }
+              direction: { type: string, enum: [debit, credit], description: "debit = owed, credit = paid / credit." }
+              amount_jod: { type: number }
+              status: { type: string }
+              status_label: { type: string }
+              counts_in_balance: { type: boolean }
+              balance_after_jod: { type: number }
+              paid_jod: { type: number, description: Dues / penalties. }
+              remaining_jod: { type: number, description: Dues / penalties. }
+              type: { $ref: "#/components/schemas/PaymentType" }
+              type_label: { type: string }
+              notes: { type: string, nullable: true }
+              used_jod: { type: number }
+              unused_jod: { type: number }
+              allocations:
+                type: array
+                description: Which dues / penalties this payment or credit settled.
+                items:
+                  type: object
+                  properties:
+                    kind: { type: string, enum: [due, penalty] }
+                    id: { type: integer }
+                    title: { type: string }
+                    reference_number: { type: string, nullable: true }
+                    amount_jod: { type: number }
     Payment:
       type: object
       properties:
@@ -3899,6 +4080,8 @@ components:
         contractor_id: { type: integer }
         membership_id: { type: integer, nullable: true }
         equipment_package_id: { type: integer, nullable: true }
+        contractor_due_id: { type: integer, nullable: true }
+        penalty_id: { type: integer, nullable: true }
         bank_account_id: { type: integer, nullable: true }
         amount: { type: number }
         currency: { $ref: "#/components/schemas/Currency" }
@@ -3906,6 +4089,13 @@ components:
         amount_jod: { type: number, nullable: true }
         rate_source: { type: string, nullable: true }
         type: { $ref: "#/components/schemas/PaymentType" }
+        type_label: { type: string, example: سداد ذمة }
+        title:
+          type: string
+          description: |
+            Card title. Linked due → its title; advance payment → "دفعة مقدمة"; linked penalty → its reason;
+            settled one due/penalty → its title (several → "تسديد N ذمم مالية"); membership fee → "رسوم اشتراك سنة <year>";
+            otherwise `type_label`.
         status: { $ref: "#/components/schemas/PaymentStatus" }
         status_label: { type: string }
         method: { type: string, example: bank_transfer }
