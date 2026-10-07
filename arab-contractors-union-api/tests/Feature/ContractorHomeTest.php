@@ -111,6 +111,19 @@ class ContractorHomeTest extends TestCase
             ->assertJsonPath('items.unread_notifications_count', 0);
     }
 
+    public function test_missing_phone_is_not_listed_as_missing_profile_field(): void
+    {
+        $contractor = $this->createContractor();
+        $contractor->forceFill(['phone' => null])->save();
+        Sanctum::actingAs($contractor, ['*']);
+
+        $missing = $this->getJson('/api/v1/contractor/home')
+            ->assertStatus(200)
+            ->json('items.contractor.missing_profile_fields');
+
+        $this->assertNotContains('رقم الهاتف', $missing);
+    }
+
     public function test_home_events_count_only_counts_upcoming_published_events(): void
     {
         // كان هذا التيست يُنشئ صفوف News بـ category='event' وevent_date — بقايا مرحلة

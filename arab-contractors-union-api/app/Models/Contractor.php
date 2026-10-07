@@ -214,11 +214,13 @@ class Contractor extends Authenticatable
         return self::CLASSIFICATION_LABELS[$this->classification] ?? $this->classification;
     }
 
-    /** الحقول والملفات المطلوبة في نموذج تسجيل المقاول بلوحة الأدمن — نفس القائمة تُستخدم هنا لبناء "اكتمال الملف". */
+    /**
+     * الحقول المطلوبة لـ "اكتمال الملف". رقم الهاتف مقصود أنه خارج القائمة:
+     * طلب المالك ألا يُعدّ ناقصاً (المقاول يدخل التطبيق برقمه أصلاً).
+     */
     private const REQUIRED_PROFILE_FIELDS = [
         'owner_name'        => 'اسم صاحب المنشأة',
         'authorized_person' => 'اسم المفوض بالتوقيع',
-        'phone'             => 'رقم الهاتف',
         'address'           => 'العنوان التفصيلي',
         'license_number'    => 'رقم رخصة البلدية',
         'established_date'  => 'تاريخ التأسيس',
