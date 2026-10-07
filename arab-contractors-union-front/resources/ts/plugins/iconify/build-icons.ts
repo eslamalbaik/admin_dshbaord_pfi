@@ -318,6 +318,14 @@ const sources: BundleScriptConfig = {
         'volume-off',
         'world',
         'x',
+        // سجل المدفوعات (ContractorStatementDialog) وزرّه بصفحة الأرصدة
+        'file-invoice',
+        'list-details',
+        'note',
+        'receipt-2',
+        'receipt-off',
+        'report-money',
+        'wallet',
       ],
     },
     {
