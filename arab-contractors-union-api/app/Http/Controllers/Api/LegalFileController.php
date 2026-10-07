@@ -23,6 +23,24 @@ class LegalFileController extends Controller
         return $this->labelCache ??= LegalFileCategory::orderBy('sort')->orderBy('id')->pluck('label', 'key')->all();
     }
 
+    // ─── Helper: place a file at a given position and re-number the rest ─────
+    // الترتيب يبدأ من 0؛ باقي الملفات تُزاح وتُرقَّم 0..n-1 بدون تكرار.
+    private function placeAt(LegalFile $target, int $position): void
+    {
+        $others = LegalFile::where('id', '!=', $target->id)
+            ->orderBy('sort')->orderBy('id')->get()->values();
+
+        $position = max(0, min($position, $others->count()));
+        $ordered  = $others->all();
+        array_splice($ordered, $position, 0, [$target]);
+
+        foreach ($ordered as $i => $f) {
+            if ((int) $f->sort !== $i) {
+                $f->forceFill(['sort' => $i])->saveQuietly();
+            }
+        }
+    }
+
     // ─── Helper: format a LegalFile for API response ─────────────────────────
     private function format(LegalFile $f): array
     {
@@ -153,6 +171,10 @@ class LegalFileController extends Controller
             'uploaded_by'    => Auth::id(),
         ]);
 
+        if (array_key_exists('sort', $data) && $data['sort'] !== null) {
+            $this->placeAt($legalFile, (int) $data['sort']);
+        }
+
         AuditLogService::record(Auth::user(), 'legal_file.created', $legalFile, ['title' => $legalFile->title, 'category' => $legalFile->category]);
 
         return $this->success($this->format($legalFile), 'تم رفع الملف بنجاح.', 201);
@@ -189,10 +211,13 @@ class LegalFileController extends Controller
             'description'    => $data['description']    ?? null,
             'description_en' => $data['description_en'] ?? null,
             'category'       => $data['category'],
-            'sort'           => $data['sort'] ?? $legalFile->sort,
             'is_active'      => $data['is_active'] ?? $legalFile->is_active,
             'is_featured'    => $data['is_featured'] ?? $legalFile->is_featured,
         ]);
+
+        if (array_key_exists('sort', $data) && $data['sort'] !== null) {
+            $this->placeAt($legalFile, (int) $data['sort']);
+        }
 
         AuditLogService::record(Auth::user(), 'legal_file.updated', $legalFile, ['title' => $legalFile->title]);
 
