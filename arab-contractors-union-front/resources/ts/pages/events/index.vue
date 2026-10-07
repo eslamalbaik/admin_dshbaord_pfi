@@ -89,11 +89,17 @@ const publishModeOptions = [
 
 // تاريخ بصيغة YYYY-MM-DD بالتوقيت المحلي (toISOString يرجّع تاريخ UTC — غلط بعد منتصف الليل)
 const localDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-const todayStr = () => localDateStr(new Date())
 const tomorrowStr = () => localDateStr(new Date(Date.now() + 24 * 60 * 60 * 1000))
 
 // موعد الفعالية من بكرا وطالع (عند الإنشاء) — نفس قيد الباك اند
 const minEventDate = computed(() => `${tomorrowStr()}T00:00`)
+
+// "ابتداءً من 08/10/2026 (تاريخ اليوم +1)" — يوضّح أقرب تاريخ مسموح بدل كلمة "بكرا"
+const minDateHint = computed(() => {
+  const [y, m, d] = tomorrowStr().split('-')
+
+  return `ابتداءً من ${d}/${m}/${y} (تاريخ اليوم +1)`
+})
 
 // رابط بدون بروتوكول (www.youtube.com/...) بيتكمّل بـ https:// — نفس ما بيعمل الخادم
 const withScheme = (v: string) => {
@@ -220,11 +226,13 @@ watch(mainImageFile, value => {
 // حالة الفعالية عند فتحها للتعديل — لتحديد شو لازم ينبعت للخادم عند الحفظ
 const originalPublishMode = ref<PublishMode>('now')
 const originalEventDate = ref('')
+const originalPublishedAt = ref('')
 
 const openCreate = () => {
   form.value = emptyForm()
   originalPublishMode.value = 'now'
   originalEventDate.value = ''
+  originalPublishedAt.value = ''
   mainImageFile.value = null
   isEditing.value = false
   formDialog.value = true
@@ -254,6 +262,7 @@ const openEdit = (item: any) => {
   }
   originalPublishMode.value = form.value.publishMode
   originalEventDate.value = form.value.event_date
+  originalPublishedAt.value = form.value.published_at
   mainImageFile.value = null
   isEditing.value = true
   formDialog.value = true
@@ -293,7 +302,7 @@ const saveEvent = async () => {
   // التعديل ما بيمنع حفظ فعالية قديمة موعدها فات — القيد بس لو انكتب موعد جديد
   const eventDateChanged = form.value.event_date !== originalEventDate.value
   if (form.value.event_date && eventDateChanged && form.value.event_date < minEventDate.value) {
-    notify('موعد الفعالية لازم يكون من بكرا وطالع', 'error')
+    notify(`موعد الفعالية لازم يكون ${minDateHint.value}`, 'error')
     return
   }
   // متحدث فاضي بالكامل (انضاف بالغلط) بيتشال لحاله — زر الحذف مخفي لما يكون في متحدث واحد
@@ -307,8 +316,9 @@ const saveEvent = async () => {
     notify('حدد تاريخ النشر للفعالية المجدولة', 'error')
     return
   }
-  if (mode === 'schedule' && !isEditing.value && form.value.published_at < todayStr()) {
-    notify('يجب أن يكون تاريخ النشر اليوم أو بعده', 'error')
+  // نفس قاعدة الموعد: تاريخ مجدول جديد من اليوم +1، والتاريخ المحفوظ أصلاً بيمرّ بالتعديل
+  if (mode === 'schedule' && form.value.published_at !== originalPublishedAt.value && form.value.published_at < tomorrowStr()) {
+    notify(`تاريخ النشر المجدول لازم يكون ${minDateHint.value}`, 'error')
     return
   }
   const mainImage = firstFile(mainImageFile.value)
@@ -330,8 +340,6 @@ const saveEvent = async () => {
     fd.append('excerpt', form.value.excerpt)
     fd.append('body', form.value.body)
     fd.append('is_published', mode === 'draft' ? '0' : '1')
-    if (form.value.video_url.trim()) fd.append('video_url', withScheme(form.value.video_url))
-    if (form.value.external_url.trim()) fd.append('external_url', withScheme(form.value.external_url))
     if (mode === 'schedule')
       fd.append('published_at', form.value.published_at)
     else if (mode === 'now' && isEditing.value && originalPublishMode.value !== 'now')
@@ -340,7 +348,12 @@ const saveEvent = async () => {
     if (form.value.event_location) fd.append('event_location', form.value.event_location)
     if (form.value.event_format) fd.append('event_format', form.value.event_format)
     fd.append('event_type', form.value.event_type)
-    if (form.value.stream_url.trim()) fd.append('stream_url', withScheme(form.value.stream_url))
+    // الروابط اختيارية: الفارغ بالتعديل بينبعت فاضي عشان يمسح الرابط القديم بدل ما يضل محفوظ
+    for (const f of ['video_url', 'external_url', 'stream_url'] as const) {
+      const v = withScheme(form.value[f])
+      if (v || isEditing.value)
+        fd.append(f, v)
+    }
     form.value.speakers.forEach((s, i) => {
       fd.append(`speakers[${i}][name]`, s.name)
       if (s.title) fd.append(`speakers[${i}][title]`, s.title)
@@ -619,8 +632,8 @@ const deleteEvent = async () => {
                   v-model="form.event_date"
                   label="موعد الفعالية"
                   type="datetime-local"
-                  :min="isEditing ? undefined : minEventDate"
-                  :hint="isEditing ? undefined : 'من بكرا وطالع'"
+                  :min="isEditing && originalEventDate ? undefined : minEventDate"
+                  :hint="minDateHint"
                   persistent-hint
                 />
               </VCol>
@@ -795,8 +808,8 @@ const deleteEvent = async () => {
                   v-model="form.published_at"
                   label="تاريخ النشر المجدول *"
                   type="date"
-                  :min="isEditing ? undefined : todayStr()"
-                  hint="الفعالية والإشعار بيوصلوا للمقاولين بهالتاريخ"
+                  :min="isEditing && originalPublishedAt ? undefined : tomorrowStr()"
+                  :hint="minDateHint"
                   persistent-hint
                 />
               </VCol>

@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Notifications\EventJoinedNotification;
 use App\Services\AuditLogService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -233,19 +234,44 @@ class EventController extends Controller
             $validated['stream_url'] = null;
     }
 
+    // أقرب تاريخ مسموح لموعد الفعالية ولتاريخ النشر المجدول: اليوم +1 بالتوقيت المحلي (Y-m-d)
+    private function minEventDate(): string
+    {
+        return now(config('app.local_timezone'))->addDay()->toDateString();
+    }
+
+    /**
+     * تاريخ جديد لازم يكون اليوم +1 أو بعده. بالتعديل، القيمة المحفوظة أصلاً تمرّ حتى لو أقدم
+     * (نفس نمط الأخبار)، حتى ما ينمنع حفظ تعديل على فعالية قديمة بدون ما يتغيّر تاريخها.
+     */
+    private function fromTomorrowRule(?Event $event, string $field, string $label): \Closure
+    {
+        return function ($attribute, $value, $fail) use ($event, $field, $label) {
+            try {
+                $date = Carbon::parse($value)->toDateString();
+            } catch (\Throwable) {
+                return; // قاعدة date بتطلع رسالة الصيغة
+            }
+            if ($event?->{$field} && $date === $event->{$field}->toDateString())
+                return;
+            $min = $this->minEventDate();
+            if ($date < $min)
+                $fail("{$label} لازم يكون ابتداءً من " . Carbon::parse($min)->format('d/m/Y') . ' (تاريخ اليوم +1).');
+        };
+    }
+
     // القواعد المشتركة بين store/update لحقول الفعالية (باستثناء title/body اللي تختلف required/sometimes)
-    // $isCreate: تاريخ النشر لازم يكون اليوم أو بعده بس عند الإنشاء (REQ-11 #2) — التعديل يبقى
-    // بلا قيد حتى لا يُمنع تصحيح حقول أخرى بفعالية قديمة تاريخ نشرها بالماضي فعلياً (نفس نمط Tenders/Announcement).
-    private function eventRules(bool $isCreate = false): array
+    // $event: الفعالية الحالية بالتعديل (null بالإنشاء) — لقيود التاريخ أعلاه
+    private function eventRules(?Event $event = null): array
     {
         return [
             'image'          => 'nullable|image|mimes:jpg,jpeg,png,webp|max:10240',
             'video_url'      => 'nullable|url|max:500',
             'external_url'   => 'nullable|url|max:500',
             'is_published'   => 'boolean',
-            'published_at'   => $isCreate ? 'nullable|date|after_or_equal:today' : 'nullable|date',
-            // موعد الفعالية من بكرا وطالع عند الإنشاء — التعديل بلا قيد (نفس منطق published_at)
-            'event_date'     => $isCreate ? 'nullable|date|after_or_equal:tomorrow' : 'nullable|date',
+            // تاريخ النشر المجدول وموعد الفعالية: من اليوم +1 (النشر المباشر ما بيبعت تاريخ أصلاً)
+            'published_at'   => ['nullable', 'date', $this->fromTomorrowRule($event, 'published_at', 'تاريخ النشر المجدول')],
+            'event_date'     => ['nullable', 'date', $this->fromTomorrowRule($event, 'event_date', 'موعد الفعالية')],
             // مكان الفعالية إلزامي لو نوع الحضور "وجاهي" أو "وجاهي + أونلاين" (بند 9ج) — hybrid
             // كان ناقصاً هون فيقدر الأدمن يحفظ فعالية hybrid بلا مكان رغم إنها تحتاجه فعلياً
             'event_location' => 'required_if:event_format,onsite,hybrid|nullable|string|max:255',
@@ -285,8 +311,6 @@ class EventController extends Controller
             'speaker_photos.*.mimes'          => 'صيغة صورة المتحدث غير مدعومة — المسموح: JPG أو PNG أو WEBP.',
             'speaker_photos.*.max'            => 'حجم صورة المتحدث يتجاوز الحد الأقصى 3 ميجابايت.',
             'speaker_photos.*.uploaded'       => 'تعذّر رفع صورة المتحدث — تأكد إن حجمها أقل من 3 ميجابايت.',
-            'event_date.after_or_equal'       => 'موعد الفعالية لازم يكون من بكرا وطالع.',
-            'published_at.after_or_equal'     => 'يجب أن يكون تاريخ النشر اليوم أو بعده.',
             'video_url.url'                   => 'رابط فيديو يوتيوب غير صالح — انسخ الرابط كامل من المتصفح.',
             'external_url.url'                => 'الرابط الخارجي غير صالح — انسخ الرابط كامل من المتصفح.',
             'stream_url.url'                  => 'رابط البث المباشر غير صالح — انسخ الرابط كامل من المتصفح.',
@@ -330,7 +354,7 @@ class EventController extends Controller
             'excerpt' => 'nullable|string|max:500',
             'body' => 'required|string',
             'is_international' => 'boolean',
-        ], $this->eventRules(isCreate: true)), $this->eventMessages());
+        ], $this->eventRules()), $this->eventMessages());
 
         $this->handleMediaUploads($request, $validated, null, 'events', 'events/gallery');
         // فعاليات: صورة رئيسية واحدة فقط، لا معرض صور (بند 9د) — handleMediaUploads يقرأ الملفات من
@@ -371,7 +395,7 @@ class EventController extends Controller
             'body' => 'sometimes|string',
             'is_international' => 'boolean',
             'publish_now' => 'boolean',
-        ], $this->eventRules()), $this->eventMessages());
+        ], $this->eventRules($event)), $this->eventMessages());
 
         // "نشر مباشرة" لفعالية كانت مسودة أو مجدولة لتاريخ لاحق: تاريخ النشر يصير الآن (نفس نمط الأخبار)
         $publishNow = $request->boolean('publish_now');
