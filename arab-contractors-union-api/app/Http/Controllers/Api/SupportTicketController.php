@@ -8,7 +8,6 @@ use App\Models\SupportTicket;
 use App\Models\User;
 use App\Notifications\SupportTicketContractorRepliedNotification;
 use App\Notifications\SupportTicketCreatedNotification;
-use App\Notifications\SupportTicketRepliedNotification;
 use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -230,19 +229,7 @@ class SupportTicketController extends Controller
             'replied_at' => now(),
         ]);
 
-        // إشعار المقاول عبر البريد الإلكتروني وإشعار داخل التطبيق — فشل الإشعار (مثلاً تعليق SMTP)
-        // ما لازم يفشّل الرد نفسه، لأن الرد أصلاً نجح بالداتابيز قبل هالسطر.
-        if ($ticket->contractor) {
-            try {
-                $ticket->contractor->notify(new SupportTicketRepliedNotification($ticket));
-            }
-            catch (\Throwable $e) {
-                Log::warning('Failed to send support ticket reply notification', [
-                    'ticket_id' => $ticket->id,
-                    'error'     => $e->getMessage(),
-                ]);
-            }
-        }
+        // ما في إشعار للمقاول عند رد الإدارة (قرار الإدارة) — الرد بيظهر بشاشة الدعم الفني بالتطبيق.
 
         AuditLogService::record(Auth::user(), 'support_ticket.replied', $ticket);
 

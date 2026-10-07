@@ -7,7 +7,6 @@ use App\Models\CertificateRequest;
 use App\Models\Contractor;
 use App\Models\Membership;
 use App\Models\Payment;
-use App\Models\SupportTicket;
 use App\Models\Tender;
 use App\Notifications\AdminBroadcastNotification;
 use App\Notifications\AnnouncementNotification;
@@ -23,7 +22,6 @@ use App\Notifications\PaymentConfirmedNotification;
 use App\Notifications\PaymentRejectedNotification;
 use App\Notifications\PenaltyAddedNotification;
 use App\Models\Penalty;
-use App\Notifications\SupportTicketRepliedNotification;
 use App\Services\Push\LogPushSender;
 use App\Services\Push\PushSenderInterface;
 use Illuminate\Support\Facades\Log;
@@ -54,7 +52,6 @@ class PushChannelWiringTest extends TestCase
             'payment rejected'   => [fn () => new PaymentRejectedNotification(new Payment(['amount' => 100]))],
             'penalty added'      => [fn () => new PenaltyAddedNotification(new Penalty(['amount' => 40, 'reason' => 'مخالفة', 'status' => 'unpaid']))],
             'complete profile'   => [fn () => new CompleteProfileNotification()],
-            'support replied'    => [fn () => new SupportTicketRepliedNotification(new SupportTicket(['subject' => 'س']))],
             'certificate status' => [fn () => new CertificateRequestStatusNotification(new CertificateRequest(['status' => 'issued']))],
             'expiry reminder'    => [fn () => new MembershipExpiryReminderNotification(new Membership(), 7)],
             'grace reminder'     => [fn () => new MembershipGracePeriodReminderNotification(new Membership(), 'start', now())],
