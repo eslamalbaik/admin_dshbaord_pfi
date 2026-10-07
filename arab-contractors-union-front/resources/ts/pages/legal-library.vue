@@ -153,7 +153,7 @@ const deleteCatMutation = useMutation({
   onError: (e: any) => { catError.value = e?.response?.data?.message || 'فشل حذف التصنيف.' },
 })
 const confirmDeleteCat = (c: any) => {
-  if (confirm(c.files_count ? `هل تريد حذف التصنيف "${c.label}"؟ الملفات (${c.files_count}) ستصبح بدون تصنيف.` : `هل تريد حذف التصنيف "${c.label}"؟`)) deleteCatMutation.mutate(c.id)
+  if (confirm(c.files_count ? `هل تريد حذف التصنيف "${c.label}"؟ الملفات (${c.files_count}) ستنتقل إلى تصنيف آخر.` : `هل تريد حذف التصنيف "${c.label}"؟`)) deleteCatMutation.mutate(c.id)
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
