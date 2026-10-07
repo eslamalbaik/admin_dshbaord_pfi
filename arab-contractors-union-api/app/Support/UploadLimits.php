@@ -17,7 +17,7 @@ class UploadLimits
     /** السقف المطلوب من جانب التطبيق (KB) — 12 ميجابايت. */
     public const CONFIGURED_MAX_KB = 12288;
 
-    /** الامتدادات المسموح بها — نفس قائمة mimes في ContractorController. */
+    /** الامتدادات المسموح بها لمستندات المقاول — لوحة الأدمن وتعديل الملف من التطبيق (documentRule). */
     public const ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
 
     /** الحد الفعلي لملف واحد (KB): الأصغر بين قاعدة Laravel وما يسمح به PHP. */
@@ -36,6 +36,38 @@ class UploadLimits
     public static function maxFiles(): int
     {
         return (int) ini_get('max_file_uploads');
+    }
+
+    /**
+     * قاعدة التحقق الموحّدة لمستندات المقاول الرسمية — لوحة الأدمن وتعديل الملف من
+     * التطبيق معاً. كان التطبيق (UpdateFullProfileRequest) على mimes:pdf,jpg,jpeg,png
+     * و max:10240 ثابتين، فيُرفض ملف Word يقبله الأدمن.
+     */
+    public static function documentRule(): string
+    {
+        return 'nullable|file|mimes:' . implode(',', self::ALLOWED_EXTENSIONS) . '|max:' . self::maxFileKb();
+    }
+
+    /**
+     * رسائل الصيغة والحجم لكل حقل مستند، بالاسم العربي للمستند وبالميجابايت —
+     * بدونها كانت الرسالة "يجب أن يكون cr file ملفاً من نوع..." والحجم بالكيلوبايت.
+     *
+     * @param  array<string,string>  $labels  مفتاح الحقل => اسمه العربي
+     */
+    public static function documentMessages(array $labels): array
+    {
+        $types = implode('، ', self::ALLOWED_EXTENSIONS);
+        $maxMb = round(self::maxFileKb() / 1024, 1);
+        $maxMb = $maxMb == (int) $maxMb ? (int) $maxMb : $maxMb;
+
+        $messages = [];
+        foreach ($labels as $field => $label) {
+            $messages["{$field}.mimes"] = "صيغة ملف «{$label}» غير مسموحة — الصيغ المسموحة: {$types}.";
+            $messages["{$field}.max"]   = "حجم ملف «{$label}» أكبر من المسموح — الحد الأقصى {$maxMb} ميجابايت للملف.";
+            $messages["{$field}.file"]  = "تعذّر رفع ملف «{$label}» — الحد الأقصى {$maxMb} ميجابايت والصيغ المسموحة: {$types}.";
+        }
+
+        return $messages;
     }
 
     /** الحمولة التي تستهلكها الواجهة لعرض القيود وللتحقق قبل بدء الرفع. */
