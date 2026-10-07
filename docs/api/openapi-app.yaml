@@ -3764,7 +3764,7 @@ components:
     ProfileUpload:
       type: string
       format: binary
-      description: pdf, jpg, jpeg or png. Max 10 MB. Replaces the existing file.
+      description: pdf, doc, docx, jpg, jpeg or png. Max 12 MB per file. Replaces the existing file. A wrong type or size returns 422 with an Arabic message naming the document.
     ProfileFileField:
       type: string
       enum:
