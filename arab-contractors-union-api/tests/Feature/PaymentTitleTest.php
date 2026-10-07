@@ -81,7 +81,7 @@ class PaymentTitleTest extends TestCase
 
         $payment = $this->myPayment($id);
         $this->assertSame('رسوم اشتراك سنة 2026', $payment['title']);
-        $this->assertSame('تسديد ذمم مالية', $payment['type_label']);
+        $this->assertSame('سداد ذمة', $payment['type_label']);
     }
 
     public function test_unlinked_dues_payment_takes_title_of_the_due_it_settled(): void
@@ -89,7 +89,7 @@ class PaymentTitleTest extends TestCase
         $this->due('رسوم اشتراك سنة 2026');
         $id = $this->submit();
 
-        $this->assertSame('تسديد ذمم مالية', $this->myPayment($id)['title']);
+        $this->assertSame('سداد ذمة', $this->myPayment($id)['title']);
 
         $this->confirm($id);
         $this->assertSame('رسوم اشتراك سنة 2026', $this->myPayment($id)['title']);
@@ -97,7 +97,7 @@ class PaymentTitleTest extends TestCase
         Sanctum::actingAs($this->contractor, ['*']);
         $this->getJson('/api/v1/contractor/payments/transfer?type=dues_payment')
             ->assertJsonPath('items.0.title', 'رسوم اشتراك سنة 2026')
-            ->assertJsonPath('items.0.type_label', 'تسديد ذمم مالية');
+            ->assertJsonPath('items.0.type_label', 'سداد ذمة');
     }
 
     public function test_payment_spread_over_several_dues_is_titled_by_count(): void

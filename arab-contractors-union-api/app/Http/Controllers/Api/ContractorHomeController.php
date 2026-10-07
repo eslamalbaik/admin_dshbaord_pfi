@@ -28,7 +28,6 @@ class ContractorHomeController extends Controller
     use ApiResponseTrait;
 
     public function __construct(
-        private \App\Services\ContractorFinancialService $financialService,
         private \App\Services\MembershipStatusService $membershipStatusService
     ) {}
 
@@ -49,10 +48,9 @@ class ContractorHomeController extends Controller
         // فإضافة العدّ الكلي كانت ستعيد بناء الخلاصة (7 استعلامات) مرة ثانية بلا داعٍ.
         $feed = $this->buildFeed($contractor);
 
-        // يُحسب مرة واحدة ويُمرَّر لكلا البطاقتين — كان كل من financialSummary()
-        // وctaCertificate() يستدعي totalObligations() (3 استعلامات SUM) بشكل منفصل
-        // على أكثر endpoint زيارة في التطبيق.
-        $balance = $this->financialService->totalObligations($contractor);
+        // يُحسب مرة واحدة ويُمرَّر لكلا البطاقتين. الرصيد الصافي (نفس صفحة الأرصدة و
+        // contractor/balance): الذمم والغرامات ناقص الأرصدة والدفعات السابقة، مش إجمالي الذمة.
+        $balance = app(ContractorBalanceController::class)->snapshot($contractor->id);
 
         return $this->success([
             'contractor'                 => $this->contractorCard($contractor),
@@ -128,7 +126,7 @@ class ContractorHomeController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
     //  الذمم المالية — نفس حسبة "ما عليه" المستخدمة في شاشة الملف المالي
     // ─────────────────────────────────────────────────────────────────────────
-    private function financialSummary(Contractor $contractor, float $balance): array
+    private function financialSummary(Contractor $contractor, array $balance): array
     {
         $hasOverdue = $contractor->dues()
             ->outstanding()
@@ -139,7 +137,17 @@ class ContractorHomeController extends Controller
         $lastDue = $contractor->dues()->latest('created_at')->first();
 
         return [
-            'balance'         => number_format($balance, 2, '.', ''),
+            // المتبقي المطلوب بعد خصم الرصيد والدفعات السابقة (صفر لو ما عليه شي) — كان إجمالي الذمم
+            'balance'         => number_format($balance['amount_due_jod'], 2, '.', ''),
+            'amount_due_jod'  => $balance['amount_due_jod'],
+            // الصافي بإشارته: موجب = له رصيد، سالب = عليه
+            'net_jod'         => $balance['net_jod'],
+            'credit_jod'      => $balance['credit_jod'],
+            'dues_jod'        => $balance['dues_jod'],
+            'penalties_jod'   => $balance['penalties_jod'],
+            'position'        => $balance['position'],
+            'currency'        => 'JOD',
+            'pending_payments_jod' => round((float) $contractor->payments()->where('status', 'pending')->sum('amount'), 2),
             'has_overdue'     => $hasOverdue,
             'last_invoice'    => $lastDue ? [
                 'id'          => $lastDue->id,
@@ -171,14 +179,14 @@ class ContractorHomeController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
     //  زر "طلب شهادة انتساب" — يظهر دائماً، لكن يُنبَّه المستخدم بالذمم قبل المتابعة
     // ─────────────────────────────────────────────────────────────────────────
-    private function ctaCertificate(Contractor $contractor, float $balance): array
+    private function ctaCertificate(Contractor $contractor, array $balance): array
     {
         $issues = \App\Support\ContractorRequirements::issues($contractor);
 
         return [
             'show'               => true,
             'has_pending_dues'   => count($issues) > 0,
-            'outstanding_amount' => $balance,
+            'outstanding_amount' => $balance['amount_due_jod'],
         ];
     }
 
@@ -191,6 +199,7 @@ class ContractorHomeController extends Controller
             ->concat($this->newsUpdates())
             ->concat($this->announcementUpdates($contractor))
             ->concat($this->financeUpdates($contractor))
+            ->concat($this->penaltyUpdates($contractor))
             ->concat($this->memberUpdates($contractor))
             // created_at وحده غير كافٍ كمفتاح ترتيب — سجلات كتيرة بنفس الثانية ممكنة (استيراد جماعي مثلاً)
             ->sort(fn ($a, $b) => [$b['created_at'], $b['reference_id']] <=> [$a['created_at'], $a['reference_id']])
@@ -298,6 +307,26 @@ class ContractorHomeController extends Controller
                 'is_new'       => $due->created_at->gt(now()->subHours(self::NEW_BADGE_HOURS)),
                 'priority'     => ($due->status !== 'paid' && $due->due_date && $due->due_date->isPast()) ? 'high' : 'normal',
                 'created_at'   => $due->created_at,
+            ]);
+    }
+
+    // نوع "penalty" = غرامات المقاول (كرت مستقل عن الذمم)
+    private function penaltyUpdates(Contractor $contractor): Collection
+    {
+        return $contractor->penalties()
+            ->where('status', '!=', 'rejected')
+            ->latest('created_at')
+            ->limit(self::FEED_POOL_LIMIT)
+            ->get()
+            ->map(fn ($penalty) => [
+                'type'         => 'penalty',
+                'reference_id' => $penalty->id,
+                'title'        => 'غرامة: ' . ($penalty->reason ?: 'غرامة مالية'),
+                'subtitle'     => $penalty->status_label . ($penalty->remaining > 0 ? ' — المتبقي ' . number_format($penalty->remaining, 2, '.', '') . ' د.أ' : ''),
+                'has_attachment' => false,
+                'is_new'       => $penalty->created_at->gt(now()->subHours(self::NEW_BADGE_HOURS)),
+                'priority'     => $penalty->remaining > 0 ? 'high' : 'normal',
+                'created_at'   => $penalty->created_at,
             ]);
     }
 

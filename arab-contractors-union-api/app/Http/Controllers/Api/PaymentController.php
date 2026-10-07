@@ -54,6 +54,7 @@ class PaymentController extends Controller
 
         // تحويل لتسديد ذمة محددة (زر "ادفع الآن" على كرت الذمة)
         $due = null;
+        $penalty = null;
         if (! empty($data['contractor_due_id'])) {
             $due = \App\Models\ContractorDue::find($data['contractor_due_id']);
 
@@ -68,13 +69,30 @@ class PaymentController extends Controller
             }
 
             $type = 'dues_payment';
+        } elseif (! empty($data['penalty_id'])) {
+            // تحويل لدفع غرامة محددة (كرت الغرامة بالمستحقات)
+            $penalty = \App\Models\Penalty::find($data['penalty_id']);
+
+            if ($penalty->contractor_id !== $contractor->id) {
+                return $this->error('هذه الغرامة لا تعود لحسابك.', 403);
+            }
+            if ($penalty->remaining <= 0) {
+                return $this->error('هذه الغرامة مسدَّدة بالكامل أو ملغاة.', 409);
+            }
+            if (Payment::where('penalty_id', $penalty->id)->where('status', 'pending')->exists()) {
+                return $this->error('يوجد إشعار تحويل لهذه الغرامة قيد المراجعة بالفعل.', 409);
+            }
+
+            $type = 'penalty_payment';
         } elseif (empty($data['type']) && empty($data['membership_id'])
             && \App\Services\PaymentConfirmationService::hasOpenObligations($contractor)) {
             // بدون نوع والمقاول عليه ذمم = سداد ذمم (بتسدّد أقدمها والفائض رصيد له)، مش رسوم عضوية
             $type = 'dues_payment';
         }
 
-        if ($type !== 'dues_payment') {
+        // سداد ذمة/غرامة ودفعة مقدمة مسموحين دايماً (حتى بدون ذمة مسجّلة — الدفعة المقدمة بتصير
+        // رصيداً بينصرف على أي ذمة جديدة). الحظر بالذمم بس على رسوم العضوية وباقي الأنواع.
+        if (! in_array($type, Payment::CREDIT_TYPES, true)) {
             $blockers = \App\Support\ContractorRequirements::renewalBlockers($contractor);
             if (count($blockers) > 0) {
                 // الرسالة عامة عمداً: blockers ممكن تكون ذمم/غرامات أو حساب موقوف
@@ -95,6 +113,7 @@ class PaymentController extends Controller
             'membership_id'        => $data['membership_id'] ?? null,
             'equipment_package_id' => $data['equipment_package_id'] ?? null,
             'contractor_due_id'    => $due?->id,
+            'penalty_id'           => $penalty?->id,
             'bank_account_id'      => $data['bank_account_id'] ?? null,
             'amount'               => $data['amount'],
             'currency'             => $data['currency'] ?? 'JOD',
@@ -103,7 +122,7 @@ class PaymentController extends Controller
             'method'               => 'bank_transfer',
             'reference_number'     => $data['reference_number'] ?? null,
             'receipt_image'        => $path,
-            'notes'                => $data['notes'] ?? $due?->description,
+            'notes'                => filled($data['notes'] ?? null) ? trim($data['notes']) : ($due?->description ?? $penalty?->reason),
             'submitted_at'         => now(),
         ]);
         $payment->update(['transaction_number' => Payment::generateTransactionNumber($payment)]);
@@ -114,7 +133,7 @@ class PaymentController extends Controller
         }
 
         return $this->success(
-            new PaymentResource($payment->load('contractor')),
+            new PaymentResource($payment->load(['contractor', ...Payment::TITLE_RELATIONS])),
             'سيقوم المحاسب بتقديم الاعتماد وتحديث حالة حسابك فور التحقق من الحوالة.',
             201,
         );

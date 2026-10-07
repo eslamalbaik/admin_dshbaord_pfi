@@ -21,6 +21,8 @@ use App\Notifications\MembershipGracePeriodReminderNotification;
 use App\Notifications\NewTenderPublishedNotification;
 use App\Notifications\PaymentConfirmedNotification;
 use App\Notifications\PaymentRejectedNotification;
+use App\Notifications\PenaltyAddedNotification;
+use App\Models\Penalty;
 use App\Notifications\SupportTicketRepliedNotification;
 use App\Services\Push\LogPushSender;
 use App\Services\Push\PushSenderInterface;
@@ -50,6 +52,7 @@ class PushChannelWiringTest extends TestCase
         return [
             'payment confirmed'  => [fn () => new PaymentConfirmedNotification(new Payment(['amount' => 100]))],
             'payment rejected'   => [fn () => new PaymentRejectedNotification(new Payment(['amount' => 100]))],
+            'penalty added'      => [fn () => new PenaltyAddedNotification(new Penalty(['amount' => 40, 'reason' => 'مخالفة', 'status' => 'unpaid']))],
             'complete profile'   => [fn () => new CompleteProfileNotification()],
             'support replied'    => [fn () => new SupportTicketRepliedNotification(new SupportTicket(['subject' => 'س']))],
             'certificate status' => [fn () => new CertificateRequestStatusNotification(new CertificateRequest(['status' => 'issued']))],

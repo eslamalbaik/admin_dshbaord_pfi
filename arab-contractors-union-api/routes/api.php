@@ -96,6 +96,8 @@ Route::prefix('v1')->group(function () {
         // شاشة الدفع — رفع إشعار التحويل ومتابعته
         Route::post('payments/transfer', [PaymentController::class, 'submitTransfer']);
         Route::get('payments/transfer',  [PaymentController::class, 'myTransfers']);
+        // سجل المدفوعات التفصيلي (كشف حساب): الذمم والغرامات والدفعات والمتبقي بعد كل حركة
+        Route::get('payments/statement', [\App\Http\Controllers\Api\ContractorBalanceController::class, 'myStatement']);
         Route::get('payments/{payment}/receipt', [PaymentController::class, 'receipt']);
         Route::get('payments/{payment}',         [PaymentController::class, 'show']);
 
@@ -490,6 +492,7 @@ Route::prefix('v1')->group(function () {
             // أرصدة المقاولين — صافي له/عليه لكل شركة
             Route::get('dashboard/balances',            [\App\Http\Controllers\Api\ContractorBalanceController::class, 'index']);
             Route::get('dashboard/balances/summary',    [\App\Http\Controllers\Api\ContractorBalanceController::class, 'summary']);
+            Route::get('dashboard/balances/{contractor}/statement', [\App\Http\Controllers\Api\ContractorBalanceController::class, 'statement']);
 
             // أسعار الصرف (عرض + override يدوي)
             Route::get('dashboard/exchange-rates',  [\App\Http\Controllers\Api\ExchangeRateController::class, 'index']);

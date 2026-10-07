@@ -223,10 +223,66 @@ class ContractorHomeTest extends TestCase
         ]);
 
         Sanctum::actingAs($contractor, ['*']);
-        $balance = $this->getJson('/api/v1/contractor/home')->json('items.financial.balance');
+        $financial = $this->getJson('/api/v1/contractor/home')->json('items.financial');
 
-        // (100-40) due + 50 pending payment + 20 penalty = 130
-        $this->assertEquals('130.00', $balance);
+        // (100-40) due + 20 penalty = 80 — الحوالة قيد المراجعة ما بتزيد ولا بتنقص لحد ما تتأكد
+        $this->assertEquals('80.00', $financial['balance']);
+        $this->assertEquals(-80, $financial['net_jod']);
+        $this->assertEquals('owes', $financial['position']);
+        $this->assertEquals(50, $financial['pending_payments_jod']);
+    }
+
+    public function test_financial_balance_is_net_of_previous_credit(): void
+    {
+        $contractor = $this->createContractor();
+
+        ContractorDue::create([
+            'contractor_id' => $contractor->id,
+            'description'   => 'رسوم اشتراك 2026',
+            'amount_jod'    => 100,
+            'status'        => 'unpaid',
+        ]);
+        // فائض دفعة ذمم سابقة = رصيد 30 للمقاول
+        Payment::create([
+            'contractor_id'   => $contractor->id,
+            'amount'          => 30,
+            'amount_jod'      => 30,
+            'used_amount_jod' => 0,
+            'type'            => 'dues_payment',
+            'status'          => 'paid',
+        ]);
+
+        Sanctum::actingAs($contractor, ['*']);
+        $home = $this->getJson('/api/v1/contractor/home')->json('items');
+
+        // الصافي المتبقي 70 مش إجمالي الذمة 100
+        $this->assertEquals('70.00', $home['financial']['balance']);
+        $this->assertEquals(30, $home['financial']['credit_jod']);
+        $this->assertEquals(70, $home['cta_certificate']['outstanding_amount']);
+
+        // نفس الرقم بـcontractor/balance
+        $this->getJson('/api/v1/contractor/balance')->assertJsonPath('items.amount_due_jod', 70);
+    }
+
+    public function test_financial_balance_is_zero_when_credit_covers_everything(): void
+    {
+        $contractor = $this->createContractor();
+
+        Payment::create([
+            'contractor_id'   => $contractor->id,
+            'amount'          => 50,
+            'amount_jod'      => 50,
+            'used_amount_jod' => 0,
+            'type'            => 'advance_payment',
+            'status'          => 'paid',
+        ]);
+
+        Sanctum::actingAs($contractor, ['*']);
+        $financial = $this->getJson('/api/v1/contractor/home')->json('items.financial');
+
+        $this->assertEquals('0.00', $financial['balance']);
+        $this->assertEquals(50, $financial['net_jod']);
+        $this->assertEquals('credit', $financial['position']);
     }
 
     public function test_has_overdue_true_only_for_unpaid_due_past_due_date(): void

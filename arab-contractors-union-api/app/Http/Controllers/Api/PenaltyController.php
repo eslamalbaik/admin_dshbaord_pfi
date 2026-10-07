@@ -86,6 +86,14 @@ class PenaltyController extends Controller
 
         AuditLogService::record(Auth::user(), 'penalty.created', $penalty, ['contractor_id' => $penalty->contractor_id, 'amount' => $penalty->amount]);
 
+        if (in_array($penalty->status, ['unpaid', 'partially_paid'], true)) {
+            // رصيد سابق للمقاول بينصرف عالغرامة فوراً، وبعدين المقاول بيوصله إشعار بالمتبقي (إن وجد)
+            app(\App\Services\ContractorCreditService::class)->applyAvailableCredit($penalty->contractor, Auth::user());
+            $penalty->refresh();
+
+            $penalty->contractor->notify(new \App\Notifications\PenaltyAddedNotification($penalty));
+        }
+
         return $this->success(
             $penalty->load('contractor')->toArray(),
             'تم إضافة الغرامة بنجاح.',

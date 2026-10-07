@@ -12,8 +12,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * أرصدة المقاولين: صافي وضع كل شركة المالي مع الاتحاد بالدينار الأردني.
  *
- * له    = الأرصدة الدائنة (contractor_credits) غير المستخدمة + فائض دفعات الذمم
- *         (dues_payment) الذي لم يُوزَّع على ذمم.
+ * له    = الأرصدة الدائنة (contractor_credits) غير المستخدمة + فائض دفعات الذمم والغرامات
+ *         والدفعات المقدمة (Payment::CREDIT_TYPES) الذي لم يُوزَّع على ذمم.
  * عليه  = المتبقي من الذمم غير المسدَّدة + المتبقي من الغرامات غير المسدَّدة (بالدينار).
  * الصافي = له − عليه (سالب = الشركة مطلوب منها للاتحاد).
  *
@@ -23,8 +23,8 @@ class ContractorBalanceController extends Controller
 {
     use ApiResponseTrait;
 
-    /** فائض دفعات الذمم غير الموزَّع يُعتبر رصيداً للشركة */
-    public const CREDIT_PAYMENT_TYPES = ['dues_payment'];
+    /** فائض دفعات الذمم/الغرامات والدفعات المقدمة غير الموزَّع يُعتبر رصيداً للشركة */
+    public const CREDIT_PAYMENT_TYPES = \App\Models\Payment::CREDIT_TYPES;
 
     /** نفس تسميات عمود "حالة العضوية" بصفحة الأرصدة */
     public const STATUS_LABELS = [
@@ -69,10 +69,22 @@ class ContractorBalanceController extends Controller
      */
     public function mine(Request $request)
     {
-        $row = $this->balancesQuery()->where('contractors.id', $request->user()->id)->first();
+        return $this->success($this->snapshot($request->user()->id));
+    }
+
+    /**
+     * رصيد مقاول واحد بشكل جاهز للتطبيق (contractor/balance والشاشة الرئيسية):
+     * الصافي بإشارته + المتبقي المطلوب بعد خصم الرصيد + حالة الاشتراك.
+     */
+    public function snapshot(int $contractorId): array
+    {
+        $row = $this->balancesQuery()->where('contractors.id', $contractorId)->first();
 
         $balance = $this->formatRow($row);
         unset($balance['status']);
+
+        // المطلوب دفعه فعلياً بعد خصم الأرصدة والدفعات السابقة (صفر لو ما عليه شي)
+        $balance['amount_due_jod'] = max(0.0, round(-$balance['net_jod'], 2));
 
         // حالة الاشتراك بنفس قاعدة الداشبورد (عليه ذمم = منتهية)، حتى يعرض التطبيق نفس اللي بيشوفه المحاسب
         $balance['subscription_status'] = $this->membershipStatus($row);
@@ -87,7 +99,19 @@ class ContractorBalanceController extends Controller
         };
         $balance['currency'] = 'JOD';
 
-        return $this->success($balance);
+        return $balance;
+    }
+
+    /** GET /api/v1/contractor/payments/statement — سجل مدفوعات المقاول التفصيلي بالتطبيق */
+    public function myStatement(Request $request, \App\Services\ContractorStatementService $statements)
+    {
+        return $this->success($statements->build($request->user()));
+    }
+
+    /** GET /api/v1/dashboard/balances/{contractor}/statement — نفس السجل للمحاسب من صفحة الأرصدة */
+    public function statement(Contractor $contractor, \App\Services\ContractorStatementService $statements)
+    {
+        return $this->success($statements->build($contractor));
     }
 
     /** GET /api/v1/dashboard/balances/summary */

@@ -24,4 +24,10 @@ class ContractorCredit extends Model
     {
         return $this->belongsTo(Contractor::class);
     }
+
+    /** الذمم/الغرامات اللي انصرف عليها هالرصيد (ContractorCreditService) */
+    public function allocations()
+    {
+        return $this->hasMany(PaymentAllocation::class, 'contractor_credit_id');
+    }
 }

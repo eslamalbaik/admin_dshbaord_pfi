@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Storage;
 class Payment extends Model
 {
     protected $fillable = [
-        'contractor_id', 'membership_id', 'membership_snapshot', 'equipment_package_id', 'contractor_due_id', 'bank_account_id', 'amount',
+        'contractor_id', 'membership_id', 'membership_snapshot', 'equipment_package_id', 'contractor_due_id', 'penalty_id', 'bank_account_id', 'amount',
         'currency', 'exchange_rate', 'amount_jod', 'used_amount_jod', 'rate_source',
         'type', 'status', 'method', 'reference_number', 'transaction_number', 'receipt_image',
         'notes', 'paid_at', 'submitted_at', 'confirmed_by', 'confirmed_at',
@@ -35,17 +35,59 @@ class Payment extends Model
         'failed'   => 'فشلت',
     ];
 
-    /** تسمية نوع الدفعة بالعربي — `membership` قيمة قديمة لنفس رسوم العضوية */
     /** العلاقات اللي بيقراها عنوان الدفعة (title) — للـ eager loading بالقوائم */
-    public const TITLE_RELATIONS = ['due', 'membership', 'equipmentPackage', 'allocations.due', 'allocations.penalty'];
+    public const TITLE_RELATIONS = ['due', 'penalty', 'membership', 'equipmentPackage', 'allocations.due', 'allocations.penalty'];
 
+    /**
+     * تسمية نوع الدفعة بالعربي. `membership` قيمة قديمة لنفس رسوم العضوية، و`penalty` قيمة قديمة
+     * من إدخال الداشبورد (فائضها ما بينحسب رصيد) — التطبيق بيبعت `penalty_payment`.
+     */
     public const TYPE_LABELS = [
-        'membership_fee'         => 'رسوم اشتراك العضوية',
-        'membership'             => 'رسوم اشتراك العضوية',
-        'dues_payment'           => 'تسديد ذمم مالية',
-        'penalty'                => 'تسديد غرامة',
+        'dues_payment'           => 'سداد ذمة',
+        'membership_fee'         => 'رسوم اشتراك',
+        'penalty_payment'        => 'دفع غرامة',
+        'advance_payment'        => 'دفعة مقدمة',
+        'membership'             => 'رسوم اشتراك',
+        'penalty'                => 'دفع غرامة',
         'equipment_subscription' => 'اشتراك باقة المعدات',
     ];
+
+    /** أنواع الدفعة اللي بيختار منها المقاول بالتطبيق (بالترتيب المعروض) */
+    public const APP_TYPES = ['dues_payment', 'membership_fee', 'penalty_payment', 'advance_payment'];
+
+    /** أنواع فائضها (المبلغ اللي ما انصرف على ذمة أو غرامة) بيضل رصيداً دائناً للمقاول */
+    public const CREDIT_TYPES = ['dues_payment', 'penalty_payment', 'advance_payment'];
+
+    /** تسميات بديلة ممكن يبعتها التطبيق لنفس الأنواع */
+    private const TYPE_ALIASES = [
+        'membership'  => 'membership_fee',
+        'subscription' => 'membership_fee',
+        'dues'        => 'dues_payment',
+        'due'         => 'dues_payment',
+        'penalty'     => 'penalty_payment',
+        'fine'        => 'penalty_payment',
+        'advance'     => 'advance_payment',
+        'prepayment'  => 'advance_payment',
+        'credit'      => 'advance_payment',
+    ];
+
+    /**
+     * نوع الدفعة المرسل من التطبيق بعد التوحيد، أو null لقيمة فاضية أو غير معروفة
+     * (وقتها السيرفر بيحدد النوع حسب وضع المقاول، متل قبل).
+     */
+    public static function normalizeAppType(?string $type): ?string
+    {
+        $type = strtolower(trim((string) $type));
+        $type = self::TYPE_ALIASES[$type] ?? $type;
+
+        return in_array($type, [...self::APP_TYPES, 'equipment_subscription'], true) ? $type : null;
+    }
+
+    /** خيارات نوع الدفعة للتطبيق: [{value, label}] */
+    public static function appTypeOptions(): array
+    {
+        return array_map(fn ($type) => ['value' => $type, 'label' => self::TYPE_LABELS[$type]], self::APP_TYPES);
+    }
 
     public function getStatusLabelAttribute(): string
     {
@@ -60,14 +102,23 @@ class Payment extends Model
     /**
      * عنوان كرت الدفعة بالتطبيق (تبويب "الدفعات السابقة"):
      * 1. ذمة مربوطة بالتحويل ← عنوان الذمة (مثلاً "رسوم اشتراك سنة 2026").
-     * 2. انصرفت على ذمة/غرامة وحدة ← عنوانها؛ على أكثر من وحدة ← "تسديد N ذمم مالية".
-     * 3. رسوم عضوية مربوطة بعضوية ← "رسوم اشتراك سنة <سنة انتهاء العضوية>"؛ باقة معدات ← اسم الباقة.
-     * 4. غير هيك ← تسمية النوع.
+     * 2. دفعة مقدمة ← "دفعة مقدمة" دايماً؛ غرامة مربوطة بالتحويل ← سبب الغرامة.
+     * 3. انصرفت على ذمة/غرامة وحدة ← عنوانها؛ على أكثر من وحدة ← "تسديد N ذمم مالية".
+     * 4. رسوم عضوية مربوطة بعضوية ← "رسوم اشتراك سنة <سنة انتهاء العضوية>"؛ باقة معدات ← اسم الباقة.
+     * 5. غير هيك ← تسمية النوع.
      */
     public function getTitleAttribute(): string
     {
         if ($this->contractor_due_id && $this->due) {
             return $this->due->title;
+        }
+
+        if ($this->type === 'advance_payment') {
+            return $this->type_label;
+        }
+
+        if ($this->penalty_id && $this->penalty) {
+            return $this->penalty->reason ?: $this->type_label;
         }
 
         $allocations = $this->allocations;
@@ -77,7 +128,7 @@ class Payment extends Model
                 return $allocation->due->title;
             }
             if ($allocation->penalty) {
-                return $allocation->penalty->reason ?: self::TYPE_LABELS['penalty'];
+                return $allocation->penalty->reason ?: self::TYPE_LABELS['penalty_payment'];
             }
         } elseif ($allocations->count() > 1) {
             return "تسديد {$allocations->count()} ذمم مالية";
@@ -126,6 +177,11 @@ class Payment extends Model
     public function due()
     {
         return $this->belongsTo(ContractorDue::class, 'contractor_due_id');
+    }
+
+    public function penalty()
+    {
+        return $this->belongsTo(Penalty::class);
     }
 
     public function membership()
