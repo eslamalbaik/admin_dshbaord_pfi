@@ -234,7 +234,7 @@ onMounted(() => {
                 <LayoutDashboard :size="14" /> لوحة تحكمي
               </button>
               <button class="pub-dd-link pub-dd-btn" @click="goToProfile">
-                <User :size="14" /> ملفي الشخصي
+                <User :size="14" /> ملفي التعريفي
               </button>
               <button class="pub-dd-link pub-dd-btn pub-dd-danger" @click="handleLogout">
                 <LogOut :size="14" /> تسجيل خروج
@@ -275,7 +275,7 @@ onMounted(() => {
               <span style="display:flex;align-items:center;gap:.5rem"><LayoutDashboard :size="15" /> لوحة تحكمي</span>
             </button>
             <button class="pub-mob-link" @click="goToProfile">
-              <span style="display:flex;align-items:center;gap:.5rem"><User :size="15" /> ملفي الشخصي</span>
+              <span style="display:flex;align-items:center;gap:.5rem"><User :size="15" /> ملفي التعريفي</span>
             </button>
             <button class="pub-mob-link" style="color:#c62828" @click="handleLogout">
               <span style="display:flex;align-items:center;gap:.5rem"><LogOut :size="15" /> تسجيل خروج</span>

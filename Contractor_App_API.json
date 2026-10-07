@@ -339,12 +339,12 @@
     "/contractor/auth/profile": {
       "get": {
         "tags": ["Profile"],
-        "summary": "الحصول على الملف الشخصي",
+        "summary": "الحصول على الملف التعريفي",
         "operationId": "getProfile"
       },
       "patch": {
         "tags": ["Profile"],
-        "summary": "تحديث الملف الشخصي",
+        "summary": "تحديث الملف التعريفي",
         "operationId": "updateProfile",
         "requestBody": {
           "required": true,
@@ -369,7 +369,7 @@
     "/contractor/auth/profile/update": {
       "post": {
         "tags": ["Profile"],
-        "summary": "تحديث الملف الشخصي (شامل)",
+        "summary": "تحديث الملف التعريفي (شامل)",
         "operationId": "updateFullProfile",
         "requestBody": {
           "required": true,

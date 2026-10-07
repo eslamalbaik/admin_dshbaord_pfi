@@ -208,7 +208,7 @@ class ContractorLookups
     }
 
     /**
-     * بناء شجرة المجالات للملف الشخصي:
+     * بناء شجرة المجالات للملف التعريفي:
      * كل مجال يضم اختصاصاته، وكل اختصاص درجته (الحرف + المسمى + المستوى).
      */
     public static function buildFieldsTree(?array $specialties): array

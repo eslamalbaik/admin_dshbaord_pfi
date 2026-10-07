@@ -32,7 +32,7 @@ class CertificateRequestTest extends TestCase
         ], $attrs));
     }
 
-    /** مقاول باكتمال ملف شخصي كامل + عضوية نشطة — يحقق شروط طلب أي نوع شهادة */
+    /** مقاول باكتمال ملف تعريفي كامل + عضوية نشطة — يحقق شروط طلب أي نوع شهادة */
     private function createCompliantContractor(array $attrs = []): Contractor
     {
         $contractor = $this->createContractor(array_merge([

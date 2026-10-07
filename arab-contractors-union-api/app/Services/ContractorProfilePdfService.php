@@ -7,13 +7,13 @@ use App\Support\ContractorLookups;
 use Mpdf\Mpdf;
 
 /**
- * خدمة تصدير الملف الشخصي للمقاول كملف PDF — تعزل 193 سطر HTML/mPDF
+ * خدمة تصدير الملف التعريفي للمقاول كملف PDF — تعزل 193 سطر HTML/mPDF
  * من الكنترولر إلى مكان قابل للاختبار والصيانة.
  */
 class ContractorProfilePdfService
 {
     /**
-     * يُنشئ ملف PDF للملف الشخصي ويُعيد محتواه كـ string.
+     * يُنشئ ملف PDF للملف التعريفي ويُعيد محتواه كـ string.
      */
     public function generate(Contractor $contractor): string
     {

@@ -49,7 +49,7 @@ function mapRawNotification(n: any): NotificationItem {
     payment_rejected:    { title: 'رُفضت الدفعة', icon: 'tabler-credit-card-off', color: 'error' },
     // عضوية
     contractor_activated:            { title: 'تفعيل حساب مقاول', icon: 'tabler-user-check', color: 'info' },
-    complete_profile:                { title: 'استكمال الملف الشخصي', icon: 'tabler-user-exclamation', color: 'secondary' },
+    complete_profile:                { title: 'استكمال الملف التعريفي', icon: 'tabler-user-exclamation', color: 'secondary' },
     membership_expiry_reminder:      { title: 'العضوية على وشك الانتهاء', icon: 'tabler-clock-exclamation', color: 'warning' },
     membership_grace_period_reminder: { title: 'مهلة تجديد العضوية', icon: 'tabler-clock-off', color: 'error' },
     // فعاليات ودعم
