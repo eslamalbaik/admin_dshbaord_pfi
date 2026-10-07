@@ -96,8 +96,7 @@ class ContractorController extends Controller
         // السقف مشتق من UploadLimits لا رقماً ثابتاً: 10240 السابقة كانت تَعِد بـ10MB
         // بينما upload_max_filesize على الخادم 2M، فكل ملف أكبر كان يُسقَط قبل التحقق
         // دون أي رسالة حجم (TASK-16 #2/#3).
-        $fileRule = 'nullable|file|mimes:' . implode(',', \App\Support\UploadLimits::ALLOWED_EXTENSIONS)
-            . '|max:' . \App\Support\UploadLimits::maxFileKb();
+        $fileRule = \App\Support\UploadLimits::documentRule();
 
         return [
             'name'                          => 'required|string|max:255',
@@ -269,7 +268,7 @@ class ContractorController extends Controller
             'file'     => 'يجب أن يكون حقل :attribute ملفاً.',
             'image'    => 'يجب أن يكون حقل :attribute صورة.',
             'mimes'    => 'يجب أن يكون ملف :attribute من نوع: :values.',
-        ];
+        ] + \App\Support\UploadLimits::documentMessages(Contractor::DOCUMENT_LABELS);
     }
 
     private function getValidationAttributes()
