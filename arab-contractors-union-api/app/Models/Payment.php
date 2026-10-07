@@ -35,9 +35,63 @@ class Payment extends Model
         'failed'   => 'فشلت',
     ];
 
+    /** تسمية نوع الدفعة بالعربي — `membership` قيمة قديمة لنفس رسوم العضوية */
+    /** العلاقات اللي بيقراها عنوان الدفعة (title) — للـ eager loading بالقوائم */
+    public const TITLE_RELATIONS = ['due', 'membership', 'equipmentPackage', 'allocations.due', 'allocations.penalty'];
+
+    public const TYPE_LABELS = [
+        'membership_fee'         => 'رسوم اشتراك العضوية',
+        'membership'             => 'رسوم اشتراك العضوية',
+        'dues_payment'           => 'تسديد ذمم مالية',
+        'penalty'                => 'تسديد غرامة',
+        'equipment_subscription' => 'اشتراك باقة المعدات',
+    ];
+
     public function getStatusLabelAttribute(): string
     {
         return self::STATUS_LABELS[$this->status] ?? $this->status;
+    }
+
+    public function getTypeLabelAttribute(): string
+    {
+        return self::TYPE_LABELS[$this->type] ?? 'دفعة';
+    }
+
+    /**
+     * عنوان كرت الدفعة بالتطبيق (تبويب "الدفعات السابقة"):
+     * 1. ذمة مربوطة بالتحويل ← عنوان الذمة (مثلاً "رسوم اشتراك سنة 2026").
+     * 2. انصرفت على ذمة/غرامة وحدة ← عنوانها؛ على أكثر من وحدة ← "تسديد N ذمم مالية".
+     * 3. رسوم عضوية مربوطة بعضوية ← "رسوم اشتراك سنة <سنة انتهاء العضوية>"؛ باقة معدات ← اسم الباقة.
+     * 4. غير هيك ← تسمية النوع.
+     */
+    public function getTitleAttribute(): string
+    {
+        if ($this->contractor_due_id && $this->due) {
+            return $this->due->title;
+        }
+
+        $allocations = $this->allocations;
+        if ($allocations->count() === 1) {
+            $allocation = $allocations->first();
+            if ($allocation->due) {
+                return $allocation->due->title;
+            }
+            if ($allocation->penalty) {
+                return $allocation->penalty->reason ?: self::TYPE_LABELS['penalty'];
+            }
+        } elseif ($allocations->count() > 1) {
+            return "تسديد {$allocations->count()} ذمم مالية";
+        }
+
+        if (in_array($this->type, ['membership_fee', 'membership'], true) && $this->membership?->expires_at) {
+            return 'رسوم اشتراك سنة ' . $this->membership->expires_at->year;
+        }
+
+        if ($this->type === 'equipment_subscription' && $this->equipmentPackage) {
+            return 'اشتراك باقة ' . $this->equipmentPackage->name;
+        }
+
+        return $this->type_label;
     }
 
     protected static function booted(): void
@@ -77,6 +131,11 @@ class Payment extends Model
     public function membership()
     {
         return $this->belongsTo(Membership::class);
+    }
+
+    public function equipmentPackage()
+    {
+        return $this->belongsTo(EquipmentPackage::class);
     }
 
     public function bankAccount()

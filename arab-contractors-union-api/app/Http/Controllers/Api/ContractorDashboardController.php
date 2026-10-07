@@ -219,6 +219,8 @@ class ContractorDashboardController extends Controller
             'pending_dues_payments' => $pendingDuesPayments->map(fn ($p) => [
                 'id'                => $p->id,
                 'contractor_due_id' => $p->contractor_due_id,
+                'title'             => $p->title,
+                'type_label'        => $p->type_label,
                 'description'       => $p->notes ?: 'دفعة مقدمة للمشروع',
                 'amount'            => $p->amount,
                 'currency'          => $p->currency ?? 'JOD',

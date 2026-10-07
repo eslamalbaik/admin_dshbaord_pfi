@@ -49,6 +49,17 @@ class ContractorDue extends Model
      * تاريخ سند القبض المعروض بكرت الذمة بالتطبيق: رسوم الاشتراك السنوي سندها 31/12 من سنتها
      * (العضوية تنتهي آخر السنة الميلادية)، وأي ذمة غيرها (رسوم متراكمة) بلا تاريخ.
      */
+    /**
+     * عنوان العرض بالتطبيق: البيان بدون اللواحق الداخلية — "(محرّك الاحتساب الآلي)" و"(بعد خصم ...)"
+     * (الخصم بيُعرض بسطر لحاله من حقول discount_*).
+     */
+    public function getTitleAttribute(): string
+    {
+        $title = preg_replace('/\s*\((?:محرّك الاحتساب الآلي|بعد خصم[^)]*)\)/u', '', (string) $this->description);
+
+        return trim($title) ?: 'ذمة مالية';
+    }
+
     public function getReceiptDateAttribute(): ?string
     {
         return $this->is_membership_fee ? "{$this->year}-12-31" : null;

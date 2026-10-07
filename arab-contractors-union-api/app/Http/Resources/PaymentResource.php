@@ -24,6 +24,9 @@ class PaymentResource extends JsonResource
             'amount_jod'        => $this->amount_jod,
             'rate_source'       => $this->rate_source,
             'type'              => $this->type,
+            'type_label'        => $this->type_label,
+            // عنوان الكرت بالتطبيق — جاهز للعرض (شوف Payment::getTitleAttribute)
+            'title'             => $this->title,
             'status'            => $this->status,
             'status_label'      => $this->status_label,
             'method'            => $this->method,
