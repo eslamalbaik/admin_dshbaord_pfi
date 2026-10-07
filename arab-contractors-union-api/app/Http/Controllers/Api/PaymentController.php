@@ -178,7 +178,7 @@ class PaymentController extends Controller
      */
     public function myTransfers(Request $request)
     {
-        $query = $request->user()->payments()->with('contractor:id,name');
+        $query = $request->user()->payments()->with(['contractor:id,name', ...Payment::TITLE_RELATIONS]);
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -204,7 +204,7 @@ class PaymentController extends Controller
             return $this->error('غير مصرَّح لك بالوصول لهذا الإشعار.', 403);
         }
 
-        return $this->success(new PaymentResource($payment->load('contractor:id,name')));
+        return $this->success(new PaymentResource($payment->load(['contractor:id,name', ...Payment::TITLE_RELATIONS])));
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -214,7 +214,7 @@ class PaymentController extends Controller
     // GET /api/v1/payments/transactions
     public function index(Request $request)
     {
-        $query = Payment::with(['contractor', 'latestStatusChange.changer:id,name']);
+        $query = Payment::with(['contractor', 'latestStatusChange.changer:id,name', ...Payment::TITLE_RELATIONS]);
 
         // فتح دفعة محددة من إشعار في لوحة التحكم
         if ($request->filled('id')) {
