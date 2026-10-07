@@ -73,9 +73,9 @@ class MembershipCalendarYearTest extends TestCase
         $this->assertSame('2026-12-31', $membership->expires_at->toDateString());
     }
 
-    public function test_prepaying_while_current_year_is_covered_extends_to_next_dec_31(): void
+    public function test_second_payment_while_current_year_is_covered_stays_in_payment_year(): void
     {
-        Carbon::setTestNow('2026-11-20 09:00:00');
+        Carbon::setTestNow('2026-10-07 09:00:00');
         $contractor = $this->contractor();
         $contractor->memberships()->create([
             'type' => 'new', 'status' => 'active',
@@ -84,7 +84,29 @@ class MembershipCalendarYearTest extends TestCase
 
         $membership = $this->renew($contractor, 'renewal');
 
-        $this->assertSame('2027-01-01', $membership->starts_at->toDateString());
-        $this->assertSame('2027-12-31', $membership->expires_at->toDateString());
+        $this->assertSame('2026-10-07', $membership->starts_at->toDateString());
+        $this->assertSame('2026-12-31', $membership->expires_at->toDateString());
+    }
+
+    public function test_migration_clamps_memberships_prepaid_into_next_year(): void
+    {
+        $contractor = $this->contractor();
+        $prepaid = $contractor->memberships()->create([
+            'type' => 'renewal', 'status' => 'active',
+            'starts_at' => '2027-01-01', 'expires_at' => '2027-12-31',
+            'reviewed_at' => '2026-10-07 08:00:00',
+        ]);
+        // استيراد قديم قبل القاعدة — ما بينلمس
+        $older = $contractor->memberships()->create([
+            'type' => 'new', 'status' => 'active',
+            'starts_at' => '2027-01-01', 'expires_at' => '2027-12-31',
+            'reviewed_at' => '2026-09-01 08:00:00',
+        ]);
+
+        (require database_path('migrations/2026_10_07_200001_clamp_prepaid_memberships_to_payment_year.php'))->up();
+
+        $this->assertSame('2026-10-07', $prepaid->fresh()->starts_at->toDateString());
+        $this->assertSame('2026-12-31', $prepaid->fresh()->expires_at->toDateString());
+        $this->assertSame('2027-12-31', $older->fresh()->expires_at->toDateString());
     }
 }

@@ -117,6 +117,11 @@ class ContractorCreditService
 
         $target->applyPayment($amount);
 
+        // رسوم الاشتراك السنوي انسدّت كاملة من الرصيد ← العضوية بتتفعّل لسنتها لحالها
+        if ($target instanceof ContractorDue && $target->is_membership_fee && $target->status === 'paid') {
+            app(MembershipRenewalService::class)->activateForDue($target, $by?->id);
+        }
+
         if ($source instanceof Payment) {
             $target instanceof ContractorDue
                 ? PaymentAllocation::record($source, $target, $amount)

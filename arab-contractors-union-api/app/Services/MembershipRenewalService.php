@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ContractorDue;
 use App\Models\Membership;
 use App\Models\Payment;
 
@@ -12,28 +13,17 @@ use App\Models\Payment;
 class MembershipRenewalService
 {
     /**
-     * كل العضويات سنوية على السنة الميلادية وتنتهي 31/12 (قرار الإدارة 2026-10-05): من يدفع
-     * يوم 30/12 تنتهي عضويته بعد يوم واحد، فالانتهاء لا يُحسب من تاريخ الدفع ولا من التسجيل.
+     * كل العضويات سنوية على السنة الميلادية وتنتهي 31/12 من سنة الدفع (قرار الإدارة 2026-10-05):
+     * من يدفع يوم 30/12 تنتهي عضويته بعد يوم واحد، فالانتهاء لا يُحسب من تاريخ الدفع ولا من التسجيل.
      *
-     * السنة المغطّاة = السنة الحالية، إلا إن كانت عضوية سابقة تغطيها أصلاً (دفع مسبق للسنة
-     * القادمة) فتصير السنة التالية لآخر سنة مغطّاة — حتى لا تُدفع نفس السنة مرتين.
+     * السنة المغطّاة = سنة المعالجة دائماً، حتى لو في عضوية فعّالة تغطيها أصلاً: دفعة ثانية أو
+     * مبلغ كبير ما بيمدّ العضوية لسنة قادمة (eslam 2026-10-07، حساب 9541_g طلع 2027-12-31).
+     * عضوية السنة الجاية بتنعمل لما تندفع رسومها السنوية بسنتها.
      */
     public function applyRenewal(Membership $membership, ?int $reviewerId = null): Membership
     {
-        $previous = $membership->contractor
-            ->memberships()
-            ->where('id', '!=', $membership->id)
-            ->where('status', 'active')
-            ->whereNotNull('expires_at')
-            ->orderByDesc('expires_at')
-            ->first();
-
-        $coveredYear = max(now()->year, ($previous?->expires_at?->year ?? 0) + 1);
-
-        // داخل السنة الحالية تبدأ من يوم المعالجة؛ الدفع المسبق لسنة قادمة يبدأ من 1/1 تبعها
-        $startsAt = $coveredYear === now()->year
-            ? now()->startOfDay()
-            : \Carbon\Carbon::create($coveredYear, 1, 1)->startOfDay();
+        $coveredYear = now()->year;
+        $startsAt    = now()->startOfDay();
 
         $membership->update([
             'status'      => 'active',
@@ -49,6 +39,65 @@ class MembershipRenewalService
         }
 
         return $membership->fresh();
+    }
+
+    /**
+     * رسوم اشتراك سنة معيّنة انسدّت كاملة من رصيد المقاول (مثلاً لما تتولّد رسوم 1/1) ← عضوية
+     * فعّالة بتنتهي 31/12 من سنة الذمة. ما بتنعمل وحدة ثانية لو في عضوية فعّالة بتغطي السنة أصلاً.
+     * العضوية بتنعلّم بالذمة، عشان ترجيع الدفعة يلغيها (deactivateForDue).
+     */
+    public function activateForDue(ContractorDue $due, ?int $reviewerId = null): ?Membership
+    {
+        $contractor = $due->contractor;
+        $year       = (int) $due->year;
+
+        $covered = $contractor->memberships()
+            ->where('status', 'active')
+            ->whereYear('expires_at', $year)
+            ->exists();
+
+        if ($covered) {
+            return null;
+        }
+
+        $startsAt = $year === now()->year
+            ? now()->startOfDay()
+            : \Carbon\Carbon::create($year, 1, 1)->startOfDay();
+
+        $membership = $contractor->memberships()->create([
+            'type'        => $contractor->memberships()->exists() ? 'renewal' : 'new',
+            'status'      => 'active',
+            'amount'      => $due->amount_jod,
+            'starts_at'   => $startsAt,
+            'expires_at'  => \Carbon\Carbon::create($year, 12, 31)->startOfDay(),
+            'notes'       => self::creditDueMarker($due),
+            'reviewed_by' => $reviewerId,
+            'reviewed_at' => now(),
+        ]);
+
+        if (in_array($contractor->status, ['pending', 'expired'], true)) {
+            $contractor->update(['status' => 'active']);
+        }
+
+        return $membership;
+    }
+
+    /** الذمة رجعت مش مسدّدة (ترجيع الدفعة اللي سدّتها) ← العضوية اللي فعّلها الرصيد بتنرفض */
+    public function deactivateForDue(ContractorDue $due): void
+    {
+        if ($due->status === 'paid') {
+            return;
+        }
+
+        $due->contractor->memberships()
+            ->where('status', 'active')
+            ->where('notes', self::creditDueMarker($due))
+            ->update(['status' => 'rejected']);
+    }
+
+    private static function creditDueMarker(ContractorDue $due): string
+    {
+        return "تفعيل تلقائي من رصيد المقاول — ذمة #{$due->id}";
     }
 
     /**
