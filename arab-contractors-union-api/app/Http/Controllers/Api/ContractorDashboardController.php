@@ -95,13 +95,16 @@ class ContractorDashboardController extends Controller
     {
         $payments = $request->user()
             ->payments()
-            ->with('membership:id,type,expires_at')
+            ->with(['membership:id,type,expires_at', ...\App\Models\Payment::TITLE_RELATIONS])
             ->latest()
             ->get()
             ->map(fn($p) => [
                 'id'               => $p->id,
                 'amount'           => $p->amount,
                 'type'             => $p->type,
+                'type_label'       => $p->type_label,
+                'title'            => $p->title,
+                'transaction_number' => $p->transaction_number,
                 'status'           => $p->status,
                 'method'           => $p->method,
                 'reference_number' => $p->reference_number,
@@ -125,7 +128,7 @@ class ContractorDashboardController extends Controller
     {
         $contractor = $request->user();
 
-        $payments  = $contractor->payments()->with('membership:id,type,expires_at')->get();
+        $payments  = $contractor->payments()->with(['membership:id,type,expires_at', ...\App\Models\Payment::TITLE_RELATIONS])->get();
         $penalties = $contractor->penalties()->get();
         $dues      = $contractor->dues()->with(['payments' => fn ($q) => $q->latest('id')])->get();
 
@@ -135,8 +138,8 @@ class ContractorDashboardController extends Controller
         foreach ($payments as $p) {
             $statement->push([
                 'date'        => ($p->paid_at ?? $p->created_at)?->toDateString(),
-                'description' => $p->notes
-                    ?: ($p->type === 'membership' ? 'رسوم اشتراك عضوية' : ($p->type ?: 'دفعة')),
+                'description' => $p->title,
+                'notes'       => $p->notes,
                 'type'        => 'payment',
                 'direction'   => $p->status === 'paid' ? 'credit' : 'debit', // له / عليه
                 'amount'      => (string) $p->amount,
@@ -181,6 +184,8 @@ class ContractorDashboardController extends Controller
         $outstandingDues    = $this->financialService->outstandingDuesTotal($contractor);
         $totalObligations   = $this->financialService->totalObligations($contractor);
         $duesTotals         = $this->financialService->duesTotalsSummary($contractor);
+        // الصافي بعد خصم الأرصدة والدفعات السابقة — نفس الشاشة الرئيسية وcontractor/balance
+        $balance            = app(ContractorBalanceController::class)->snapshot($contractor->id);
 
         // ذمم "قيد المراجعة" (شاشة الذمم المالية) — تحويلات مرفوعة لتسديد ذمم بانتظار تأكيد المحاسبة،
         // مش عمود بجدول contractor_dues، مشتقة من Payment(type=dues_payment, status=pending)
@@ -197,7 +202,15 @@ class ContractorDashboardController extends Controller
                 'dues_total_jod'       => number_format($duesTotals['total'], 2, '.', ''),
                 'dues_paid_jod'        => number_format($duesTotals['paid'], 2, '.', ''),
                 'dues_paid_percentage' => $this->financialService->duesPaidPercentage($contractor),
+                // إجمالي المستحق (ذمم + غرامات بالمتبقي منها)، والرصيد الدائن، والمطلوب فعلياً بعد خصمه
+                'total_due_jod'        => number_format($balance['debit_jod'], 2, '.', ''),
+                'credit_jod'           => number_format($balance['credit_jod'], 2, '.', ''),
+                'amount_due_jod'       => number_format($balance['amount_due_jod'], 2, '.', ''),
+                'net_jod'              => number_format($balance['net_jod'], 2, '.', ''),
+                'position'             => $balance['position'],
             ],
+            // خيارات "نوع الدفعة" بشاشة رفع الإشعار: [{value, label}]
+            'payment_types' => \App\Models\Payment::appTypeOptions(),
             // لقطة احتساب رسوم السنة الحالية (محرّك الاحتساب الآلي — المادة 37)، إن وُجدت
             'current_year_fee_breakdown' => $dues
                 ->first(fn ($d) => $d->source === 'fee_engine' && $d->year === now()->year)
@@ -206,6 +219,7 @@ class ContractorDashboardController extends Controller
             'dues_counts' => [
                 'unpaid'         => $dues->where('status', '!=', 'paid')->count(),
                 'pending_review' => $pendingDuesPayments->count(),
+                'penalties'      => $penalties->filter(fn ($pen) => $pen->remaining > 0)->count(),
             ],
             // تبويب "الدفعات السابقة": بادجات الأعداد (دفع جزئي / مكتمل)
             // دفع جزئي = ذمم partially_paid (تُعرض من مصفوفة dues أدناه بفلتر ?status=partially_paid)
@@ -222,6 +236,7 @@ class ContractorDashboardController extends Controller
                 'title'             => $p->title,
                 'type_label'        => $p->type_label,
                 'description'       => $p->notes ?: 'دفعة مقدمة للمشروع',
+                'notes'             => $p->notes,
                 'amount'            => $p->amount,
                 'currency'          => $p->currency ?? 'JOD',
                 'reference_number'  => $p->reference_number,
@@ -265,11 +280,47 @@ class ContractorDashboardController extends Controller
                             'amount'             => $pending->amount,
                             'currency'           => $pending->currency ?? 'JOD',
                             'reference_number'   => $pending->reference_number,
+                            'notes'              => $pending->notes,
                             'receipt_image_url'  => $pending->receipt_image_url,
                             'submitted_at'       => $pending->submitted_at,
                         ] : null,
                         'last_rejection_reason' => $rejected?->rejection_reason,
                         'last_rejected_at'      => $rejected?->confirmed_at,
+                    ];
+                })->values(),
+            // كروت الغرامات بتبويب "المستحقات" (مستقلة عن الذمم): المفتوحة أولاً، والمرفوضة مخفية.
+            // "ادفع الآن" على الكرت = POST contractor/payments/transfer مع penalty_id
+            'penalties' => $penalties->where('status', '!=', 'rejected')
+                ->sortBy(fn ($pen) => [$pen->remaining > 0 ? 0 : 1, -$pen->created_at->getTimestamp()])
+                ->map(function ($pen) use ($payments) {
+                    $lastTransfer = $payments->where('penalty_id', $pen->id)->sortByDesc('id')->first();
+                    $pending      = $lastTransfer?->status === 'pending' ? $lastTransfer : null;
+                    $rejected     = $lastTransfer?->status === 'rejected' ? $lastTransfer : null;
+
+                    return [
+                        'id'            => $pen->id,
+                        'kind'          => 'penalty',
+                        'title'         => $pen->reason ?: 'غرامة',
+                        'type_label'    => 'غرامة',
+                        'amount_jod'    => $pen->amount,
+                        'paid_jod'      => number_format((float) $pen->paid_amount, 2, '.', ''),
+                        'remaining_jod' => $pen->remaining,
+                        'status'        => $pen->status,
+                        'status_label'  => $pen->status_label,
+                        'notes'         => $pen->notes,
+                        'created_at'    => $pen->created_at?->toDateString(),
+                        'is_under_review' => $pending !== null,
+                        'pending_payment' => $pending ? [
+                            'id'                 => $pending->id,
+                            'transaction_number' => $pending->transaction_number,
+                            'amount'             => $pending->amount,
+                            'currency'           => $pending->currency ?? 'JOD',
+                            'reference_number'   => $pending->reference_number,
+                            'notes'              => $pending->notes,
+                            'receipt_image_url'  => $pending->receipt_image_url,
+                            'submitted_at'       => $pending->submitted_at,
+                        ] : null,
+                        'last_rejection_reason' => $rejected?->rejection_reason,
                     ];
                 })->values(),
             // الالتزامات المستحقة فقط (تُستثنى الدفعات المرفوضة — ليست دينًا قائمًا)

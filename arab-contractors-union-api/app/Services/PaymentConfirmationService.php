@@ -75,6 +75,7 @@ class PaymentConfirmationService
             $payment->update($updateData);
 
             $this->settleLinkedDue($payment, $authUser);
+            $this->settleLinkedPenalty($payment, $authUser);
             $this->settleOutstandingDues($payment, $authUser);
 
             // إطلاق حدث للمكونات الأخرى (Membership, Equipment) للتفاعل مع الدفعة باستقلالية
@@ -138,7 +139,8 @@ class PaymentConfirmationService
 
     /**
      * دفعة من التطبيق ما إلها ذمة محددة كانت تتأكد وتضل الذمم "غير مسدَّدة":
-     * - سداد ذمم بلا ذمة مربوطة ← بتتوزع على أقدم الذمم، متل الدفعة اليدوية (DuesPaymentService).
+     * - سداد ذمم بلا ذمة مربوطة / دفعة مقدمة ← أقدم الذمم، بعدين الغرامات المفتوحة، والباقي رصيد.
+     * - دفع غرامة ← الغرامات المفتوحة أولاً (بعد المربوطة)، بعدين الذمم، والباقي رصيد.
      * - رسوم عضوية ← بتسدّد ذمم رسوم الاشتراك السنوي أولاً (الأقدم أولاً)، والباقي على أقدم
      *   الذمم الثانية: التطبيق بيبعت التحويل "رسوم عضوية" افتراضياً حتى لو المقاول بيدفع ذمة
      *   عادية، وبدونها بيدفع وبتضل الذمة عليه وحالته "منتهية".
@@ -147,7 +149,7 @@ class PaymentConfirmationService
     private function settleOutstandingDues(Payment $payment, User $authUser): void
     {
         $applies = ($payment->type === 'dues_payment' && ! $payment->contractor_due_id)
-            || $payment->type === 'membership_fee';
+            || in_array($payment->type, ['membership_fee', 'advance_payment', 'penalty_payment'], true);
 
         if (! $applies || ! $payment->contractor) {
             return;
@@ -161,63 +163,72 @@ class PaymentConfirmationService
             $dues = $fees->concat($others);
         }
 
-        $available = round((float) $payment->amount_jod - (float) $payment->used_amount_jod, 2);
-
-        foreach ($dues as $due) {
-            if ($available <= 0) {
-                break;
-            }
-
-            $amount = min($available, $due->remaining_jod);
-            if ($amount <= 0) {
-                continue;
-            }
-
-            $payment->increment('used_amount_jod', $amount);
-            $due->applyPayment($amount);
-            PaymentAllocation::record($payment, $due, $amount);
-            $available = round($available - $amount, 2);
-
-            AuditLogService::record(
-                $authUser,
-                'due.settled',
-                $due,
-                ['contractor_id' => $due->contractor_id, 'amount_jod' => $amount, 'payment_id' => $payment->id],
-            );
-        }
-
-        // سداد الذمم بعد الذمم بيسدّد الغرامات المفتوحة، متل الدفعة اليدوية (DuesPaymentService)،
-        // حتى ما يضل الفائض رصيداً والغرامة مفتوحة
-        if ($payment->type !== 'dues_payment' || $available <= 0) {
-            return;
-        }
-
-        $penalties = $payment->contractor->penalties()
+        // رسوم العضوية ما بتسدّد غرامات (فائضها مش رصيد أصلاً)
+        $penalties = $payment->type === 'membership_fee' ? collect() : $payment->contractor->penalties()
             ->whereIn('status', ['unpaid', 'partially_paid'])
             ->orderBy('created_at')->orderBy('id')->lockForUpdate()->get();
 
-        foreach ($penalties as $penalty) {
+        $targets = $payment->type === 'penalty_payment' ? $penalties->concat($dues) : $dues->concat($penalties);
+
+        $available = round((float) $payment->amount_jod - (float) $payment->used_amount_jod, 2);
+
+        foreach ($targets as $target) {
             if ($available <= 0) {
                 break;
             }
 
-            $amount = min($available, $penalty->remaining);
+            $isDue  = $target instanceof \App\Models\ContractorDue;
+            $amount = min($available, $isDue ? $target->remaining_jod : $target->remaining);
             if ($amount <= 0) {
                 continue;
             }
 
             $payment->increment('used_amount_jod', $amount);
-            $penalty->applyPayment($amount);
-            PaymentAllocation::recordPenalty($payment, $penalty, $amount);
+            $target->applyPayment($amount);
+            $isDue
+                ? PaymentAllocation::record($payment, $target, $amount)
+                : PaymentAllocation::recordPenalty($payment, $target, $amount);
             $available = round($available - $amount, 2);
 
             AuditLogService::record(
                 $authUser,
-                'penalty.settled',
-                $penalty,
-                ['contractor_id' => $penalty->contractor_id, 'amount_jod' => $amount, 'payment_id' => $payment->id],
+                $isDue ? 'due.settled' : 'penalty.settled',
+                $target,
+                ['contractor_id' => $target->contractor_id, 'amount_jod' => $amount, 'payment_id' => $payment->id],
             );
         }
+    }
+
+    /**
+     * تحويل مرفوع من التطبيق لدفع غرامة محددة (كرت الغرامة بالمستحقات): بيسدّدها أولاً بحدود
+     * المتبقي عليها، والباقي بيكمّل على باقي الغرامات والذمم (settleOutstandingDues).
+     */
+    private function settleLinkedPenalty(Payment $payment, User $authUser): void
+    {
+        if ($payment->type !== 'penalty_payment' || ! $payment->penalty_id) {
+            return;
+        }
+
+        $penalty = $payment->penalty()->lockForUpdate()->first();
+        if (! $penalty || $penalty->remaining <= 0) {
+            return;
+        }
+
+        $amount = min(round((float) $payment->amount_jod - (float) $payment->used_amount_jod, 2), $penalty->remaining);
+        if ($amount <= 0) {
+            return;
+        }
+
+        $payment->increment('used_amount_jod', $amount);
+        $penalty->applyPayment($amount);
+        PaymentAllocation::recordPenalty($payment, $penalty, $amount);
+
+        AuditLogService::record(
+            $authUser,
+            'penalty.settled',
+            $penalty,
+            ['contractor_id' => $penalty->contractor_id, 'amount_jod' => $amount, 'payment_id' => $payment->id],
+        );
     }
 
     /** عليه ذمم أو غرامات مفتوحة — الدفعة بلا نوع وقتها سداد ذمم، مش رسوم عضوية */

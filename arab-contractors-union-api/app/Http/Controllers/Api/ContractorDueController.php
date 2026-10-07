@@ -321,6 +321,10 @@ class ContractorDueController extends Controller
 
         AuditLogService::record(Auth::user(), 'due.created', $due, ['contractor_id' => $due->contractor_id, 'amount_jod' => $due->amount_jod]);
 
+        // رصيد سابق للمقاول (فائض دفعة/دفعة مقدمة) بينصرف عالذمة الجديدة فوراً
+        app(\App\Services\ContractorCreditService::class)->applyAvailableCredit($due->contractor, Auth::user());
+        $due->refresh();
+
         return $this->success(
             new ContractorDueResource($due->load('contractor:id,name,membership_number')),
             'تمت إضافة الذمة المالية بنجاح.',

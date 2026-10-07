@@ -75,13 +75,16 @@ class DuesGenerationService
         if ($existingFeeEngine) {
             $existingFeeEngine->update($attributes);
             $existingFeeEngine->applyPayment(0);
-            $due = $existingFeeEngine->fresh(['contractor:id,name,membership_number']);
+            $due = $existingFeeEngine;
         } else {
             $attributes['created_by'] = $authId;
             $due = ContractorDue::create($attributes);
             $due->update(['reference_number' => ContractorDue::generateReferenceNumber($due)]);
-            $due = $due->fresh(['contractor:id,name,membership_number']);
         }
+
+        // رصيد سابق للمقاول بينصرف عالرسوم الجديدة فوراً (مسدَّدة كلياً أو جزئياً)
+        app(ContractorCreditService::class)->applyAvailableCredit($contractor, \App\Models\User::find($authId));
+        $due = $due->fresh(['contractor:id,name,membership_number']);
 
         $otherExisting = ContractorDue::where('contractor_id', $contractor->id)
             ->where('year', $year)
@@ -109,7 +112,9 @@ class DuesGenerationService
         $unresolvable = [];
         $created = 0;
 
-        $query->chunkById(100, function ($contractors) use ($year, $dryRun, $authId, &$wouldCreate, &$wouldSkipExisting, &$unresolvable, &$created) {
+        $by = $authId ? \App\Models\User::find($authId) : null;
+
+        $query->chunkById(100, function ($contractors) use ($year, $dryRun, $authId, $by, &$wouldCreate, &$wouldSkipExisting, &$unresolvable, &$created) {
             foreach ($contractors as $contractor) {
                 $exists = ContractorDue::where('contractor_id', $contractor->id)
                     ->where('year', $year)
@@ -143,6 +148,7 @@ class DuesGenerationService
                     'created_by'    => $authId,
                 ]);
                 $due->update(['reference_number' => ContractorDue::generateReferenceNumber($due)]);
+                app(ContractorCreditService::class)->applyAvailableCredit($contractor, $by);
                 $wouldCreate[] = ['contractor_id' => $contractor->id, 'name' => $contractor->name, 'total_jod' => $breakdown['total_before_discount_jod']];
                 $created++;
             }
