@@ -47,16 +47,17 @@ class SupabaseRateProxyService
             throw new \RuntimeException('supabase_proxy_missing_fields: لا يوجد JOD/USD بالرد.');
         }
 
-        // منتصف buy/sell — سعر عادل لا يحابي طرفاً بالتحويل الداخلي
-        $jodMidInIls = ((float) $rows['JOD']['buy'] + (float) $rows['JOD']['sell']) / 2;
-        $usdMidInIls = ((float) $rows['USD']['buy'] + (float) $rows['USD']['sell']) / 2;
+        // سعر بيع الدينار (قرار الإدارة 2026-10-08) — نفس PmaRateScraperService: البنك يبيع الدينار
+        // بسعر JOD.sell شيكل، ويشتري الدولار بسعر USD.buy شيكل قبل ما يحوّله لدينار.
+        $jodSellInIls = (float) $rows['JOD']['sell'];
+        $usdBuyInIls  = (float) $rows['USD']['buy'];
 
-        if ($jodMidInIls <= 0 || $usdMidInIls <= 0) {
+        if ($jodSellInIls <= 0 || $usdBuyInIls <= 0) {
             throw new \RuntimeException('supabase_proxy_invalid_rate: قيمة سعر صفر أو سالبة.');
         }
 
-        $ilsToJod = 1 / $jodMidInIls;          // 1 ILS = كم JOD
-        $usdToJod = $usdMidInIls * $ilsToJod;  // 1 USD = X ILS = X * (JOD لكل ILS)
+        $ilsToJod = 1 / $jodSellInIls;          // 1 ILS = كم JOD
+        $usdToJod = $usdBuyInIls * $ilsToJod;   // 1 USD = X ILS = X * (JOD لكل ILS)
 
         if ($usdToJod < self::USD_JOD_SANITY_MIN || $usdToJod > self::USD_JOD_SANITY_MAX) {
             throw new \RuntimeException(

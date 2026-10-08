@@ -14,8 +14,9 @@ use Spatie\Browsershot\Browsershot;
  *
  * شكل الرد — مرصود فعلياً بتاريخ 2026-09-24 (كان مجهولاً قبلها لأن الخدمة كانت
  * ترجع 503 باستمرار): الخدمة تعود بـHTTP 200 وملف **Excel (xlsx)** لا JSON/CSV،
- * بالأعمدة: التاريخ | العملة | الشراء | البيع | الوسطي، وبأزواج مثل USD/ILS و
- * USD/JOD. نقرأه بـPhpSpreadsheet ونأخذ عمود "الوسطي".
+ * بالأعمدة: التاريخ | العملة | الشراء | البيع | الوسطي، وبأزواج مثل JOD/ILS و
+ * USD/JOD. نقرأه بـPhpSpreadsheet ونعتمد "سعر بيع الدينار" (قرار الإدارة 2026-10-08):
+ * السعر الذي يبيع به البنك الدينار مقابل العملة التي دفعها المقاول، أي سعر تحويلها فعلياً لدينار.
  *
  * يبقى مسار JSON/CSV مدعوماً أيضاً تحسّباً لتغيّر الصيغة مستقبلاً؛ وأي شكل غير
  * معروف يُرفض صراحة بدل تخمين قراءته، فيذهب لمسار fallback+تنبيه في rates:fetch-pma.
@@ -143,9 +144,11 @@ class PmaRateScraperService
 
     /**
      * يقرأ ملف xlsx الذي تعيده أداة التصدير فعلياً.
-     * الأعمدة المرصودة: 0=التاريخ (yyyy/mm/dd) · 1=العملة (زوج مثل USD/ILS) · 2=الشراء · 3=البيع · 4=الوسطي
-     * الجدول يسعّر كل شيء مقابل الدولار، بينما REQ-17 تحتاج الأساس ILS — فنشتق:
-     *   1 ILS = (USD/JOD) ÷ (USD/ILS) دينار   ·   1 ILS = 1 ÷ (USD/ILS) دولار
+     * الأعمدة المرصودة: 0=التاريخ (yyyy/mm/dd) · 1=العملة (زوج مثل JOD/ILS) · 2=الشراء · 3=البيع · 4=الوسطي
+     * سعر بيع الدينار (قرار الإدارة 2026-10-08، وهو اللي بيقرّبه كشف الدفعات بـ"سعر بيع شيكل لدينار"):
+     *   1 ILS = 1 ÷ (JOD/ILS بيع) دينار      — البنك يبيع الدينار بهذا العدد من الشواكل
+     *   1 USD = (USD/JOD شراء) دينار         — البنك يشتري الدولار، أي يبيع الدينار مقابله
+     * والمخرَج بأساس ILS (REQ-17)، فـUSD هنا = كم دولار يعادل 1 ILS = دينار الشيكل ÷ دينار الدولار.
      *
      * @return array{JOD: float, USD: float, date: string}
      */
@@ -169,18 +172,19 @@ class PmaRateScraperService
 
         foreach ($rows as $row) {
             $pair = trim((string) ($row[1] ?? ''));
-            $mid  = $row[4] ?? null;
+            $buy  = trim((string) ($row[2] ?? ''));
+            $sell = trim((string) ($row[3] ?? ''));
 
-            if ($pair === '' || ! is_numeric($mid)) {
+            if ($pair === '' || ! is_numeric($buy) || ! is_numeric($sell)) {
                 continue; // صف العناوين أو صف فارغ
             }
 
-            $pairs[strtoupper($pair)] = (float) $mid;
+            $pairs[strtoupper($pair)] = ['buy' => (float) $buy, 'sell' => (float) $sell];
             $fileDate ??= str_replace('/', '-', trim((string) ($row[0] ?? '')));
         }
 
-        foreach (['USD/ILS', 'USD/JOD'] as $needed) {
-            if (empty($pairs[$needed])) {
+        foreach (['JOD/ILS', 'USD/JOD'] as $needed) {
+            if (empty($pairs[$needed]['buy']) || empty($pairs[$needed]['sell'])) {
                 throw new \RuntimeException("pma_scrape_excel_missing_pair: الزوج {$needed} غير موجود في ملف التصدير.");
             }
         }
@@ -193,9 +197,12 @@ class PmaRateScraperService
             );
         }
 
+        $ilsToJod = 1 / $pairs['JOD/ILS']['sell'];
+        $usdToJod = $pairs['USD/JOD']['buy'];
+
         return [
-            'JOD'  => $pairs['USD/JOD'] / $pairs['USD/ILS'],
-            'USD'  => 1 / $pairs['USD/ILS'],
+            'JOD'  => $ilsToJod,
+            'USD'  => $ilsToJod / $usdToJod,
             'date' => $fileDate ?? $expectedDate,
         ];
     }
