@@ -42,7 +42,10 @@ class ContractorEquipmentController extends Controller
             // بطاقة "المالك/المقاول" بشاشة تفاصيل الألية — زر تواصل واتساب مباشر (owner_phone)
             'contractor_name'   => $e->contractor?->name,
             'equipment_type_id' => $e->equipment_type_id,
-            'type'              => $e->type?->only(['id', 'name_ar', 'icon']),
+            // نوع ملغى (معطَّل أو محذوف) بينعرض "غير محدد" بشاشة التفاصيل بدل اسم قديم أو فراغ (REQ-08 #21)
+            'type'              => $e->type?->is_active
+                ? $e->type->only(['id', 'name_ar', 'icon'])
+                : ['id' => null, 'name_ar' => Equipment::UNDEFINED_TYPE_LABEL, 'icon' => null],
             'name'              => $e->name,
             'brand'             => $e->brand,
             'description'       => $e->description,
@@ -347,7 +350,7 @@ class ContractorEquipmentController extends Controller
     {
         $query = Equipment::visibleInMarketplace()
             ->whereHas('contractor', fn ($q) => $q->whereNull('equipment_banned_at'))
-            ->with(['type:id,name_ar,icon', 'contractor:id,name,phone', 'primaryImage']);
+            ->with(['type:id,name_ar,icon,is_active', 'contractor:id,name,phone', 'primaryImage']);
 
         if ($request->filled('type_id')) {
             $query->where('equipment_type_id', $request->type_id);
@@ -375,7 +378,7 @@ class ContractorEquipmentController extends Controller
     // GET /api/v1/contractor/equipment/marketplace/{equipment} — شاشة تفاصيل الألية
     public function show(Equipment $equipment)
     {
-        $equipment->load(['type:id,name_ar,icon', 'contractor:id,name,phone', 'images']);
+        $equipment->load(['type:id,name_ar,icon,is_active', 'contractor:id,name,phone', 'images']);
 
         return $this->success($this->format($equipment));
     }
@@ -437,7 +440,7 @@ class ContractorEquipmentController extends Controller
             return $this->error('لا يمكنك حجز آليتك الخاصة.', 422);
         }
 
-        if ($equipment->is_hidden || $equipment->status !== 'visible' || $equipment->needs_maintenance) {
+        if ($equipment->is_hidden || $equipment->status !== 'visible' || $equipment->needs_maintenance || $equipment->is_scheduled) {
             return $this->error('هذه الآلية غير متاحة للحجز حالياً.', 422);
         }
 

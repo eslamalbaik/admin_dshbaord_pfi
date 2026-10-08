@@ -191,10 +191,22 @@ const saveEdit = async () => {
     editDialog.value = false
     fetchStats()
   }
+  catch (err: any) {
+    const errors = err?.response?.data?.errors
+    notify(errors ? Object.values(errors).flat().join(' — ') : (err?.response?.data?.message || 'تعذّر حفظ التعديلات'), 'error')
+  }
   finally {
     saving.value = false
   }
 }
+
+// مخفية بقرار المالك / موقوفة بقرار الإدارة ← خيار "تظهر أولاً في السوق" بيتلغى ويتعطّل (REQ-08 #20)
+const editIsSuspended = computed(() => ['hidden', 'suspended'].includes(editForm.value.status))
+
+watch(editIsSuspended, suspended => {
+  if (suspended)
+    editForm.value.is_featured = false
+})
 
 // ─── Quick status toggle ──────────────────────────────────────────────────────
 const cycleStatus = async (item: any) => {
@@ -490,10 +502,26 @@ const setPrimary = async (img: any) => {
               >
                 {{ statusMeta[item.status]?.label ?? item.status }}
               </VChip>
+              <VChip
+                v-if="item.published_at && new Date(item.published_at) > new Date()"
+                color="info"
+                size="small"
+                label
+                variant="tonal"
+                class="ms-1"
+                prepend-icon="tabler-calendar-time"
+                style="font-family:Cairo,sans-serif"
+              >
+                مجدولة {{ new Date(item.published_at).toLocaleDateString('ar-PS') }}
+              </VChip>
             </td>
             <!-- Actions -->
             <td>
               <div class="d-flex gap-1 flex-wrap">
+                <VBtn icon size="x-small" variant="tonal" color="secondary" :to="{ name: 'marketplace-id', params: { id: item.id } }">
+                  <VIcon icon="tabler-eye" size="16" />
+                  <VTooltip activator="parent">معاينة</VTooltip>
+                </VBtn>
                 <VBtn v-if="$can('marketplace.equipment', 'update')" icon size="x-small" variant="tonal" color="primary" @click="openEdit(item)">
                   <VIcon icon="tabler-edit" size="16" />
                   <VTooltip activator="parent">تعديل</VTooltip>
@@ -560,15 +588,7 @@ const setPrimary = async (img: any) => {
               <VTextField v-model="editForm.brand" label="الماركة" variant="outlined" density="compact" style="font-family:Cairo,sans-serif" />
             </VCol>
             <VCol cols="12" md="6">
-              <VTextField
-                v-model="editForm.owner_phone"
-                label="رقم واتساب المالك"
-                hint="يُستخدم للتواصل المباشر عبر واتساب من شاشة تفاصيل الآلية"
-                persistent-hint
-                variant="outlined"
-                density="compact"
-                style="font-family:Cairo,sans-serif"
-              />
+              <WhatsappPhoneField v-model="editForm.owner_phone" />
             </VCol>
             <VCol cols="12" md="3">
               <VTextField v-model.number="editForm.manufacture_year" label="سنة الصنع" type="number" variant="outlined" density="compact" style="font-family:Cairo,sans-serif" />
@@ -617,7 +637,15 @@ const setPrimary = async (img: any) => {
               />
             </VCol>
             <VCol cols="12" md="6" class="d-flex align-center">
-              <VSwitch v-model="editForm.is_featured" label="آلية مميزة (تظهر أولاً في السوق)" color="warning" style="font-family:Cairo,sans-serif" />
+              <VSwitch
+                v-model="editForm.is_featured"
+                label="آلية مميزة (تظهر أولاً في السوق)"
+                color="warning"
+                :disabled="editIsSuspended"
+                :hint="editIsSuspended ? 'غير متاح والآلية مخفية بقرار المالك أو موقوفة بقرار الإدارة' : undefined"
+                :persistent-hint="editIsSuspended"
+                style="font-family:Cairo,sans-serif"
+              />
             </VCol>
             <VCol cols="12" md="6" class="d-flex align-center">
               <VSwitch v-model="editForm.needs_maintenance" label="بحاجة صيانة (تختفي من السوق مؤقتاً)" color="error" style="font-family:Cairo,sans-serif" />

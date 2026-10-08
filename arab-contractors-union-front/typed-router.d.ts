@@ -67,6 +67,7 @@ declare module 'vue-router/auto-routes' {
     'landing-training-center': RouteRecordInfo<'landing-training-center', '/landing/training-center', Record<never, never>, Record<never, never>>,
     'legal-library': RouteRecordInfo<'legal-library', '/legal-library', Record<never, never>, Record<never, never>>,
     'marketplace': RouteRecordInfo<'marketplace', '/marketplace', Record<never, never>, Record<never, never>>,
+    'marketplace-id': RouteRecordInfo<'marketplace-id', '/marketplace/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
     'marketplace-create': RouteRecordInfo<'marketplace-create', '/marketplace/create', Record<never, never>, Record<never, never>>,
     'marketplace-packages': RouteRecordInfo<'marketplace-packages', '/marketplace/packages', Record<never, never>, Record<never, never>>,
     'marketplace-types': RouteRecordInfo<'marketplace-types', '/marketplace/types', Record<never, never>, Record<never, never>>,

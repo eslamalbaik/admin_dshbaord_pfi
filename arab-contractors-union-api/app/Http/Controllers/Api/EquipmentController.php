@@ -8,6 +8,7 @@ use App\Models\EquipmentBlockedDate;
 use App\Models\EquipmentImage;
 use App\Models\EquipmentReservation;
 use App\Services\AuditLogService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -21,10 +22,82 @@ class EquipmentController extends Controller
     /** حد وصف الحالة الفنية للآلية بالحروف. */
     private const DESCRIPTION_MAX_LENGTH = 250;
 
+    /** رقم واتساب المالك بالصيغة الدولية بدون + : مقدمة 970 أو 972 ثم رقم جوال من 9 خانات يبدأ بـ5. */
+    private const OWNER_PHONE_REGEX = '/^(970|972)5\d{8}$/';
+
+    private const OWNER_PHONE_MESSAGE = 'رقم واتساب المالك لازم يبدأ بمقدمة 970 أو 972 وبعدها رقم الجوال (9 خانات تبدأ بـ5)، مثال: 970599123456.';
+
+    /**
+     * يوحّد رقم الواتساب قبل التحقق: يشيل المسافات والشرطات و+ و00 بالبداية، فـ"+970 599-123456"
+     * و"00970599123456" بيتخزنوا "970599123456" — نفس الصيغة اللي بيحتاجها رابط wa.me بالتطبيق.
+     */
+    private function normalizeOwnerPhone(Request $request): void
+    {
+        if (! $request->filled('owner_phone'))
+            return;
+
+        $digits = preg_replace('/\D+/', '', (string) $request->input('owner_phone'));
+        if (str_starts_with($digits, '00'))
+            $digits = substr($digits, 2);
+
+        $request->merge(['owner_phone' => $digits]);
+    }
+
+    /** تاريخ النشر المجدول من بكرا وطالع (تاريخ اليوم +1) — نفس قاعدة فورم الفعاليات. */
+    private function fromTomorrowRule(?Equipment $equipment): \Closure
+    {
+        return function ($attribute, $value, $fail) use ($equipment) {
+            try {
+                $date = Carbon::parse($value)->toDateString();
+            } catch (\Throwable) {
+                return; // قاعدة date بتطلع رسالة الصيغة
+            }
+            // تعديل آلية مجدولة بدون تغيير موعدها ما لازم يرفضه القيد
+            if ($equipment?->published_at && $date === $equipment->published_at->toDateString())
+                return;
+            $min = now()->addDay()->toDateString();
+            if ($date < $min)
+                $fail('تاريخ النشر المجدول لازم يكون ابتداءً من ' . Carbon::parse($min)->format('d/m/Y') . ' (تاريخ اليوم +1).');
+        };
+    }
+
+    /**
+     * آلية مخفية بقرار المالك أو موقوفة بقرار الإدارة ما بتنعرض بالسوق أصلاً، فخيار "مميزة (تظهر أولاً
+     * في السوق)" بيتلغى معها (REQ-08 #20) — وإلا بترجع مميزة فجأة أول ما ينرفع الإيقاف.
+     */
+    private function dropFeaturedWhenSuspended(array &$validated, ?Equipment $equipment): void
+    {
+        $status = $validated['status'] ?? $equipment?->status ?? 'visible';
+
+        if (in_array($status, ['hidden', 'suspended'], true))
+            $validated['is_featured'] = false;
+    }
+
+    /**
+     * يحوّل publish_mode (now / schedule) إلى published_at: "مباشر" = وقت الحفظ، و"مجدول" = بداية
+     * يوم التاريخ المختار. بدون publish_mode (مثلاً تبديل الحالة السريع) ما بيتغير موعد النشر.
+     */
+    private function applyPublishMode(array &$validated, ?Equipment $equipment): void
+    {
+        $mode = $validated['publish_mode'] ?? null;
+        unset($validated['publish_mode']);
+
+        if ($mode === 'schedule') {
+            $validated['published_at'] = Carbon::parse($validated['published_at'])->startOfDay();
+        } elseif ($mode === 'now') {
+            // آلية منشورة أصلاً بتحتفظ بموعد نشرها الأصلي؛ المجدولة بتنشر هلق
+            $validated['published_at'] = $equipment?->published_at && ! $equipment->is_scheduled
+                ? $equipment->published_at
+                : now();
+        } else {
+            unset($validated['published_at']);
+        }
+    }
+
     // GET /api/equipment
     public function index(Request $request)
     {
-        $query = Equipment::with(['type:id,name_ar,icon', 'contractor:id,name,phone', 'primaryImage']);
+        $query = Equipment::with(['type:id,name_ar,icon,is_active', 'contractor:id,name,phone', 'primaryImage']);
 
         if ($request->filled('search')) {
             $q = $request->search;
@@ -73,6 +146,8 @@ class EquipmentController extends Controller
     // POST /api/equipment
     public function store(Request $request)
     {
+        $this->normalizeOwnerPhone($request);
+
         $validated = $request->validate([
             'contractor_id'     => 'required|exists:contractors,id',
             'equipment_type_id' => 'required|exists:equipment_types,id',
@@ -85,29 +160,42 @@ class EquipmentController extends Controller
             'contract_type'     => 'nullable|in:daily,weekly,monthly',
             'governorate'       => 'nullable|string|max:100',
             'city'              => 'nullable|string|max:100',
-            'owner_phone'       => 'nullable|string|max:20',
+            'owner_phone'       => ['nullable', 'string', 'regex:' . self::OWNER_PHONE_REGEX],
             'status'            => 'nullable|in:visible,hidden,suspended',
+            'publish_mode'      => 'nullable|in:now,schedule',
+            'published_at'      => ['required_if:publish_mode,schedule', 'nullable', 'date', $this->fromTomorrowRule(null)],
             'is_featured'       => 'nullable|boolean',
             'needs_maintenance' => 'nullable|boolean',
             'admin_notes'       => 'nullable|string',
             'images'            => 'nullable|array|max:' . self::MAX_IMAGES,
             'images.*'          => 'image|mimes:jpg,jpeg,png,webp|max:' . self::MAX_IMAGE_KB,
+            // ترتيب صورة الغلاف ضمن images[] — تختارها الإدارة من معاينة الصور بالفورم قبل الحفظ
+            'primary_index'     => 'nullable|integer|min:0',
         ], [
             'images.max'   => 'الحد الأقصى ' . self::MAX_IMAGES . ' صور لكل آلية.',
             'images.*.max' => 'حجم الصورة يتجاوز الحد الأقصى ' . (self::MAX_IMAGE_KB / 1024) . ' ميجابايت.',
+            'owner_phone.regex'        => self::OWNER_PHONE_MESSAGE,
+            'published_at.required_if' => 'حدد تاريخ النشر للآلية المجدولة.',
         ]);
 
         $images = $request->file('images', []);
-        unset($validated['images']);
+        $primaryIndex = (int) ($validated['primary_index'] ?? 0);
+        if ($primaryIndex >= count($images))
+            $primaryIndex = 0;
+        unset($validated['images'], $validated['primary_index']);
+
+        $validated['publish_mode'] ??= 'now';
+        $this->applyPublishMode($validated, null);
+        $this->dropFeaturedWhenSuspended($validated, null);
 
         $equipment = Equipment::create($validated);
 
-        foreach ($images as $index => $file) {
+        foreach (array_values($images) as $index => $file) {
             $path = $file->store('equipment/' . $equipment->id, 'public');
             EquipmentImage::create([
                 'equipment_id' => $equipment->id,
                 'path'         => $path,
-                'is_primary'   => $index === 0,
+                'is_primary'   => $index === $primaryIndex,
                 'sort_order'   => $index,
             ]);
         }
@@ -128,6 +216,8 @@ class EquipmentController extends Controller
     // PATCH /api/equipment/{equipment}
     public function update(Request $request, Equipment $equipment)
     {
+        $this->normalizeOwnerPhone($request);
+
         $validated = $request->validate([
             'contractor_id'     => 'sometimes|exists:contractors,id',
             'equipment_type_id' => 'sometimes|exists:equipment_types,id',
@@ -140,12 +230,20 @@ class EquipmentController extends Controller
             'contract_type'     => 'nullable|in:daily,weekly,monthly',
             'governorate'       => 'nullable|string|max:100',
             'city'              => 'nullable|string|max:100',
-            'owner_phone'       => 'nullable|string|max:20',
+            'owner_phone'       => ['nullable', 'string', 'regex:' . self::OWNER_PHONE_REGEX],
             'status'            => 'nullable|in:visible,hidden,suspended',
+            'publish_mode'      => 'nullable|in:now,schedule',
+            'published_at'      => ['required_if:publish_mode,schedule', 'nullable', 'date', $this->fromTomorrowRule($equipment)],
             'is_featured'       => 'nullable|boolean',
             'needs_maintenance' => 'nullable|boolean',
             'admin_notes'       => 'nullable|string',
+        ], [
+            'owner_phone.regex'        => self::OWNER_PHONE_MESSAGE,
+            'published_at.required_if' => 'حدد تاريخ النشر للآلية المجدولة.',
         ]);
+
+        $this->applyPublishMode($validated, $equipment);
+        $this->dropFeaturedWhenSuspended($validated, $equipment);
 
         $equipment->update($validated);
 

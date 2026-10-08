@@ -53,5 +53,6 @@ declare module 'vue' {
     ThemeSwitcher: typeof import('./resources/ts/@core/components/ThemeSwitcher.vue')['default']
     TiptapEditor: typeof import('./resources/ts/@core/components/TiptapEditor.vue')['default']
     VueApexCharts: typeof import('vue3-apexcharts')['default']
+    WhatsappPhoneField: typeof import('./resources/ts/components/marketplace/WhatsappPhoneField.vue')['default']
   }
 }
