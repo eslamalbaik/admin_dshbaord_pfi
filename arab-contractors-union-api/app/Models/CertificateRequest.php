@@ -4,18 +4,22 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 
 class CertificateRequest extends Model
 {
     protected $fillable = [
         'contractor_id', 'type', 'status', 'notes', 'attachment',
         'reject_reason', 'certificate_path', 'issued_at', 'reviewed_by', 'reviewed_at',
-        'pending_payment_id',
+        'pending_payment_id', 'viewed_at', 'last_viewed_at', 'views_count',
     ];
 
     protected $casts = [
-        'issued_at'   => 'datetime',
-        'reviewed_at' => 'datetime',
+        'issued_at'      => 'datetime',
+        'reviewed_at'    => 'datetime',
+        'viewed_at'      => 'datetime',
+        'last_viewed_at' => 'datetime',
+        'views_count'    => 'integer',
     ];
 
     public function contractor()
@@ -56,6 +60,22 @@ class CertificateRequest extends Model
         return $this->certificate_path
             ? Storage::disk('public')->url($this->certificate_path)
             : null;
+    }
+
+    /**
+     * رابط الشهادة اللي بيستلمه المقاول (التطبيق والبريد): رابط موقَّع بيمرّ على السيرفر
+     * فبينسجّل فتحه (viewed_at)، بعكس certificate_url المباشر اللي بتستخدمه اللوحة —
+     * فتح الأدمن للشهادة ما بينحسب على المقاول.
+     */
+    public function getTrackedCertificateUrlAttribute(): ?string
+    {
+        if (! $this->certificate_path) {
+            return null;
+        }
+
+        // توقيع نسبي (مسار + query بس): رابط مطلق بيتكسر توقيعه لو اختلف المخطط/المضيف
+        // بين APP_URL والطلب الواصل من خلف nginx.
+        return url(URL::signedRoute('certificates.file', ['certificateRequest' => $this->id], absolute: false));
     }
 
     public function getTypeLabelAttribute(): string

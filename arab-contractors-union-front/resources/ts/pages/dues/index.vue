@@ -205,6 +205,18 @@ const todayIso = new Date().toISOString().slice(0, 10)
 const isPositiveAmount = (v: unknown) => v !== '' && v !== null && Number(v) > 0
 const positiveAmountRule = (v: unknown) => isPositiveAmount(v) || 'المبلغ لازم يكون أكبر من صفر'
 
+// قيمة الخصم موجبة دائماً، والنسبة ما بتتعدّى 100%. حقل type=number بيقبل "-" من الكيبورد
+// وأسهم السبنر بتنزل تحت الصفر، فبنمنع الحرف ونقلب أي قيمة سالبة ملصوقة لموجبة.
+const isValidDiscount = (type: string, v: unknown) =>
+  isPositiveAmount(v) && (type !== 'percent' || Number(v) <= 100)
+const discountRules = (type: string) => [
+  (v: unknown) => isValidDiscount(type, v) || (type === 'percent' ? 'النسبة بين 0.01 و100' : 'المبلغ لازم يكون أكبر من صفر'),
+]
+function blockNegativeKey(e: KeyboardEvent) {
+  if (['-', '+', 'e', 'E'].includes(e.key))
+    e.preventDefault()
+}
+
 // السنة تُعبّأ تلقائياً من تاريخ الاستحقاق وبتلحقه طول ما المستخدم ما كتبها بنفسه. حقل التاريخ
 // بيبعت قيم ناقصة وقت كتابة السنة حرف حرف (0002-10-06 ثم 0020-...)، فكانت أول قيمة (2) تنحفظ
 // وتضل، والحفظ يرفض "السنة بين 1990 و2100". فبنتجاهل أي سنة مش منطقية.
@@ -630,6 +642,14 @@ const criteriaForm = ref({
   discount_reason: '',
 })
 const criteriaPreview = ref<any>(null)
+
+// أي قيمة خصم سالبة (لصق، أسهم) بتنقلب لموجبة بكل نماذج الخصم الثلاثة
+for (const form of [calcForm, selectedDiscountForm, criteriaForm] as const) {
+  watch(() => form.value.discount_value, v => {
+    if (v !== '' && Number(v) < 0)
+      form.value.discount_value = String(Math.abs(Number(v)))
+  })
+}
 
 // بحث المقاولين لمود المعايير — منفصل عن قائمة نموذج الذمة حتى لا يبتلع أحدهما اختيار الآخر
 const criteriaContractorSearch = ref('')
@@ -1363,7 +1383,11 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
                 v-model="calcForm.discount_value"
                 :label="calcForm.discount_type === 'percent' ? 'نسبة الخصم %' : 'مبلغ الخصم (د.أ)'"
                 type="number"
+                min="0"
+                :max="calcForm.discount_type === 'percent' ? 100 : undefined"
+                :rules="discountRules(calcForm.discount_type)"
                 dir="ltr"
+                @keydown="blockNegativeKey"
               />
             </VCol>
             <VCol v-if="calcForm.discount_type" cols="12">
@@ -1375,6 +1399,7 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
             class="mt-2"
             variant="tonal"
             color="primary"
+            :disabled="!!calcForm.discount_type && !isValidDiscount(calcForm.discount_type, calcForm.discount_value)"
             :loading="previewFeeMutation.isPending.value"
             @click="previewFeeMutation.mutate()"
           >
@@ -1431,6 +1456,7 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
           <VBtn variant="tonal" color="secondary" @click="calcDialog = false">إلغاء</VBtn>
           <VBtn
             v-if="calcPreview && !calcPreview.unresolvable"
+            :disabled="!!calcForm.discount_type && !isValidDiscount(calcForm.discount_type, calcForm.discount_value)"
             color="success"
             :loading="generateFeeMutation.isPending.value"
             @click="generateFeeMutation.mutate(false)"
@@ -1439,6 +1465,7 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
           </VBtn>
           <VBtn
             v-if="calcPreview && !calcPreview.unresolvable"
+            :disabled="!!calcForm.discount_type && !isValidDiscount(calcForm.discount_type, calcForm.discount_value)"
             variant="tonal"
             color="warning"
             :loading="generateFeeMutation.isPending.value"
@@ -1518,7 +1545,11 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
                 v-model="selectedDiscountForm.discount_value"
                 :label="selectedDiscountForm.discount_type === 'percent' ? 'نسبة الخصم %' : 'مبلغ الخصم (د.أ)'"
                 type="number"
+                min="0"
+                :max="selectedDiscountForm.discount_type === 'percent' ? 100 : undefined"
+                :rules="discountRules(selectedDiscountForm.discount_type)"
                 dir="ltr"
+                @keydown="blockNegativeKey"
               />
             </VCol>
             <VCol cols="12">
@@ -1545,7 +1576,7 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
           <VBtn
             variant="tonal"
             color="info"
-            :disabled="!selectedDiscountForm.discount_value"
+            :disabled="!isValidDiscount(selectedDiscountForm.discount_type, selectedDiscountForm.discount_value)"
             :loading="applySelectedDiscountMutation.isPending.value"
             @click="applySelectedDiscountMutation.mutate(true)"
           >
@@ -1553,7 +1584,7 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
           </VBtn>
           <VBtn
             color="success"
-            :disabled="!selectedDiscountForm.discount_value"
+            :disabled="!isValidDiscount(selectedDiscountForm.discount_type, selectedDiscountForm.discount_value)"
             :loading="applySelectedDiscountMutation.isPending.value"
             @click="applySelectedDiscountMutation.mutate(false)"
           >
@@ -1654,7 +1685,11 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
                 v-model="criteriaForm.discount_value"
                 :label="criteriaForm.discount_type === 'percent' ? 'نسبة الخصم %' : 'مبلغ الخصم (د.أ)'"
                 type="number"
+                min="0"
+                :max="criteriaForm.discount_type === 'percent' ? 100 : undefined"
+                :rules="discountRules(criteriaForm.discount_type)"
                 dir="ltr"
+                @keydown="blockNegativeKey"
               />
             </VCol>
             <VCol cols="12">
@@ -1709,7 +1744,7 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
           <VBtn
             variant="tonal"
             color="info"
-            :disabled="!criteriaForm.discount_value || !criteriaHasAnyFilter"
+            :disabled="!isValidDiscount(criteriaForm.discount_type, criteriaForm.discount_value) || !criteriaHasAnyFilter"
             :loading="criteriaDiscountMutation.isPending.value"
             @click="criteriaDiscountMutation.mutate(true)"
           >
@@ -1719,7 +1754,7 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
                المقاولين بنداء واحد، فلا يصحّ أن يمرّ بلا رقم يراه المستخدم أولاً. -->
           <VBtn
             color="error"
-            :disabled="!criteriaForm.discount_value || !criteriaHasAnyFilter || !criteriaPreview"
+            :disabled="!isValidDiscount(criteriaForm.discount_type, criteriaForm.discount_value) || !criteriaHasAnyFilter || !criteriaPreview"
             :loading="criteriaDiscountMutation.isPending.value"
             @click="criteriaDiscountMutation.mutate(false)"
           >

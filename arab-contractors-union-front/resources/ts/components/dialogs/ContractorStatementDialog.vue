@@ -41,7 +41,9 @@ interface StatementEntry {
 interface Summary {
   total_dues_jod: number
   total_penalties_jod: number
+  total_obligations_jod?: number
   total_paid_jod: number
+  other_payments_jod?: number
   pending_payments_jod: number
   credit_jod: number
   amount_due_jod: number
@@ -111,9 +113,16 @@ const tiles = computed(() => {
   if (!s)
     return []
 
+  // "المدفوع" = اللي انحسب له على الذمم والغرامات بس، فـ"الذمم − المدفوع" = المتبقي.
+  // رسوم العضوية/باقات المعدات بتطلع كملاحظة تحت الرقم، مش جوّاه.
+  const hints = [
+    s.other_payments_jod ? `+ ${money(s.other_payments_jod)} رسوم عضوية/أخرى` : null,
+    s.pending_payments_jod > 0 ? `+ ${money(s.pending_payments_jod)} قيد المراجعة` : null,
+  ].filter(Boolean).join(' · ')
+
   return [
-    { title: 'إجمالي الذمم والغرامات', value: s.total_dues_jod + s.total_penalties_jod, icon: 'tabler-file-invoice', color: 'primary' },
-    { title: 'إجمالي المدفوع', value: s.total_paid_jod, icon: 'tabler-cash', color: 'success', hint: s.pending_payments_jod > 0 ? `+ ${money(s.pending_payments_jod)} قيد المراجعة` : null },
+    { title: 'إجمالي الذمم والغرامات', value: s.total_obligations_jod ?? s.total_dues_jod + s.total_penalties_jod, icon: 'tabler-file-invoice', color: 'primary' },
+    { title: 'إجمالي المدفوع', value: s.total_paid_jod, icon: 'tabler-cash', color: 'success', hint: hints || null },
     { title: 'الرصيد الدائن', value: s.credit_jod, icon: 'tabler-wallet', color: 'info' },
     { title: 'المتبقي المطلوب', value: s.amount_due_jod, icon: 'tabler-receipt-2', color: s.amount_due_jod > 0 ? 'error' : 'success' },
   ]
@@ -527,6 +536,18 @@ function exportCsv() {
   font-weight: 600 !important;
   white-space: nowrap;
   background: rgba(var(--v-theme-on-surface), 0.04) !important;
+}
+
+/* خطوط شبكية: فاصل عمودي بين الأعمدة وأفقي بين الصفوف */
+.statement-table :deep(th),
+.statement-table :deep(td) {
+  border-block-end: thin solid rgba(var(--v-border-color), var(--v-border-opacity)) !important;
+  border-inline-end: thin solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+
+.statement-table :deep(th:last-child),
+.statement-table :deep(td:last-child) {
+  border-inline-end: none;
 }
 
 .statement-table :deep(tbody tr:hover) {

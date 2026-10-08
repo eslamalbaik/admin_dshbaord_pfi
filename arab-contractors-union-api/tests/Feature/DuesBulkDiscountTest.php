@@ -213,4 +213,23 @@ class DuesBulkDiscountTest extends TestCase
         $this->assertSame('100.00', $blocked->fresh()->amount_jod, 'الذمة المرفوضة تبقى بمبلغها الأصلي');
         $this->assertNull($blocked->fresh()->discount_type, 'ولا يُسجَّل عليها أي خصم');
     }
+
+    public function test_negative_or_over_100_percent_discount_is_rejected(): void
+    {
+        $this->actingAsAdmin();
+
+        $contractor = $this->contractor('929_g');
+        $due = $this->due($contractor, 100);
+
+        foreach ([-110, 110] as $value) {
+            $this->postJson('/api/v1/dashboard/dues/discount/bulk', [
+                'mode'           => 'ids',
+                'ids'            => [$due->id],
+                'discount_type'  => 'percent',
+                'discount_value' => $value,
+            ])->assertStatus(422)->assertJsonValidationErrors('discount_value');
+        }
+
+        $this->assertSame('100.00', $due->fresh()->amount_jod);
+    }
 }

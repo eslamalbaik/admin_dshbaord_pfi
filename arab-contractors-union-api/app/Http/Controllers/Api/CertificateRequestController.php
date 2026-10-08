@@ -103,7 +103,7 @@ class CertificateRequestController extends Controller
             ],
             'classification' => [
                 'has_certificate' => (bool) $latestClassificationCert?->certificate_path,
-                'certificate_url' => $latestClassificationCert?->certificate_url,
+                'certificate_url' => $latestClassificationCert?->tracked_certificate_url,
                 'latest_request'  => $latestClassificationCert ? new CertificateRequestResource($latestClassificationCert) : null,
                 'message'         => $latestClassificationCert?->certificate_path
                     ? null
@@ -199,8 +199,84 @@ class CertificateRequestController extends Controller
         $data['requirement_issues'] = $certificateRequest->contractor
             ? $this->eligibilityService->getIssues($certificateRequest->contractor)
             : [];
+        $data['delivery'] = $this->deliveryStatus($certificateRequest);
 
         return $this->success($data);
+    }
+
+    /**
+     * وصلت الشهادة للمقاول؟ وفتحها؟ — لنافذة عرض الشهادة باللوحة.
+     *
+     * - notified_at: إشعار "شهادتك جاهزة" انكتب بصندوق إشعارات المقاول بالتطبيق (الإشعار
+     *   بيمرّ على الطابور، فبيضل null لثواني بعد الإصدار).
+     * - notification_read_at: المقاول فتح الإشعار.
+     * - has_device: عنده توكن FCM، يعني انبعت push لجواله. بدونه الإشعار بالتطبيق بس.
+     * - viewed_at / views_count: فتح ملف الشهادة نفسه من الرابط المتتبَّع.
+     */
+    private function deliveryStatus(CertificateRequest $certificateRequest): ?array
+    {
+        if ($certificateRequest->status !== 'issued' || ! $certificateRequest->contractor) {
+            return null;
+        }
+
+        $notification = $certificateRequest->contractor->notifications()
+            ->where('type', CertificateRequestStatusNotification::class)
+            ->where('data->request_id', $certificateRequest->id)
+            ->where('data->status', 'issued')
+            ->when($certificateRequest->issued_at, fn ($q, $at) => $q->where('created_at', '>=', $at->copy()->subMinute()))
+            ->latest()
+            ->first();
+
+        return [
+            'notified_at'          => $notification?->created_at,
+            'notification_read_at' => $notification?->read_at,
+            'has_device'           => filled($certificateRequest->contractor->fcm_token),
+            'viewed_at'            => $certificateRequest->viewed_at,
+            'last_viewed_at'       => $certificateRequest->last_viewed_at,
+            'views_count'          => (int) $certificateRequest->views_count,
+        ];
+    }
+
+    /** نفس CertificateRequestResource + حالة الوصول — ردود الإصدار بتفتح نافذة العرض مباشرة */
+    private function issuedPayload(CertificateRequest $certificateRequest): array
+    {
+        $fresh = $certificateRequest->fresh(['contractor', 'reviewedBy:id,name', 'pendingPayment']);
+        $data  = (new CertificateRequestResource($fresh))->resolve();
+        $data['delivery'] = $this->deliveryStatus($fresh);
+
+        return $data;
+    }
+
+    /**
+     * GET /api/v1/certificates/{certificateRequest}/certificate.pdf (رابط موقَّع)
+     *
+     * الرابط اللي بيستلمه المقاول بالتطبيق والبريد — كل فتح بيتسجّل، فاللوحة بتعرف إذا
+     * المقاول فتح شهادته.
+     */
+    public function file(Request $request, CertificateRequest $certificateRequest)
+    {
+        if (! $request->hasValidRelativeSignature()) {
+            abort(403, 'رابط الشهادة غير صالح.');
+        }
+
+        $path = $certificateRequest->certificate_path;
+        if ($certificateRequest->status !== 'issued' || ! $path || ! Storage::disk('public')->exists($path)) {
+            abort(404, 'الشهادة غير متاحة.');
+        }
+
+        // تحديث مباشر بدون updated_at — الفتح مش تعديل على الطلب
+        CertificateRequest::whereKey($certificateRequest->id)->update([
+            'viewed_at'      => $certificateRequest->viewed_at ?? now(),
+            'last_viewed_at' => now(),
+            'views_count'    => \Illuminate\Support\Facades\DB::raw('views_count + 1'),
+        ]);
+
+        $serial = 'MC-' . str_pad((string) $certificateRequest->id, 6, '0', STR_PAD_LEFT);
+
+        return Storage::disk('public')->response($path, "{$serial}.pdf", [
+            'Content-Type'  => 'application/pdf',
+            'Cache-Control' => 'no-store',
+        ]);
     }
 
     /**
@@ -260,21 +336,38 @@ class CertificateRequestController extends Controller
         return $this->success(new CertificateRequestResource($certificateRequest->fresh()), 'تم رفض الطلب.');
     }
 
-    /** POST /api/v1/dashboard/certificate-requests/{certificateRequest}/issue */
+    /**
+     * POST /api/v1/dashboard/certificate-requests/{certificateRequest}/issue
+     *
+     * بدون ملف: شهادة العضوية بتتولّد تلقائياً (نفس قالب "إصدار مباشر") من بيانات ملف
+     * المقاول — ما في داعي يرفع الأدمن PDF. الأنواع التانية ما إلها قالب، فبدها ملف.
+     * مع ملف: بيتخزّن كما هو (للأنواع التانية، أو لاستبدال المولَّد بنسخة يدوية).
+     */
     public function issue(IssueCertificateRequestRequest $request, CertificateRequest $certificateRequest)
     {
         if ($blocked = $this->blockedByUnconfirmedPayment($certificateRequest)) {
             return $blocked;
         }
 
-        $oldPath     = $certificateRequest->certificate_path;
-        $oldIssuedAt = $certificateRequest->issued_at;
-
-        if ($oldPath) {
-            Storage::disk('public')->delete($oldPath);
+        if (! $request->hasFile('certificate') && $certificateRequest->type !== 'membership') {
+            return $this->error(
+                'الإصدار التلقائي متاح لشهادة العضوية فقط — ارفع ملف PDF للشهادة.',
+                422,
+                ['certificate' => ['ملف الشهادة مطلوب لهذا النوع.']],
+            );
         }
 
-        $path = $request->file('certificate')->store('certificates/membership', 'public');
+        $oldPath     = $certificateRequest->certificate_path;
+        $oldIssuedAt = $certificateRequest->issued_at;
+        $generated   = ! $request->hasFile('certificate');
+
+        $path = $generated
+            ? $this->pdfService->generate($certificateRequest)
+            : $request->file('certificate')->store('certificates/membership', 'public');
+
+        if ($oldPath && $oldPath !== $path) {
+            Storage::disk('public')->delete($oldPath);
+        }
 
         $certificateRequest->update([
             'status'           => 'issued',
@@ -282,6 +375,10 @@ class CertificateRequestController extends Controller
             'issued_at'        => now(),
             'reviewed_by'      => Auth::id(),
             'reviewed_at'      => now(),
+            // ملف جديد وإشعار جديد — "فتحها المقاول" بيرجع يتحسب من الصفر
+            'viewed_at'        => null,
+            'last_viewed_at'   => null,
+            'views_count'      => 0,
         ]);
 
         $certificateRequest->contractor?->notify(
@@ -300,10 +397,16 @@ class CertificateRequestController extends Controller
                 context: $this->certificateLogContext($certificateRequest),
             );
         } else {
-            AuditLogService::record(Auth::user(), 'certificate.issued', $certificateRequest, ['contractor_id' => $certificateRequest->contractor_id]);
+            AuditLogService::record(Auth::user(), 'certificate.issued', $certificateRequest, [
+                'contractor_id' => $certificateRequest->contractor_id,
+                'generated'     => $generated,
+            ]);
         }
 
-        return $this->success(new CertificateRequestResource($certificateRequest->fresh()), 'تم إصدار الشهادة بنجاح.');
+        return $this->success(
+            $this->issuedPayload($certificateRequest),
+            $generated ? 'تم توليد الشهادة وإرسالها للمقاول.' : 'تم إصدار الشهادة بنجاح.',
+        );
     }
 
     /** DELETE /api/v1/dashboard/certificate-requests/{certificateRequest} */
@@ -388,7 +491,7 @@ class CertificateRequestController extends Controller
             context: $this->certificateLogContext($certificateRequest),
         );
 
-        return $this->success(new CertificateRequestResource($certificateRequest->fresh()), 'تمت إعادة إصدار الشهادة بنجاح.');
+        return $this->success($this->issuedPayload($certificateRequest), 'تمت إعادة إصدار الشهادة بنجاح.');
     }
 
     /** POST /api/v1/dashboard/certificate-requests/issue-membership */
@@ -448,7 +551,7 @@ class CertificateRequestController extends Controller
         }
 
         return $this->success(
-            new CertificateRequestResource($certRequest->fresh()),
+            $this->issuedPayload($certRequest),
             'تم إصدار شهادة العضوية بنجاح.',
             201,
         );

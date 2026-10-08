@@ -314,4 +314,67 @@ class CertificateRequestTest extends TestCase
             'contractor_id' => $contractor->id,
         ])->assertStatus(401);
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    //  issue — إصدار تلقائي بدون رفع ملف + تتبّع وصول/فتح الشهادة
+    // ─────────────────────────────────────────────────────────────────────
+
+    public function test_issue_membership_request_without_file_generates_the_certificate(): void
+    {
+        $contractor = $this->createCompliantContractor();
+        $certRequest = $contractor->certificateRequests()->create(['type' => 'membership', 'status' => 'approved']);
+        $this->actingAsAdmin();
+
+        $this->postJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}/issue")
+            ->assertOk()
+            ->assertJsonPath('items.status', 'issued')
+            ->assertJsonStructure(['items' => ['delivery' => ['notified_at', 'notification_read_at', 'has_device', 'viewed_at', 'views_count']]]);
+
+        $certRequest->refresh();
+        $this->assertSame('issued', $certRequest->status);
+        Storage::disk('public')->assertExists($certRequest->certificate_path);
+        // الإشعار وصل لصندوق المقاول (الطابور sync بالاختبار)
+        $this->assertNotNull(
+            $this->getJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}")->json('items.delivery.notified_at')
+        );
+    }
+
+    public function test_issue_other_types_without_file_is_refused(): void
+    {
+        $contractor = $this->createCompliantContractor();
+        $certRequest = $contractor->certificateRequests()->create(['type' => 'classification', 'status' => 'approved']);
+        $this->actingAsAdmin();
+
+        $this->postJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}/issue")->assertStatus(422);
+        $this->assertSame('approved', $certRequest->fresh()->status);
+    }
+
+    public function test_contractor_gets_a_tracked_link_and_opening_it_is_recorded(): void
+    {
+        $contractor = $this->createCompliantContractor();
+        $certRequest = $contractor->certificateRequests()->create(['type' => 'membership', 'status' => 'approved']);
+        $this->actingAsAdmin();
+        $this->postJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}/issue")->assertOk();
+
+        Sanctum::actingAs($contractor, ['*']);
+        $url = collect($this->getJson('/api/v1/contractor/certificate-requests')->json('items.requests'))
+            ->firstWhere('id', $certRequest->id)['certificate_url'];
+        $this->assertStringContainsString('signature=', $url);
+        $this->assertNull($certRequest->fresh()->viewed_at);
+
+        $this->get($url)->assertOk()->assertHeader('Content-Type', 'application/pdf');
+        $this->get($url)->assertOk();
+
+        $certRequest->refresh();
+        $this->assertNotNull($certRequest->viewed_at);
+        $this->assertSame(2, $certRequest->views_count);
+
+        // رابط بدون توقيع صالح ما بيفتح وما بيتسجّل
+        $this->get("/api/v1/certificates/{$certRequest->id}/certificate.pdf")->assertStatus(403);
+        $this->assertSame(2, $certRequest->fresh()->views_count);
+
+        $this->actingAsAdmin();
+        $this->getJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}")
+            ->assertJsonPath('items.delivery.views_count', 2);
+    }
 }

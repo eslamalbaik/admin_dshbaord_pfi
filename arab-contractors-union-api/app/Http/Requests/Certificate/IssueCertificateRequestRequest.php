@@ -14,7 +14,8 @@ class IssueCertificateRequestRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'certificate' => 'required|file|mimes:pdf|max:10240', // 10 MB
+            // اختياري: بدونه شهادة العضوية بتتولّد تلقائياً (CertificateRequestController::issue)
+            'certificate' => 'nullable|file|mimes:pdf|max:10240', // 10 MB
             'reason'      => 'nullable|string|max:500', // سبب التعديل — سجل المحددات الهامة
         ];
     }

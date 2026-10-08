@@ -228,6 +228,9 @@ Route::prefix('v1')->group(function () {
     //  Certificate Verification (QR) — Public (no auth)
     // --------------------------------------------------------
     Route::get('certificates/verify/{token}', [\App\Http\Controllers\Api\CertificateRequestController::class, 'verify']);
+    // ملف الشهادة للمقاول برابط موقَّع — بيسجّل فتحه (اللوحة بتعرض "فتحها المقاول")
+    Route::get('certificates/{certificateRequest}/certificate.pdf', [\App\Http\Controllers\Api\CertificateRequestController::class, 'file'])
+        ->name('certificates.file');
 
     // --------------------------------------------------------
     //  Landing Home — Public (كل بيانات الصفحة الرئيسية في نداء واحد)

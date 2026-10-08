@@ -24,6 +24,7 @@ declare module 'vue' {
     CardStatisticsHorizontal: typeof import('./resources/ts/@core/components/cards/CardStatisticsHorizontal.vue')['default']
     CardStatisticsVertical: typeof import('./resources/ts/@core/components/cards/CardStatisticsVertical.vue')['default']
     CardStatisticsVerticalSimple: typeof import('./resources/ts/@core/components/CardStatisticsVerticalSimple.vue')['default']
+    CertificatePreviewDialog: typeof import('./resources/ts/components/dialogs/CertificatePreviewDialog.vue')['default']
     ConfirmDialog: typeof import('./resources/ts/components/dialogs/ConfirmDialog.vue')['default']
     ContractorStatementDialog: typeof import('./resources/ts/components/dialogs/ContractorStatementDialog.vue')['default']
     CustomCheckboxes: typeof import('./resources/ts/@core/components/app-form-elements/CustomCheckboxes.vue')['default']

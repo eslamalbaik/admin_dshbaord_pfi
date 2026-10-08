@@ -30,7 +30,8 @@ class ApplyDiscountBulkRequest extends FormRequest
             'criteria.contractor_ids' => 'nullable|array|max:200',
             'criteria.contractor_ids.*' => 'integer|exists:contractors,id',
             'discount_type'           => 'required|in:percent,fixed',
-            'discount_value'          => 'required|numeric|min:0.01',
+            // نسبة الخصم بين 0.01 و100 — لا سالب ولا أكثر من 100%
+            'discount_value'          => ['required', 'numeric', 'min:0.01', \Illuminate\Validation\Rule::when($this->input('discount_type') === 'percent', 'max:100')],
             'discount_reason'         => 'nullable|string|max:255',
             'dry_run'                 => 'boolean',
         ];

@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import api from '@/plugins/axios'
+import CertificatePreviewDialog from '@/components/dialogs/CertificatePreviewDialog.vue'
 
 definePage({ meta: { requiresAdmin: true } })
 
@@ -43,6 +44,14 @@ const { data: contractorsData, isLoading: loadingContractors } = useQuery({
 
 const contractors = computed(() => contractorsData.value?.items ?? contractorsData.value?.data ?? [])
 const contractorsLastPage = computed(() => contractorsData.value?.meta?.last_page ?? contractorsData.value?.last_page ?? 1)
+
+// ─── نافذة عرض الشهادة + حالة وصولها للمقاول (بدل فتح الرابط بتبويب جديد) ───
+const previewOpen = ref(false)
+const previewId = ref<number | null>(null)
+function openPreview(id: number) {
+  previewId.value = id
+  previewOpen.value = true
+}
 
 // ─── إصدار شهادة ───
 const isIssueOpen = ref(false)
@@ -91,9 +100,10 @@ const issueMutation = useMutation({
   onSuccess: (data: any) => {
     queryClient.invalidateQueries({ queryKey: ['issued-certificates'] })
 
-    const certificateUrl = data?.items?.certificate_url
-    if (certificateUrl)
-      window.open(certificateUrl, '_blank')
+    if (data?.items?.id) {
+      isIssueOpen.value = false
+      openPreview(data.items.id)
+    }
   },
   onError: (e: any) => {
     console.error('Issue error:', e, e.response?.data);
@@ -215,9 +225,9 @@ const regenerateMutation = useMutation({
   onSuccess: (data: any) => {
     queryClient.invalidateQueries({ queryKey: ['issued-certificates'] })
 
-    const url = data?.items?.certificate_url
-    if (url)
-      window.open(`${url}?t=${Date.now()}`, '_blank')
+    queryClient.invalidateQueries({ queryKey: ['certificate-request'] })
+    if (data?.items?.id)
+      openPreview(data.items.id)
   },
   onError: (e: any) => {
     regenerateError.value = e?.response?.data?.message ?? 'تعذّرت إعادة إصدار الشهادة.'
@@ -495,16 +505,26 @@ const contractorStatusLabel: Record<string, string> = {
               <td class="text-body-2">{{ fmtDate(r.request_date) }}</td>
               <td class="text-body-2">{{ fmtDate(r.issue_date) }}</td>
               <td class="text-center">
-                <VTooltip v-if="r.certificate_url" text="تحميل الشهادة PDF" location="top">
+                <VTooltip v-if="r.certificate_url" text="عرض الشهادة وحالة وصولها" location="top">
                   <template #activator="{ props }">
                     <VBtn
                       v-bind="props"
-                      icon="tabler-download"
+                      icon="tabler-eye"
                       size="x-small"
                       variant="text"
                       color="success"
-                      :href="r.certificate_url"
-                      target="_blank"
+                      @click="openPreview(r.id)"
+                    />
+                  </template>
+                </VTooltip>
+                <VTooltip v-if="r.certificate_url" :text="r.viewed_at ? 'فتحها المقاول' : 'لم يفتحها المقاول بعد'" location="top">
+                  <template #activator="{ props }">
+                    <VIcon
+                      v-bind="props"
+                      :icon="r.viewed_at ? 'tabler-checks' : 'tabler-check'"
+                      :color="r.viewed_at ? 'info' : 'secondary'"
+                      size="18"
+                      class="mx-1"
                     />
                   </template>
                 </VTooltip>
@@ -701,5 +721,10 @@ const contractorStatusLabel: Record<string, string> = {
         </VCardActions>
       </VCard>
     </VDialog>
+
+    <CertificatePreviewDialog
+      v-model="previewOpen"
+      :request-id="previewId"
+    />
   </div>
 </template>

@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import api from '@/plugins/axios'
 import { firstFile, type SingleFileModel } from '@/utils/files'
+import CertificatePreviewDialog from '@/components/dialogs/CertificatePreviewDialog.vue'
 
 definePage({ meta: { requiresAdmin: true } })
 
@@ -56,7 +57,16 @@ const isViewOpen = ref(false)
 const selected = ref<any>(null)
 const rejectReason = ref('')
 const certificateFile = ref<SingleFileModel>(null)
+const manualUpload = ref(false)
 const actionError = ref('')
+
+// نافذة عرض الشهادة + حالة وصولها للمقاول (بدل فتح الرابط بتبويب جديد)
+const previewOpen = ref(false)
+const previewId = ref<number | null>(null)
+function openPreview(id: number) {
+  previewId.value = id
+  previewOpen.value = true
+}
 
 const detailQueryEnabled = computed(() => isViewOpen.value && !!selected.value?.id)
 const { data: detailData } = useQuery({
@@ -72,6 +82,7 @@ const openRequest = (r: any) => {
   selected.value = r
   rejectReason.value = ''
   certificateFile.value = null
+  manualUpload.value = false
   actionError.value = ''
   isViewOpen.value = true
 }
@@ -109,14 +120,20 @@ const rejectMutation = useMutation({
   onError: (e: any) => actionError.value = e?.response?.data?.message || 'فشل تنفيذ الإجراء.',
 })
 
+// شهادة العضوية بتتولّد تلقائياً من بيانات المقاول (بدون رفع ملف)؛ الأنواع التانية
+// ما إلها قالب، فبدها ملف PDF. رفع ملف يدوي للعضوية متاح كخيار بديل.
+const canAutoIssue = computed(() => detail.value?.type === 'membership')
+const needsFile = computed(() => !canAutoIssue.value || manualUpload.value)
+
 const issueMutation = useMutation({
   mutationFn: async () => {
-    const file = firstFile(certificateFile.value)
-    if (!file)
-      throw new Error('لم يتم اختيار ملف الشهادة.')
-
     const fd = new FormData()
-    fd.append('certificate', file)
+    if (needsFile.value) {
+      const file = firstFile(certificateFile.value)
+      if (!file)
+        throw new Error('لم يتم اختيار ملف الشهادة.')
+      fd.append('certificate', file)
+    }
 
     return (await api.post(`/api/v1/dashboard/certificate-requests/${selected.value.id}/issue`, fd)).data
   },
@@ -124,6 +141,9 @@ const issueMutation = useMutation({
     refresh()
     selected.value = d?.items ?? selected.value
     certificateFile.value = null
+    manualUpload.value = false
+    if (d?.items?.id)
+      openPreview(d.items.id)
   },
   onError: (e: any) => actionError.value = e?.response?.data?.message || 'فشل إصدار الشهادة.',
 })
@@ -312,12 +332,11 @@ function fmtDate(d: string | null) {
             v-if="detail.certificate_url"
             color="success"
             variant="tonal"
-            prepend-icon="tabler-download"
-            :href="detail.certificate_url"
-            target="_blank"
+            prepend-icon="tabler-eye"
             class="mb-4"
+            @click="openPreview(detail.id)"
           >
-            تحميل الشهادة الصادرة
+            عرض الشهادة وحالة وصولها
           </VBtn>
 
           <VAlert
@@ -374,23 +393,42 @@ function fmtDate(d: string | null) {
 
           <template v-if="detail.status === 'pending' || detail.status === 'approved'">
             <VDivider class="my-4" />
-            <p class="text-body-2 font-weight-medium mb-2">إصدار الشهادة (ملف PDF):</p>
+            <p class="text-body-2 font-weight-medium mb-2">
+              إصدار الشهادة<template v-if="!canAutoIssue"> (ملف PDF)</template>:
+            </p>
+            <p
+              v-if="canAutoIssue && !manualUpload"
+              class="text-body-2 text-medium-emphasis mb-3"
+            >
+              بتتولّد الشهادة تلقائياً من بيانات ملف المقاول وبتوصله إشعار بالتطبيق — بدون رفع ملف.
+            </p>
             <VFileInput
+              v-if="needsFile"
               v-model="certificateFile"
               label="ملف الشهادة"
               accept="application/pdf"
               density="compact"
               prepend-icon="tabler-file-type-pdf"
             />
-            <VBtn v-if="$can('services.certificate_requests', 'update')"
-              color="success"
-              prepend-icon="tabler-certificate"
-              :disabled="!firstFile(certificateFile) || detail.awaiting_payment_confirmation"
-              :loading="issueMutation.isPending.value"
-              @click="issueMutation.mutate()"
-            >
-              إصدار الشهادة
-            </VBtn>
+            <div class="d-flex flex-wrap align-center gap-3">
+              <VBtn v-if="$can('services.certificate_requests', 'update')"
+                color="success"
+                :prepend-icon="needsFile ? 'tabler-certificate' : 'tabler-wand'"
+                :disabled="(needsFile && !firstFile(certificateFile)) || detail.awaiting_payment_confirmation"
+                :loading="issueMutation.isPending.value"
+                @click="issueMutation.mutate()"
+              >
+                {{ needsFile ? 'إصدار الشهادة' : 'إصدار الشهادة تلقائياً' }}
+              </VBtn>
+              <VBtn
+                v-if="canAutoIssue && $can('services.certificate_requests', 'update')"
+                variant="text"
+                size="small"
+                @click="manualUpload = !manualUpload; certificateFile = null"
+              >
+                {{ manualUpload ? 'رجوع للإصدار التلقائي' : 'أو ارفع ملف PDF يدوياً' }}
+              </VBtn>
+            </div>
           </template>
         </VCardText>
 
@@ -401,5 +439,10 @@ function fmtDate(d: string | null) {
         </VCardActions>
       </VCard>
     </VDialog>
+
+    <CertificatePreviewDialog
+      v-model="previewOpen"
+      :request-id="previewId"
+    />
   </div>
 </template>

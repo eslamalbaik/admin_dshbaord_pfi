@@ -355,4 +355,29 @@ class AppPaymentTypesAndCreditTest extends TestCase
             ->assertOk()
             ->assertJsonPath('items.summary.net_jod', -50);
     }
+
+    public function test_statement_paid_total_only_counts_what_settled_dues_so_tiles_add_up(): void
+    {
+        // ذمة 100 + دفعة على الذمم 40 + اشتراك باقة معدات 500 مؤكَّد (ما بينصرف على ذمم).
+        // قبل: "المدفوع" = 540 أكبر من "الذمم" 100، والمقاول لسا عليه 60.
+        $this->addDue(100);
+        $id = $this->submit(['amount' => 40, 'type' => 'dues_payment'])->json('items.id');
+        $this->confirm($id);
+        Payment::create([
+            'contractor_id' => $this->contractor->id, 'type' => 'equipment_subscription',
+            'amount' => 500, 'amount_jod' => 500, 'currency' => 'JOD', 'status' => 'paid',
+            'payment_method' => 'bank_transfer', 'paid_at' => now(),
+        ]);
+
+        $this->admin();
+        $summary = $this->getJson("/api/v1/dashboard/balances/{$this->contractor->id}/statement")
+            ->assertOk()->json('items.summary');
+
+        $this->assertEquals(100, $summary['total_obligations_jod']);
+        $this->assertEquals(40, $summary['total_paid_jod']);
+        $this->assertEquals(500, $summary['other_payments_jod']);
+        $this->assertEquals(540, $summary['total_payments_jod']);
+        $this->assertEquals(60, $summary['amount_due_jod']);
+        $this->assertEquals($summary['total_obligations_jod'] - $summary['total_paid_jod'], -$summary['net_jod']);
+    }
 }

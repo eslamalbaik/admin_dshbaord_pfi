@@ -16,7 +16,7 @@ class GenerateFeeRequest extends FormRequest
         return [
             'year'             => 'required|integer|between:1990,2100',
             'discount_type'    => 'nullable|in:percent,fixed',
-            'discount_value'   => 'required_with:discount_type|nullable|numeric|min:0.01',
+            'discount_value'   => ['required_with:discount_type', 'nullable', 'numeric', 'min:0.01', \Illuminate\Validation\Rule::when($this->input('discount_type') === 'percent', 'max:100')],
             'discount_reason'  => 'nullable|string|max:255',
         ];
     }

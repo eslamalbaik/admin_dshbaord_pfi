@@ -15,7 +15,7 @@ class ApplyDiscountRequest extends FormRequest
     {
         return [
             'discount_type'   => 'required|in:percent,fixed',
-            'discount_value'  => 'required|numeric|min:0.01',
+            'discount_value'  => ['required', 'numeric', 'min:0.01', \Illuminate\Validation\Rule::when($this->input('discount_type') === 'percent', 'max:100')],
             'discount_reason' => 'nullable|string|max:255',
         ];
     }

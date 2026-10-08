@@ -116,6 +116,10 @@ class ContractorStatementService
             ));
         }
 
+        // مجاميع بطاقات الملخص من نفس حركات الجدول، فـ"عليه − له" = الرصيد الأخير بالظبط
+        $debited  = round(-(float) $entries->where('delta', '<', 0)->sum('delta'), 2);
+        $credited = round((float) $entries->where('delta', '>', 0)->sum('delta'), 2);
+
         // أقدم حركة أولاً لحساب الرصيد التراكمي، وبعدين الأحدث أولاً للعرض
         $balance = 0.0;
         $entries = $entries
@@ -137,21 +141,37 @@ class ContractorStatementService
                 'name'              => $contractor->name,
                 'membership_number' => $contractor->membership_number,
             ],
-            'summary'    => $this->summary($contractor, $dues, $penalties, $payments),
+            'summary'    => $this->summary($contractor, $dues, $penalties, $payments, $debited, $credited),
             'entries'    => $entries,
         ];
     }
 
-    private function summary(Contractor $contractor, Collection $dues, Collection $penalties, Collection $payments): array
+    /**
+     * total_paid_jod = كل اللي انحسب له بالجدول (دفعات على ذمم/غرامات، أرصدة دائنة،
+     * تسديدات سابقة) — مش مجموع كل الدفعات المؤكَّدة. قبل هيك كان بيجمع رسوم العضوية
+     * وباقات المعدات كمان، فيطلع "المدفوع" أكبر من "الذمم" والمقاول لسا عليه (مثلاً
+     * ذمم 55,462 ومدفوع 55,800.17 ومتبقي 262). الدفعات اللي ما انصرفت على ذمم
+     * بتطلع لحالها بـother_payments_jod.
+     */
+    private function summary(Contractor $contractor, Collection $dues, Collection $penalties, Collection $payments,
+        float $debited, float $credited): array
     {
         $row = app(ContractorBalanceController::class)->balancesQuery()->where('contractors.id', $contractor->id)->first();
 
         $net = round((float) $row->net_jod, 2);
 
+        $otherPayments = $payments
+            ->where('status', 'paid')
+            ->reject(fn ($p) => in_array($p->type, Payment::CREDIT_TYPES, true))
+            ->sum(fn ($p) => max(0, (float) ($p->amount_jod ?? $p->amount) - (float) $p->allocations->sum('amount_jod')));
+
         return [
             'total_dues_jod'          => round((float) $dues->sum('amount_jod'), 2),
             'total_penalties_jod'     => round((float) $penalties->where('status', '!=', 'rejected')->sum('amount'), 2),
-            'total_paid_jod'          => round((float) $payments->where('status', 'paid')->sum(fn ($p) => (float) ($p->amount_jod ?? $p->amount)), 2),
+            'total_obligations_jod'   => $debited,
+            'total_paid_jod'          => $credited,
+            'other_payments_jod'      => round((float) $otherPayments, 2),
+            'total_payments_jod'      => round((float) $payments->where('status', 'paid')->sum(fn ($p) => (float) ($p->amount_jod ?? $p->amount)), 2),
             'pending_payments_jod'    => round((float) $payments->where('status', 'pending')->sum('amount'), 2),
             'dues_remaining_jod'      => round((float) $row->dues_jod, 2),
             'penalties_remaining_jod' => round((float) $row->penalties_jod, 2),

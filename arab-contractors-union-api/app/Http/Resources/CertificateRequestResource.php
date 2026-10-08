@@ -9,6 +9,8 @@ class CertificateRequestResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $forContractor = $request->user() instanceof \App\Models\Contractor;
+
         return [
             'id'                => $this->id,
             'contractor_id'     => $this->contractor_id,
@@ -32,10 +34,16 @@ class CertificateRequestResource extends JsonResource
             'notes'             => $this->notes,
             'attachment_url'    => $this->attachment_url,
             'reject_reason'     => $this->reject_reason,
-            'certificate_url'   => $this->certificate_url,
+            // المقاول بياخد الرابط المتتبَّع (فتحه بيتسجّل)، واللوحة الرابط المباشر
+            'certificate_url'   => $forContractor ? $this->tracked_certificate_url : $this->certificate_url,
             'request_date'      => $this->created_at,
             'issue_date'        => $this->issued_at,
             'reviewed_by'       => $this->reviewedBy?->name,
+            $this->mergeUnless($forContractor, [
+                'viewed_at'      => $this->viewed_at,
+                'last_viewed_at' => $this->last_viewed_at,
+                'views_count'    => (int) $this->views_count,
+            ]),
         ];
     }
 }

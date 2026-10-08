@@ -76,8 +76,8 @@ class CertificateRequestStatusNotification extends Notification implements Shoul
             ->greeting("مرحبًا {$notifiable->name}")
             ->line($this->statusMessage());
 
-        if ($this->certificateRequest->status === 'issued' && $this->certificateRequest->certificate_url) {
-            $mail->action('تحميل الشهادة', $this->certificateRequest->certificate_url);
+        if ($this->certificateRequest->status === 'issued' && $this->certificateRequest->certificate_path) {
+            $mail->action('تحميل الشهادة', $this->certificateRequest->tracked_certificate_url);
         }
 
         return $mail->salutation('مع تحيات اتحاد المقاولين الفلسطينيين');
