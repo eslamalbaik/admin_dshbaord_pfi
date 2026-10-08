@@ -137,12 +137,13 @@ class DuesDiscountPenaltyCalculationTest extends TestCase
         $contractor = $this->contractor();
         $this->due($contractor, 2781.78);
 
-        $this->assertEquals(2781.78, $this->getJson('/api/v1/dashboard/dues/summary')->json('items.outstanding_total_jod'));
+        // + ذمة "جبر كسور الرصيد" 0.22 (BalanceRoundingService): المطلوب بيتجبر للأكثر 2781.78 ← 2782
+        $this->assertEquals(2782, $this->getJson('/api/v1/dashboard/dues/summary')->json('items.outstanding_total_jod'));
 
         $this->penalty($contractor, 100);
 
         $summary = $this->getJson('/api/v1/dashboard/dues/summary')->assertOk()->json('items');
-        $this->assertEquals(2881.78, $summary['outstanding_total_jod']);
+        $this->assertEquals(2882, $summary['outstanding_total_jod']);
         $this->assertSame(1, $summary['open_penalties_count']);
         $this->assertSame(1, $summary['contractors_with_dues']);
     }

@@ -134,7 +134,9 @@ class ContractorHomeController extends Controller
             ->where('due_date', '<', now()->toDateString())
             ->exists();
 
-        $lastDue = $contractor->dues()->latest('created_at')->first();
+        // قيد جبر الكسور مش فاتورة — ما يطلع كـ"آخر فاتورة" بالرئيسية
+        $lastDue = $contractor->dues()->where(fn ($q) => $q->whereNull('notes')->orWhere('notes', '!=', \App\Services\BalanceRoundingService::TAG))
+            ->latest('created_at')->first();
 
         return [
             // المتبقي المطلوب بعد خصم الرصيد والدفعات السابقة (صفر لو ما عليه شي) — كان إجمالي الذمم

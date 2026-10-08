@@ -51,18 +51,20 @@ class ContractorBalanceAdjustmentTest extends TestCase
             'mode' => 'increase', 'amount' => 25.5, 'reason' => 'تصحيح رصيد قديم',
         ])->assertOk()
             ->assertJsonPath('items.adjustment.balance_before_jod', 0)
-            ->assertJsonPath('items.adjustment.balance_after_jod', 25.5)
+            // رصيد الشركة بيتجبر للأقل لصالح الاتحاد (BalanceRoundingService): 25.5 ← 25
+            ->assertJsonPath('items.adjustment.balance_after_jod', 25)
             ->assertJsonPath('items.adjustment.created_by', 'المدير')
-            ->assertJsonPath('items.balance.net_jod', 25.5);
+            ->assertJsonPath('items.balance.net_jod', 25);
 
-        $this->assertEquals(25.5, $this->net($c));
-        $this->assertSame(1, ContractorCredit::where('contractor_id', $c->id)->count());
+        $this->assertEquals(25, $this->net($c));
+        $this->assertSame(1, ContractorCredit::where('contractor_id', $c->id)
+            ->where('description', \App\Services\ContractorBalanceAdjustmentService::DESCRIPTION)->count());
 
         $log = ActivityLog::where('action', 'balance.adjusted')->sole();
         $this->assertTrue($log->is_critical);
         $this->assertSame('تصحيح رصيد قديم', $log->meta['reason']);
         $this->assertEquals(0, $log->meta['before']['net_jod']);
-        $this->assertEquals(25.5, $log->meta['after']['net_jod']);
+        $this->assertEquals(25, $log->meta['after']['net_jod']);
     }
 
     public function test_increase_settles_open_dues_and_status_follows_balance(): void

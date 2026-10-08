@@ -11,6 +11,7 @@ use App\Models\Penalty;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -87,6 +88,62 @@ class ContractorBalanceTest extends TestCase
             $this->assertEquals($admin[$key], $mine[$key], $key);
         }
         $this->assertSame($admin['status'], $mine['subscription_status']);
+    }
+
+    /**
+     * جبر الصافي لصالح الاتحاد: رصيد الشركة للأقل، والمطلوب منها للأكثر.
+     */
+    #[DataProvider('roundingCases')]
+    public function test_net_is_rounded_in_the_unions_favour(float $credit, float $due, int $net, float $exact): void
+    {
+        $c = $this->contractor('944_g');
+        if ($credit > 0) {
+            ContractorCredit::create(['contractor_id' => $c->id, 'amount_jod' => $credit, 'used_jod' => 0, 'description' => 'رصيد']);
+        }
+        if ($due > 0) {
+            ContractorDue::create([
+                'contractor_id' => $c->id, 'description' => 'رسوم', 'year' => 2026,
+                'amount_jod' => $due, 'paid_jod' => 0, 'status' => 'unpaid',
+            ]);
+        }
+
+        Sanctum::actingAs($c, ['*']);
+
+        $items = $this->getJson('/api/v1/contractor/balance')
+            ->assertOk()
+            ->assertJsonPath('items.net_jod', $net)
+            ->json('items');
+
+        // JSON بيرجع 300 مش 300.0 لما ما في كسور، فالمقارنة بالقيمة مش بالنوع
+        $this->assertEquals($exact, $items['net_exact_jod']);
+    }
+
+    /** الجبر مخزَّن بقيد "جبر كسور الرصيد"، فالصافي الدقيق نفسه صار عدداً صحيحاً */
+    public static function roundingCases(): array
+    {
+        return [
+            'credit 300.20 → 300'   => [300.20, 0, 300, 300],
+            'credit 300.50 → 300'   => [300.50, 0, 300, 300],
+            'credit 300.99 → 300'   => [300.99, 0, 300, 300],
+            'credit 0.50 → settled' => [0.50, 0, 0, 0],
+            'owes 349.20 → 350'     => [0, 349.20, -350, -350],
+            'owes 349.01 → 350'     => [0, 349.01, -350, -350],
+            'owes 349.00 stays'     => [0, 349.00, -349, -349],
+            'credit 300.00 stays'   => [300.00, 0, 300, 300],
+        ];
+    }
+
+    public function test_balances_filter_uses_the_rounded_net(): void
+    {
+        $c = $this->contractor('945_g');
+        ContractorCredit::create(['contractor_id' => $c->id, 'amount_jod' => 0.6, 'used_jod' => 0, 'description' => 'كسور']);
+
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']), ['*']);
+
+        $this->getJson('/api/v1/dashboard/balances?search=945_g&filter=zero')
+            ->assertOk()->assertJsonCount(1, 'items');
+        $this->getJson('/api/v1/dashboard/balances?search=945_g&filter=credit')
+            ->assertOk()->assertJsonCount(0, 'items');
     }
 
     public function test_contractor_with_nothing_on_record_is_settled(): void
