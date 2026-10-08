@@ -38,6 +38,7 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
   'legal-library': 'legal.library',
   'marketplace': 'marketplace.equipment',
   'marketplace-create': 'marketplace.equipment',
+  'marketplace-id': 'marketplace.equipment',
   'marketplace-types': 'marketplace.types',
   'marketplace-packages': 'marketplace.packages',
   'documents': 'documents.manage',

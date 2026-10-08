@@ -57,10 +57,52 @@ const form = ref({
   is_featured:       false,
   needs_maintenance: false,
   admin_notes:       '',
+  publishMode:       'now' as PublishMode,
+  published_at:      '',
 })
 
-const newImages   = ref<File[]>([])
-const imageErrors = ref('')
+// ─── تاريخ النشر (REQ-08 #17) ────────────────────────────────────────────────
+// "مباشر" = تظهر بالسوق فور الحفظ، "مجدول" = ما بتظهر بالتطبيق قبل التاريخ المختار.
+// التاريخ من بكرا وطالع (تاريخ اليوم +1) — نفس قاعدة فورم الفعاليات، والخادم بيفرضها كمان.
+type PublishMode = 'now' | 'schedule'
+
+const publishModeOptions = [
+  { value: 'now', label: 'نشر مباشر', icon: 'tabler-send' },
+  { value: 'schedule', label: 'نشر مجدول', icon: 'tabler-calendar-time' },
+]
+
+// تاريخ بصيغة YYYY-MM-DD بالتوقيت المحلي (toISOString يرجّع تاريخ UTC — غلط بعد منتصف الليل)
+const localDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const tomorrowStr = () => localDateStr(new Date(Date.now() + 24 * 60 * 60 * 1000))
+
+const minDateHint = computed(() => {
+  const [y, m, d] = tomorrowStr().split('-')
+
+  return `ابتداءً من ${d}/${m}/${y} (تاريخ اليوم +1)`
+})
+
+// موعد النشر الأصلي بالتعديل — تعديل آلية مجدولة بدون تغيير موعدها ما لازم يرفضه قيد "من بكرا"
+const originalPublishedAt = ref('')
+
+const publishModeHint = computed(() => form.value.publishMode === 'schedule'
+  ? 'الآلية بتنحفظ هلق، بس ما بتظهر بسوق الآليات بالتطبيق قبل تاريخ النشر.'
+  : 'الآلية بتظهر بالسوق فور الحفظ (إذا كانت حالة الظهور "ظاهر في السوق").')
+
+// ─── الصور الجديدة: معاينة بنفس الفورم + حذف كل صورة لحالها + اختيار الغلاف (REQ-08 #14–#16، #18)
+const newImages      = ref<File[]>([])
+const imagePreviews  = ref<string[]>([])
+const coverIndex     = ref(0)
+const imageErrors    = ref('')
+const imagePicker    = ref<File[]>([])
+
+// آلية مخفية بقرار المالك أو موقوفة بقرار الإدارة ما بتنعرض بالسوق، فخيار "تظهر أولاً في السوق"
+// بيتلغى وبيتعطّل معها (REQ-08 #20) — والخادم بيفرض نفس القاعدة
+const isSuspended = computed(() => ['hidden', 'suspended'].includes(form.value.status))
+
+watch(isSuspended, suspended => {
+  if (suspended)
+    form.value.is_featured = false
+})
 
 // ─── Load reference data + edit data ─────────────────────────────────────────
 const fetchRef = async () => {
@@ -93,7 +135,10 @@ const fetchEquipment = async () => {
       is_featured:       !!data.is_featured,
       needs_maintenance: !!data.needs_maintenance,
       admin_notes:       data.admin_notes ?? '',
+      publishMode:       data.published_at && new Date(data.published_at) > new Date() ? 'schedule' : 'now',
+      published_at:      data.published_at ? localDateStr(new Date(data.published_at)) : '',
     }
+    originalPublishedAt.value = form.value.published_at
   }
   finally {
     loading.value = false
@@ -109,34 +154,100 @@ onMounted(async () => {
 const MAX_IMAGES   = 5
 const MAX_IMAGE_MB = 5
 
-const onFilesSelected = (e: Event) => {
-  const input = e.target as HTMLInputElement
-  if (!input.files) return
-  imageErrors.value = ''
-  const files = Array.from(input.files)
-  for (const f of files) {
+// حقل الاختيار مجرد "زر إضافة": كل اختيار جديد ينضاف فوق الصور المختارة قبله (بدل ما يستبدلها)،
+// وبعدها الحقل يرجع فاضي. القائمة الفعلية بـ newImages وبتنعرض كمعاينات تحت الحقل.
+const onFilesSelected = async (value: File[] | File | null) => {
+  const files = Array.isArray(value) ? value : value ? [value] : []
+  if (!files.length) return
+
+  const problems: string[] = []
+  const isDuplicate = (f: File) => newImages.value.some(g => g.name === f.name && g.size === f.size && g.lastModified === f.lastModified)
+  const accepted = files.filter(f => {
     if (f.size > MAX_IMAGE_MB * 1024 * 1024) {
-      imageErrors.value = `حجم الصورة "${f.name}" (${(f.size / 1024 / 1024).toFixed(1)} ميغابايت) يتجاوز الحد الأقصى ${MAX_IMAGE_MB} ميغابايت — فشل رفعها.`
-      return
+      problems.push(`حجم الصورة "${f.name}" (${(f.size / 1024 / 1024).toFixed(1)} ميغابايت) يتجاوز الحد الأقصى ${MAX_IMAGE_MB} ميغابايت.`)
+
+      return false
     }
-  }
-  if (files.length > MAX_IMAGES)
-    imageErrors.value = `الحد الأقصى ${MAX_IMAGES} صور — تم اختيار أول ${MAX_IMAGES} من أصل ${files.length}.`
-  newImages.value = files.slice(0, MAX_IMAGES)
+
+    return !isDuplicate(f)
+  })
+
+  const room = MAX_IMAGES - newImages.value.length
+  if (accepted.length > room)
+    problems.push(`الحد الأقصى ${MAX_IMAGES} صور — انضاف ${Math.max(room, 0)} من ${accepted.length}.`)
+
+  newImages.value = [...newImages.value, ...accepted.slice(0, Math.max(room, 0))]
+  imageErrors.value = problems.join(' — ')
+
+  await nextTick()
+  imagePicker.value = []
+}
+
+// روابط المعاينة المحلية تتحرر (revokeObjectURL) عند تغيّر القائمة لمنع تسريب الذاكرة
+watch(newImages, files => {
+  imagePreviews.value.forEach(url => URL.revokeObjectURL(url))
+  imagePreviews.value = files.map(f => URL.createObjectURL(f))
+})
+
+onBeforeUnmount(() => imagePreviews.value.forEach(url => URL.revokeObjectURL(url)))
+
+const removeImage = (index: number) => {
+  newImages.value = newImages.value.filter((_, i) => i !== index)
+  imageErrors.value = ''
+
+  // الغلاف يضل على نفس الصورة؛ ولو انحذف الغلاف نفسه بتصير أول صورة هي الغلاف
+  if (index === coverIndex.value)
+    coverIndex.value = 0
+  else if (index < coverIndex.value)
+    coverIndex.value--
 }
 
 // ─── Submit ───────────────────────────────────────────────────────────────────
+const successDialog = ref(false)
+const createdItem   = ref<any>(null)
+
+const goToPreview = () => router.push({ name: 'marketplace-id', params: { id: String(createdItem.value.id) } })
+
+// "إضافة آلية أخرى" — يفضّي الفورم والصور بدون ما يطلع من الصفحة
+const resetForm = () => {
+  const keepContractor = form.value.contractor_id
+  form.value = {
+    contractor_id: keepContractor, equipment_type_id: '', name: '', brand: '', description: '',
+    manufacture_year: null, power: '', condition: 'good', contract_type: 'daily', governorate: '',
+    city: '', owner_phone: '', status: 'visible', is_featured: false, needs_maintenance: false,
+    admin_notes: '', publishMode: 'now', published_at: '',
+  }
+  newImages.value = []
+  coverIndex.value = 0
+  imageErrors.value = ''
+  successDialog.value = false
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
 const submit = async () => {
   if (!form.value.name.trim() || !form.value.contractor_id || !form.value.equipment_type_id) {
     alert('يرجى ملء الحقول المطلوبة: المالك، النوع، الاسم')
     return
   }
 
+  if (form.value.publishMode === 'schedule') {
+    if (!form.value.published_at) {
+      alert('حدد تاريخ النشر للآلية المجدولة')
+      return
+    }
+    if (form.value.published_at !== originalPublishedAt.value && form.value.published_at < tomorrowStr()) {
+      alert(`تاريخ النشر المجدول لازم يكون ${minDateHint.value}`)
+      return
+    }
+  }
+
   saving.value = true
   try {
     const payload = new FormData()
 
-    Object.entries(form.value).forEach(([key, val]) => {
+    const { publishMode, published_at: publishedAt, ...fields } = form.value
+
+    Object.entries(fields).forEach(([key, val]) => {
       if (val !== null && val !== undefined && val !== '') {
         if (typeof val === 'boolean')
           payload.append(key, val ? '1' : '0')
@@ -145,21 +256,32 @@ const submit = async () => {
       }
     })
 
-    newImages.value.forEach(file => payload.append('images[]', file))
+    payload.append('publish_mode', publishMode)
+    if (publishMode === 'schedule')
+      payload.append('published_at', publishedAt)
+
+    if (!isEdit.value) {
+      newImages.value.forEach(file => payload.append('images[]', file))
+      if (newImages.value.length)
+        payload.append('primary_index', String(coverIndex.value))
+    }
 
     if (isEdit.value) {
       payload.append('_method', 'PATCH')
       await api.post(`/api/v1/equipment/${editId.value}`, payload, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
+      router.push({ name: 'marketplace-id', params: { id: editId.value! } })
     }
     else {
-      await api.post('/api/v1/equipment', payload, {
+      const { data } = await api.post('/api/v1/equipment', payload, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
-    }
 
-    router.push({ name: 'marketplace' })
+      // بعد الإضافة: نافذة نجاح فيها زر "معاينة" ينقل لصفحة معاينة الآلية (REQ-08 #19)
+      createdItem.value = data
+      successDialog.value = true
+    }
   }
   catch (e: any) {
     const errors = e?.response?.data?.errors
@@ -261,16 +383,7 @@ const contractTypeOptions = [
             />
           </VCol>
           <VCol cols="12" md="6">
-            <VTextField
-              v-model="form.owner_phone"
-              label="رقم واتساب المالك"
-              hint="يُستخدم للتواصل المباشر عبر واتساب من شاشة تفاصيل الآلية"
-              persistent-hint
-              placeholder="0599-XXXXXX"
-              variant="outlined"
-              density="compact"
-              style="font-family:Cairo,sans-serif"
-            />
+            <WhatsappPhoneField v-model="form.owner_phone" />
           </VCol>
           <VCol cols="12">
             <VTextarea
@@ -281,6 +394,8 @@ const contractTypeOptions = [
               rows="3"
               maxlength="250"
               counter
+              hint="حد أقصى 250 حرف"
+              persistent-hint
               style="font-family:Cairo,sans-serif"
             />
           </VCol>
@@ -393,6 +508,9 @@ const contractTypeOptions = [
               v-model="form.is_featured"
               label="آلية مميزة (تظهر أولاً في السوق)"
               color="warning"
+              :disabled="isSuspended"
+              :hint="isSuspended ? 'غير متاح والآلية مخفية بقرار المالك أو موقوفة بقرار الإدارة' : undefined"
+              :persistent-hint="isSuspended"
               style="font-family:Cairo,sans-serif"
             />
           </VCol>
@@ -404,6 +522,41 @@ const contractTypeOptions = [
               style="font-family:Cairo,sans-serif"
             />
           </VCol>
+          <!-- تاريخ النشر: مباشر / مجدول -->
+          <VCol cols="12" md="6">
+            <p class="text-body-2 mb-2" style="font-family:Cairo,sans-serif">تاريخ نشر الآلية</p>
+            <VBtnToggle
+              v-model="form.publishMode"
+              mandatory
+              color="primary"
+              variant="outlined"
+              divided
+              density="comfortable"
+              style="font-family:Cairo,sans-serif"
+            >
+              <VBtn v-for="opt in publishModeOptions" :key="opt.value" :value="opt.value">
+                <VIcon :icon="opt.icon" size="18" class="me-1" />
+                {{ opt.label }}
+              </VBtn>
+            </VBtnToggle>
+          </VCol>
+          <VCol v-if="form.publishMode === 'schedule'" cols="12" md="6">
+            <VTextField
+              v-model="form.published_at"
+              label="تاريخ النشر المجدول *"
+              type="date"
+              :min="isEdit && originalPublishedAt ? undefined : tomorrowStr()"
+              :hint="`${minDateHint} — ${publishModeHint}`"
+              persistent-hint
+              variant="outlined"
+              density="compact"
+              style="font-family:Cairo,sans-serif"
+            />
+          </VCol>
+          <VCol v-else cols="12" md="6" class="d-flex align-center">
+            <p class="text-body-2 text-medium-emphasis mb-0" style="font-family:Cairo,sans-serif">{{ publishModeHint }}</p>
+          </VCol>
+
           <VCol cols="12">
             <VTextarea
               v-model="form.admin_notes"
@@ -424,19 +577,51 @@ const contractTypeOptions = [
                 صور الآلية (حتى {{ MAX_IMAGES }} صور)
               </p>
               <VFileInput
-                label="اختر الصور"
+                v-model="imagePicker"
+                :label="newImages.length ? `إضافة صور (${newImages.length} من ${MAX_IMAGES})` : 'اختر الصور'"
                 accept="image/jpeg,image/png,image/webp"
                 multiple
                 prepend-icon="tabler-upload"
                 variant="outlined"
                 density="compact"
+                :disabled="newImages.length >= MAX_IMAGES"
                 :error-messages="imageErrors"
                 style="font-family:Cairo,sans-serif"
-                @change="onFilesSelected"
+                @update:model-value="onFilesSelected"
               />
               <p class="text-caption text-medium-emphasis mt-1" style="font-family:Cairo,sans-serif">
                 JPG، PNG، WebP — الحد الأقصى {{ MAX_IMAGES }} صور، وحتى {{ MAX_IMAGE_MB }} ميغابايت للصورة الواحدة. يمكنك إضافة المزيد من الصور لاحقاً.
               </p>
+
+              <!-- معاينة الصور المختارة قبل الحفظ: حذف كل صورة لحالها + اختيار صورة الغلاف -->
+              <div v-if="newImages.length" class="equip-previews mt-3">
+                <div
+                  v-for="(url, i) in imagePreviews"
+                  :key="url"
+                  class="equip-preview"
+                  :class="{ 'equip-preview--cover': i === coverIndex }"
+                >
+                  <img :src="url" :alt="newImages[i]?.name">
+                  <span v-if="i === coverIndex" class="equip-preview__badge">صورة الغلاف</span>
+                  <div class="equip-preview__actions">
+                    <VBtn
+                      v-if="i !== coverIndex"
+                      size="x-small"
+                      variant="flat"
+                      color="primary"
+                      prepend-icon="tabler-star"
+                      style="font-family:Cairo,sans-serif"
+                      @click="coverIndex = i"
+                    >
+                      تعيين كغلاف
+                    </VBtn>
+                    <VBtn icon size="x-small" variant="flat" color="error" @click="removeImage(i)">
+                      <VIcon icon="tabler-x" size="14" />
+                      <VTooltip activator="parent">حذف الصورة</VTooltip>
+                    </VBtn>
+                  </div>
+                </div>
+              </div>
             </VCol>
           </template>
 
@@ -450,5 +635,82 @@ const contractTypeOptions = [
         </VRow>
       </VCardText>
     </VCard>
+
+    <!-- نافذة نجاح الإضافة — منها زر "معاينة" لصفحة معاينة الآلية (REQ-08 #19) -->
+    <VDialog v-model="successDialog" max-width="440" persistent>
+      <VCard>
+        <VCardText class="pa-6 text-center">
+          <VIcon icon="tabler-circle-check" size="52" color="success" class="mb-3" />
+          <p class="text-h6 mb-1" style="font-family:Cairo,sans-serif">تمت إضافة الآلية</p>
+          <p class="text-body-2 text-medium-emphasis mb-0" style="font-family:Cairo,sans-serif">
+            {{ createdItem?.name }}
+            <template v-if="createdItem?.published_at && new Date(createdItem.published_at) > new Date()">
+              — مجدولة للنشر بتاريخ {{ new Date(createdItem.published_at).toLocaleDateString('ar-PS') }}
+            </template>
+          </p>
+        </VCardText>
+        <VCardActions class="justify-center flex-wrap gap-2 pb-5">
+          <VBtn color="primary" variant="flat" prepend-icon="tabler-eye" style="font-family:Cairo,sans-serif" @click="goToPreview">
+            معاينة
+          </VBtn>
+          <VBtn variant="tonal" color="primary" prepend-icon="tabler-plus" style="font-family:Cairo,sans-serif" @click="resetForm">
+            إضافة آلية أخرى
+          </VBtn>
+          <VBtn variant="text" color="secondary" :to="{ name: 'marketplace' }" style="font-family:Cairo,sans-serif">
+            العودة للقائمة
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
   </div>
 </template>
+
+<style scoped>
+.equip-previews {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+.equip-preview {
+  position: relative;
+  overflow: hidden;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  aspect-ratio: 4 / 3;
+}
+
+.equip-preview--cover {
+  border-color: #000269;
+}
+
+.equip-preview img {
+  display: block;
+  block-size: 100%;
+  inline-size: 100%;
+  object-fit: cover;
+}
+
+.equip-preview__badge {
+  position: absolute;
+  inset-block-start: 6px;
+  inset-inline-start: 6px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #000269;
+  color: #fff;
+  font-family: Cairo, sans-serif;
+  font-size: 11px;
+}
+
+.equip-preview__actions {
+  position: absolute;
+  display: flex;
+  justify-content: center;
+  padding: 6px;
+  background: rgba(0, 0, 0, 55%);
+  gap: 6px;
+  inset-block-end: 0;
+  inset-inline: 0;
+}
+</style>
