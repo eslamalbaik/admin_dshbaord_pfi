@@ -527,6 +527,9 @@ class ContractorDueController extends Controller
     {
         $data = $request->validated();
 
+        $discountFields = ['amount_jod', 'original_amount_jod', 'discount_type', 'discount_value', 'discount_amount_jod'];
+        $before = $due->only($discountFields);
+
         try {
             $due->applyDiscount($data['discount_type'], $data['discount_value'], $data['discount_reason'] ?? null, Auth::id());
         } catch (\InvalidArgumentException $e) {
@@ -536,7 +539,22 @@ class ContractorDueController extends Controller
         $this->financeLog('due.discount_applied', [
             'due_id' => $due->id, 'discount_type' => $data['discount_type'], 'discount_value' => $data['discount_value'],
         ]);
-        AuditLogService::record(Auth::user(), 'due.discount_applied', $due, ['discount_type' => $data['discount_type'], 'discount_value' => $data['discount_value']]);
+        // سجل المحددات الهامة — تعديل رسوم العضوية (خصم على ذمة مقاول)
+        $due->load('contractor:id,name,membership_number');
+        AuditLogService::recordCritical(
+            Auth::user(),
+            'due.discount_applied',
+            $due,
+            before: $before,
+            after: $due->only($discountFields),
+            reason: $data['discount_reason'] ?? null,
+            context: [
+                'contractor_id'     => $due->contractor_id,
+                'contractor_name'   => $due->contractor?->name,
+                'membership_number' => $due->contractor?->membership_number,
+                'year'              => $due->year,
+            ],
+        );
 
         return $this->success(new ContractorDueResource($due->fresh(['contractor:id,name,membership_number'])), 'تم تطبيق الخصم بنجاح.');
     }
@@ -559,7 +577,22 @@ class ContractorDueController extends Controller
                 'applied'     => $result['applied_count'],
                 'skipped'     => count($result['skipped']),
             ]);
-            AuditLogService::record(Auth::user(), 'due.discount_applied_bulk', null, ['mode' => $data['mode'], 'applied' => $result['applied_count']]);
+            // سجل المحددات الهامة — خصم جماعي على رسوم العضوية
+            AuditLogService::recordCritical(
+                Auth::user(),
+                'due.discount_applied_bulk',
+                null,
+                before: [],
+                after: ['discount_type' => $data['discount_type'], 'discount_value' => $data['discount_value']],
+                reason: $data['discount_reason'] ?? null,
+                context: array_filter([
+                    'mode'        => $data['mode'],
+                    'ids'         => $data['mode'] === 'ids' ? $data['ids'] : null,
+                    'criteria'    => $data['mode'] === 'criteria' ? $data['criteria'] : null,
+                    'applied'     => $result['applied_count'],
+                    'contractors' => $result['contractors_count'],
+                ], fn ($v) => $v !== null),
+            );
             return $this->success($result, 'تم تطبيق الخصم الجماعي بنجاح.');
         }
 

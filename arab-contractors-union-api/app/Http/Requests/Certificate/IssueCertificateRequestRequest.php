@@ -15,6 +15,7 @@ class IssueCertificateRequestRequest extends FormRequest
     {
         return [
             'certificate' => 'required|file|mimes:pdf|max:10240', // 10 MB
+            'reason'      => 'nullable|string|max:500', // سبب التعديل — سجل المحددات الهامة
         ];
     }
 }

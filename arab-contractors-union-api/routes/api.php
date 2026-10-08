@@ -435,6 +435,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware('role:admin')->group(function () {
             Route::get('dashboard/activity-logs',         [\App\Http\Controllers\Api\ActivityLogController::class, 'index']);
             Route::get('dashboard/activity-logs/actions',  [\App\Http\Controllers\Api\ActivityLogController::class, 'actions']);
+            Route::get('dashboard/activity-logs/critical-summary', [\App\Http\Controllers\Api\ActivityLogController::class, 'criticalSummary']);
         });
 
         // --------------------------------------------------------

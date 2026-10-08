@@ -9,11 +9,12 @@ class ActivityLog extends Model
     public $timestamps = false;
 
     protected $fillable = [
-        'actor_id', 'actor_type', 'action', 'subject_type', 'subject_id', 'meta', 'created_at',
+        'actor_id', 'actor_type', 'action', 'is_critical', 'subject_type', 'subject_id', 'meta', 'created_at',
     ];
 
     protected $casts = [
-        'meta'       => 'array',
+        'meta'        => 'array',
+        'is_critical' => 'boolean',
         'created_at' => 'datetime',
     ];
 
