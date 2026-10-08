@@ -16,15 +16,42 @@ const toFilter = ref('')
 
 const actionOptions = ref<string[]>([])
 
+// تبويب «المحددات الهامة»: أحداث مخالفة للوضع الطبيعي (تعديل رسوم العضوية، تعديل
+// إصدار شهادة عضوية...) — تعريفها بالباك إند (App\Support\CriticalEvents)، فأي نوع
+// جديد بيظهر هون تلقائياً مع مسمّاه وتفاصيله قبل/بعد.
+const tab = ref<'all' | 'critical'>('all')
+const categoryFilter = ref('')
+const criticalSummary = ref<{ total: number; categories: { key: string; label: string; count: number }[] }>({ total: 0, categories: [] })
+const isCritical = computed(() => tab.value === 'critical')
+
 const fetchActions = async () => {
   try {
-    const { data } = await api.get('/api/v1/dashboard/activity-logs/actions')
+    const { data } = await api.get('/api/v1/dashboard/activity-logs/actions', {
+      params: { critical: isCritical.value ? 1 : undefined },
+    })
     actionOptions.value = data.items ?? []
   }
   catch (err) {
     console.error(err)
   }
 }
+
+const fetchCriticalSummary = async () => {
+  try {
+    const { data } = await api.get('/api/v1/dashboard/activity-logs/critical-summary')
+    criticalSummary.value = data.items ?? { total: 0, categories: [] }
+  }
+  catch (err) {
+    console.error(err)
+  }
+}
+
+watch(tab, () => {
+  page.value = 1
+  actionFilter.value = ''
+  categoryFilter.value = ''
+  fetchActions()
+})
 
 const fetchLogs = async () => {
   loading.value = true
@@ -33,6 +60,8 @@ const fetchLogs = async () => {
       params: {
         search: search.value,
         action: actionFilter.value,
+        critical: isCritical.value ? 1 : undefined,
+        category: isCritical.value && categoryFilter.value ? categoryFilter.value : undefined,
         from: fromFilter.value || undefined,
         to: toFilter.value || undefined,
         page: page.value,
@@ -198,6 +227,9 @@ const actionLabels: Record<string, string> = {
 
 const actionLabel = (action: string) => actionLabels[action] ?? action
 
+// الحدث الحرج بيعرض مسمّاه من سجل المحددات الهامة (أدق، مثلاً «استبدال ملف شهادة صادرة»)
+const logLabel = (log: any) => log.critical?.label ?? actionLabel(log.action)
+
 const actionColor = (action: string) => {
   if (action.startsWith('security.')) return 'error'
   if (action.includes('reject') || action.includes('ban') || action.includes('freeze') || action.includes('frozen') || action.includes('deleted') || action.includes('deactivat')) return 'warning'
@@ -207,7 +239,10 @@ const actionColor = (action: string) => {
 }
 
 watchEffect(() => fetchLogs())
-onMounted(fetchActions)
+onMounted(() => {
+  fetchActions()
+  fetchCriticalSummary()
+})
 
 const formatDate = (v: string) => v ? new Date(v).toLocaleString('ar-PS', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'
 
@@ -222,6 +257,27 @@ const headers = [
 const metaDialog = ref(false)
 const metaItem = ref<any>(null)
 const openMeta = (log: any) => { metaItem.value = log; metaDialog.value = true }
+
+// تسميات عربية للحقول السياقية اللي بتتخزّن مع الحدث الحرج (غير قبل/بعد)
+const contextLabels: Record<string, string> = {
+  contractor_name: 'المقاول',
+  membership_number: 'رقم العضوية',
+  grade_label: 'الدرجة',
+  grade_code: 'رمز الدرجة',
+  year: 'السنة',
+  mode: 'طريقة التحديد',
+  applied: 'عدد الذمم المتأثرة',
+  contractors: 'عدد المقاولين',
+}
+
+const contextKeysHidden = ['before', 'after', 'reason', 'contractor_id', 'ids', 'criteria']
+
+const criticalContext = (log: any) => Object.entries(log?.meta ?? {})
+  .filter(([k, v]) => !contextKeysHidden.includes(k) && v !== null && v !== '' && typeof v !== 'object')
+  .map(([k, v]) => ({ label: contextLabels[k] ?? k, value: k === 'mode' ? (v === 'ids' ? 'ذمم محددة' : 'حسب معايير') : v }))
+
+const valueLabels: Record<string, string> = { percent: 'نسبة مئوية', fixed: 'مبلغ ثابت' }
+const formatValue = (v: any) => (v === null || v === undefined || v === '') ? '—' : (valueLabels[v] ?? v)
 </script>
 
 <template>
@@ -234,6 +290,25 @@ const openMeta = (log: any) => { metaItem.value = log; metaDialog.value = true }
     </div>
 
     <VCard>
+      <VTabs v-model="tab" class="px-4" style="font-family:Cairo,sans-serif">
+        <VTab value="all">
+          <VIcon icon="tabler-list-details" start />
+          كل النشاط
+        </VTab>
+        <VTab value="critical">
+          <VIcon icon="tabler-alert-triangle" start color="error" />
+          المحددات الهامة
+          <VChip v-if="criticalSummary.total" size="x-small" color="error" class="ms-2">
+            {{ criticalSummary.total }}
+          </VChip>
+        </VTab>
+      </VTabs>
+      <VDivider />
+
+      <VAlert v-if="isCritical" type="warning" variant="tonal" density="compact" class="ma-4 mb-0" style="font-family:Cairo,sans-serif">
+        تعديلات مخالفة للوضع الطبيعي: تعديل رسوم العضوية (جدول الرسوم والخصومات) وأي تعديل على إصدار شهادة العضوية — مع القيمة قبل وبعد التعديل والسبب.
+      </VAlert>
+
       <VCardText class="d-flex gap-4 flex-wrap">
         <VTextField
           v-model="search"
@@ -251,6 +326,17 @@ const openMeta = (log: any) => { metaItem.value = log; metaDialog.value = true }
           label="الإجراء"
           density="compact"
           clearable
+          style="max-width:220px"
+          @update:model-value="page = 1"
+        />
+        <VSelect
+          v-if="isCritical"
+          v-model="categoryFilter"
+          :items="[{ title: 'كل الفئات', value: '' }, ...criticalSummary.categories.map(c => ({ title: `${c.label} (${c.count})`, value: c.key }))]"
+          item-title="title"
+          item-value="value"
+          label="الفئة"
+          density="compact"
           style="max-width:220px"
           @update:model-value="page = 1"
         />
@@ -286,8 +372,14 @@ const openMeta = (log: any) => { metaItem.value = log; metaDialog.value = true }
         @update:options="fetchLogs"
       >
         <template #item.action="{ item }">
-          <VChip :color="actionColor(item.action)" size="small" label style="font-family:Cairo,sans-serif">
-            {{ actionLabel(item.action) }}
+          <VChip
+            :color="item.is_critical ? 'error' : actionColor(item.action)"
+            :prepend-icon="item.is_critical ? 'tabler-alert-triangle' : undefined"
+            size="small"
+            label
+            style="font-family:Cairo,sans-serif"
+          >
+            {{ logLabel(item) }}
           </VChip>
         </template>
 
@@ -300,7 +392,14 @@ const openMeta = (log: any) => { metaItem.value = log; metaDialog.value = true }
         </template>
 
         <template #item.subject="{ item }">
-          <span v-if="item.subject_type" class="text-body-2" style="font-family:Cairo,sans-serif">
+          <div v-if="item.meta?.contractor_name" class="text-body-2" style="font-family:Cairo,sans-serif">
+            <div>{{ item.meta.contractor_name }}</div>
+            <div v-if="item.meta.membership_number" class="text-caption text-medium-emphasis">عضوية {{ item.meta.membership_number }}</div>
+          </div>
+          <span v-else-if="item.meta?.grade_label && item.action === 'grade_fee.updated'" class="text-body-2" style="font-family:Cairo,sans-serif">
+            درجة {{ item.meta.grade_label }}
+          </span>
+          <span v-else-if="item.subject_type" class="text-body-2" style="font-family:Cairo,sans-serif">
             {{ item.subject_type }} #{{ item.subject_id }}
           </span>
           <span v-else class="text-medium-emphasis text-body-2">—</span>
@@ -325,10 +424,52 @@ const openMeta = (log: any) => { metaItem.value = log; metaDialog.value = true }
     </VCard>
 
     <!-- Meta Details Dialog -->
-    <VDialog v-model="metaDialog" max-width="480">
+    <VDialog v-model="metaDialog" :max-width="metaItem?.critical ? 640 : 480">
       <VCard v-if="metaItem">
-        <VCardTitle style="font-family:Cairo,sans-serif">تفاصيل الإجراء</VCardTitle>
-        <VCardText>
+        <VCardTitle style="font-family:Cairo,sans-serif">
+          {{ metaItem.critical ? logLabel(metaItem) : 'تفاصيل الإجراء' }}
+        </VCardTitle>
+
+        <VCardText v-if="metaItem.critical" style="font-family:Cairo,sans-serif">
+          <div class="d-flex flex-wrap gap-2 mb-4">
+            <VChip v-if="metaItem.critical.category_label" size="small" color="error" variant="tonal" label>
+              {{ metaItem.critical.category_label }}
+            </VChip>
+            <VChip size="small" variant="tonal" label>
+              {{ metaItem.actor_name ?? 'النظام' }} · <span dir="ltr" class="ms-1">{{ formatDate(metaItem.created_at) }}</span>
+            </VChip>
+          </div>
+
+          <div v-for="c in criticalContext(metaItem)" :key="c.label" class="text-body-2 mb-1">
+            <span class="text-medium-emphasis">{{ c.label }}:</span> {{ c.value }}
+          </div>
+
+          <VTable v-if="metaItem.critical.changes.length" density="compact" class="mt-3 border rounded">
+            <thead>
+              <tr>
+                <th>البند</th>
+                <th>قبل</th>
+                <th>بعد</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="c in metaItem.critical.changes" :key="c.field">
+                <td class="font-weight-medium">{{ c.label }}</td>
+                <td class="text-error">{{ formatValue(c.before) }}</td>
+                <td class="text-success">{{ formatValue(c.after) }}</td>
+              </tr>
+            </tbody>
+          </VTable>
+          <div v-else class="text-body-2 text-medium-emphasis mt-3">
+            سُجّل هذا الحدث قبل تفعيل تسجيل القيم قبل/بعد.
+          </div>
+
+          <VAlert type="info" variant="tonal" density="compact" class="mt-4">
+            <strong>السبب:</strong> {{ metaItem.critical.reason || 'لم يُذكر سبب' }}
+          </VAlert>
+        </VCardText>
+
+        <VCardText v-else>
           <pre class="text-body-2" style="white-space:pre-wrap;word-break:break-word;font-family:monospace">{{ JSON.stringify(metaItem.meta, null, 2) }}</pre>
         </VCardText>
         <VCardActions>

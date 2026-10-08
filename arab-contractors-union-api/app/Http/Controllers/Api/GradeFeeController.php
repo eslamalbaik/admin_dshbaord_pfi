@@ -42,15 +42,25 @@ class GradeFeeController extends Controller
             'grade_label'          => 'sometimes|string|max:50',
             'registration_fee_jod' => 'sometimes|numeric|min:0|max:99999',
             'annual_fee_jod'       => 'sometimes|numeric|min:0|max:99999',
+            'reason'               => 'nullable|string|max:500',
         ]);
+
+        $reason = $data['reason'] ?? null;
+        unset($data['reason']);
+
+        $before = array_intersect_key($gradeFee->only(array_keys($data)), $data);
 
         $gradeFee->update($data);
 
-        \App\Services\AuditLogService::record(
+        // سجل المحددات الهامة — تعديل رسوم العضوية
+        \App\Services\AuditLogService::recordCritical(
             \Illuminate\Support\Facades\Auth::user(),
             'grade_fee.updated',
             $gradeFee,
-            ['grade_code' => $gradeFee->grade_code, 'changes' => $data]
+            before: $before,
+            after: $data,
+            reason: $reason,
+            context: ['grade_code' => $gradeFee->grade_code, 'grade_label' => $gradeFee->grade_label],
         );
 
         return $this->success($this->format($gradeFee->fresh()), 'تم تحديث رسوم الدرجة بنجاح');

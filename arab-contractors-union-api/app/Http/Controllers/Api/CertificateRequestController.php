@@ -267,8 +267,11 @@ class CertificateRequestController extends Controller
             return $blocked;
         }
 
-        if ($certificateRequest->certificate_path) {
-            Storage::disk('public')->delete($certificateRequest->certificate_path);
+        $oldPath     = $certificateRequest->certificate_path;
+        $oldIssuedAt = $certificateRequest->issued_at;
+
+        if ($oldPath) {
+            Storage::disk('public')->delete($oldPath);
         }
 
         $path = $request->file('certificate')->store('certificates/membership', 'public');
@@ -285,7 +288,20 @@ class CertificateRequestController extends Controller
             new CertificateRequestStatusNotification($certificateRequest)
         );
 
-        AuditLogService::record(Auth::user(), 'certificate.issued', $certificateRequest, ['contractor_id' => $certificateRequest->contractor_id]);
+        if ($oldPath) {
+            // سجل المحددات الهامة — استبدال ملف شهادة كانت صادرة مسبقاً
+            AuditLogService::recordCritical(
+                Auth::user(),
+                'certificate.issued',
+                $certificateRequest,
+                before: ['issued_at' => $oldIssuedAt?->toDateTimeString(), 'certificate_file' => basename($oldPath)],
+                after: ['issued_at' => $certificateRequest->issued_at?->toDateTimeString(), 'certificate_file' => basename($path)],
+                reason: $request->validated('reason'),
+                context: $this->certificateLogContext($certificateRequest),
+            );
+        } else {
+            AuditLogService::record(Auth::user(), 'certificate.issued', $certificateRequest, ['contractor_id' => $certificateRequest->contractor_id]);
+        }
 
         return $this->success(new CertificateRequestResource($certificateRequest->fresh()), 'تم إصدار الشهادة بنجاح.');
     }
@@ -340,6 +356,7 @@ class CertificateRequestController extends Controller
 
         $data = $request->validated();
         $oldPath = $certificateRequest->certificate_path;
+        $oldIssuedAt = $certificateRequest->issued_at;
 
         $path = $this->pdfService->generate($certificateRequest, [
             'address'         => $data['address'] ?? null,
@@ -359,11 +376,16 @@ class CertificateRequestController extends Controller
             'reviewed_at'      => now(),
         ]);
 
-        AuditLogService::record(
+        // سجل المحددات الهامة — إعادة إصدار شهادة عضوية (مع أي بيانات مخالفة لملف المقاول)
+        [$before, $after] = $this->certificateOverrideDiff($certificateRequest->contractor, $data);
+        AuditLogService::recordCritical(
             Auth::user(),
             'certificate.regenerated',
             $certificateRequest,
-            ['contractor_id' => $certificateRequest->contractor_id]
+            before: $before + ['issued_at' => $oldIssuedAt?->toDateTimeString()],
+            after: $after + ['issued_at' => $certificateRequest->issued_at?->toDateTimeString()],
+            reason: $data['reason'] ?? null,
+            context: $this->certificateLogContext($certificateRequest),
         );
 
         return $this->success(new CertificateRequestResource($certificateRequest->fresh()), 'تمت إعادة إصدار الشهادة بنجاح.');
@@ -404,18 +426,85 @@ class CertificateRequestController extends Controller
             new CertificateRequestStatusNotification($certRequest)
         );
 
-        AuditLogService::record(
-            Auth::user(),
-            'certificate.admin_issued_membership',
-            $certRequest,
-            ['contractor_id' => $contractor->id, 'contractor_name' => $contractor->name]
-        );
+        [$before, $after] = $this->certificateOverrideDiff($contractor, $data);
+        if ($after) {
+            // سجل المحددات الهامة — شهادة صدرت ببيانات تختلف عن المسجّلة بملف المقاول
+            AuditLogService::recordCritical(
+                Auth::user(),
+                'certificate.admin_issued_membership',
+                $certRequest,
+                before: $before,
+                after: $after,
+                reason: $data['notes'] ?? null,
+                context: $this->certificateLogContext($certRequest),
+            );
+        } else {
+            AuditLogService::record(
+                Auth::user(),
+                'certificate.admin_issued_membership',
+                $certRequest,
+                ['contractor_id' => $contractor->id, 'contractor_name' => $contractor->name]
+            );
+        }
 
         return $this->success(
             new CertificateRequestResource($certRequest->fresh()),
             'تم إصدار شهادة العضوية بنجاح.',
             201,
         );
+    }
+
+    /**
+     * يقارن البيانات المُدخلة يدوياً عند إصدار شهادة (العنوان/رقم وتاريخ قرار التصنيف)
+     * مع المسجّلة بملف المقاول، ويرجّع [قبل, بعد] للحقول المختلفة فقط.
+     *
+     * @return array{0: array<string, ?string>, 1: array<string, string>}
+     */
+    private function certificateOverrideDiff(?Contractor $contractor, array $data): array
+    {
+        if (! $contractor) {
+            return [[], []];
+        }
+
+        $record = MembershipCertificatePdfService::recordFields($contractor);
+
+        // العنوان بيعتبر مطابق إذا طابق أي حقل عنوان بملف المقاول (المدينة/المحافظة/العنوان) —
+        // شاشة الإصدار بتعبّيه تلقائياً من حقل غير اللي بيستخدمه التوليد أحياناً.
+        $accepted = [
+            'address'         => [$record['address'], $contractor->city, $contractor->governorate?->name, $contractor->address],
+            'decision_number' => [$record['decision_number']],
+            'decision_date'   => [$record['decision_date']],
+        ];
+
+        $before = $after = [];
+        foreach ($accepted as $field => $values) {
+            $value = $data[$field] ?? null;
+            if (! filled($value)) {
+                continue;
+            }
+            if ($field === 'decision_date') {
+                $value = \Illuminate\Support\Carbon::parse($value)->format('d/m/Y');
+            }
+
+            $matches = collect($values)->contains(fn ($v) => filled($v) && AuditLogService::sameValue($v, $value));
+            if (! $matches) {
+                $before[$field] = $record[$field];
+                $after[$field]  = $value;
+            }
+        }
+
+        return [$before, $after];
+    }
+
+    private function certificateLogContext(CertificateRequest $certificateRequest): array
+    {
+        $contractor = $certificateRequest->contractor;
+
+        return [
+            'contractor_id'     => $certificateRequest->contractor_id,
+            'contractor_name'   => $contractor?->name,
+            'membership_number' => $contractor?->membership_number,
+        ];
     }
 
     /** GET /api/v1/certificates/verify/{token} */

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\CertificateRequest;
+use App\Models\Contractor;
 use App\Support\ContractorLookups;
 use Illuminate\Support\Facades\Storage;
 use Mpdf\Mpdf;
@@ -33,6 +34,21 @@ class MembershipCertificatePdfService
      * @param  bool  $preview  يكتب في certificates/preview بدل مسار الشهادة الرسمي.
      *                         بدونه، أي توليد اختباري يدهس شهادة صادرة تحمل نفس الرقم.
      */
+    /**
+     * بيانات الشهادة كما هي مسجّلة بملف المقاول — اللي بتنطبع لما ما في overrides.
+     * سجل المحددات الهامة بيقارن فيها أي بيانات مُدخلة يدوياً عند الإصدار.
+     *
+     * @return array{address: ?string, decision_number: ?string, decision_date: ?string}
+     */
+    public static function recordFields(Contractor $contractor): array
+    {
+        return [
+            'address'         => $contractor->city ?: $contractor->governorate?->name ?: $contractor->address ?: null,
+            'decision_number' => $contractor->classification_decision_number ?: null,
+            'decision_date'   => $contractor->classification_decision_date?->format('d/m/Y'),
+        ];
+    }
+
     public function generate(CertificateRequest $certRequest, array $overrides = [], bool $preview = false): string
     {
         $contractor = $certRequest->contractor;
@@ -42,14 +58,13 @@ class MembershipCertificatePdfService
         // صيغ التواريخ مطابقة للقالب: الترويسة d-m-Y، ومتن الشهادة d/m/Y
         $issuedAt = now()->format('d-m-Y');
 
-        $decisionDate   = $overrides['decision_date']
-            ?? ($contractor->classification_decision_date?->format('d/m/Y') ?? '—');
-        $decisionNumber = $overrides['decision_number']
-            ?? ($contractor->classification_decision_number ?: '—');
+        $defaults = self::recordFields($contractor);
+
+        $decisionDate   = $overrides['decision_date'] ?? ($defaults['decision_date'] ?? '—');
+        $decisionNumber = $overrides['decision_number'] ?? ($defaults['decision_number'] ?? '—');
         $validUntil = $membership?->expires_at?->format('d/m/Y') ?? now()->addYear()->format('d/m/Y');
 
-        $address = $overrides['address']
-            ?? ($contractor->city ?: $contractor->governorate?->name ?: $contractor->address ?: '—');
+        $address = $overrides['address'] ?? ($defaults['address'] ?? '—');
 
         // القالب الأصلي لا يكتب "شركة/" ثابتة — نتجنّب تكرارها لو كان الاسم حاملاً لها
         $companyLabel = str_contains($contractor->name, 'شركة')

@@ -17,6 +17,7 @@ class RegenerateCertificateRequestRequest extends FormRequest
             'address'         => 'nullable|string|max:255',
             'decision_number' => 'nullable|string|max:100',
             'decision_date'   => 'nullable|date',
+            'reason'          => 'nullable|string|max:500', // سبب التعديل — سجل المحددات الهامة
         ];
     }
 }

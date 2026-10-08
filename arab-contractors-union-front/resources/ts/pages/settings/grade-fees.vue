@@ -16,7 +16,7 @@ const rows = computed(() => data.value?.items ?? [])
 
 const isFormOpen = ref(false)
 const editingId = ref<number | null>(null)
-const form = ref({ grade_label: '', registration_fee_jod: 0, annual_fee_jod: 0 })
+const form = ref({ grade_label: '', registration_fee_jod: 0, annual_fee_jod: 0, reason: '' })
 const formError = ref('')
 
 const openEdit = (row: any) => {
@@ -25,6 +25,7 @@ const openEdit = (row: any) => {
     grade_label: row.grade_label,
     registration_fee_jod: Number(row.registration_fee_jod),
     annual_fee_jod: Number(row.annual_fee_jod),
+    reason: '',
   }
   formError.value = ''
   isFormOpen.value = true
@@ -124,6 +125,16 @@ const saveMutation = useMutation({
                 type="number"
                 min="0"
                 hint="كل سنة تجديد — 100%/50%"
+                persistent-hint
+              />
+            </VCol>
+            <VCol cols="12">
+              <VTextarea
+                v-model="form.reason"
+                label="سبب التعديل (اختياري)"
+                rows="2"
+                auto-grow
+                hint="يظهر في سجل المحددات الهامة مع القيم قبل وبعد التعديل"
                 persistent-hint
               />
             </VCol>
