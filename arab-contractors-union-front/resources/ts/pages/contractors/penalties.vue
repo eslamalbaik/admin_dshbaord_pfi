@@ -215,7 +215,7 @@ const addPenalty = async () => {
         <h1 class="text-h4 font-weight-bold" style="font-family:Cairo,sans-serif">الغرامات والمخالفات</h1>
         <p class="text-body-2 text-medium-emphasis mb-0" style="font-family:Cairo,sans-serif">إدارة غرامات المقاولين والمخالفات المسجّلة</p>
       </div>
-      <VBtn color="primary" prepend-icon="tabler-plus" @click="openAddDialog">
+      <VBtn v-if="$can('contractors.penalties', 'create')" color="primary" prepend-icon="tabler-plus" @click="openAddDialog">
         إضافة غرامة
       </VBtn>
     </div>
@@ -279,8 +279,8 @@ const addPenalty = async () => {
         </template>
 
         <template #item.actions="{ item }">
-          <VBtn size="small" variant="text" icon="tabler-edit" title="تحديث الحالة" @click="openStatusDialog(item)" />
-          <VBtn size="small" variant="text" color="error" icon="tabler-trash" title="حذف الغرامة" @click="openDeleteDialog(item)" />
+          <VBtn v-if="$can('contractors.penalties', 'update')" size="small" variant="text" icon="tabler-edit" title="تحديث الحالة" @click="openStatusDialog(item)" />
+          <VBtn v-if="$can('contractors.penalties', 'delete')" size="small" variant="text" color="error" icon="tabler-trash" title="حذف الغرامة" @click="openDeleteDialog(item)" />
         </template>
 
         <template #no-data>

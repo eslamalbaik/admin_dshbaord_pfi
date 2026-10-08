@@ -368,7 +368,7 @@ const contractorStatusLabel: Record<string, string> = {
                 </VChip>
               </td>
               <td class="text-center">
-                <VBtn
+                <VBtn v-if="$can('services.membership_certificates', 'create')"
                   color="success"
                   size="small"
                   variant="tonal"
@@ -436,7 +436,7 @@ const contractorStatusLabel: Record<string, string> = {
               <VBtn size="small" variant="text" @click="selectedIds = []">
                 إلغاء التحديد
               </VBtn>
-              <VBtn
+              <VBtn v-if="$can('services.membership_certificates', 'delete')"
                 size="small"
                 color="error"
                 variant="tonal"
@@ -513,7 +513,7 @@ const contractorStatusLabel: Record<string, string> = {
                 </VChip>
                 <VTooltip text="إعادة إصدار الشهادة بنفس الرقم" location="top">
                   <template #activator="{ props }">
-                    <VBtn
+                    <VBtn v-if="$can('services.membership_certificates', 'update')"
                       v-bind="props"
                       icon="tabler-refresh"
                       size="x-small"
@@ -527,7 +527,7 @@ const contractorStatusLabel: Record<string, string> = {
                 </VTooltip>
                 <VTooltip text="حذف الشهادة" location="top">
                   <template #activator="{ props }">
-                    <VBtn
+                    <VBtn v-if="$can('services.membership_certificates', 'delete')"
                       v-bind="props"
                       icon="tabler-trash"
                       size="x-small"

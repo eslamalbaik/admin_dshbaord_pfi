@@ -7,10 +7,13 @@
 export {}
 declare global {
   const $api: typeof import('./resources/ts/utils/api')['$api']
+  const ADMIN_ONLY_ROUTES: typeof import('./resources/ts/utils/permissions')['ADMIN_ONLY_ROUTES']
   const COOKIE_MAX_AGE_1_YEAR: typeof import('./resources/ts/utils/constants')['COOKIE_MAX_AGE_1_YEAR']
   const CreateUrl: typeof import('./src/@core/composable/CreateUrl')['CreateUrl']
+  const DASHBOARD_ROLES: typeof import('./resources/ts/utils/permissions')['DASHBOARD_ROLES']
   const EffectScope: typeof import('vue')['EffectScope']
   const NOTIFICATIONS_KEY: typeof import('./resources/ts/composables/useNotifications')['NOTIFICATIONS_KEY']
+  const ROUTE_PERMISSIONS: typeof import('./resources/ts/utils/permissions')['ROUTE_PERMISSIONS']
   const acceptHMRUpdate: typeof import('pinia')['acceptHMRUpdate']
   const adminToasts: typeof import('./resources/ts/composables/useRealtimeAdminNotifications')['adminToasts']
   const alphaDashValidator: typeof import('./resources/ts/@core/utils/validators')['alphaDashValidator']
@@ -19,6 +22,7 @@ declare global {
   const autoResetRef: typeof import('@vueuse/core')['autoResetRef']
   const avatarText: typeof import('./resources/ts/@core/utils/formatters')['avatarText']
   const betweenValidator: typeof import('./resources/ts/@core/utils/validators')['betweenValidator']
+  const canAccessRoute: typeof import('./resources/ts/utils/permissions')['canAccessRoute']
   const computed: typeof import('vue')['computed']
   const computedAsync: typeof import('@vueuse/core')['computedAsync']
   const computedEager: typeof import('@vueuse/core')['computedEager']
@@ -53,6 +57,7 @@ declare global {
   const effectScope: typeof import('vue')['effectScope']
   const emailValidator: typeof import('./resources/ts/@core/utils/validators')['emailValidator']
   const extendRef: typeof import('@vueuse/core')['extendRef']
+  const firstAllowedRoute: typeof import('./resources/ts/utils/permissions')['firstAllowedRoute']
   const firstFile: typeof import('./resources/ts/utils/files')['firstFile']
   const formatDate: typeof import('./resources/ts/@core/utils/formatters')['formatDate']
   const formatDateToMonthShort: typeof import('./resources/ts/@core/utils/formatters')['formatDateToMonthShort']
@@ -60,6 +65,8 @@ declare global {
   const getCurrentInstance: typeof import('vue')['getCurrentInstance']
   const getCurrentScope: typeof import('vue')['getCurrentScope']
   const h: typeof import('vue')['h']
+  const hasAnyPermission: typeof import('./resources/ts/utils/permissions')['hasAnyPermission']
+  const hasPermission: typeof import('./resources/ts/utils/permissions')['hasPermission']
   const hexToRgb: typeof import('./resources/ts/@core/utils/colorConverter')['hexToRgb']
   const idbDelete: typeof import('./resources/ts/utils/idbStore')['idbDelete']
   const idbGet: typeof import('./resources/ts/utils/idbStore')['idbGet']
@@ -79,6 +86,7 @@ declare global {
   const isReactive: typeof import('vue')['isReactive']
   const isReadonly: typeof import('vue')['isReadonly']
   const isRef: typeof import('vue')['isRef']
+  const isSupervisor: typeof import('./resources/ts/utils/permissions')['isSupervisor']
   const isToday: typeof import('./resources/ts/@core/utils/helpers')['isToday']
   const kFormatter: typeof import('./resources/ts/@core/utils/formatters')['kFormatter']
   const lengthValidator: typeof import('./resources/ts/@core/utils/validators')['lengthValidator']
@@ -198,6 +206,7 @@ declare global {
   const useBroadcastChannel: typeof import('@vueuse/core')['useBroadcastChannel']
   const useBrowserLocation: typeof import('@vueuse/core')['useBrowserLocation']
   const useCached: typeof import('@vueuse/core')['useCached']
+  const useCan: typeof import('./resources/ts/composables/useCan')['useCan']
   const useCeil: typeof import('@vueuse/math')['useCeil']
   const useClamp: typeof import('@vueuse/math')['useClamp']
   const useClipboard: typeof import('@vueuse/core')['useClipboard']
@@ -391,9 +400,12 @@ declare module 'vue' {
   interface GlobalComponents {}
   interface ComponentCustomProperties {
     readonly $api: UnwrapRef<typeof import('./resources/ts/utils/api')['$api']>
+    readonly ADMIN_ONLY_ROUTES: UnwrapRef<typeof import('./resources/ts/utils/permissions')['ADMIN_ONLY_ROUTES']>
     readonly COOKIE_MAX_AGE_1_YEAR: UnwrapRef<typeof import('./resources/ts/utils/constants')['COOKIE_MAX_AGE_1_YEAR']>
+    readonly DASHBOARD_ROLES: UnwrapRef<typeof import('./resources/ts/utils/permissions')['DASHBOARD_ROLES']>
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
     readonly NOTIFICATIONS_KEY: UnwrapRef<typeof import('./resources/ts/composables/useNotifications')['NOTIFICATIONS_KEY']>
+    readonly ROUTE_PERMISSIONS: UnwrapRef<typeof import('./resources/ts/utils/permissions')['ROUTE_PERMISSIONS']>
     readonly acceptHMRUpdate: UnwrapRef<typeof import('pinia')['acceptHMRUpdate']>
     readonly adminToasts: UnwrapRef<typeof import('./resources/ts/composables/useRealtimeAdminNotifications')['adminToasts']>
     readonly alphaDashValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['alphaDashValidator']>
@@ -402,6 +414,7 @@ declare module 'vue' {
     readonly autoResetRef: UnwrapRef<typeof import('@vueuse/core')['autoResetRef']>
     readonly avatarText: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['avatarText']>
     readonly betweenValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['betweenValidator']>
+    readonly canAccessRoute: UnwrapRef<typeof import('./resources/ts/utils/permissions')['canAccessRoute']>
     readonly computed: UnwrapRef<typeof import('vue')['computed']>
     readonly computedAsync: UnwrapRef<typeof import('@vueuse/core')['computedAsync']>
     readonly computedEager: UnwrapRef<typeof import('@vueuse/core')['computedEager']>
@@ -435,6 +448,7 @@ declare module 'vue' {
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly emailValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['emailValidator']>
     readonly extendRef: UnwrapRef<typeof import('@vueuse/core')['extendRef']>
+    readonly firstAllowedRoute: UnwrapRef<typeof import('./resources/ts/utils/permissions')['firstAllowedRoute']>
     readonly firstFile: UnwrapRef<typeof import('./resources/ts/utils/files')['firstFile']>
     readonly formatDate: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['formatDate']>
     readonly formatDateToMonthShort: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['formatDateToMonthShort']>
@@ -442,6 +456,8 @@ declare module 'vue' {
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
     readonly h: UnwrapRef<typeof import('vue')['h']>
+    readonly hasAnyPermission: UnwrapRef<typeof import('./resources/ts/utils/permissions')['hasAnyPermission']>
+    readonly hasPermission: UnwrapRef<typeof import('./resources/ts/utils/permissions')['hasPermission']>
     readonly hexToRgb: UnwrapRef<typeof import('./resources/ts/@core/utils/colorConverter')['hexToRgb']>
     readonly idbDelete: UnwrapRef<typeof import('./resources/ts/utils/idbStore')['idbDelete']>
     readonly idbGet: UnwrapRef<typeof import('./resources/ts/utils/idbStore')['idbGet']>
@@ -460,6 +476,7 @@ declare module 'vue' {
     readonly isReactive: UnwrapRef<typeof import('vue')['isReactive']>
     readonly isReadonly: UnwrapRef<typeof import('vue')['isReadonly']>
     readonly isRef: UnwrapRef<typeof import('vue')['isRef']>
+    readonly isSupervisor: UnwrapRef<typeof import('./resources/ts/utils/permissions')['isSupervisor']>
     readonly isToday: UnwrapRef<typeof import('./resources/ts/@core/utils/helpers')['isToday']>
     readonly kFormatter: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['kFormatter']>
     readonly lengthValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['lengthValidator']>
@@ -577,6 +594,7 @@ declare module 'vue' {
     readonly useBroadcastChannel: UnwrapRef<typeof import('@vueuse/core')['useBroadcastChannel']>
     readonly useBrowserLocation: UnwrapRef<typeof import('@vueuse/core')['useBrowserLocation']>
     readonly useCached: UnwrapRef<typeof import('@vueuse/core')['useCached']>
+    readonly useCan: UnwrapRef<typeof import('./resources/ts/composables/useCan')['useCan']>
     readonly useCeil: UnwrapRef<typeof import('@vueuse/math')['useCeil']>
     readonly useClamp: UnwrapRef<typeof import('@vueuse/math')['useClamp']>
     readonly useClipboard: UnwrapRef<typeof import('@vueuse/core')['useClipboard']>

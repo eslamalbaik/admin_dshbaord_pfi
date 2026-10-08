@@ -137,7 +137,7 @@ const reactivateMutation = useMutation({
     <VCard v-if="tab === 'fields'">
       <VCardTitle class="d-flex justify-space-between align-center">
         <span>المجالات</span>
-        <VBtn size="small" color="primary" prepend-icon="tabler-plus" @click="openCreate('field')">إضافة مجال</VBtn>
+        <VBtn v-if="$can('settings.lookups', 'create')" size="small" color="primary" prepend-icon="tabler-plus" @click="openCreate('field')">إضافة مجال</VBtn>
       </VCardTitle>
       <VProgressLinear v-if="fieldsLoading" indeterminate color="primary" />
       <VTable v-else>
@@ -159,9 +159,9 @@ const reactivateMutation = useMutation({
               </VChip>
             </td>
             <td class="text-center">
-              <VBtn icon="tabler-edit" size="x-small" variant="text" @click="openEdit('field', row)" />
+              <VBtn v-if="$can('settings.lookups', 'update')" icon="tabler-edit" size="x-small" variant="text" @click="openEdit('field', row)" />
               <VBtn
-                v-if="row.is_active"
+                v-if="(row.is_active) && $can('settings.lookups', 'delete')"
                 icon="tabler-trash" size="x-small" variant="text" color="error"
                 @click="confirmDeactivate('field', row)"
               />
@@ -181,7 +181,7 @@ const reactivateMutation = useMutation({
     <VCard v-if="tab === 'specializations'">
       <VCardTitle class="d-flex justify-space-between align-center">
         <span>الاختصاصات</span>
-        <VBtn size="small" color="primary" prepend-icon="tabler-plus" @click="openCreate('specialization')">إضافة اختصاص</VBtn>
+        <VBtn v-if="$can('settings.lookups', 'create')" size="small" color="primary" prepend-icon="tabler-plus" @click="openCreate('specialization')">إضافة اختصاص</VBtn>
       </VCardTitle>
       <VProgressLinear v-if="specsLoading" indeterminate color="primary" />
       <VTable v-else>
@@ -205,9 +205,9 @@ const reactivateMutation = useMutation({
               </VChip>
             </td>
             <td class="text-center">
-              <VBtn icon="tabler-edit" size="x-small" variant="text" @click="openEdit('specialization', row)" />
+              <VBtn v-if="$can('settings.lookups', 'update')" icon="tabler-edit" size="x-small" variant="text" @click="openEdit('specialization', row)" />
               <VBtn
-                v-if="row.is_active"
+                v-if="(row.is_active) && $can('settings.lookups', 'delete')"
                 icon="tabler-trash" size="x-small" variant="text" color="error"
                 @click="confirmDeactivate('specialization', row)"
               />
@@ -227,7 +227,7 @@ const reactivateMutation = useMutation({
     <VCard v-if="tab === 'grades'">
       <VCardTitle class="d-flex justify-space-between align-center">
         <span>الدرجات</span>
-        <VBtn size="small" color="primary" prepend-icon="tabler-plus" @click="openCreate('grade')">إضافة درجة</VBtn>
+        <VBtn v-if="$can('settings.lookups', 'create')" size="small" color="primary" prepend-icon="tabler-plus" @click="openCreate('grade')">إضافة درجة</VBtn>
       </VCardTitle>
       <VProgressLinear v-if="gradesLoading" indeterminate color="primary" />
       <VTable v-else>
@@ -253,9 +253,9 @@ const reactivateMutation = useMutation({
               </VChip>
             </td>
             <td class="text-center">
-              <VBtn icon="tabler-edit" size="x-small" variant="text" @click="openEdit('grade', row)" />
+              <VBtn v-if="$can('settings.lookups', 'update')" icon="tabler-edit" size="x-small" variant="text" @click="openEdit('grade', row)" />
               <VBtn
-                v-if="row.is_active"
+                v-if="(row.is_active) && $can('settings.lookups', 'delete')"
                 icon="tabler-trash" size="x-small" variant="text" color="error"
                 @click="confirmDeactivate('grade', row)"
               />

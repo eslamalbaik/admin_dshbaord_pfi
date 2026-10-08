@@ -4,6 +4,7 @@ import { VForm } from 'vuetify/components/VForm'
 
 import { VNodeRenderer } from '@layouts/components/VNodeRenderer'
 import { themeConfig } from '@themeConfig'
+import { DASHBOARD_ROLES, firstAllowedRoute } from '@/utils/permissions'
 
 definePage({
   meta: {
@@ -58,6 +59,10 @@ const getLoginErrorMessage = (err: any) => {
     return msg
   }
 
+  // حساب مشرف عطّله الأدمن
+  if (err.response.status === 403)
+    return err.response.data?.message || 'تم تعطيل هذا الحساب.'
+
   if (err.response.status === 419)
     return 'تم رفض طلب تسجيل الدخول بواسطة حماية CSRF.'
 
@@ -83,7 +88,7 @@ const login = async () => {
     if (!items?.user || !items?.token)
       throw new Error('Login response did not include a user and token.')
 
-    if (!['admin', 'accountant'].includes(items.user.role)) {
+    if (!DASHBOARD_ROLES.includes(items.user.role)) {
       errors.value.email = 'ليس لديك صلاحية الدخول للوحة التحكم.'
       isSubmitting.value = false
       return
@@ -95,7 +100,7 @@ const login = async () => {
     isSubmitting.value = false
     isSuccess.value = true
     await new Promise(resolve => setTimeout(resolve, SUCCESS_DELAY_MS))
-    await router.replace('/dashboards')
+    await router.replace({ name: firstAllowedRoute(authStore.user) } as any)
   }
   catch (err: any) {
     console.error(err)

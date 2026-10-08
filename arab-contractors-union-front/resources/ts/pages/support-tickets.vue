@@ -242,7 +242,7 @@ function waLink(phone: string | null) {
               <td class="text-body-2">{{ fmtDate(t.created_at) }}</td>
               <td class="text-center" @click.stop>
                 <VBtn icon="tabler-eye" size="x-small" variant="text" @click="openTicket(t)" />
-                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" @click="confirmDelete(t)" />
+                <VBtn v-if="$can('services.support_tickets', 'delete')" icon="tabler-trash" size="x-small" variant="text" color="error" @click="confirmDelete(t)" />
               </td>
             </tr>
           </tbody>
@@ -351,10 +351,10 @@ function waLink(phone: string | null) {
         </VCardText>
 
         <VCardActions>
-          <VBtn color="error" variant="text" @click="confirmDelete(selected)">حذف</VBtn>
+          <VBtn v-if="$can('services.support_tickets', 'delete')" color="error" variant="text" @click="confirmDelete(selected)">حذف</VBtn>
           <VSpacer />
           <VBtn variant="text" @click="isViewOpen = false">إغلاق</VBtn>
-          <VBtn
+          <VBtn v-if="$can('services.support_tickets', 'update')"
             color="primary"
             prepend-icon="tabler-send"
             :disabled="!replyText"

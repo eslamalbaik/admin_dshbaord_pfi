@@ -16,5 +16,6 @@ export function normalizeUser(data: Record<string, unknown> | User | null | unde
     email: String(email),
     role: String(data.role ?? 'student'),
     avatar: data.avatar != null ? String(data.avatar) : undefined,
+    permissions: Array.isArray(data.permissions) ? data.permissions.map(String) : null,
   }
 }

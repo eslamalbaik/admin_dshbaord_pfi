@@ -15,6 +15,13 @@ class CheckRole
      */
     public function handle(Request $request, Closure $next, string ...$roles): Response
     {
+        // المشرف ما إله دور ثابت: بيمر من هون فقط على route عليه perm:... وهو اللي
+        // بيقرر حسب صلاحياته (CheckPermission). بدون perm بيضل ممنوع كما قبل.
+        $user = $request->user();
+        if ($user instanceof \App\Models\User && $user->isSupervisor() && CheckPermission::routeIsGuarded($request)) {
+            return $next($request);
+        }
+
         if (! $request->user() || ! in_array($request->user()->role, $roles, true)) {
             $user = $request->user();
             

@@ -37,6 +37,8 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         $middleware->alias([
             'role' => \App\Http\Middleware\CheckRole::class,
+            'perm' => \App\Http\Middleware\CheckPermission::class,
+            'supervisor.scope' => \App\Http\Middleware\RestrictSupervisor::class,
             'tenant' => \App\Http\Middleware\TenantMiddleware::class,
             'contractor.active' => \App\Http\Middleware\EnsureContractorIsActive::class,
         ]);

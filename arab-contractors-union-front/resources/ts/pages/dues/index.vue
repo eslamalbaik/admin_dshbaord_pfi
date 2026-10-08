@@ -736,7 +736,7 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
         </p>
       </div>
       <div class="d-flex gap-2 flex-wrap">
-        <VBtn
+        <VBtn v-if="$can('finance.dues_discounts', 'update')"
           variant="tonal"
           color="info"
           prepend-icon="tabler-percentage"
@@ -744,7 +744,7 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
         >
           خصم جماعي بمعايير
         </VBtn>
-        <VBtn
+        <VBtn v-if="$can('finance.dues', 'create')"
           variant="tonal"
           color="primary"
           prepend-icon="tabler-calculator"
@@ -752,7 +752,7 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
         >
           توليد رسوم للكل
         </VBtn>
-        <VBtn
+        <VBtn v-if="$can('finance.dues', 'create')"
           variant="tonal"
           color="success"
           prepend-icon="tabler-file-spreadsheet"
@@ -760,7 +760,7 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
         >
           استيراد من إكسل
         </VBtn>
-        <VBtn prepend-icon="tabler-plus" @click="openCreateDue()">
+        <VBtn v-if="$can('finance.dues', 'create')" prepend-icon="tabler-plus" @click="openCreateDue()">
           إضافة ذمة
         </VBtn>
       </div>
@@ -889,7 +889,7 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
               </td>
               <td class="text-end text-no-wrap" @click.stop>
                 <VBtn
-                  v-if="c.remaining_jod > 0"
+                  v-if="(c.remaining_jod > 0) && $can('finance.dues', 'update')"
                   size="small"
                   color="success"
                   variant="tonal"
@@ -906,14 +906,14 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
                   title="احسب الرسوم السنوية (محرّك الاحتساب الآلي)"
                   @click="openCalculateFees(c)"
                 />
-                <VBtn
+                <VBtn v-if="$can('finance.dues', 'create')"
                   size="small"
                   variant="text"
                   icon="tabler-plus"
                   title="إضافة ذمة لهذه الشركة"
                   @click="openCreateDue(c)"
                 />
-                <VBtn
+                <VBtn v-if="$can('contractors.penalties', 'create')"
                   size="small"
                   variant="text"
                   color="error"
@@ -931,7 +931,7 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
                 <template v-else>
                 <div v-if="selectedDueIds.length" class="d-flex align-center gap-3 pa-2" style="background: rgba(var(--v-theme-info), 0.08);">
                   <span class="text-body-2">{{ selectedDueIds.length }} ذمة محدَّدة</span>
-                  <VBtn size="small" color="info" @click="openSelectedDiscount">تطبيق خصم على المحدَّد</VBtn>
+                  <VBtn v-if="$can('finance.dues_discounts', 'update')" size="small" color="info" @click="openSelectedDiscount">تطبيق خصم على المحدَّد</VBtn>
                 </div>
                 <div class="overflow-x-auto">
                 <VTable density="compact" style="background: transparent;">
@@ -964,7 +964,7 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
                       </td>
                       <td class="text-end text-no-wrap">
                         <span :title="Number(accumulatedRow.paid_jod) > 0 ? 'لا يمكن حذف ذمم عليها مبالغ مسدَّدة' : 'حذف الرسوم المتراكمة'">
-                          <VBtn
+                          <VBtn v-if="$can('finance.dues', 'delete')"
                             icon="tabler-trash"
                             size="x-small"
                             variant="text"
@@ -994,9 +994,9 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
                         </VChip>
                       </td>
                       <td class="text-end text-no-wrap">
-                        <VBtn icon="tabler-edit" size="x-small" variant="text" @click="openEditDue(d)" />
+                        <VBtn v-if="$can('finance.dues', 'update')" icon="tabler-edit" size="x-small" variant="text" @click="openEditDue(d)" />
                         <span :title="Number(d.paid_jod) > 0 ? 'لا يمكن حذف ذمة عليها مبالغ مسدَّدة' : 'حذف الذمة'">
-                          <VBtn
+                          <VBtn v-if="$can('finance.dues', 'delete')"
                             icon="tabler-trash"
                             size="x-small"
                             variant="text"

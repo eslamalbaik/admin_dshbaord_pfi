@@ -363,7 +363,7 @@ const deleteNews = async () => {
         <h1 class="text-h4 font-weight-bold" style="font-family:Cairo,sans-serif">الأخبار</h1>
         <p class="text-body-2 text-medium-emphasis mb-0" style="font-family:Cairo,sans-serif">إدارة أخبار وإعلانات وعطاءات الاتحاد المنشورة على الموقع</p>
       </div>
-      <VBtn color="primary" prepend-icon="tabler-plus" @click="openCreate">
+      <VBtn v-if="$can('content.news', 'create')" color="primary" prepend-icon="tabler-plus" @click="openCreate">
         خبر جديد
       </VBtn>
     </div>
@@ -422,11 +422,11 @@ const deleteNews = async () => {
               <VIcon icon="tabler-eye" />
               <VTooltip activator="parent">عرض التفاصيل</VTooltip>
             </VBtn>
-            <VBtn icon size="small" variant="text" color="primary" @click="openEdit(item)">
+            <VBtn v-if="$can('content.news', 'update')" icon size="small" variant="text" color="primary" @click="openEdit(item)">
               <VIcon icon="tabler-pencil" />
               <VTooltip activator="parent">تعديل</VTooltip>
             </VBtn>
-            <VBtn icon size="small" variant="text" color="error" @click="confirmDelete(item)">
+            <VBtn v-if="$can('content.news', 'delete')" icon size="small" variant="text" color="error" @click="confirmDelete(item)">
               <VIcon icon="tabler-trash" />
               <VTooltip activator="parent">حذف</VTooltip>
             </VBtn>

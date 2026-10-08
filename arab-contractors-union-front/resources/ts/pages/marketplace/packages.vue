@@ -120,7 +120,7 @@ const toggleActive = async (pkg: any) => {
           إدارة الباقات المدفوعة لنشر الآليات في سوق الآليات
         </p>
       </div>
-      <VBtn color="primary" prepend-icon="tabler-plus" style="font-family:Cairo,sans-serif" @click="openCreate">
+      <VBtn v-if="$can('marketplace.packages', 'create')" color="primary" prepend-icon="tabler-plus" style="font-family:Cairo,sans-serif" @click="openCreate">
         إضافة باقة
       </VBtn>
     </div>
@@ -160,11 +160,11 @@ const toggleActive = async (pkg: any) => {
             </td>
             <td>
               <div class="d-flex gap-2">
-                <VBtn icon size="small" variant="tonal" color="primary" @click="openEdit(pkg)">
+                <VBtn v-if="$can('marketplace.packages', 'update')" icon size="small" variant="tonal" color="primary" @click="openEdit(pkg)">
                   <VIcon icon="tabler-edit" size="18" />
                   <VTooltip activator="parent">تعديل</VTooltip>
                 </VBtn>
-                <VBtn icon size="small" variant="tonal" color="error" @click="openDelete(pkg)">
+                <VBtn v-if="$can('marketplace.packages', 'delete')" icon size="small" variant="tonal" color="error" @click="openDelete(pkg)">
                   <VIcon icon="tabler-trash" size="18" />
                   <VTooltip activator="parent">حذف</VTooltip>
                 </VBtn>

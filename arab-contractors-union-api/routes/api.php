@@ -280,7 +280,8 @@ Route::prefix('v1')->group(function () {
     // --------------------------------------------------------
     //  Protected — Sanctum
     // --------------------------------------------------------
-    Route::middleware('auth:sanctum')->group(function () {
+    // supervisor.scope: المشرف بيوصل بس للمسارات اللي عليها perm:... (انظر RestrictSupervisor)
+    Route::middleware(['auth:sanctum', 'supervisor.scope'])->group(function () {
 
         // بيانات المستخدم الحالي (authStore.fetchUser)
         Route::get('user', function (\Illuminate\Http\Request $request) {
@@ -291,6 +292,7 @@ Route::prefix('v1')->group(function () {
                 'role'     => $user->role,
                 'email'    => $user->email,
                 'avatar'   => $user->avatar ?? null,
+                'permissions' => $user instanceof \App\Models\User ? $user->dashboardPermissions() : null,
             ]);
         });
 
@@ -305,6 +307,7 @@ Route::prefix('v1')->group(function () {
                     'role'     => $user->role,
                     'email'    => $user->email,
                     'avatar'   => $user->avatar ?? null,
+                    'permissions' => $user instanceof \App\Models\User ? $user->dashboardPermissions() : null,
                 ]);
             });
         });
@@ -312,140 +315,160 @@ Route::prefix('v1')->group(function () {
         // --------------------------------------------------------
         //  Dashboard
         // --------------------------------------------------------
-        Route::get('dashboard/stats', [DashboardController::class, 'index']);
+        Route::get('dashboard/stats', [DashboardController::class, 'index'])->middleware('perm:dashboard.home');
 
         // --------------------------------------------------------
         //  News — Admin CRUD
         // --------------------------------------------------------
         Route::prefix('admin/news')->group(function () {
-            Route::get('/',          [NewsController::class, 'adminIndex']);
-            Route::post('/',         [NewsController::class, 'store']);
-            Route::put('{news}',     [NewsController::class, 'update']);
-            Route::delete('{news}',  [NewsController::class, 'destroy']);
-            Route::delete('{news}/gallery-image', [NewsController::class, 'destroyGalleryImage']);
+            Route::get('/',          [NewsController::class, 'adminIndex'])->middleware('perm:content.news');
+            Route::post('/',         [NewsController::class, 'store'])->middleware('perm:content.news');
+            Route::put('{news}',     [NewsController::class, 'update'])->middleware('perm:content.news');
+            Route::delete('{news}',  [NewsController::class, 'destroy'])->middleware('perm:content.news');
+            Route::delete('{news}/gallery-image', [NewsController::class, 'destroyGalleryImage'])->middleware('perm:content.news');
         });
 
         // --------------------------------------------------------
         //  Events — Admin CRUD
         // --------------------------------------------------------
         Route::prefix('admin/events')->group(function () {
-            Route::get('/',                 [EventController::class, 'adminIndex']);
-            Route::post('/',                [EventController::class, 'store']);
-            Route::put('{event}',           [EventController::class, 'update']);
-            Route::delete('{event}',        [EventController::class, 'destroy']);
-            Route::get('{event}/attendees', [EventController::class, 'attendees']);
+            Route::get('/',                 [EventController::class, 'adminIndex'])->middleware('perm:content.events');
+            Route::post('/',                [EventController::class, 'store'])->middleware('perm:content.events');
+            Route::put('{event}',           [EventController::class, 'update'])->middleware('perm:content.events');
+            Route::delete('{event}',        [EventController::class, 'destroy'])->middleware('perm:content.events');
+            Route::get('{event}/attendees', [EventController::class, 'attendees'])->middleware('perm:content.events');
         });
 
         // --------------------------------------------------------
         //  Announcements — Admin CRUD
         // --------------------------------------------------------
         Route::prefix('admin/announcements')->group(function () {
-            Route::get('/',                  [\App\Http\Controllers\Api\AnnouncementController::class, 'adminIndex']);
-            Route::post('/',                 [\App\Http\Controllers\Api\AnnouncementController::class, 'store']);
-            Route::put('{announcement}',     [\App\Http\Controllers\Api\AnnouncementController::class, 'update']);
-            Route::delete('{announcement}',  [\App\Http\Controllers\Api\AnnouncementController::class, 'destroy']);
+            Route::get('/',                  [\App\Http\Controllers\Api\AnnouncementController::class, 'adminIndex'])->middleware('perm:content.announcements');
+            Route::post('/',                 [\App\Http\Controllers\Api\AnnouncementController::class, 'store'])->middleware('perm:content.announcements');
+            Route::put('{announcement}',     [\App\Http\Controllers\Api\AnnouncementController::class, 'update'])->middleware('perm:content.announcements');
+            Route::delete('{announcement}',  [\App\Http\Controllers\Api\AnnouncementController::class, 'destroy'])->middleware('perm:content.announcements');
         });
 
-        Route::get('announcement-categories',    [\App\Http\Controllers\Api\AnnouncementCategoryController::class, 'index']);
-        Route::post('announcement-categories',   [\App\Http\Controllers\Api\AnnouncementCategoryController::class, 'store']);
-        Route::patch('announcement-categories/{announcementCategory}',  [\App\Http\Controllers\Api\AnnouncementCategoryController::class, 'update']);
-        Route::delete('announcement-categories/{announcementCategory}', [\App\Http\Controllers\Api\AnnouncementCategoryController::class, 'destroy']);
+        Route::get('announcement-categories',    [\App\Http\Controllers\Api\AnnouncementCategoryController::class, 'index'])->middleware('perm:content.announcement_categories|content.announcements,view');
+        Route::post('announcement-categories',   [\App\Http\Controllers\Api\AnnouncementCategoryController::class, 'store'])->middleware('perm:content.announcement_categories');
+        Route::patch('announcement-categories/{announcementCategory}',  [\App\Http\Controllers\Api\AnnouncementCategoryController::class, 'update'])->middleware('perm:content.announcement_categories');
+        Route::delete('announcement-categories/{announcementCategory}', [\App\Http\Controllers\Api\AnnouncementCategoryController::class, 'destroy'])->middleware('perm:content.announcement_categories');
 
         // --------------------------------------------------------
         //  Terms & Conditions — Admin CRUD
         // --------------------------------------------------------
         Route::middleware('role:admin')->group(function () {
-            Route::get('dashboard/terms',          [TermsController::class, 'index']);
-            Route::post('dashboard/terms',         [TermsController::class, 'store']);
-            Route::put('dashboard/terms/{term}',   [TermsController::class, 'update']);
-            Route::delete('dashboard/terms/{term}',[TermsController::class, 'destroy']);
+            Route::get('dashboard/terms',          [TermsController::class, 'index'])->middleware('perm:settings.terms');
+            Route::post('dashboard/terms',         [TermsController::class, 'store'])->middleware('perm:settings.terms');
+            Route::put('dashboard/terms/{term}',   [TermsController::class, 'update'])->middleware('perm:settings.terms');
+            Route::delete('dashboard/terms/{term}',[TermsController::class, 'destroy'])->middleware('perm:settings.terms');
         });
 
         // --------------------------------------------------------
         //  Legal Library — Admin CRUD
         // --------------------------------------------------------
         Route::middleware('role:admin')->group(function () {
-            Route::get('dashboard/legal-files',                  [LegalFileController::class, 'index']);
-            Route::post('dashboard/legal-files',                 [LegalFileController::class, 'store']);
-            Route::post('dashboard/legal-files/{legalFile}',     [LegalFileController::class, 'update']);
-            Route::delete('dashboard/legal-files/{legalFile}',   [LegalFileController::class, 'destroy']);
+            Route::get('dashboard/legal-files',                  [LegalFileController::class, 'index'])->middleware('perm:legal.library');
+            Route::post('dashboard/legal-files',                 [LegalFileController::class, 'store'])->middleware('perm:legal.library');
+            Route::post('dashboard/legal-files/{legalFile}',     [LegalFileController::class, 'update'])->middleware('perm:legal.library,update');
+            Route::delete('dashboard/legal-files/{legalFile}',   [LegalFileController::class, 'destroy'])->middleware('perm:legal.library');
 
-            Route::get('dashboard/legal-file-categories',                          [LegalFileCategoryController::class, 'index']);
-            Route::post('dashboard/legal-file-categories',                         [LegalFileCategoryController::class, 'store']);
-            Route::post('dashboard/legal-file-categories/{legalFileCategory}',     [LegalFileCategoryController::class, 'update']);
-            Route::delete('dashboard/legal-file-categories/{legalFileCategory}',   [LegalFileCategoryController::class, 'destroy']);
+            Route::get('dashboard/legal-file-categories',                          [LegalFileCategoryController::class, 'index'])->middleware('perm:legal.library');
+            Route::post('dashboard/legal-file-categories',                         [LegalFileCategoryController::class, 'store'])->middleware('perm:legal.library');
+            Route::post('dashboard/legal-file-categories/{legalFileCategory}',     [LegalFileCategoryController::class, 'update'])->middleware('perm:legal.library,update');
+            Route::delete('dashboard/legal-file-categories/{legalFileCategory}',   [LegalFileCategoryController::class, 'destroy'])->middleware('perm:legal.library');
         });
 
         // --------------------------------------------------------
         //  Contractors
         // --------------------------------------------------------
-        Route::get('contractors/next-membership-number', [ContractorController::class, 'nextMembershipNumber']);
+        Route::get('contractors/next-membership-number', [ContractorController::class, 'nextMembershipNumber'])->middleware('perm:contractors.list,create');
+        // القائمة/التفاصيل بتستخدمها صفحات تانية لاختيار مقاول (الذمم، المدفوعات، الوثائق...)
         Route::apiResource('contractors', ContractorController::class)
-             ->only(['index', 'store', 'show', 'update', 'destroy']);
-        Route::post('contractors/{contractor}/qr', [ContractorController::class, 'generateQR']);
-        Route::patch('contractors/{contractor}/status', [ContractorController::class, 'changeStatus']);
-        Route::patch('contractors/{contractor}/freeze', [ContractorController::class, 'freeze']);
-        Route::patch('contractors/{contractor}/contact', [ContractorController::class, 'updateContact']);
+             ->only(['index', 'show'])
+             ->middleware('perm:contractors.list|contractors.penalties|finance.payments|finance.dues|finance.balances|marketplace.equipment|services.membership_certificates|services.certificate_requests|documents.manage,view');
+        Route::apiResource('contractors', ContractorController::class)
+             ->only(['store', 'update', 'destroy'])
+             ->middleware('perm:contractors.list');
+        Route::post('contractors/{contractor}/qr', [ContractorController::class, 'generateQR'])->middleware('perm:contractors.list,update');
+        Route::patch('contractors/{contractor}/status', [ContractorController::class, 'changeStatus'])->middleware('perm:contractors.list');
+        Route::patch('contractors/{contractor}/freeze', [ContractorController::class, 'freeze'])->middleware('perm:contractors.list');
+        Route::patch('contractors/{contractor}/contact', [ContractorController::class, 'updateContact'])->middleware('perm:contractors.list');
 
         // --------------------------------------------------------
         //  Memberships
         // --------------------------------------------------------
-        Route::get('memberships/pending',               [MembershipController::class, 'pending']);
-        Route::get('memberships',                       [MembershipController::class, 'index']);
-        Route::post('memberships',                      [MembershipController::class, 'store']);
-        Route::post('memberships/{membership}/approve', [MembershipController::class, 'approve']);
-        Route::post('memberships/{membership}/reject',  [MembershipController::class, 'reject']);
+        Route::get('memberships/pending',               [MembershipController::class, 'pending'])->middleware('perm:contractors.memberships');
+        Route::get('memberships',                       [MembershipController::class, 'index'])->middleware('perm:contractors.memberships');
+        Route::post('memberships',                      [MembershipController::class, 'store'])->middleware('perm:contractors.memberships');
+        Route::post('memberships/{membership}/approve', [MembershipController::class, 'approve'])->middleware('perm:contractors.memberships,update');
+        Route::post('memberships/{membership}/reject',  [MembershipController::class, 'reject'])->middleware('perm:contractors.memberships,update');
 
         // --------------------------------------------------------
         //  Payments
         // --------------------------------------------------------
-        Route::get('payments/transactions',  [PaymentController::class, 'index']);
-        Route::post('payments/transactions', [PaymentController::class, 'store']);
+        Route::get('payments/transactions',  [PaymentController::class, 'index'])->middleware('perm:finance.payments');
+        Route::post('payments/transactions', [PaymentController::class, 'store'])->middleware('perm:finance.payments');
         Route::post('payments/transactions/manual', [PaymentController::class, 'storeManual'])
-             ->middleware('role:admin,accountant');
-        Route::post('payments/transactions/{payment}/confirm', [PaymentController::class, 'confirm']);
-        Route::post('payments/transactions/{payment}/reject',  [PaymentController::class, 'reject']);
-        Route::post('payments/transactions/{payment}/status',  [PaymentController::class, 'changeStatus']);
-        Route::post('payments/transactions/{payment}/receipt-image', [PaymentController::class, 'uploadReceiptImage']);
+             ->middleware('role:admin,accountant')
+             ->middleware('perm:finance.payments');
+        Route::post('payments/transactions/{payment}/confirm', [PaymentController::class, 'confirm'])->middleware('perm:finance.payments,update');
+        Route::post('payments/transactions/{payment}/reject',  [PaymentController::class, 'reject'])->middleware('perm:finance.payments,update');
+        Route::post('payments/transactions/{payment}/status',  [PaymentController::class, 'changeStatus'])->middleware('perm:finance.payments,update');
+        Route::post('payments/transactions/{payment}/receipt-image', [PaymentController::class, 'uploadReceiptImage'])->middleware('perm:finance.payments,update');
 
         // --------------------------------------------------------
         //  Bank Accounts — Admin CRUD (شاشة الدفع)
         // --------------------------------------------------------
         Route::middleware('role:admin')->group(function () {
-            Route::get('dashboard/bank-accounts',                [BankAccountController::class, 'index']);
-            Route::post('dashboard/bank-accounts',               [BankAccountController::class, 'store']);
-            Route::match(['post', 'put'], 'dashboard/bank-accounts/{bankAccount}', [BankAccountController::class, 'update']);
-            Route::delete('dashboard/bank-accounts/{bankAccount}',[BankAccountController::class, 'destroy']);
+            Route::get('dashboard/bank-accounts',                [BankAccountController::class, 'index'])->middleware('perm:finance.bank_accounts');
+            Route::post('dashboard/bank-accounts',               [BankAccountController::class, 'store'])->middleware('perm:finance.bank_accounts');
+            Route::match(['post', 'put'], 'dashboard/bank-accounts/{bankAccount}', [BankAccountController::class, 'update'])->middleware('perm:finance.bank_accounts,update');
+            Route::delete('dashboard/bank-accounts/{bankAccount}',[BankAccountController::class, 'destroy'])->middleware('perm:finance.bank_accounts');
         });
 
         // --------------------------------------------------------
         //  App Settings — Admin (واتساب/بريد الدعم، بيانات الاتحاد، السوشال ميديا)
         // --------------------------------------------------------
         Route::middleware('role:admin')->group(function () {
-            Route::get('dashboard/settings',       [SettingController::class, 'index']);
-            Route::put('dashboard/settings',       [SettingController::class, 'update']);
-            Route::post('dashboard/settings/logo', [SettingController::class, 'uploadLogo']);
-            Route::post('dashboard/settings/cover-image', [SettingController::class, 'uploadCoverImage']);
-            Route::post('dashboard/settings/service-icon', [SettingController::class, 'uploadServiceIcon']);
+            Route::get('dashboard/settings',       [SettingController::class, 'index'])->middleware('perm:settings.app');
+            Route::put('dashboard/settings',       [SettingController::class, 'update'])->middleware('perm:settings.app');
+            Route::post('dashboard/settings/logo', [SettingController::class, 'uploadLogo'])->middleware('perm:settings.app,update');
+            Route::post('dashboard/settings/cover-image', [SettingController::class, 'uploadCoverImage'])->middleware('perm:settings.app,update');
+            Route::post('dashboard/settings/service-icon', [SettingController::class, 'uploadServiceIcon'])->middleware('perm:settings.app,update');
         });
 
         // --------------------------------------------------------
         //  Activity Log — سجل النشاط الإداري (Admin only، للمساءلة والمراجعة)
         // --------------------------------------------------------
         Route::middleware('role:admin')->group(function () {
-            Route::get('dashboard/activity-logs',         [\App\Http\Controllers\Api\ActivityLogController::class, 'index']);
-            Route::get('dashboard/activity-logs/actions',  [\App\Http\Controllers\Api\ActivityLogController::class, 'actions']);
-            Route::get('dashboard/activity-logs/critical-summary', [\App\Http\Controllers\Api\ActivityLogController::class, 'criticalSummary']);
+            Route::get('dashboard/activity-logs',         [\App\Http\Controllers\Api\ActivityLogController::class, 'index'])->middleware('perm:settings.activity_log,view');
+            Route::get('dashboard/activity-logs/actions',  [\App\Http\Controllers\Api\ActivityLogController::class, 'actions'])->middleware('perm:settings.activity_log,view');
+            Route::get('dashboard/activity-logs/critical-summary', [\App\Http\Controllers\Api\ActivityLogController::class, 'criticalSummary'])->middleware('perm:settings.activity_log,view');
+        });
+
+        // --------------------------------------------------------
+        //  Supervisors — إدارة المشرفين وصلاحياتهم حسب الأقسام (أدمن فقط، ما في perm:
+        //  عشان ولا مشرف يقدر يعطي حاله أو غيره صلاحيات)
+        // --------------------------------------------------------
+        Route::middleware('role:admin')->prefix('dashboard/supervisors')->group(function () {
+            Route::get('permissions-catalog',  [\App\Http\Controllers\Api\SupervisorController::class, 'catalog']);
+            Route::get('/',                    [\App\Http\Controllers\Api\SupervisorController::class, 'index']);
+            Route::post('/',                   [\App\Http\Controllers\Api\SupervisorController::class, 'store']);
+            Route::get('{id}',                 [\App\Http\Controllers\Api\SupervisorController::class, 'show'])->whereNumber('id');
+            Route::put('{id}',                 [\App\Http\Controllers\Api\SupervisorController::class, 'update'])->whereNumber('id');
+            Route::patch('{id}/status',        [\App\Http\Controllers\Api\SupervisorController::class, 'updateStatus'])->whereNumber('id');
+            Route::post('{id}/reset-password', [\App\Http\Controllers\Api\SupervisorController::class, 'resetPassword'])->whereNumber('id');
         });
 
         // --------------------------------------------------------
         //  Dynamic Pages — Admin CRUD
         // --------------------------------------------------------
         Route::middleware('role:admin')->group(function () {
-            Route::get('dashboard/pages',           [\App\Http\Controllers\Api\PageController::class, 'index']);
-            Route::post('dashboard/pages',          [\App\Http\Controllers\Api\PageController::class, 'store']);
-            Route::put('dashboard/pages/{page}',    [\App\Http\Controllers\Api\PageController::class, 'update']);
-            Route::delete('dashboard/pages/{page}', [\App\Http\Controllers\Api\PageController::class, 'destroy']);
+            Route::get('dashboard/pages',           [\App\Http\Controllers\Api\PageController::class, 'index'])->middleware('perm:settings.pages');
+            Route::post('dashboard/pages',          [\App\Http\Controllers\Api\PageController::class, 'store'])->middleware('perm:settings.pages');
+            Route::put('dashboard/pages/{page}',    [\App\Http\Controllers\Api\PageController::class, 'update'])->middleware('perm:settings.pages');
+            Route::delete('dashboard/pages/{page}', [\App\Http\Controllers\Api\PageController::class, 'destroy'])->middleware('perm:settings.pages');
         });
 
         // --------------------------------------------------------
@@ -453,68 +476,68 @@ Route::prefix('v1')->group(function () {
         // --------------------------------------------------------
         // المسارات الثابتة قبل {certificateRequest} حتى لا تُلتقط كمعرّف
         Route::middleware('role:admin')->group(function () {
-            Route::get('dashboard/certificate-requests',                                  [CertificateRequestController::class, 'adminIndex']);
-            Route::post('dashboard/certificate-requests/issue-membership',                [CertificateRequestController::class, 'adminIssueMembership']);
-            Route::post('dashboard/certificate-requests/bulk-delete',                     [CertificateRequestController::class, 'bulkDestroy']);
-            Route::get('dashboard/certificate-requests/{certificateRequest}',             [CertificateRequestController::class, 'show']);
-            Route::post('dashboard/certificate-requests/{certificateRequest}/approve',    [CertificateRequestController::class, 'approve']);
-            Route::post('dashboard/certificate-requests/{certificateRequest}/reject',     [CertificateRequestController::class, 'reject']);
-            Route::post('dashboard/certificate-requests/{certificateRequest}/issue',      [CertificateRequestController::class, 'issue']);
-            Route::post('dashboard/certificate-requests/{certificateRequest}/regenerate', [CertificateRequestController::class, 'regenerate']);
-            Route::delete('dashboard/certificate-requests/{certificateRequest}',          [CertificateRequestController::class, 'destroy']);
+            Route::get('dashboard/certificate-requests',                                  [CertificateRequestController::class, 'adminIndex'])->middleware('perm:services.certificate_requests|services.membership_certificates');
+            Route::post('dashboard/certificate-requests/issue-membership',                [CertificateRequestController::class, 'adminIssueMembership'])->middleware('perm:services.membership_certificates,create');
+            Route::post('dashboard/certificate-requests/bulk-delete',                     [CertificateRequestController::class, 'bulkDestroy'])->middleware('perm:services.membership_certificates,delete');
+            Route::get('dashboard/certificate-requests/{certificateRequest}',             [CertificateRequestController::class, 'show'])->middleware('perm:services.certificate_requests|services.membership_certificates');
+            Route::post('dashboard/certificate-requests/{certificateRequest}/approve',    [CertificateRequestController::class, 'approve'])->middleware('perm:services.certificate_requests,update');
+            Route::post('dashboard/certificate-requests/{certificateRequest}/reject',     [CertificateRequestController::class, 'reject'])->middleware('perm:services.certificate_requests,update');
+            Route::post('dashboard/certificate-requests/{certificateRequest}/issue',      [CertificateRequestController::class, 'issue'])->middleware('perm:services.certificate_requests,update');
+            Route::post('dashboard/certificate-requests/{certificateRequest}/regenerate', [CertificateRequestController::class, 'regenerate'])->middleware('perm:services.membership_certificates,update');
+            Route::delete('dashboard/certificate-requests/{certificateRequest}',          [CertificateRequestController::class, 'destroy'])->middleware('perm:services.certificate_requests|services.membership_certificates');
         });
 
         // --------------------------------------------------------
         //  Support Tickets — Admin (الدعم الفني، أُعيد تفعيلها بتصميم جديد)
         // --------------------------------------------------------
         Route::middleware('role:admin')->group(function () {
-            Route::get('dashboard/support-tickets',                     [SupportTicketController::class, 'index']);
-            Route::get('dashboard/support-tickets/{ticket}',             [SupportTicketController::class, 'show']);
-            Route::post('dashboard/support-tickets/{ticket}/reply',      [SupportTicketController::class, 'reply']);
-            Route::patch('dashboard/support-tickets/{ticket}/status',    [SupportTicketController::class, 'updateStatus']);
-            Route::delete('dashboard/support-tickets/{ticket}',          [SupportTicketController::class, 'destroy']);
+            Route::get('dashboard/support-tickets',                     [SupportTicketController::class, 'index'])->middleware('perm:services.support_tickets');
+            Route::get('dashboard/support-tickets/{ticket}',             [SupportTicketController::class, 'show'])->middleware('perm:services.support_tickets');
+            Route::post('dashboard/support-tickets/{ticket}/reply',      [SupportTicketController::class, 'reply'])->middleware('perm:services.support_tickets,update');
+            Route::patch('dashboard/support-tickets/{ticket}/status',    [SupportTicketController::class, 'updateStatus'])->middleware('perm:services.support_tickets');
+            Route::delete('dashboard/support-tickets/{ticket}',          [SupportTicketController::class, 'destroy'])->middleware('perm:services.support_tickets');
         });
 
         // --------------------------------------------------------
         //  Contractor Dues — الذمم المالية (أدمن + محاسب)
         // --------------------------------------------------------
         Route::middleware('role:admin,accountant')->group(function () {
-            Route::get('dashboard/dues',                [\App\Http\Controllers\Api\ContractorDueController::class, 'index']);
-            Route::get('dashboard/dues/summary',        [\App\Http\Controllers\Api\ContractorDueController::class, 'summary']);
-            Route::get('dashboard/dues/by-contractor',  [\App\Http\Controllers\Api\ContractorDueController::class, 'byContractor']);
-            Route::post('dashboard/dues/import',        [\App\Http\Controllers\Api\ContractorDueController::class, 'import']);
-            Route::post('dashboard/contractors/{contractor}/dues/pay', [\App\Http\Controllers\Api\ContractorDueController::class, 'payForContractor']);
-            Route::post('dashboard/dues',               [\App\Http\Controllers\Api\ContractorDueController::class, 'store']);
-            Route::patch('dashboard/dues/{due}',        [\App\Http\Controllers\Api\ContractorDueController::class, 'update']);
-            Route::post('dashboard/dues/{due}/settle',  [\App\Http\Controllers\Api\ContractorDueController::class, 'settle']);
-            Route::delete('dashboard/dues/{due}',       [\App\Http\Controllers\Api\ContractorDueController::class, 'destroy']);
-            Route::post('dashboard/dues/bulk-delete',   [\App\Http\Controllers\Api\ContractorDueController::class, 'bulkDestroy']);
+            Route::get('dashboard/dues',                [\App\Http\Controllers\Api\ContractorDueController::class, 'index'])->middleware('perm:finance.dues');
+            Route::get('dashboard/dues/summary',        [\App\Http\Controllers\Api\ContractorDueController::class, 'summary'])->middleware('perm:finance.dues');
+            Route::get('dashboard/dues/by-contractor',  [\App\Http\Controllers\Api\ContractorDueController::class, 'byContractor'])->middleware('perm:finance.dues');
+            Route::post('dashboard/dues/import',        [\App\Http\Controllers\Api\ContractorDueController::class, 'import'])->middleware('perm:finance.dues,create');
+            Route::post('dashboard/contractors/{contractor}/dues/pay', [\App\Http\Controllers\Api\ContractorDueController::class, 'payForContractor'])->middleware('perm:finance.dues,update');
+            Route::post('dashboard/dues',               [\App\Http\Controllers\Api\ContractorDueController::class, 'store'])->middleware('perm:finance.dues');
+            Route::patch('dashboard/dues/{due}',        [\App\Http\Controllers\Api\ContractorDueController::class, 'update'])->middleware('perm:finance.dues');
+            Route::post('dashboard/dues/{due}/settle',  [\App\Http\Controllers\Api\ContractorDueController::class, 'settle'])->middleware('perm:finance.dues,update');
+            Route::delete('dashboard/dues/{due}',       [\App\Http\Controllers\Api\ContractorDueController::class, 'destroy'])->middleware('perm:finance.dues');
+            Route::post('dashboard/dues/bulk-delete',   [\App\Http\Controllers\Api\ContractorDueController::class, 'bulkDestroy'])->middleware('perm:finance.dues,delete');
 
             // أرصدة المقاولين — صافي له/عليه لكل شركة
-            Route::get('dashboard/balances',            [\App\Http\Controllers\Api\ContractorBalanceController::class, 'index']);
-            Route::get('dashboard/balances/summary',    [\App\Http\Controllers\Api\ContractorBalanceController::class, 'summary']);
-            Route::get('dashboard/balances/{contractor}/statement', [\App\Http\Controllers\Api\ContractorBalanceController::class, 'statement']);
+            Route::get('dashboard/balances',            [\App\Http\Controllers\Api\ContractorBalanceController::class, 'index'])->middleware('perm:finance.balances');
+            Route::get('dashboard/balances/summary',    [\App\Http\Controllers\Api\ContractorBalanceController::class, 'summary'])->middleware('perm:finance.balances');
+            Route::get('dashboard/balances/{contractor}/statement', [\App\Http\Controllers\Api\ContractorBalanceController::class, 'statement'])->middleware('perm:finance.balances|finance.dues,view');
 
             // أسعار الصرف (عرض + override يدوي)
-            Route::get('dashboard/exchange-rates',  [\App\Http\Controllers\Api\ExchangeRateController::class, 'index']);
-            Route::post('dashboard/exchange-rates', [\App\Http\Controllers\Api\ExchangeRateController::class, 'store']);
+            Route::get('dashboard/exchange-rates',  [\App\Http\Controllers\Api\ExchangeRateController::class, 'index'])->middleware('perm:finance.exchange_rates|finance.payments|finance.dues|finance.balances,view');
+            Route::post('dashboard/exchange-rates', [\App\Http\Controllers\Api\ExchangeRateController::class, 'store'])->middleware('perm:finance.exchange_rates,update');
 
             // جدول رسوم الدرجات — قراءة فقط هنا (التعديل صلاحية أدمن، أدناه)
-            Route::get('dashboard/grade-fees', [\App\Http\Controllers\Api\GradeFeeController::class, 'index']);
+            Route::get('dashboard/grade-fees', [\App\Http\Controllers\Api\GradeFeeController::class, 'index'])->middleware('perm:finance.grade_fees|finance.dues,view');
 
             // محرّك احتساب رسوم العضوية (المادة 37) — معاينة/توليد فردي وجماعي
-            Route::post('dashboard/contractors/{contractor}/dues/calculate-fee', [\App\Http\Controllers\Api\ContractorDueController::class, 'calculateFee']);
-            Route::post('dashboard/contractors/{contractor}/dues/generate-fee',  [\App\Http\Controllers\Api\ContractorDueController::class, 'generateFee']);
-            Route::post('dashboard/dues/generate-fee/bulk',                     [\App\Http\Controllers\Api\ContractorDueController::class, 'generateFeeBulk']);
+            Route::post('dashboard/contractors/{contractor}/dues/calculate-fee', [\App\Http\Controllers\Api\ContractorDueController::class, 'calculateFee'])->middleware('perm:finance.dues,view');
+            Route::post('dashboard/contractors/{contractor}/dues/generate-fee',  [\App\Http\Controllers\Api\ContractorDueController::class, 'generateFee'])->middleware('perm:finance.dues,create');
+            Route::post('dashboard/dues/generate-fee/bulk',                     [\App\Http\Controllers\Api\ContractorDueController::class, 'generateFeeBulk'])->middleware('perm:finance.dues,create');
 
             // خصم فردي على ذمة قائمة (المادة 37/ت)
-            Route::post('dashboard/dues/{due}/discount', [\App\Http\Controllers\Api\ContractorDueController::class, 'applyDiscount']);
+            Route::post('dashboard/dues/{due}/discount', [\App\Http\Controllers\Api\ContractorDueController::class, 'applyDiscount'])->middleware('perm:finance.dues_discounts,update');
         });
 
         // صلاحية أدمن فقط — تعديل رسوم الدرجات والخصم الجماعي (المادة 37/ت تُطر هذه كصلاحية مجلس إدارة)
         Route::middleware('role:admin')->group(function () {
-            Route::put('dashboard/grade-fees/{gradeFee}', [\App\Http\Controllers\Api\GradeFeeController::class, 'update']);
-            Route::post('dashboard/dues/discount/bulk',   [\App\Http\Controllers\Api\ContractorDueController::class, 'applyDiscountBulk']);
+            Route::put('dashboard/grade-fees/{gradeFee}', [\App\Http\Controllers\Api\GradeFeeController::class, 'update'])->middleware('perm:finance.grade_fees');
+            Route::post('dashboard/dues/discount/bulk',   [\App\Http\Controllers\Api\ContractorDueController::class, 'applyDiscountBulk'])->middleware('perm:finance.dues_discounts,update');
         });
 
         // --------------------------------------------------------
@@ -522,20 +545,20 @@ Route::prefix('v1')->group(function () {
         //  هذه الأكواد تغذّي محرّك حساب الرسوم وتوليد الشهادات مباشرة)
         // --------------------------------------------------------
         Route::middleware('role:admin')->group(function () {
-            Route::get('dashboard/contractor-fields',          [\App\Http\Controllers\Api\ContractorLookupController::class, 'fieldsIndex']);
-            Route::post('dashboard/contractor-fields',         [\App\Http\Controllers\Api\ContractorLookupController::class, 'fieldsStore']);
-            Route::patch('dashboard/contractor-fields/{contractorField}',  [\App\Http\Controllers\Api\ContractorLookupController::class, 'fieldsUpdate']);
-            Route::delete('dashboard/contractor-fields/{contractorField}', [\App\Http\Controllers\Api\ContractorLookupController::class, 'fieldsDestroy']);
+            Route::get('dashboard/contractor-fields',          [\App\Http\Controllers\Api\ContractorLookupController::class, 'fieldsIndex'])->middleware('perm:settings.lookups');
+            Route::post('dashboard/contractor-fields',         [\App\Http\Controllers\Api\ContractorLookupController::class, 'fieldsStore'])->middleware('perm:settings.lookups');
+            Route::patch('dashboard/contractor-fields/{contractorField}',  [\App\Http\Controllers\Api\ContractorLookupController::class, 'fieldsUpdate'])->middleware('perm:settings.lookups');
+            Route::delete('dashboard/contractor-fields/{contractorField}', [\App\Http\Controllers\Api\ContractorLookupController::class, 'fieldsDestroy'])->middleware('perm:settings.lookups');
 
-            Route::get('dashboard/contractor-specializations',          [\App\Http\Controllers\Api\ContractorLookupController::class, 'specializationsIndex']);
-            Route::post('dashboard/contractor-specializations',         [\App\Http\Controllers\Api\ContractorLookupController::class, 'specializationsStore']);
-            Route::patch('dashboard/contractor-specializations/{contractorSpecialization}',  [\App\Http\Controllers\Api\ContractorLookupController::class, 'specializationsUpdate']);
-            Route::delete('dashboard/contractor-specializations/{contractorSpecialization}', [\App\Http\Controllers\Api\ContractorLookupController::class, 'specializationsDestroy']);
+            Route::get('dashboard/contractor-specializations',          [\App\Http\Controllers\Api\ContractorLookupController::class, 'specializationsIndex'])->middleware('perm:settings.lookups');
+            Route::post('dashboard/contractor-specializations',         [\App\Http\Controllers\Api\ContractorLookupController::class, 'specializationsStore'])->middleware('perm:settings.lookups');
+            Route::patch('dashboard/contractor-specializations/{contractorSpecialization}',  [\App\Http\Controllers\Api\ContractorLookupController::class, 'specializationsUpdate'])->middleware('perm:settings.lookups');
+            Route::delete('dashboard/contractor-specializations/{contractorSpecialization}', [\App\Http\Controllers\Api\ContractorLookupController::class, 'specializationsDestroy'])->middleware('perm:settings.lookups');
 
-            Route::get('dashboard/contractor-grades',          [\App\Http\Controllers\Api\ContractorLookupController::class, 'gradesIndex']);
-            Route::post('dashboard/contractor-grades',         [\App\Http\Controllers\Api\ContractorLookupController::class, 'gradesStore']);
-            Route::patch('dashboard/contractor-grades/{contractorGrade}',  [\App\Http\Controllers\Api\ContractorLookupController::class, 'gradesUpdate']);
-            Route::delete('dashboard/contractor-grades/{contractorGrade}', [\App\Http\Controllers\Api\ContractorLookupController::class, 'gradesDestroy']);
+            Route::get('dashboard/contractor-grades',          [\App\Http\Controllers\Api\ContractorLookupController::class, 'gradesIndex'])->middleware('perm:settings.lookups');
+            Route::post('dashboard/contractor-grades',         [\App\Http\Controllers\Api\ContractorLookupController::class, 'gradesStore'])->middleware('perm:settings.lookups');
+            Route::patch('dashboard/contractor-grades/{contractorGrade}',  [\App\Http\Controllers\Api\ContractorLookupController::class, 'gradesUpdate'])->middleware('perm:settings.lookups');
+            Route::delete('dashboard/contractor-grades/{contractorGrade}', [\App\Http\Controllers\Api\ContractorLookupController::class, 'gradesDestroy'])->middleware('perm:settings.lookups');
         });
 
         // --------------------------------------------------------
@@ -543,47 +566,47 @@ Route::prefix('v1')->group(function () {
         //  تغذّي contractors.governorate_id/city_id وGET /api/v1/app/governorates العام)
         // --------------------------------------------------------
         Route::middleware('role:admin')->group(function () {
-            Route::get('dashboard/governorates',          [\App\Http\Controllers\Api\GovernorateController::class, 'governoratesIndex']);
-            Route::post('dashboard/governorates',         [\App\Http\Controllers\Api\GovernorateController::class, 'governoratesStore']);
-            Route::patch('dashboard/governorates/{governorate}',  [\App\Http\Controllers\Api\GovernorateController::class, 'governoratesUpdate']);
-            Route::delete('dashboard/governorates/{governorate}', [\App\Http\Controllers\Api\GovernorateController::class, 'governoratesDestroy']);
+            Route::get('dashboard/governorates',          [\App\Http\Controllers\Api\GovernorateController::class, 'governoratesIndex'])->middleware('perm:settings.governorates');
+            Route::post('dashboard/governorates',         [\App\Http\Controllers\Api\GovernorateController::class, 'governoratesStore'])->middleware('perm:settings.governorates');
+            Route::patch('dashboard/governorates/{governorate}',  [\App\Http\Controllers\Api\GovernorateController::class, 'governoratesUpdate'])->middleware('perm:settings.governorates');
+            Route::delete('dashboard/governorates/{governorate}', [\App\Http\Controllers\Api\GovernorateController::class, 'governoratesDestroy'])->middleware('perm:settings.governorates');
 
-            Route::get('dashboard/cities',          [\App\Http\Controllers\Api\GovernorateController::class, 'citiesIndex']);
-            Route::post('dashboard/cities',         [\App\Http\Controllers\Api\GovernorateController::class, 'citiesStore']);
-            Route::patch('dashboard/cities/{city}',  [\App\Http\Controllers\Api\GovernorateController::class, 'citiesUpdate']);
-            Route::delete('dashboard/cities/{city}', [\App\Http\Controllers\Api\GovernorateController::class, 'citiesDestroy']);
+            Route::get('dashboard/cities',          [\App\Http\Controllers\Api\GovernorateController::class, 'citiesIndex'])->middleware('perm:settings.governorates');
+            Route::post('dashboard/cities',         [\App\Http\Controllers\Api\GovernorateController::class, 'citiesStore'])->middleware('perm:settings.governorates');
+            Route::patch('dashboard/cities/{city}',  [\App\Http\Controllers\Api\GovernorateController::class, 'citiesUpdate'])->middleware('perm:settings.governorates');
+            Route::delete('dashboard/cities/{city}', [\App\Http\Controllers\Api\GovernorateController::class, 'citiesDestroy'])->middleware('perm:settings.governorates');
         });
 
         // --------------------------------------------------------
         //  Penalties — Admin (الغرامات المالية)
         // --------------------------------------------------------
         Route::middleware('role:admin,accountant')->group(function () {
-            Route::get('penalties',                    [PenaltyController::class, 'index']);
-            Route::post('penalties',                   [PenaltyController::class, 'store']);
-            Route::get('penalties/{penalty}',          [PenaltyController::class, 'show']);
-            Route::patch('penalties/{penalty}/status', [PenaltyController::class, 'updateStatus']);
-            Route::delete('penalties/{penalty}',       [PenaltyController::class, 'destroy']);
+            Route::get('penalties',                    [PenaltyController::class, 'index'])->middleware('perm:contractors.penalties|finance.dues,view');
+            Route::post('penalties',                   [PenaltyController::class, 'store'])->middleware('perm:contractors.penalties');
+            Route::get('penalties/{penalty}',          [PenaltyController::class, 'show'])->middleware('perm:contractors.penalties');
+            Route::patch('penalties/{penalty}/status', [PenaltyController::class, 'updateStatus'])->middleware('perm:contractors.penalties');
+            Route::delete('penalties/{penalty}',       [PenaltyController::class, 'destroy'])->middleware('perm:contractors.penalties');
         });
 
         // --------------------------------------------------------
         //  Tenders
         // --------------------------------------------------------
         // تصنيفات العطاءات + صورة افتراضية لكل تصنيف (بدل tenders/category-images السابقة)
-        Route::get('tender-categories',                     [TenderCategoryController::class, 'index']);
-        Route::post('tender-categories',                    [TenderCategoryController::class, 'store']);
-        Route::patch('tender-categories/{tenderCategory}',  [TenderCategoryController::class, 'update']);
-        Route::delete('tender-categories/{tenderCategory}', [TenderCategoryController::class, 'destroy']);
-        Route::apiResource('tenders', TenderController::class);
-        Route::post('tenders/{tender}/attachments', [TenderController::class, 'storeAttachment']);
-        Route::delete('tenders/{tender}/attachments/{attachment}', [TenderController::class, 'destroyAttachment']);
+        Route::get('tender-categories',                     [TenderCategoryController::class, 'index'])->middleware('perm:tenders.categories|tenders.list,view');
+        Route::post('tender-categories',                    [TenderCategoryController::class, 'store'])->middleware('perm:tenders.categories');
+        Route::patch('tender-categories/{tenderCategory}',  [TenderCategoryController::class, 'update'])->middleware('perm:tenders.categories');
+        Route::delete('tender-categories/{tenderCategory}', [TenderCategoryController::class, 'destroy'])->middleware('perm:tenders.categories');
+        Route::apiResource('tenders', TenderController::class)->middleware('perm:tenders.list');
+        Route::post('tenders/{tender}/attachments', [TenderController::class, 'storeAttachment'])->middleware('perm:tenders.list,update');
+        Route::delete('tenders/{tender}/attachments/{attachment}', [TenderController::class, 'destroyAttachment'])->middleware('perm:tenders.list,update');
 
         // --------------------------------------------------------
         //  Documents
         // --------------------------------------------------------
-        Route::get('documents',               [DocumentController::class, 'index']);
-        Route::get('documents/export-zip',    [DocumentController::class, 'exportZip']);
-        Route::post('documents',              [DocumentController::class, 'store']);
-        Route::delete('documents/{document}', [DocumentController::class, 'destroy']);
+        Route::get('documents',               [DocumentController::class, 'index'])->middleware('perm:documents.manage');
+        Route::get('documents/export-zip',    [DocumentController::class, 'exportZip'])->middleware('perm:documents.manage,view');
+        Route::post('documents',              [DocumentController::class, 'store'])->middleware('perm:documents.manage');
+        Route::delete('documents/{document}', [DocumentController::class, 'destroy'])->middleware('perm:documents.manage');
 
         // --------------------------------------------------------
         //  Users & Notifications
@@ -595,53 +618,53 @@ Route::prefix('v1')->group(function () {
 
         // بث إشعارات مستهدَفة لكل المقاولين — أدمن فقط (REQ-22)
         Route::middleware('role:admin')->group(function () {
-            Route::post('notifications/broadcast', [NotificationController::class, 'broadcast']);
+            Route::post('notifications/broadcast', [NotificationController::class, 'broadcast'])->middleware('perm:reports.broadcast,create');
         });
 
         // --------------------------------------------------------
         //  Equipment Marketplace — سوق الآليات
         // --------------------------------------------------------
-        Route::get('equipment-types',                    [EquipmentTypeController::class, 'index']);
-        Route::post('equipment-types',                   [EquipmentTypeController::class, 'store']);
-        Route::patch('equipment-types/{equipmentType}',  [EquipmentTypeController::class, 'update']);
-        Route::delete('equipment-types/{equipmentType}', [EquipmentTypeController::class, 'destroy']);
+        Route::get('equipment-types',                    [EquipmentTypeController::class, 'index'])->middleware('perm:marketplace.types|marketplace.equipment,view');
+        Route::post('equipment-types',                   [EquipmentTypeController::class, 'store'])->middleware('perm:marketplace.types');
+        Route::patch('equipment-types/{equipmentType}',  [EquipmentTypeController::class, 'update'])->middleware('perm:marketplace.types');
+        Route::delete('equipment-types/{equipmentType}', [EquipmentTypeController::class, 'destroy'])->middleware('perm:marketplace.types');
 
-        Route::get('equipment/stats',                    [EquipmentController::class, 'stats']);
-        Route::get('equipment',                          [EquipmentController::class, 'index']);
-        Route::post('equipment',                         [EquipmentController::class, 'store']);
-        Route::get('equipment/{equipment}',              [EquipmentController::class, 'show']);
-        Route::patch('equipment/{equipment}',            [EquipmentController::class, 'update']);
-        Route::delete('equipment/{equipment}',           [EquipmentController::class, 'destroy']);
+        Route::get('equipment/stats',                    [EquipmentController::class, 'stats'])->middleware('perm:marketplace.equipment,view');
+        Route::get('equipment',                          [EquipmentController::class, 'index'])->middleware('perm:marketplace.equipment');
+        Route::post('equipment',                         [EquipmentController::class, 'store'])->middleware('perm:marketplace.equipment');
+        Route::get('equipment/{equipment}',              [EquipmentController::class, 'show'])->middleware('perm:marketplace.equipment');
+        Route::patch('equipment/{equipment}',            [EquipmentController::class, 'update'])->middleware('perm:marketplace.equipment');
+        Route::delete('equipment/{equipment}',           [EquipmentController::class, 'destroy'])->middleware('perm:marketplace.equipment');
 
-        Route::post('equipment/{equipment}/images',                          [EquipmentController::class, 'uploadImages']);
-        Route::delete('equipment/{equipment}/images/{equipmentImage}',       [EquipmentController::class, 'deleteImage']);
-        Route::post('equipment/{equipment}/images/{equipmentImage}/primary', [EquipmentController::class, 'setPrimaryImage']);
+        Route::post('equipment/{equipment}/images',                          [EquipmentController::class, 'uploadImages'])->middleware('perm:marketplace.equipment,update');
+        Route::delete('equipment/{equipment}/images/{equipmentImage}',       [EquipmentController::class, 'deleteImage'])->middleware('perm:marketplace.equipment,update');
+        Route::post('equipment/{equipment}/images/{equipmentImage}/primary', [EquipmentController::class, 'setPrimaryImage'])->middleware('perm:marketplace.equipment,update');
 
-        Route::get('equipment/{equipment}/blocked-dates',                  [EquipmentController::class, 'blockedDates']);
-        Route::post('equipment/{equipment}/blocked-dates',                 [EquipmentController::class, 'addBlockedDate']);
-        Route::delete('equipment/{equipment}/blocked-dates/{blockedDate}', [EquipmentController::class, 'removeBlockedDate']);
-        Route::get('equipment/{equipment}/reservations',                  [EquipmentController::class, 'reservations']);
+        Route::get('equipment/{equipment}/blocked-dates',                  [EquipmentController::class, 'blockedDates'])->middleware('perm:marketplace.equipment,update');
+        Route::post('equipment/{equipment}/blocked-dates',                 [EquipmentController::class, 'addBlockedDate'])->middleware('perm:marketplace.equipment,update');
+        Route::delete('equipment/{equipment}/blocked-dates/{blockedDate}', [EquipmentController::class, 'removeBlockedDate'])->middleware('perm:marketplace.equipment,update');
+        Route::get('equipment/{equipment}/reservations',                  [EquipmentController::class, 'reservations'])->middleware('perm:marketplace.equipment');
 
         // بلاغات "الإبلاغ عن مشكلة" بالسوق (اكتُشف بتصميم الموبايل)
-        Route::get('equipment-reports',                [\App\Http\Controllers\Api\EquipmentReportController::class, 'index']);
-        Route::patch('equipment-reports/{equipmentReport}', [\App\Http\Controllers\Api\EquipmentReportController::class, 'update']);
+        Route::get('equipment-reports',                [\App\Http\Controllers\Api\EquipmentReportController::class, 'index'])->middleware('perm:marketplace.reports');
+        Route::patch('equipment-reports/{equipmentReport}', [\App\Http\Controllers\Api\EquipmentReportController::class, 'update'])->middleware('perm:marketplace.reports');
 
         // باقات اشتراك سوق الآليات (REQ-06)
-        Route::get('equipment-packages',                    [\App\Http\Controllers\Api\EquipmentPackageController::class, 'index']);
-        Route::post('equipment-packages',                   [\App\Http\Controllers\Api\EquipmentPackageController::class, 'store']);
-        Route::patch('equipment-packages/{equipmentPackage}', [\App\Http\Controllers\Api\EquipmentPackageController::class, 'update']);
-        Route::delete('equipment-packages/{equipmentPackage}', [\App\Http\Controllers\Api\EquipmentPackageController::class, 'destroy']);
+        Route::get('equipment-packages',                    [\App\Http\Controllers\Api\EquipmentPackageController::class, 'index'])->middleware('perm:marketplace.packages');
+        Route::post('equipment-packages',                   [\App\Http\Controllers\Api\EquipmentPackageController::class, 'store'])->middleware('perm:marketplace.packages');
+        Route::patch('equipment-packages/{equipmentPackage}', [\App\Http\Controllers\Api\EquipmentPackageController::class, 'update'])->middleware('perm:marketplace.packages');
+        Route::delete('equipment-packages/{equipmentPackage}', [\App\Http\Controllers\Api\EquipmentPackageController::class, 'destroy'])->middleware('perm:marketplace.packages');
 
         // حظر مقاول من سوق الآليات فقط (REQ-08)
-        Route::patch('contractors/{contractor}/equipment-ban', [ContractorController::class, 'equipmentBan']);
+        Route::patch('contractors/{contractor}/equipment-ban', [ContractorController::class, 'equipmentBan'])->middleware('perm:marketplace.equipment|contractors.list,update');
 
         // --------------------------------------------------------
         //  Reports / Analytics
         // --------------------------------------------------------
         Route::prefix('reports')->group(function () {
-            Route::get('summary',        [ReportsController::class, 'summary']);
-            Route::get('export/pdf',     [ReportsController::class, 'exportPdf']);
-            Route::get('export/excel',   [ReportsController::class, 'exportExcel']);
+            Route::get('summary',        [ReportsController::class, 'summary'])->middleware('perm:reports.analytics,view');
+            Route::get('export/pdf',     [ReportsController::class, 'exportPdf'])->middleware('perm:reports.analytics,view');
+            Route::get('export/excel',   [ReportsController::class, 'exportExcel'])->middleware('perm:reports.analytics,view');
         });
     });
 });

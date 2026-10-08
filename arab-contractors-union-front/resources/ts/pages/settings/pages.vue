@@ -91,7 +91,7 @@ function publicUrl(slug: string) {
           صفحات عامة على روابط مخصصة، مثال: pcu.org.ps/testing
         </p>
       </div>
-      <VBtn prepend-icon="tabler-plus" @click="openCreate">
+      <VBtn v-if="$can('settings.pages', 'create')" prepend-icon="tabler-plus" @click="openCreate">
         صفحة جديدة
       </VBtn>
     </div>
@@ -128,8 +128,8 @@ function publicUrl(slug: string) {
             </td>
             <td>{{ p.updated_at ? new Date(p.updated_at).toLocaleDateString('ar-EG') : '—' }}</td>
             <td class="text-end">
-              <VBtn icon="tabler-edit" size="small" variant="text" @click="openEdit(p)" />
-              <VBtn
+              <VBtn v-if="$can('settings.pages', 'update')" icon="tabler-edit" size="small" variant="text" @click="openEdit(p)" />
+              <VBtn v-if="$can('settings.pages', 'delete')"
                 icon="tabler-trash"
                 size="small"
                 variant="text"

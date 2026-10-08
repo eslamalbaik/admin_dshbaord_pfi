@@ -166,7 +166,7 @@ onMounted(fetchCategories)
           لكل تصنيف صورة افتراضية تُعرض للعطاءات التابعة له (العطاءات لا تحمل صوراً خاصة بها)
         </p>
       </div>
-      <VBtn color="primary" prepend-icon="tabler-plus" @click="openCreate">
+      <VBtn v-if="$can('tenders.categories', 'create')" color="primary" prepend-icon="tabler-plus" @click="openCreate">
         تصنيف جديد
       </VBtn>
     </div>
@@ -195,12 +195,12 @@ onMounted(fetchCategories)
             </div>
           </VCardText>
           <VCardActions>
-            <VBtn size="small" variant="text" color="primary" prepend-icon="tabler-pencil" @click="openEdit(c)">تعديل</VBtn>
-            <VBtn size="small" variant="text" :loading="togglingId === c.id" @click="toggleActive(c)">
+            <VBtn v-if="$can('tenders.categories', 'update')" size="small" variant="text" color="primary" prepend-icon="tabler-pencil" @click="openEdit(c)">تعديل</VBtn>
+            <VBtn v-if="$can('tenders.categories', 'update')" size="small" variant="text" :loading="togglingId === c.id" @click="toggleActive(c)">
               {{ c.is_active ? 'تعطيل' : 'تفعيل' }}
             </VBtn>
             <VSpacer />
-            <VBtn icon size="small" variant="text" color="error" :disabled="c.tenders_count > 0" @click="confirmDelete(c)">
+            <VBtn v-if="$can('tenders.categories', 'delete')" icon size="small" variant="text" color="error" :disabled="c.tenders_count > 0" @click="confirmDelete(c)">
               <VIcon icon="tabler-trash" size="18" />
               <VTooltip activator="parent">{{ c.tenders_count > 0 ? 'مرتبط بعطاءات — عطّله بدلاً من حذفه' : 'حذف' }}</VTooltip>
             </VBtn>

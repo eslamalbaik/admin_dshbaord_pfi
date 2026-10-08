@@ -431,7 +431,7 @@ watch(coverImageFile, () => {
             />
           </VCol>
           <VCol cols="12" md="1" class="text-center">
-            <VBtn icon="tabler-trash" size="small" variant="text" color="error" @click="confirmDeleteService(i)" />
+            <VBtn v-if="$can('settings.app', 'update')" icon="tabler-trash" size="small" variant="text" color="error" @click="confirmDeleteService(i)" />
           </VCol>
         </VRow>
 
@@ -564,7 +564,7 @@ watch(coverImageFile, () => {
     </VCard>
 
     <div class="d-flex justify-end">
-      <VBtn
+      <VBtn v-if="$can('settings.app', 'update')"
         color="primary"
         size="large"
         prepend-icon="tabler-device-floppy"

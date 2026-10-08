@@ -128,7 +128,7 @@ const reactivateMutation = useMutation({
     <VCard v-if="tab === 'governorates'">
       <VCardTitle class="d-flex justify-space-between align-center">
         <span>المحافظات</span>
-        <VBtn size="small" color="primary" prepend-icon="tabler-plus" @click="openCreate('governorate')">إضافة محافظة</VBtn>
+        <VBtn v-if="$can('settings.governorates', 'create')" size="small" color="primary" prepend-icon="tabler-plus" @click="openCreate('governorate')">إضافة محافظة</VBtn>
       </VCardTitle>
       <VProgressLinear v-if="governoratesLoading" indeterminate color="primary" />
       <VTable v-else>
@@ -150,9 +150,9 @@ const reactivateMutation = useMutation({
               </VChip>
             </td>
             <td class="text-center">
-              <VBtn icon="tabler-edit" size="x-small" variant="text" @click="openEdit('governorate', row)" />
+              <VBtn v-if="$can('settings.governorates', 'update')" icon="tabler-edit" size="x-small" variant="text" @click="openEdit('governorate', row)" />
               <VBtn
-                v-if="row.is_active"
+                v-if="(row.is_active) && $can('settings.governorates', 'delete')"
                 icon="tabler-trash" size="x-small" variant="text" color="error"
                 @click="confirmDeactivate('governorate', row)"
               />
@@ -172,7 +172,7 @@ const reactivateMutation = useMutation({
     <VCard v-if="tab === 'cities'">
       <VCardTitle class="d-flex justify-space-between align-center">
         <span>المدن</span>
-        <VBtn size="small" color="primary" prepend-icon="tabler-plus" @click="openCreate('city')">إضافة مدينة</VBtn>
+        <VBtn v-if="$can('settings.governorates', 'create')" size="small" color="primary" prepend-icon="tabler-plus" @click="openCreate('city')">إضافة مدينة</VBtn>
       </VCardTitle>
       <VProgressLinear v-if="citiesLoading" indeterminate color="primary" />
       <VTable v-else>
@@ -194,9 +194,9 @@ const reactivateMutation = useMutation({
               </VChip>
             </td>
             <td class="text-center">
-              <VBtn icon="tabler-edit" size="x-small" variant="text" @click="openEdit('city', row)" />
+              <VBtn v-if="$can('settings.governorates', 'update')" icon="tabler-edit" size="x-small" variant="text" @click="openEdit('city', row)" />
               <VBtn
-                v-if="row.is_active"
+                v-if="(row.is_active) && $can('settings.governorates', 'delete')"
                 icon="tabler-trash" size="x-small" variant="text" color="error"
                 @click="confirmDeactivate('city', row)"
               />

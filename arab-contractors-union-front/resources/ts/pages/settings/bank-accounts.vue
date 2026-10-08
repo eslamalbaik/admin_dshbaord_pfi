@@ -109,7 +109,7 @@ const confirmDelete = (a: any) => {
           الحسابات البنكية الظاهرة في شاشة الدفع بالتطبيق (معلومات الدفع)
         </p>
       </div>
-      <VBtn color="primary" prepend-icon="tabler-plus" @click="openCreate">
+      <VBtn v-if="$can('finance.bank_accounts', 'create')" color="primary" prepend-icon="tabler-plus" @click="openCreate">
         إضافة حساب بنكي
       </VBtn>
     </div>
@@ -119,7 +119,7 @@ const confirmDelete = (a: any) => {
     <VCard v-else-if="accounts.length === 0" class="text-center py-12">
       <VIcon icon="tabler-building-bank" size="64" color="disabled" class="mb-3" />
       <p class="text-h6 text-medium-emphasis">لا توجد حسابات بنكية بعد.</p>
-      <VBtn class="mt-4" color="primary" prepend-icon="tabler-plus" @click="openCreate">
+      <VBtn v-if="$can('finance.bank_accounts', 'create')" class="mt-4" color="primary" prepend-icon="tabler-plus" @click="openCreate">
         أضف أول حساب
       </VBtn>
     </VCard>
@@ -165,8 +165,8 @@ const confirmDelete = (a: any) => {
               </VChip>
             </td>
             <td class="text-center">
-              <VBtn icon="tabler-edit" size="x-small" variant="text" @click="openEdit(a)" />
-              <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" @click="confirmDelete(a)" />
+              <VBtn v-if="$can('finance.bank_accounts', 'update')" icon="tabler-edit" size="x-small" variant="text" @click="openEdit(a)" />
+              <VBtn v-if="$can('finance.bank_accounts', 'delete')" icon="tabler-trash" size="x-small" variant="text" color="error" @click="confirmDelete(a)" />
             </td>
           </tr>
         </tbody>

@@ -110,7 +110,7 @@ const moveDown = (index: number) => {
           {{ props.subtitle }}
         </p>
       </div>
-      <VBtn color="primary" prepend-icon="tabler-plus" @click="openCreate">
+      <VBtn v-if="$can('settings.terms', 'create')" color="primary" prepend-icon="tabler-plus" @click="openCreate">
         إضافة بند جديد
       </VBtn>
     </div>
@@ -122,7 +122,7 @@ const moveDown = (index: number) => {
     <VCard v-else-if="terms.length === 0" class="text-center py-12">
       <VIcon icon="tabler-file-text" size="64" color="disabled" class="mb-3" />
       <p class="text-h6 text-medium-emphasis">لا توجد بنود بعد.</p>
-      <VBtn class="mt-4" color="primary" prepend-icon="tabler-plus" @click="openCreate">
+      <VBtn v-if="$can('settings.terms', 'create')" class="mt-4" color="primary" prepend-icon="tabler-plus" @click="openCreate">
         أضف أول بند
       </VBtn>
     </VCard>
@@ -168,10 +168,10 @@ const moveDown = (index: number) => {
             <div class="text-body-2 term-body-preview" v-html="t.body" />
           </VCard>
           <div class="d-flex gap-2 mt-2">
-            <VBtn size="small" prepend-icon="tabler-edit" @click="openEdit(t)">
+            <VBtn v-if="$can('settings.terms', 'update')" size="small" prepend-icon="tabler-edit" @click="openEdit(t)">
               تعديل
             </VBtn>
-            <VBtn
+            <VBtn v-if="$can('settings.terms', 'delete')"
               size="small"
               color="error"
               variant="tonal"

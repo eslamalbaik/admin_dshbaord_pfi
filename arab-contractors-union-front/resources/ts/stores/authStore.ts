@@ -8,6 +8,8 @@ export interface User {
   email: string
   role: string
   avatar?: string
+  /** مشرف: قائمة صلاحياته ("finance.dues.view"...)، أدمن: ['*']، غيرهم: null */
+  permissions?: string[] | null
   [key: string]: any
 }
 
@@ -83,7 +85,9 @@ export const useAuthStore = defineStore('auth', {
           // Network errors, CORS failures, or 5xx must not wipe a valid token —
           // otherwise a transient/server issue looks identical to a bad login.
           const status = error?.response?.status
-          if (status === 401 || status === 419) {
+          // 403 + force_logout: حساب مشرف معطّل
+          const disabled = status === 403 && error?.response?.data?.force_logout === true
+          if (status === 401 || status === 419 || disabled) {
             this.user = null
             this.isLoggedIn = false
             if (typeof localStorage !== 'undefined') {
