@@ -12,6 +12,7 @@ class CertificateRequest extends Model
         'contractor_id', 'type', 'status', 'notes', 'attachment',
         'reject_reason', 'certificate_path', 'issued_at', 'reviewed_by', 'reviewed_at',
         'pending_payment_id', 'viewed_at', 'last_viewed_at', 'views_count',
+        'certificate_address', 'decision_number', 'decision_date',
     ];
 
     protected $casts = [
@@ -20,7 +21,22 @@ class CertificateRequest extends Model
         'viewed_at'      => 'datetime',
         'last_viewed_at' => 'datetime',
         'views_count'    => 'integer',
+        'decision_date'  => 'date',
     ];
+
+    /**
+     * بيانات الطباعة المحفوظة على الطلب (من الموافقة أو إصدار سابق)، بصيغة overrides
+     * اللي بيستقبلها MembershipCertificatePdfService::generate. الفارغ ما بيتبعت، فبيرجع
+     * التوليد لملف المقاول.
+     */
+    public function certificateOverrides(): array
+    {
+        return array_filter([
+            'address'         => $this->certificate_address,
+            'decision_number' => $this->decision_number,
+            'decision_date'   => $this->decision_date?->toDateString(),
+        ], fn ($v) => filled($v));
+    }
 
     public function contractor()
     {

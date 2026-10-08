@@ -377,4 +377,33 @@ class CertificateRequestTest extends TestCase
         $this->getJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}")
             ->assertJsonPath('items.delivery.views_count', 2);
     }
+
+    public function test_approve_stores_decision_fields_and_auto_issue_prints_them(): void
+    {
+        $contractor = $this->createCompliantContractor();
+        $certRequest = $contractor->certificateRequests()->create(['type' => 'membership', 'status' => 'pending']);
+        $this->actingAsAdmin();
+
+        $this->postJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}/approve", [
+            'decision_number' => '07/2023',
+            'decision_date'   => '2023-05-14',
+        ])->assertOk()
+            ->assertJsonPath('items.status', 'approved')
+            ->assertJsonPath('items.decision_number', '07/2023')
+            ->assertJsonPath('items.decision_date', '2023-05-14');
+
+        // الإصدار بدون حقول بيستخدم المحفوظ من الموافقة، والعنوان المُدخل الآن بينضاف له
+        $spy = $this->spy(\App\Services\MembershipCertificatePdfService::class);
+        $spy->shouldReceive('generate')->andReturn('certificates/membership/test.pdf');
+
+        $this->postJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}/issue", ['address' => 'خانيونس'])
+            ->assertOk()
+            ->assertJsonPath('items.certificate_address', 'خانيونس')
+            ->assertJsonPath('items.decision_number', '07/2023');
+
+        $spy->shouldHaveReceived('generate')->with(
+            \Mockery::type(CertificateRequest::class),
+            ['address' => 'خانيونس', 'decision_number' => '07/2023', 'decision_date' => '2023-05-14'],
+        );
+    }
 }

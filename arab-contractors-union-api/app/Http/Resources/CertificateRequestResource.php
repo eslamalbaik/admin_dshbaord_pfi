@@ -39,6 +39,10 @@ class CertificateRequestResource extends JsonResource
             'request_date'      => $this->created_at,
             'issue_date'        => $this->issued_at,
             'reviewed_by'       => $this->reviewedBy?->name,
+            // بيانات شهادة العضوية المُدخلة عند الموافقة/الإصدار (العنوان ورقم وتاريخ القرار)
+            'certificate_address' => $this->certificate_address,
+            'decision_number'     => $this->decision_number,
+            'decision_date'       => $this->decision_date?->toDateString(),
             $this->mergeUnless($forContractor, [
                 'viewed_at'      => $this->viewed_at,
                 'last_viewed_at' => $this->last_viewed_at,

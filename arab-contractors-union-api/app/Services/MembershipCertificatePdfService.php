@@ -61,6 +61,10 @@ class MembershipCertificatePdfService
         $defaults = self::recordFields($contractor);
 
         $decisionDate   = $overrides['decision_date'] ?? ($defaults['decision_date'] ?? '—');
+        // اللوحة بتبعت التاريخ من حقل type=date بصيغة Y-m-d، والمتن بيطبعه d/m/Y
+        if (preg_match('/^\d{4}-\d{2}-\d{2}/', $decisionDate)) {
+            $decisionDate = \Illuminate\Support\Carbon::parse($decisionDate)->format('d/m/Y');
+        }
         $decisionNumber = $overrides['decision_number'] ?? ($defaults['decision_number'] ?? '—');
         $validUntil = $membership?->expires_at?->format('d/m/Y') ?? now()->addYear()->format('d/m/Y');
 
@@ -127,7 +131,10 @@ class MembershipCertificatePdfService
         $html = <<<HTML
 <style>
   body { font-family: calibri; direction: rtl; color: #000; font-size: 17pt; }
-  .meta { text-align: right; margin: 0 0 2pt 0; font-family: calibri; font-size: 12pt; color: #D80F18; font-weight: bold; line-height: 1.25; }
+  .meta { text-align: right; margin: 0 0 2pt 0; font-family: calibri; line-height: 1.3; }
+  /* "الرقم:" و"التاريخ:" أحمر 10، والقيمة مقابلهما أزرق غامق سميك 11 */
+  .meta-label { color: #D80F18; font-size: 10pt; }
+  .meta-value { color: #002060; font-size: 11pt; font-weight: bold; }
   .title {
     font-family: ptboldheading; text-align: center;
     font-size: 26pt; font-weight: bold; margin: 2pt 0 10pt 0;
@@ -139,9 +146,9 @@ class MembershipCertificatePdfService
   .member-no { font-size: 17pt; font-weight: bold; }
   .classified { font-size: 16pt; font-weight: bold; }
   .decision { font-size: 17pt; font-weight: bold; }
-  /* القالب: 3 أعمدة × 2952 twips = 156mm إجمالاً، ملتصق باليمين (tblpXSpec=right).
+  /* الجدول بعرض المتن كاملاً، فطرفاه محاذيان للنص يميناً ويساراً.
      لا نستخدم width:auto — يكسر تدفّق mPDF ويدفع بقية المحتوى لصفحات إضافية. */
-  table.data-table { width: 156mm; border-collapse: collapse; margin: 10pt 0 10pt auto; }
+  table.data-table { width: 100%; border-collapse: collapse; margin: 10pt 0; }
   table.data-table th, table.data-table td {
     border: 0.5pt solid #000; padding: {$tableCellPad};
     font-size: {$tableFontPt}; text-align: center; font-weight: normal; line-height: 1.2;
@@ -156,7 +163,7 @@ class MembershipCertificatePdfService
   .seal-cell { text-align: center; }
 </style>
 
-<div class="meta">الرقـم: <span dir="ltr">{$serial}</span><br>التاريخ: {$issuedAt}</div>
+<div class="meta"><span class="meta-label">الرقـم:</span> <span class="meta-value" dir="ltr">{$serial}</span><br><span class="meta-label">التاريخ:</span> <span class="meta-value">{$issuedAt}</span></div>
 
 <div class="title">شهادة عضـــــــــوية</div>
 

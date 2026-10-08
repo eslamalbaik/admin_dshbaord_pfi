@@ -298,17 +298,26 @@ class CertificateRequestController extends Controller
     }
 
     /** POST /api/v1/dashboard/certificate-requests/{certificateRequest}/approve */
-    public function approve(CertificateRequest $certificateRequest)
+    public function approve(Request $request, CertificateRequest $certificateRequest)
     {
         if ($blocked = $this->blockedByUnconfirmedPayment($certificateRequest)) {
             return $blocked;
         }
+
+        // شهادة العضوية: رقم وتاريخ قرار التصنيف (والعنوان) بيندخلوا عند الموافقة،
+        // وبينطبعوا لاحقاً بالإصدار التلقائي
+        $data = $request->validate([
+            'address'         => 'nullable|string|max:255',
+            'decision_number' => 'nullable|string|max:100',
+            'decision_date'   => 'nullable|date',
+        ]);
+
         $certificateRequest->update([
             'status'        => 'approved',
             'reject_reason' => null,
             'reviewed_by'   => Auth::id(),
             'reviewed_at'   => now(),
-        ]);
+        ] + ($certificateRequest->type === 'membership' ? $this->certificateFields($data) : []));
 
         $certificateRequest->contractor?->notify(
             new CertificateRequestStatusNotification($certificateRequest)
@@ -361,8 +370,15 @@ class CertificateRequestController extends Controller
         $oldIssuedAt = $certificateRequest->issued_at;
         $generated   = ! $request->hasFile('certificate');
 
+        // بيانات نافذة الإصدار بتغلب على المحفوظة من الموافقة، والفارغ بيرجع لملف المقاول
+        $fields = [];
+        if ($generated) {
+            $fields = $this->certificateFields($request->validated());
+            $certificateRequest->fill($fields);
+        }
+
         $path = $generated
-            ? $this->pdfService->generate($certificateRequest)
+            ? $this->pdfService->generate($certificateRequest, $certificateRequest->certificateOverrides())
             : $request->file('certificate')->store('certificates/membership', 'public');
 
         if ($oldPath && $oldPath !== $path) {
@@ -379,20 +395,27 @@ class CertificateRequestController extends Controller
             'viewed_at'        => null,
             'last_viewed_at'   => null,
             'views_count'      => 0,
-        ]);
+        ] + $fields);
 
         $certificateRequest->contractor?->notify(
             new CertificateRequestStatusNotification($certificateRequest)
         );
 
-        if ($oldPath) {
-            // سجل المحددات الهامة — استبدال ملف شهادة كانت صادرة مسبقاً
+        // بيانات مطبوعة تخالف ملف المقاول — سجل المحددات الهامة، زي الإصدار المباشر
+        [$diffBefore, $diffAfter] = $generated
+            ? $this->certificateOverrideDiff($certificateRequest->contractor, $certificateRequest->certificateOverrides())
+            : [[], []];
+
+        if ($oldPath || $diffAfter) {
+            // سجل المحددات الهامة — استبدال ملف شهادة كانت صادرة مسبقاً، و/أو بيانات مخالفة لملف المقاول
+            $fileBefore = $oldPath ? ['issued_at' => $oldIssuedAt?->toDateTimeString(), 'certificate_file' => basename($oldPath)] : [];
+            $fileAfter  = $oldPath ? ['issued_at' => $certificateRequest->issued_at?->toDateTimeString(), 'certificate_file' => basename($path)] : [];
             AuditLogService::recordCritical(
                 Auth::user(),
                 'certificate.issued',
                 $certificateRequest,
-                before: ['issued_at' => $oldIssuedAt?->toDateTimeString(), 'certificate_file' => basename($oldPath)],
-                after: ['issued_at' => $certificateRequest->issued_at?->toDateTimeString(), 'certificate_file' => basename($path)],
+                before: $diffBefore + $fileBefore,
+                after: $diffAfter + $fileAfter,
                 reason: $request->validated('reason'),
                 context: $this->certificateLogContext($certificateRequest),
             );
@@ -461,11 +484,9 @@ class CertificateRequestController extends Controller
         $oldPath = $certificateRequest->certificate_path;
         $oldIssuedAt = $certificateRequest->issued_at;
 
-        $path = $this->pdfService->generate($certificateRequest, [
-            'address'         => $data['address'] ?? null,
-            'decision_number' => $data['decision_number'] ?? null,
-            'decision_date'   => $data['decision_date'] ?? null,
-        ]);
+        // القيم المُدخلة الآن بتغلب على المحفوظة على الطلب (من الموافقة/الإصدار)، وبتنحفظ بداله
+        $certificateRequest->fill($this->certificateFields($data));
+        $path = $this->pdfService->generate($certificateRequest, $certificateRequest->certificateOverrides());
 
         if ($oldPath && $oldPath !== $path) {
             Storage::disk('public')->delete($oldPath);
@@ -504,14 +525,10 @@ class CertificateRequestController extends Controller
             'type'   => 'membership',
             'notes'  => $data['notes'] ?? 'إصدار مباشر من لوحة التحكم',
             'status' => 'pending',
-        ]);
+        ] + $this->certificateFields($data));
 
         try {
-            $path = $this->pdfService->generate($certRequest, [
-                'address'         => $data['address'] ?? null,
-                'decision_number' => $data['decision_number'] ?? null,
-                'decision_date'   => $data['decision_date'] ?? null,
-            ]);
+            $path = $this->pdfService->generate($certRequest, $certRequest->certificateOverrides());
         } catch (\Throwable $e) {
             $certRequest->delete();
             throw $e;
@@ -555,6 +572,19 @@ class CertificateRequestController extends Controller
             'تم إصدار شهادة العضوية بنجاح.',
             201,
         );
+    }
+
+    /**
+     * حقول الشهادة المُرسلة (address/decision_number/decision_date) بأسماء أعمدة الطلب.
+     * الفارغ ما بيمسح المحفوظ — بيضل اللي انحفظ عند الموافقة أو إصدار سابق.
+     */
+    private function certificateFields(array $data): array
+    {
+        return array_filter([
+            'certificate_address' => $data['address'] ?? null,
+            'decision_number'     => $data['decision_number'] ?? null,
+            'decision_date'       => $data['decision_date'] ?? null,
+        ], fn ($v) => filled($v));
     }
 
     /**

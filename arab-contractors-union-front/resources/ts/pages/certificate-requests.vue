@@ -100,12 +100,64 @@ const refresh = () => {
   queryClient.invalidateQueries({ queryKey: ['certificate-request'] })
 }
 
+// ─── بيانات شهادة العضوية: رقم وتاريخ قرار التصنيف (+ العنوان عند الإصدار) ───
+// بتنطلب بنافذة عند الموافقة على طلب عضوية وعند الإصدار التلقائي، زي صفحة شهادات
+// العضوية. بتتعبّى من المحفوظ على الطلب (من الموافقة)، وإلا من ملف المقاول.
+const certFieldsOpen = ref(false)
+const certFieldsMode = ref<'approve' | 'issue'>('approve')
+const certFieldsLoading = ref(false)
+const certFields = ref({ address: '', decision_number: '', decision_date: '' })
+
+async function openCertFields(mode: 'approve' | 'issue') {
+  const r = detail.value
+
+  certFieldsMode.value = mode
+  certFields.value = {
+    address: r?.certificate_address || '',
+    decision_number: r?.decision_number || '',
+    decision_date: r?.decision_date || '',
+  }
+  actionError.value = ''
+  certFieldsOpen.value = true
+
+  if (certFields.value.decision_number && certFields.value.decision_date && (mode === 'approve' || certFields.value.address))
+    return
+
+  certFieldsLoading.value = true
+  try {
+    const c = (await api.get(`/api/v1/contractors/${r.contractor_id}`)).data?.items
+
+    certFields.value.address ||= c?.city || c?.address || 'غزة'
+    certFields.value.decision_number ||= c?.classification_decision_number || ''
+    certFields.value.decision_date ||= c?.classification_decision_date?.slice(0, 10) || ''
+  }
+  catch {}
+  finally {
+    certFieldsLoading.value = false
+  }
+}
+
+function certFieldsPayload() {
+  const f = certFields.value
+  const payload: Record<string, string> = {}
+
+  if (certFieldsMode.value === 'issue' && f.address)
+    payload.address = f.address
+  if (f.decision_number)
+    payload.decision_number = f.decision_number
+  if (f.decision_date)
+    payload.decision_date = f.decision_date
+
+  return payload
+}
+
 const approveMutation = useMutation({
-  mutationFn: async () =>
-    (await api.post(`/api/v1/dashboard/certificate-requests/${selected.value.id}/approve`)).data,
+  mutationFn: async (payload: Record<string, string>) =>
+    (await api.post(`/api/v1/dashboard/certificate-requests/${selected.value.id}/approve`, payload)).data,
   onSuccess: (d: any) => {
     refresh()
     selected.value = d?.items ?? selected.value
+    certFieldsOpen.value = false
   },
   onError: (e: any) => actionError.value = e?.response?.data?.message || 'فشل تنفيذ الإجراء.',
 })
@@ -126,13 +178,17 @@ const canAutoIssue = computed(() => detail.value?.type === 'membership')
 const needsFile = computed(() => !canAutoIssue.value || manualUpload.value)
 
 const issueMutation = useMutation({
-  mutationFn: async () => {
+  mutationFn: async (fields: Record<string, string>) => {
     const fd = new FormData()
     if (needsFile.value) {
       const file = firstFile(certificateFile.value)
       if (!file)
         throw new Error('لم يتم اختيار ملف الشهادة.')
       fd.append('certificate', file)
+    }
+    else {
+      for (const [k, v] of Object.entries(fields))
+        fd.append(k, v)
     }
 
     return (await api.post(`/api/v1/dashboard/certificate-requests/${selected.value.id}/issue`, fd)).data
@@ -142,11 +198,33 @@ const issueMutation = useMutation({
     selected.value = d?.items ?? selected.value
     certificateFile.value = null
     manualUpload.value = false
+    certFieldsOpen.value = false
     if (d?.items?.id)
       openPreview(d.items.id)
   },
   onError: (e: any) => actionError.value = e?.response?.data?.message || 'فشل إصدار الشهادة.',
 })
+
+function submitCertFields() {
+  if (certFieldsMode.value === 'approve')
+    approveMutation.mutate(certFieldsPayload())
+  else
+    issueMutation.mutate(certFieldsPayload())
+}
+
+function onApprove() {
+  if (detail.value?.type === 'membership')
+    openCertFields('approve')
+  else
+    approveMutation.mutate({})
+}
+
+function onIssue() {
+  if (needsFile.value)
+    issueMutation.mutate({})
+  else
+    openCertFields('issue')
+}
 
 const deleteMutation = useMutation({
   mutationFn: async (id: number) => (await api.delete(`/api/v1/dashboard/certificate-requests/${id}`)).data,
@@ -300,6 +378,8 @@ function fmtDate(d: string | null) {
             <div><strong>رقم العضوية:</strong> {{ detail.membership_number ?? '—' }}</div>
             <div><strong>تاريخ الطلب:</strong> {{ fmtDate(detail.request_date) }}</div>
             <div v-if="detail.issue_date"><strong>تاريخ الإصدار:</strong> {{ fmtDate(detail.issue_date) }}</div>
+            <div v-if="detail.decision_number"><strong>رقم قرار التصنيف:</strong> {{ detail.decision_number }}</div>
+            <div v-if="detail.decision_date"><strong>تاريخ القرار:</strong> {{ detail.decision_date }}</div>
           </div>
 
           <VCard v-if="detail.notes" variant="tonal" color="secondary" class="pa-4 mb-4 rounded-lg">
@@ -367,7 +447,7 @@ function fmtDate(d: string | null) {
                 :disabled="detail.awaiting_payment_confirmation"
                 :title="detail.awaiting_payment_confirmation ? 'اعتمد دفعة الرسوم أولاً' : undefined"
                 :loading="approveMutation.isPending.value"
-                @click="approveMutation.mutate()"
+                @click="onApprove"
               >
                 موافقة
               </VBtn>
@@ -416,7 +496,7 @@ function fmtDate(d: string | null) {
                 :prepend-icon="needsFile ? 'tabler-certificate' : 'tabler-wand'"
                 :disabled="(needsFile && !firstFile(certificateFile)) || detail.awaiting_payment_confirmation"
                 :loading="issueMutation.isPending.value"
-                @click="issueMutation.mutate()"
+                @click="onIssue"
               >
                 {{ needsFile ? 'إصدار الشهادة' : 'إصدار الشهادة تلقائياً' }}
               </VBtn>
@@ -436,6 +516,76 @@ function fmtDate(d: string | null) {
           <VBtn v-if="$can('services.certificate_requests', 'delete')" color="error" variant="text" @click="confirmDelete(detail)">حذف</VBtn>
           <VSpacer />
           <VBtn variant="text" @click="isViewOpen = false">إغلاق</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- ─── نافذة بيانات شهادة العضوية (عند الموافقة / الإصدار التلقائي) ─── -->
+    <VDialog v-model="certFieldsOpen" max-width="520">
+      <VCard>
+        <VCardItem>
+          <VCardTitle class="d-flex align-center gap-2">
+            <VIcon :icon="certFieldsMode === 'approve' ? 'tabler-check' : 'tabler-certificate'" :color="certFieldsMode === 'approve' ? 'info' : 'success'" />
+            {{ certFieldsMode === 'approve' ? 'الموافقة على طلب شهادة العضوية' : 'إصدار شهادة العضوية' }}
+          </VCardTitle>
+          <VCardSubtitle>
+            {{ certFieldsMode === 'approve'
+              ? 'رقم وتاريخ قرار لجنة التصنيف — بينحفظوا على الطلب وبينطبعوا بالشهادة عند إصدارها.'
+              : 'بتتولّد الشهادة PDF بهذه البيانات وبيوصل للمقاول إشعار.' }}
+          </VCardSubtitle>
+        </VCardItem>
+
+        <VCardText>
+          <VAlert type="info" variant="tonal" density="compact" class="mb-4">
+            <strong>المقاول:</strong> {{ detail?.contractor ?? '—' }} — {{ detail?.membership_number ?? '—' }}
+          </VAlert>
+
+          <VTextField
+            v-if="certFieldsMode === 'issue'"
+            v-model="certFields.address"
+            label="عنوان الشركة"
+            dir="rtl"
+            class="mb-4"
+            :loading="certFieldsLoading"
+            placeholder="غزة"
+          />
+          <VRow dense>
+            <VCol cols="6">
+              <VTextField
+                v-model="certFields.decision_number"
+                label="رقم قرار التصنيف"
+                dir="rtl"
+                :loading="certFieldsLoading"
+                placeholder="مثال: 04/2022"
+              />
+            </VCol>
+            <VCol cols="6">
+              <VTextField
+                v-model="certFields.decision_date"
+                label="تاريخ قرار التصنيف"
+                type="date"
+                :loading="certFieldsLoading"
+              />
+            </VCol>
+          </VRow>
+
+          <VAlert v-if="actionError" type="error" variant="tonal" density="compact" class="mt-3">
+            {{ actionError }}
+          </VAlert>
+        </VCardText>
+
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="text" @click="certFieldsOpen = false">إلغاء</VBtn>
+          <VBtn
+            :color="certFieldsMode === 'approve' ? 'info' : 'success'"
+            :prepend-icon="certFieldsMode === 'approve' ? 'tabler-check' : 'tabler-certificate'"
+            :loading="approveMutation.isPending.value || issueMutation.isPending.value"
+            :disabled="certFieldsLoading"
+            @click="submitCertFields"
+          >
+            {{ certFieldsMode === 'approve' ? 'موافقة' : 'إصدار الشهادة' }}
+          </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
