@@ -253,7 +253,7 @@ const deleteAnnouncement = async () => {
           إدارة التعميمات — التثبيت "عاجل وهام" يظهر كـ Pop-up لمرة واحدة عند فتح تطبيق المقاول
         </p>
       </div>
-      <VBtn color="primary" prepend-icon="tabler-plus" @click="openCreate">
+      <VBtn v-if="$can('content.announcements', 'create')" color="primary" prepend-icon="tabler-plus" @click="openCreate">
         تعميم جديد
       </VBtn>
     </div>
@@ -356,11 +356,11 @@ const deleteAnnouncement = async () => {
               <VIcon icon="tabler-eye" />
               <VTooltip activator="parent">عرض التفاصيل</VTooltip>
             </VBtn>
-            <VBtn icon size="small" variant="text" color="primary" @click="openEdit(item)">
+            <VBtn v-if="$can('content.announcements', 'update')" icon size="small" variant="text" color="primary" @click="openEdit(item)">
               <VIcon icon="tabler-pencil" />
               <VTooltip activator="parent">تعديل</VTooltip>
             </VBtn>
-            <VBtn icon size="small" variant="text" color="error" @click="confirmDelete(item)">
+            <VBtn v-if="$can('content.announcements', 'delete')" icon size="small" variant="text" color="error" @click="confirmDelete(item)">
               <VIcon icon="tabler-trash" />
               <VTooltip activator="parent">حذف</VTooltip>
             </VBtn>

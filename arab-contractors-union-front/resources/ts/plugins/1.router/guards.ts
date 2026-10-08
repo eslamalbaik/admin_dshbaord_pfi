@@ -4,6 +4,7 @@ import NProgress from 'nprogress'
 import 'nprogress/nprogress.css'
 import { useAuthStore } from '@/stores/authStore'
 import { themeConfig } from '@themeConfig'
+import { DASHBOARD_ROLES, canAccessRoute, firstAllowedRoute, isSupervisor } from '@/utils/permissions'
 
 const waitForAuthInit = (authStore: any) => {
   if (!authStore.isInitializing)
@@ -110,8 +111,8 @@ export const setupGuards = (router: _RouterTyped<RouteNamedMap & { [key: string]
       // Token exists — wait for auth so we can redirect the logged-in user.
       await waitForAuthInit(authStore)
       if (authStore.isLoggedIn) {
-        if (['admin', 'accountant'].includes(authStore.userRole ?? ''))
-          return '/dashboards'
+        if (DASHBOARD_ROLES.includes(authStore.userRole ?? ''))
+          return { name: firstAllowedRoute(authStore.user) }
         redirectStudentToLanding()
         return false
       }
@@ -125,8 +126,8 @@ export const setupGuards = (router: _RouterTyped<RouteNamedMap & { [key: string]
     const isLoggedIn = authStore.isLoggedIn
     const userRole = authStore.userRole
 
-    // Redirect logged-in non-admins/non-accountants (students) to the landing-page student dashboard
-    if (isLoggedIn && !['admin', 'accountant'].includes(userRole ?? '')) {
+    // Redirect logged-in non-admins/non-accountants/non-supervisors (students) to the landing-page student dashboard
+    if (isLoggedIn && !DASHBOARD_ROLES.includes(userRole ?? '')) {
       redirectStudentToLanding()
       return false
     }
@@ -140,6 +141,21 @@ export const setupGuards = (router: _RouterTyped<RouteNamedMap & { [key: string]
         },
       }
     }
+
+    // المشرف: الصفحة لازم تكون ضمن صلاحياته (utils/permissions.ts) بدل requiresAdmin/adminOnly
+    if (isSupervisor(authStore.user)) {
+      if (canAccessRoute(authStore.user, to.name as string))
+        return
+
+      // بدون صلاحية على لوحة التحكم الرئيسية → أول صفحة مسموحة بدل "غير مصرح"
+      if (to.name === 'dashboards')
+        return { name: firstAllowedRoute(authStore.user) }
+
+      return { name: 'not-authorized' }
+    }
+
+    if (!canAccessRoute(authStore.user, to.name as string))
+      return { name: 'not-authorized' }
 
     if (to.meta.requiresAdmin && !['admin', 'accountant'].includes(userRole ?? ''))
       return { name: 'not-authorized' }

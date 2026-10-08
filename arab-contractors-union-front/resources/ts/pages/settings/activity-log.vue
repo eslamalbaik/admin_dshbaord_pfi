@@ -306,7 +306,7 @@ const formatValue = (v: any) => (v === null || v === undefined || v === '') ? '�
       <VDivider />
 
       <VAlert v-if="isCritical" type="warning" variant="tonal" density="compact" class="ma-4 mb-0" style="font-family:Cairo,sans-serif">
-        تعديلات مخالفة للوضع الطبيعي: تعديل رسوم العضوية (جدول الرسوم والخصومات) وأي تعديل على إصدار شهادة العضوية — مع القيمة قبل وبعد التعديل والسبب.
+        تعديلات مخالفة للوضع الطبيعي: تعديل رسوم العضوية (جدول الرسوم والخصومات) وأي تعديل على إصدار شهادة العضوية، وإنشاء المشرفين وتعديل صلاحياتهم — مع القيمة قبل وبعد التعديل والسبب.
       </VAlert>
 
       <VCardText class="d-flex gap-4 flex-wrap">

@@ -248,7 +248,7 @@ function fmtDate(d: string | null) {
               <td class="text-body-2">{{ fmtDate(r.request_date) }}</td>
               <td class="text-center" @click.stop>
                 <VBtn icon="tabler-eye" size="x-small" variant="text" @click="openRequest(r)" />
-                <VBtn icon="tabler-trash" size="x-small" variant="text" color="error" @click="confirmDelete(r)" />
+                <VBtn v-if="$can('services.certificate_requests', 'delete')" icon="tabler-trash" size="x-small" variant="text" color="error" @click="confirmDelete(r)" />
               </td>
             </tr>
           </tbody>
@@ -342,7 +342,7 @@ function fmtDate(d: string | null) {
             <VDivider class="my-4" />
             <p class="text-body-2 font-weight-medium mb-2">قرار المراجعة:</p>
             <div class="d-flex gap-3 mb-4">
-              <VBtn
+              <VBtn v-if="$can('services.certificate_requests', 'update')"
                 color="info"
                 prepend-icon="tabler-check"
                 :disabled="detail.awaiting_payment_confirmation"
@@ -359,7 +359,7 @@ function fmtDate(d: string | null) {
               rows="2"
               dir="rtl"
             />
-            <VBtn
+            <VBtn v-if="$can('services.certificate_requests', 'update')"
               color="error"
               variant="tonal"
               prepend-icon="tabler-x"
@@ -382,7 +382,7 @@ function fmtDate(d: string | null) {
               density="compact"
               prepend-icon="tabler-file-type-pdf"
             />
-            <VBtn
+            <VBtn v-if="$can('services.certificate_requests', 'update')"
               color="success"
               prepend-icon="tabler-certificate"
               :disabled="!firstFile(certificateFile) || detail.awaiting_payment_confirmation"
@@ -395,7 +395,7 @@ function fmtDate(d: string | null) {
         </VCardText>
 
         <VCardActions>
-          <VBtn color="error" variant="text" @click="confirmDelete(detail)">حذف</VBtn>
+          <VBtn v-if="$can('services.certificate_requests', 'delete')" color="error" variant="text" @click="confirmDelete(detail)">حذف</VBtn>
           <VSpacer />
           <VBtn variant="text" @click="isViewOpen = false">إغلاق</VBtn>
         </VCardActions>

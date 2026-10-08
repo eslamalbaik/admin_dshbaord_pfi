@@ -74,8 +74,11 @@ axiosIns.interceptors.response.use(
     return response
   },
   error => {
+    // مشرف تعطّل حسابه أثناء الجلسة → نفس معالجة انتهاء الجلسة
+    const forceLogout = error.response?.status === 403 && error.response?.data?.force_logout === true
+
     // Handle 401 Unauthorized errors (session expired)
-    if (error.response && error.response.status === 401) {
+    if (error.response && (error.response.status === 401 || forceLogout)) {
       // If the 401 comes from the /api/v1/user check, it's just a guest checking auth state. Do not redirect.
       if (error.config && (error.config.url === '/api/v1/user' || error.config.url?.endsWith('/api/v1/user'))) {
         return Promise.reject(error)

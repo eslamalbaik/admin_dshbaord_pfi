@@ -23,6 +23,11 @@ class AuthController extends Controller
         if (Auth::attempt($credentials)) {
             $user = Auth::user();
 
+            // حساب معطّل (مشرف عطّله الأدمن) — ما بياخد توكن
+            if ($user->is_active === false) {
+                return $this->error('تم تعطيل هذا الحساب. تواصل مع مدير النظام.', 403, null, 'account_disabled');
+            }
+
             if ($user->role === 'admin') {
                 Log::info("Admin login: {$user->email} at " . now());
             }
@@ -36,7 +41,7 @@ class AuthController extends Controller
             $landingUrl = rtrim(config('app.landing_url'), '/');
 
             $redirectUrl = match($user->role) {
-                'admin', 'accountant' => $frontendUrl . '/dashboards',
+                'admin', 'accountant', 'supervisor' => $frontendUrl . '/dashboards',
                 default               => $landingUrl . '/',
             };
 
@@ -46,6 +51,7 @@ class AuthController extends Controller
                 'fullName'    => $user->name,
                 'role'        => $user->role ?? 'admin',
                 'email'       => $user->email,
+                'permissions' => $user->dashboardPermissions(),
                 'redirect_url'=> $redirectUrl,
             ], 'تم تسجيل الدخول بنجاح.', 200, 'user');
         }
@@ -152,7 +158,7 @@ class AuthController extends Controller
         // Find existing user or create a new admin account
         $user = \App\Models\User::withTrashed()->where('email', $email)->first();
 
-        if ($user && $user->trashed()) {
+        if ($user && ($user->trashed() || $user->is_active === false)) {
             return $this->error('تم تعطيل هذا الحساب.', 403);
         }
 
@@ -168,7 +174,7 @@ class AuthController extends Controller
 
         $plainToken = $user->createToken('google_oauth')->plainTextToken;
 
-        $redirectUrl = in_array($user->role, ['admin', 'accountant'])
+        $redirectUrl = in_array($user->role, ['admin', 'accountant', 'supervisor'])
             ? rtrim(config('app.frontend_url'), '/') . '/dashboards'
             : $landingUrl . '/';
 

@@ -36,6 +36,8 @@ const displayName = computed(() => {
 const displayRole = computed(() => {
   const map: Record<string, string> = {
     admin: 'مدير النظام',
+    accountant: 'محاسب',
+    supervisor: 'مشرف',
     student: 'عضو',
     instructor: 'مشرف',
   }

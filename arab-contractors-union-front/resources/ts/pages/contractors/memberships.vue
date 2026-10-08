@@ -150,7 +150,7 @@ onMounted(fetchRequests)
 
         <template #item.actions="{ item }">
           <div class="d-flex gap-2" v-if="item.status === 'pending'">
-            <VBtn
+            <VBtn v-if="$can('contractors.memberships', 'update')"
               color="success"
               size="small"
               :loading="actionLoading === item.id"
@@ -159,7 +159,7 @@ onMounted(fetchRequests)
             >
               قبول
             </VBtn>
-            <VBtn
+            <VBtn v-if="$can('contractors.memberships', 'update')"
               color="error"
               size="small"
               variant="tonal"

@@ -160,7 +160,7 @@ watchEffect(() => fetchDocuments())
         <h1 class="text-h4 font-weight-bold" style="font-family:Cairo,sans-serif">إدارة الوثائق</h1>
         <p class="text-body-2 text-medium-emphasis mb-0" style="font-family:Cairo,sans-serif">وثائق ومستندات المقاولين</p>
       </div>
-      <VBtn color="primary" prepend-icon="tabler-upload" @click="uploadDialog = true">
+      <VBtn v-if="$can('documents.manage', 'create')" color="primary" prepend-icon="tabler-upload" @click="uploadDialog = true">
         رفع وثيقة
       </VBtn>
     </div>

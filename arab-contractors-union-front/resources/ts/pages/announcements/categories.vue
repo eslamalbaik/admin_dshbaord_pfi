@@ -108,7 +108,7 @@ const toggleActive = async (category: any) => {
           التصنيفات المعتمدة من الإدارة، والمتاحة عند إنشاء تعميم جديد
         </p>
       </div>
-      <VBtn color="primary" prepend-icon="tabler-plus" style="font-family:Cairo,sans-serif" @click="openCreate">
+      <VBtn v-if="$can('content.announcement_categories', 'create')" color="primary" prepend-icon="tabler-plus" style="font-family:Cairo,sans-serif" @click="openCreate">
         إضافة تصنيف
       </VBtn>
     </div>
@@ -142,11 +142,11 @@ const toggleActive = async (category: any) => {
             </td>
             <td>
               <div class="d-flex gap-2">
-                <VBtn icon size="small" variant="tonal" color="primary" @click="openEdit(category)">
+                <VBtn v-if="$can('content.announcement_categories', 'update')" icon size="small" variant="tonal" color="primary" @click="openEdit(category)">
                   <VIcon icon="tabler-edit" size="18" />
                   <VTooltip activator="parent">تعديل</VTooltip>
                 </VBtn>
-                <VBtn icon size="small" variant="tonal" color="error" @click="openDelete(category)">
+                <VBtn v-if="$can('content.announcement_categories', 'delete')" icon size="small" variant="tonal" color="error" @click="openDelete(category)">
                   <VIcon icon="tabler-trash" size="18" />
                   <VTooltip activator="parent">حذف</VTooltip>
                 </VBtn>

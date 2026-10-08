@@ -626,7 +626,7 @@ onMounted(fetchCategories)
         <VBtn variant="tonal" prepend-icon="tabler-file-spreadsheet" @click="exportDialog = true">
           تصدير Excel
         </VBtn>
-        <VBtn color="primary" prepend-icon="tabler-plus" @click="openCreate">
+        <VBtn v-if="$can('tenders.list', 'create')" color="primary" prepend-icon="tabler-plus" @click="openCreate">
           عطاء جديد
         </VBtn>
       </div>
@@ -744,7 +744,7 @@ onMounted(fetchCategories)
                 <VListItem
                   v-for="opt in [{ label:'مفتوحة', value:'open', color:'success' }, { label:'مغلقة', value:'closed', color:'error' }, { label:'ملغية', value:'cancelled', color:'secondary' }]"
                   :key="opt.value"
-                  :disabled="item.status === opt.value"
+                  :disabled="item.status === opt.value || !$can('tenders.list', 'update')"
                   @click="changeStatus(item, opt.value)"
                 >
                   <template #prepend>
@@ -762,13 +762,13 @@ onMounted(fetchCategories)
             </VBtn>
 
             <!-- تعديل -->
-            <VBtn icon size="small" variant="text" color="primary" @click="openEdit(item)">
+            <VBtn v-if="$can('tenders.list', 'update')" icon size="small" variant="text" color="primary" @click="openEdit(item)">
               <VIcon icon="tabler-pencil" />
               <VTooltip activator="parent">تعديل</VTooltip>
             </VBtn>
 
             <!-- حذف -->
-            <VBtn icon size="small" variant="text" color="error" @click="confirmDelete(item)">
+            <VBtn v-if="$can('tenders.list', 'delete')" icon size="small" variant="text" color="error" @click="confirmDelete(item)">
               <VIcon icon="tabler-trash" />
               <VTooltip activator="parent">حذف</VTooltip>
             </VBtn>

@@ -85,7 +85,7 @@ const saveMutation = useMutation({
             <td>{{ row.registration_fee_jod }}</td>
             <td>{{ row.annual_fee_jod }}</td>
             <td class="text-center">
-              <VBtn icon="tabler-edit" size="x-small" variant="text" @click="openEdit(row)" />
+              <VBtn v-if="$can('finance.grade_fees', 'update')" icon="tabler-edit" size="x-small" variant="text" @click="openEdit(row)" />
             </td>
           </tr>
         </tbody>

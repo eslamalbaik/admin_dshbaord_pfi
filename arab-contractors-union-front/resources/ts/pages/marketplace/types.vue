@@ -113,7 +113,7 @@ const toggleActive = async (type: any) => {
           إدارة تصنيفات الآليات المتاحة في سوق الآليات
         </p>
       </div>
-      <VBtn color="primary" prepend-icon="tabler-plus" style="font-family:Cairo,sans-serif" @click="openCreate">
+      <VBtn v-if="$can('marketplace.types', 'create')" color="primary" prepend-icon="tabler-plus" style="font-family:Cairo,sans-serif" @click="openCreate">
         إضافة نوع
       </VBtn>
     </div>
@@ -155,11 +155,11 @@ const toggleActive = async (type: any) => {
             </td>
             <td>
               <div class="d-flex gap-2">
-                <VBtn icon size="small" variant="tonal" color="primary" @click="openEdit(type)">
+                <VBtn v-if="$can('marketplace.types', 'update')" icon size="small" variant="tonal" color="primary" @click="openEdit(type)">
                   <VIcon icon="tabler-edit" size="18" />
                   <VTooltip activator="parent">تعديل</VTooltip>
                 </VBtn>
-                <VBtn icon size="small" variant="tonal" color="error" @click="openDelete(type)">
+                <VBtn v-if="$can('marketplace.types', 'delete')" icon size="small" variant="tonal" color="error" @click="openDelete(type)">
                   <VIcon icon="tabler-trash" size="18" />
                   <VTooltip activator="parent">حذف</VTooltip>
                 </VBtn>

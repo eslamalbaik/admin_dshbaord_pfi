@@ -2,12 +2,15 @@
 import { ref, computed } from 'vue'
 import api from '@/plugins/axios'
 import { useAuthStore } from '@/stores/authStore'
+import { canAccessRoute, isSupervisor } from '@/utils/permissions'
 
 definePage({ meta: { requiresAdmin: true } })
 
 const currentTab = ref('profile')
 
 const authStore = useAuthStore()
+const canOpen = (routeName: string) => canAccessRoute(authStore.user, routeName)
+
 const API_ORIGIN = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/$/, '')
 
 const avatarFile = ref<File | null>(null)
@@ -74,6 +77,7 @@ const uploadAvatar = async () => {
               @click="currentTab = 'profile'"
             />
             <VListItem
+              v-if="!isSupervisor(authStore.user)"
               value="branding"
               prepend-icon="tabler-palette"
               :title="$t('Branding')"
@@ -84,46 +88,55 @@ const uploadAvatar = async () => {
             <VDivider class="my-2" />
 
             <VListItem
+              v-if="canOpen('settings-terms')"
               prepend-icon="tabler-file-text"
               title="الشروط والأحكام"
               :to="{ name: 'settings-terms' }"
             />
             <VListItem
+              v-if="canOpen('settings-privacy-policy')"
               prepend-icon="tabler-shield-lock"
               title="سياسة الخصوصية"
               :to="{ name: 'settings-privacy-policy' }"
             />
             <VListItem
+              v-if="canOpen('settings-app-settings')"
               prepend-icon="tabler-adjustments"
               title="إعدادات التطبيق"
               :to="{ name: 'settings-app-settings' }"
             />
             <VListItem
+              v-if="canOpen('settings-exchange-rates')"
               prepend-icon="tabler-currency-dollar"
               title="أسعار الصرف"
               :to="{ name: 'settings-exchange-rates' }"
             />
             <VListItem
+              v-if="canOpen('settings-pages')"
               prepend-icon="tabler-file-plus"
               title="الصفحات الديناميكية"
               :to="{ name: 'settings-pages' }"
             />
             <VListItem
+              v-if="canOpen('settings-grade-fees')"
               prepend-icon="tabler-cash"
               title="رسوم الدرجات"
               :to="{ name: 'settings-grade-fees' }"
             />
             <VListItem
+              v-if="canOpen('settings-contractor-lookups')"
               prepend-icon="tabler-list-details"
               title="المجالات والاختصاصات والدرجات"
               :to="{ name: 'settings-contractor-lookups' }"
             />
             <VListItem
+              v-if="canOpen('settings-governorates')"
               prepend-icon="tabler-map-2"
               title="المحافظات والمدن"
               :to="{ name: 'settings-governorates' }"
             />
             <VListItem
+              v-if="canOpen('tenders-categories')"
               prepend-icon="tabler-category"
               title="تصنيفات العطاءات"
               :to="{ name: 'tenders-categories' }"
@@ -132,9 +145,16 @@ const uploadAvatar = async () => {
             <VDivider class="my-2" />
 
             <VListItem
+              v-if="canOpen('settings-activity-log')"
               prepend-icon="tabler-history"
               title="سجل النشاط"
               :to="{ name: 'settings-activity-log' }"
+            />
+            <VListItem
+              v-if="canOpen('supervisors')"
+              prepend-icon="tabler-shield-check"
+              title="المشرفون والصلاحيات"
+              :to="{ name: 'supervisors' }"
             />
           </VList>
         </VCard>

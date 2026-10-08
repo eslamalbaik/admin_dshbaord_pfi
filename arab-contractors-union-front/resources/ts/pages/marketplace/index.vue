@@ -315,7 +315,7 @@ const setPrimary = async (img: any) => {
         <VBtn variant="tonal" color="secondary" :to="{ name: 'marketplace-types' }" prepend-icon="tabler-list" style="font-family:Cairo,sans-serif">
           أنواع المعدات
         </VBtn>
-        <VBtn color="primary" :to="{ name: 'marketplace-create' }" prepend-icon="tabler-plus" style="font-family:Cairo,sans-serif">
+        <VBtn v-if="$can('marketplace.equipment', 'create')" color="primary" :to="{ name: 'marketplace-create' }" prepend-icon="tabler-plus" style="font-family:Cairo,sans-serif">
           إضافة آلية
         </VBtn>
       </div>
@@ -494,15 +494,15 @@ const setPrimary = async (img: any) => {
             <!-- Actions -->
             <td>
               <div class="d-flex gap-1 flex-wrap">
-                <VBtn icon size="x-small" variant="tonal" color="primary" @click="openEdit(item)">
+                <VBtn v-if="$can('marketplace.equipment', 'update')" icon size="x-small" variant="tonal" color="primary" @click="openEdit(item)">
                   <VIcon icon="tabler-edit" size="16" />
                   <VTooltip activator="parent">تعديل</VTooltip>
                 </VBtn>
-                <VBtn icon size="x-small" variant="tonal" color="info" @click="openImages(item)">
+                <VBtn v-if="$can('marketplace.equipment', 'update')" icon size="x-small" variant="tonal" color="info" @click="openImages(item)">
                   <VIcon icon="tabler-photo" size="16" />
                   <VTooltip activator="parent">الصور</VTooltip>
                 </VBtn>
-                <VBtn
+                <VBtn v-if="$can('marketplace.equipment', 'delete')"
                   icon
                   size="x-small"
                   variant="tonal"

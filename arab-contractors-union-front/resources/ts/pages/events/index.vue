@@ -478,7 +478,7 @@ const deleteEvent = async () => {
         <h1 class="text-h4 font-weight-bold" style="font-family:Cairo,sans-serif">الفعاليات</h1>
         <p class="text-body-2 text-medium-emphasis mb-0" style="font-family:Cairo,sans-serif">إدارة فعاليات الاتحاد المنشورة على الموقع والتطبيق</p>
       </div>
-      <VBtn color="primary" prepend-icon="tabler-plus" @click="openCreate">
+      <VBtn v-if="$can('content.events', 'create')" color="primary" prepend-icon="tabler-plus" @click="openCreate">
         فعالية جديدة
       </VBtn>
     </div>
@@ -574,11 +574,11 @@ const deleteEvent = async () => {
               <VIcon icon="tabler-eye" />
               <VTooltip activator="parent">عرض التفاصيل</VTooltip>
             </VBtn>
-            <VBtn icon size="small" variant="text" color="primary" @click="openEdit(item)">
+            <VBtn v-if="$can('content.events', 'update')" icon size="small" variant="text" color="primary" @click="openEdit(item)">
               <VIcon icon="tabler-pencil" />
               <VTooltip activator="parent">تعديل</VTooltip>
             </VBtn>
-            <VBtn icon size="small" variant="text" color="error" @click="confirmDelete(item)">
+            <VBtn v-if="$can('content.events', 'delete')" icon size="small" variant="text" color="error" @click="confirmDelete(item)">
               <VIcon icon="tabler-trash" />
               <VTooltip activator="parent">حذف</VTooltip>
             </VBtn>

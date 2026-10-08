@@ -1,5 +1,6 @@
 <script lang="ts" setup>
-import navItems from '@/navigation/vertical'
+import { buildPcuNav } from '@/navigation/vertical/pcu'
+import { useAuthStore } from '@/stores/authStore'
 
 // Components
 import CurrencyRatesWidget from '@/layouts/components/CurrencyRatesWidget.vue'
@@ -12,6 +13,10 @@ import UserProfile from '@/layouts/components/UserProfile.vue'
 
 // @layouts plugin
 import { VerticalNavLayout } from '@layouts'
+
+// القائمة بتتبنى من المستخدم الحالي (الدور + صلاحيات المشرف) وبتتحدث مع تغيّره
+const authStore = useAuthStore()
+const navItems = computed(() => buildPcuNav(authStore.user))
 </script>
 
 <template>

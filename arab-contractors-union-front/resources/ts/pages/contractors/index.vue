@@ -546,7 +546,7 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
         <VBtn variant="tonal" prepend-icon="tabler-file-spreadsheet" :loading="exporting" @click="exportContractors">
           تصدير Excel
         </VBtn>
-        <VBtn color="primary" prepend-icon="tabler-plus" :to="{ name: 'contractors-create' }">
+        <VBtn v-if="$can('contractors.list', 'create')" color="primary" prepend-icon="tabler-plus" :to="{ name: 'contractors-create' }">
           تسجيل مقاول جديد
         </VBtn>
       </div>
@@ -617,7 +617,7 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
                 </VChip>
               </template>
               <VList density="compact">
-                <VListItem v-for="opt in statusChangeOptions" :key="opt.value" :active="opt.value === item.status" @click="requestStatusChange(item, opt.value)">
+                <VListItem v-for="opt in statusChangeOptions" :key="opt.value" :active="opt.value === item.status" :disabled="!$can('contractors.list', 'update')" @click="requestStatusChange(item, opt.value)">
                   <VListItemTitle style="font-family:Cairo,sans-serif">{{ opt.title }}</VListItemTitle>
                 </VListItem>
               </VList>
@@ -642,10 +642,10 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
           <VBtn icon size="small" variant="text" color="info" @click="openDetails(item)" title="عرض التفاصيل">
             <VIcon icon="tabler-eye" />
           </VBtn>
-          <VBtn icon size="small" variant="text" color="primary" :to="{ name: 'contractors-edit-id', params: { id: item.id } }" title="تعديل">
+          <VBtn v-if="$can('contractors.list', 'update')" icon size="small" variant="text" color="primary" :to="{ name: 'contractors-edit-id', params: { id: item.id } }" title="تعديل">
             <VIcon icon="tabler-edit" />
           </VBtn>
-          <VBtn
+          <VBtn v-if="$can('contractors.list', 'update')"
             icon size="small" variant="text"
             :color="item.is_frozen ? 'info' : 'default'"
             :loading="freezeUpdating === item.id"
@@ -654,7 +654,7 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
           >
             <VIcon :icon="item.is_frozen ? 'tabler-snowflake-off' : 'tabler-snowflake'" />
           </VBtn>
-          <VBtn icon size="small" variant="text" color="error" @click="openDelete(item)" title="حذف">
+          <VBtn v-if="$can('contractors.list', 'delete')" icon size="small" variant="text" color="error" @click="openDelete(item)" title="حذف">
             <VIcon icon="tabler-trash" />
           </VBtn>
         </template>
@@ -734,7 +734,7 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
                   </template>
                   <VCardTitle class="text-subtitle-1 font-weight-bold">الإدارة والشركاء</VCardTitle>
                   <template #append>
-                    <VBtn size="small" variant="text" color="primary" prepend-icon="tabler-edit" @click="openContactEdit">
+                    <VBtn v-if="$can('contractors.list', 'update')" size="small" variant="text" color="primary" prepend-icon="tabler-edit" @click="openContactEdit">
                       تعديل
                     </VBtn>
                   </template>

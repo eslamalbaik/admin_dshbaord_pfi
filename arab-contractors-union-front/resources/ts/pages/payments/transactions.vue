@@ -340,7 +340,7 @@ function fmtDate(d: string | null) {
           إشعارات التحويل الواردة من المقاولين — التأكيد يُثبّت سعر الصرف والمعادل بالدينار
         </p>
       </div>
-      <VBtn color="primary" prepend-icon="tabler-plus" @click="openAdd">
+      <VBtn v-if="$can('finance.payments', 'create')" color="primary" prepend-icon="tabler-plus" @click="openAdd">
         إضافة دفعة
       </VBtn>
     </div>
@@ -444,7 +444,7 @@ function fmtDate(d: string | null) {
                   </VBtn>
                 </template>
                 <VList density="compact" min-width="160">
-                  <VListItem prepend-icon="tabler-transfer" title="تغيير الحالة" @click="openStatusChange(p)" />
+                  <VListItem v-if="$can('finance.payments', 'update')" prepend-icon="tabler-transfer" title="تغيير الحالة" @click="openStatusChange(p)" />
                 </VList>
               </VMenu>
             </td>

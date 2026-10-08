@@ -1,5 +1,7 @@
 <script lang="ts" setup>
-import navItems from '@/navigation/horizontal'
+import allNavItems from '@/navigation/horizontal'
+import { useAuthStore } from '@/stores/authStore'
+import { canAccessRoute } from '@/utils/permissions'
 
 import { themeConfig } from '@themeConfig'
 
@@ -13,6 +15,15 @@ import NavbarThemeSwitcher from '@/layouts/components/NavbarThemeSwitcher.vue'
 import UserProfile from '@/layouts/components/UserProfile.vue'
 import { HorizontalNavLayout } from '@layouts'
 import { VNodeRenderer } from '@layouts/components/VNodeRenderer'
+
+// إخفاء الصفحات اللي المشرف ما عنده عليها صلاحية (الأدمن والمحاسب ما بيتأثروا)
+const authStore = useAuthStore()
+
+const navItems = computed(() => (allNavItems as any[])
+  .map(item => item.children
+    ? { ...item, children: item.children.filter((child: any) => canAccessRoute(authStore.user, child.to)) }
+    : item)
+  .filter(item => item.children ? item.children.length > 0 : canAccessRoute(authStore.user, item.to)))
 </script>
 
 <template>

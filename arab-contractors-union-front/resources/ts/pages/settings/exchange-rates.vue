@@ -97,7 +97,7 @@ const fmtDate = (d: string | null) => {
                 <VIcon :icon="c.icon" size="22" color="primary" />
                 <span class="text-h6">{{ c.label }}</span>
               </div>
-              <VBtn size="small" variant="tonal" prepend-icon="tabler-edit" @click="openEditFor(c.code as 'USD' | 'ILS')">
+              <VBtn v-if="$can('finance.exchange_rates', 'update')" size="small" variant="tonal" prepend-icon="tabler-edit" @click="openEditFor(c.code as 'USD' | 'ILS')">
                 تعديل يدوي
               </VBtn>
             </div>

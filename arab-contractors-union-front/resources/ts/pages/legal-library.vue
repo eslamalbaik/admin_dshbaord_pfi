@@ -184,7 +184,7 @@ function openFile(url: string) {
         <VBtn variant="tonal" prepend-icon="tabler-category" @click="openCats">
           إدارة التصنيفات
         </VBtn>
-        <VBtn color="primary" prepend-icon="tabler-upload" @click="openCreate">
+        <VBtn v-if="$can('legal.library', 'create')" color="primary" prepend-icon="tabler-upload" @click="openCreate">
           رفع ملف جديد
         </VBtn>
       </div>
@@ -245,7 +245,7 @@ function openFile(url: string) {
     <VCard v-else-if="files.length === 0" class="text-center py-14" variant="flat">
       <VIcon icon="tabler-library" size="72" color="disabled" class="mb-3" />
       <p class="text-h6 text-medium-emphasis">لا توجد ملفات في هذا التصنيف</p>
-      <VBtn class="mt-4" color="primary" prepend-icon="tabler-upload" @click="openCreate">
+      <VBtn v-if="$can('legal.library', 'create')" class="mt-4" color="primary" prepend-icon="tabler-upload" @click="openCreate">
         ارفع أول ملف
       </VBtn>
     </VCard>
@@ -320,7 +320,7 @@ function openFile(url: string) {
               >
                 فتح
               </VBtn>
-              <VBtn
+              <VBtn v-if="$can('legal.library', 'update')"
                 size="small"
                 prepend-icon="tabler-edit"
                 variant="text"
@@ -329,7 +329,7 @@ function openFile(url: string) {
                 تعديل
               </VBtn>
               <VSpacer />
-              <VBtn
+              <VBtn v-if="$can('legal.library', 'delete')"
                 size="small"
                 color="error"
                 variant="text"
@@ -488,8 +488,8 @@ function openFile(url: string) {
               <VListItemTitle>{{ c.label }}</VListItemTitle>
               <VListItemSubtitle>{{ c.files_count }} ملف{{ c.is_system ? ' — أساسي' : '' }}</VListItemSubtitle>
               <template #append>
-                <VBtn icon="tabler-edit" size="small" variant="text" @click="editCat(c)" />
-                <VBtn
+                <VBtn v-if="$can('legal.library', 'update')" icon="tabler-edit" size="small" variant="text" @click="editCat(c)" />
+                <VBtn v-if="$can('legal.library', 'delete')"
                   icon="tabler-trash"
                   size="small"
                   variant="text"

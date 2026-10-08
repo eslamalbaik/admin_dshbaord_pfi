@@ -15,10 +15,12 @@ class CriticalEvents
 {
     public const CATEGORY_MEMBERSHIP_FEE = 'membership_fee';
     public const CATEGORY_CERTIFICATE    = 'membership_certificate';
+    public const CATEGORY_SUPERVISORS    = 'supervisors';
 
     public const CATEGORIES = [
         self::CATEGORY_MEMBERSHIP_FEE => 'رسوم العضوية',
         self::CATEGORY_CERTIFICATE    => 'إصدار شهادة العضوية',
+        self::CATEGORY_SUPERVISORS    => 'المشرفون والصلاحيات',
     ];
 
     public const EVENTS = [
@@ -68,6 +70,28 @@ class CriticalEvents
             'category' => self::CATEGORY_CERTIFICATE,
             'fields'   => self::CERTIFICATE_FIELDS,
         ],
+
+        // ── المشرفون والصلاحيات ──
+        'supervisor.created' => [
+            'label'    => 'إنشاء مشرف',
+            'category' => self::CATEGORY_SUPERVISORS,
+            'fields'   => self::SUPERVISOR_FIELDS,
+        ],
+        'supervisor.updated' => [
+            'label'    => 'تعديل بيانات أو صلاحيات مشرف',
+            'category' => self::CATEGORY_SUPERVISORS,
+            'fields'   => self::SUPERVISOR_FIELDS,
+        ],
+        'supervisor.status_changed' => [
+            'label'    => 'تفعيل/تعطيل حساب مشرف',
+            'category' => self::CATEGORY_SUPERVISORS,
+            'fields'   => self::SUPERVISOR_FIELDS,
+        ],
+        'supervisor.password_reset' => [
+            'label'    => 'إعادة تعيين كلمة مرور مشرف',
+            'category' => self::CATEGORY_SUPERVISORS,
+            'fields'   => self::SUPERVISOR_FIELDS,
+        ],
     ];
 
     /** أحداث حرجة دائماً (بغض النظر عن تفاصيلها) — الباقي حرج بشرط يحدده مكان التسجيل */
@@ -76,6 +100,10 @@ class CriticalEvents
         'due.discount_applied',
         'due.discount_applied_bulk',
         'certificate.regenerated',
+        'supervisor.created',
+        'supervisor.updated',
+        'supervisor.status_changed',
+        'supervisor.password_reset',
     ];
 
     private const CERTIFICATE_FIELDS = [
@@ -84,6 +112,15 @@ class CriticalEvents
         'decision_date'    => 'تاريخ قرار التصنيف',
         'issued_at'        => 'تاريخ الإصدار',
         'certificate_file' => 'ملف الشهادة',
+    ];
+
+    private const SUPERVISOR_FIELDS = [
+        'name'        => 'الاسم',
+        'email'       => 'البريد الإلكتروني',
+        'phone'       => 'الهاتف',
+        'is_active'   => 'الحالة',
+        'permissions' => 'الصلاحيات',
+        'password'    => 'كلمة المرور',
     ];
 
     public static function definition(string $action): ?array
