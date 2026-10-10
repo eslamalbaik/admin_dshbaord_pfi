@@ -448,6 +448,7 @@ Route::prefix('v1')->group(function () {
             Route::get('dashboard/activity-logs',         [\App\Http\Controllers\Api\ActivityLogController::class, 'index'])->middleware('perm:settings.activity_log,view');
             Route::get('dashboard/activity-logs/actions',  [\App\Http\Controllers\Api\ActivityLogController::class, 'actions'])->middleware('perm:settings.activity_log,view');
             Route::get('dashboard/activity-logs/critical-summary', [\App\Http\Controllers\Api\ActivityLogController::class, 'criticalSummary'])->middleware('perm:settings.activity_log,view');
+            Route::get('dashboard/activity-logs/financial-summary', [\App\Http\Controllers\Api\ActivityLogController::class, 'financialSummary'])->middleware('perm:settings.activity_log,view');
         });
 
         // --------------------------------------------------------

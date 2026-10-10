@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\ActivityLog;
+use App\Models\Contractor;
 use App\Support\CriticalEvents;
+use App\Support\FinancialEvents;
 use Illuminate\Http\Request;
 
 class ActivityLogController extends Controller
@@ -20,6 +22,10 @@ class ActivityLogController extends Controller
         // سجل المحددات الهامة: ?critical=1
         if ($request->boolean('critical'))
             $query->where('is_critical', true);
+
+        // سجل النشاط المالي: ?financial=1
+        if ($request->boolean('financial'))
+            FinancialEvents::scope($query);
 
         if ($request->filled('category')) {
             $actions = array_keys(array_filter(CriticalEvents::EVENTS, fn ($e) => $e['category'] === $request->category));
@@ -55,6 +61,8 @@ class ActivityLogController extends Controller
 
         $paginated = $query->paginate($perPage);
 
+        $contractors = $this->contractorsFor($paginated->getCollection());
+
         $paginated->getCollection()->transform(fn ($log) => [
             'id'           => $log->id,
             'actor_name'   => $log->actor?->name,
@@ -64,6 +72,8 @@ class ActivityLogController extends Controller
             'subject_id'   => $log->subject_id,
             'meta'         => $log->meta,
             'is_critical'  => $log->is_critical,
+            'is_financial' => FinancialEvents::isFinancial($log->action),
+            'contractor'   => $contractors[$this->contractorIdOf($log)] ?? null,
             'critical'     => $log->is_critical ? $this->criticalDetails($log) : null,
             'created_at'   => $log->created_at,
         ]);
@@ -78,6 +88,7 @@ class ActivityLogController extends Controller
         return $this->success(
             ActivityLog::query()
                 ->when($request->boolean('critical'), fn ($q) => $q->where('is_critical', true))
+                ->when($request->boolean('financial'), fn ($q) => FinancialEvents::scope($q))
                 ->select('action')->distinct()->orderBy('action')->pluck('action')
         );
     }
@@ -104,6 +115,62 @@ class ActivityLogController extends Controller
             'total'      => (int) $counts->sum(),
             'categories' => $categories,
         ]);
+    }
+
+    // GET /api/v1/dashboard/activity-logs/financial-summary — عدد أحداث سجل النشاط المالي (للعدّاد بجانب التبويب)
+    public function financialSummary()
+    {
+        return $this->success([
+            'total' => FinancialEvents::scope(ActivityLog::query())->count(),
+        ]);
+    }
+
+    /**
+     * رقم المقاول المرتبط بالحدث: من الـ meta، أو العنصر نفسه لو كان مقاولاً، أو
+     * contractor_id على العنصر المتأثر (دفعة، ذمة، غرامة...). الأحداث القديمة ما كانت
+     * تخزّن اسم المقاول، فبهيك بيظهر اسمه ورقم عضويته بدل المعرّف الخام.
+     */
+    private function contractorIdOf(ActivityLog $log): ?int
+    {
+        $meta = $log->meta ?? [];
+
+        if (! empty($meta['contractor_id']) && is_numeric($meta['contractor_id']))
+            return (int) $meta['contractor_id'];
+
+        if ($log->subject_type === Contractor::class && $log->subject_id)
+            return (int) $log->subject_id;
+
+        $subjectContractor = $log->relationLoaded('subject') ? $log->subject?->getAttribute('contractor_id') : null;
+
+        return is_numeric($subjectContractor) ? (int) $subjectContractor : null;
+    }
+
+    /** @return array<int, array{id: int, name: string|null, membership_number: string|null}> */
+    private function contractorsFor($logs): array
+    {
+        // العناصر المتأثرة اللي بتحمل contractor_id (بدون المقاول نفسه): نحمّلها دفعة وحدة لكل نوع
+        $logs->filter(fn ($log) => $log->subject_type && $log->subject_type !== Contractor::class
+                && empty(($log->meta ?? [])['contractor_id'])
+                && class_exists($log->subject_type))
+            ->groupBy('subject_type')
+            ->each(function ($group, $type) {
+                $model = new $type;
+                if (! \Illuminate\Support\Facades\Schema::hasColumn($model->getTable(), 'contractor_id'))
+                    return;
+
+                $subjects = $type::query()->whereKey($group->pluck('subject_id')->filter()->unique())
+                    ->get([$model->getKeyName(), 'contractor_id'])->keyBy($model->getKeyName());
+
+                $group->each(fn ($log) => $log->setRelation('subject', $subjects[$log->subject_id] ?? null));
+            });
+
+        $ids = $logs->map(fn ($log) => $this->contractorIdOf($log))->filter()->unique()->values();
+        if ($ids->isEmpty())
+            return [];
+
+        return Contractor::query()->whereKey($ids)->get(['id', 'name', 'membership_number'])
+            ->mapWithKeys(fn ($c) => [$c->id => ['id' => $c->id, 'name' => $c->name, 'membership_number' => $c->membership_number]])
+            ->all();
     }
 
     private function criticalDetails(ActivityLog $log): array
