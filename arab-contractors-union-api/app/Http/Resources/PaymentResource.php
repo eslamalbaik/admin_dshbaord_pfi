@@ -14,7 +14,11 @@ class PaymentResource extends JsonResource
             'transaction_number' => $this->transaction_number,
             'contractor'        => $this->contractor?->name,
             'contractor_id'     => $this->contractor_id,
-            'contractor_membership_number' => $this->contractor?->membership_number,
+            // الحذف الناعم بيلحق "_deleted_{id}" بالرقم لتحريره — نعرض الرقم الأصلي
+            'contractor_membership_number' => $this->contractor?->membership_number
+                ? preg_replace('/_deleted_\d+$/', '', $this->contractor->membership_number)
+                : null,
+            'contractor_deleted' => (bool) $this->contractor?->trashed(),
             'membership_id'     => $this->membership_id,
             'equipment_package_id' => $this->equipment_package_id,
             'contractor_due_id' => $this->contractor_due_id,
