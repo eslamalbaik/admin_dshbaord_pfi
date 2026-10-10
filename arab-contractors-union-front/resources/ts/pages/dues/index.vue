@@ -1319,17 +1319,17 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
             <!-- أول قرار بالفورم: الذمة قديمة ولا جديدة؟ التاريخ بيتقيّد حسب الاختيار (Trello #13) -->
             <VCol v-if="!editingDue" cols="12">
               <div class="text-body-2 mb-1">نوع الذمة</div>
-              <VBtnToggle
+              <!-- راديو بدل VBtnToggle: الأخير جوّا slide-group بيقصّ الأزرار ويطلّع أسهم سكرول بالعربي -->
+              <VRadioGroup
                 v-model="dueForm.due_kind"
+                inline
+                hide-details
+                density="compact"
                 color="primary"
-                variant="outlined"
-                divided
-                mandatory
-                density="comfortable"
               >
-                <VBtn value="new">ذمة جديدة</VBtn>
-                <VBtn value="old">ذمة قديمة (سابقة)</VBtn>
-              </VBtnToggle>
+                <VRadio value="new" label="ذمة جديدة" class="me-6" />
+                <VRadio value="old" label="ذمة قديمة (سابقة)" />
+              </VRadioGroup>
               <div class="text-caption text-medium-emphasis mt-1">
                 <template v-if="dueForm.due_kind === 'new'">تاريخ الاستحقاق من بكرة وما بعد.</template>
                 <template v-else-if="dueForm.due_kind === 'old'">تاريخ الاستحقاق اليوم أو قبله، مع ذكر السبب.</template>
