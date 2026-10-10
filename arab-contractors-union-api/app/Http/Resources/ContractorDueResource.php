@@ -32,6 +32,7 @@ class ContractorDueResource extends JsonResource
             'discount_value'       => $this->discount_value,
             'discount_amount_jod'  => $this->discount_amount_jod,
             'discount_reason'      => $this->discount_reason,
+            'discount_label'       => $this->discount_label,
             'original_amount_jod'  => $this->original_amount_jod,
             'fee_breakdown'        => $this->fee_breakdown,
         ];

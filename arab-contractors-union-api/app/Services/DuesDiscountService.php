@@ -70,7 +70,7 @@ class DuesDiscountService
                 // وتضيف أثرها الكامل للإجمالي، فيظهر رقم أكبر من الواقع.
                 'applicable_count' => $usable->count(),
                 'contractors_count' => $dues->pluck('contractor_id')->unique()->count(),
-                'total_discount_impact_jod' => round($usable->sum(fn ($p) => $p['projection']['discount_amount']), 2),
+                'total_discount_impact_jod' => round($usable->sum(fn ($p) => $p['projection']['impact']), 2),
                 'refund_to_credit_jod' => round($usable->sum(fn ($p) => $p['projection']['refund_to_credit']), 2),
                 'skipped'          => $skipped,
                 'is_dry_run'       => true,

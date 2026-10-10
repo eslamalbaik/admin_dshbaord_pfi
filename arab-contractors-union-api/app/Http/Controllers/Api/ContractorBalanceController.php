@@ -222,18 +222,26 @@ class ContractorBalanceController extends Controller
      */
     public function membershipStatus(object $row): string
     {
-        if ($row->status !== 'active') {
+        // "منتهية" إدارياً كمان بتمشي على قاعدة الـ95% إذا انحسبت عليه رسوم السنة الحالية:
+        // المقاول اللي سدّد 95% من كل اللي عليه (ومنها رسوم هالسنة) عضويته سارية، حتى لو ما
+        // انعملّه تجديد يدوي (حالة 9565_g: 608 من 640). بدون ذمة للسنة الحالية بتضل "منتهية"،
+        // عشان المنتهي القديم اللي ما عليه شي ما ينقلب "فعّالة" لحاله.
+        $eligible = $row->status === 'active'
+            || ($row->status === 'expired' && ! empty($row->has_current_year_due));
+
+        if (! $eligible) {
             return $row->status;
         }
 
-        $owed = -(float) $row->net_jod;
+        $owed = round(-(float) $row->net_jod, 2);
         if ($owed <= 0) {
             return 'active';
         }
 
         $allowed = round((float) ($row->obligations_jod ?? 0) * (1 - self::ACTIVE_PAID_RATIO), 2);
 
-        return $owed <= $allowed ? 'active' : 'expired';
+        // مقارنة بالقروش (أعداد صحيحة) عشان حالة الـ95% بالضبط ما تفشل بفرق كسور عشرية
+        return (int) round($owed * 100) <= (int) round($allowed * 100) ? 'active' : 'expired';
     }
 
     public function balancesQuery(): Builder
@@ -261,6 +269,8 @@ class ContractorBalanceController extends Controller
             ->selectRaw("ROUND({$dues}, 2) AS dues_jod")
             ->selectRaw("ROUND({$penalties}, 2) AS penalties_jod")
             ->selectRaw("ROUND({$credit} - {$dues} - {$penalties}, 2) AS net_jod")
-            ->selectRaw("ROUND({$obligations}, 2) AS obligations_jod");
+            ->selectRaw("ROUND({$obligations}, 2) AS obligations_jod")
+            ->selectRaw('EXISTS(SELECT 1 FROM contractor_dues cy WHERE cy.contractor_id = contractors.id
+                          AND cy.deleted_at IS NULL AND cy.year = ?) AS has_current_year_due', [now()->year]);
     }
 }
