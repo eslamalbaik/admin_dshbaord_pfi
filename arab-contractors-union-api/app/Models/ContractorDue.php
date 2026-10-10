@@ -123,11 +123,15 @@ class ContractorDue extends Model
      * ترتيب تسديد الذمم: الأقدم أولاً (قاعدة eslam 10/10). بالسنة، وذمة بلا سنة بتاخد سنة تاريخ
      * استحقاقها أو إنشائها (كانت بتروح آخر شي حتى لو قديمة)، بعدين تاريخ الاستحقاق، بعدين الأقدم إدخالاً.
      * كل مسار بيوزّع دفعة أو رصيد على الذمم لازم يمرّ من هون.
+     *
+     * ذمة "جبر كسور الرصيد" دايماً آخر شي: هي فرق تقريب على الرصيد كله مش فاتورة لها تاريخ،
+     * وبدون هيك تاريخ إنشائها كان يسبق ذمم تاريخ استحقاقها لاحق فتنسدّ قبل الأصل (QA R-06).
      */
     public static function sortOldestFirst(\Illuminate\Support\Collection $dues): \Illuminate\Support\Collection
     {
         return $dues->sortBy(fn (self $due) => sprintf(
-            '%04d|%s|%012d',
+            '%d|%04d|%s|%012d',
+            $due->notes === \App\Services\BalanceRoundingService::TAG ? 1 : 0,
             $due->year ?? $due->due_date?->year ?? $due->created_at?->year ?? 9999,
             ($due->due_date ?? $due->created_at)?->format('Y-m-d') ?? '9999-12-31',
             $due->id,

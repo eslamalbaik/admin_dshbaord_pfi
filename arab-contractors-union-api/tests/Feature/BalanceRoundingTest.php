@@ -99,6 +99,24 @@ class BalanceRoundingTest extends TestCase
         $this->assertEquals(-492, ContractorBalances::exactNet($c->id));
     }
 
+    /** QA R-06: ذمة استحقاقها لاحق كانت تنسبق بذمة الجبر (تاريخ إنشائها اليوم) فينسدّ الكسر أولاً */
+    public function test_partial_payment_settles_the_real_due_before_the_rounding_due(): void
+    {
+        $c = $this->contractor();
+        ContractorDue::create([
+            'contractor_id' => $c->id, 'description' => 'رصيد مستحق', 'year' => 2026,
+            'amount_jod' => 100.40, 'paid_jod' => 0, 'status' => 'unpaid',
+            'due_date' => now()->addDays(5)->toDateString(),
+        ]);
+
+        $this->pay($c, 50);
+
+        $real = ContractorDue::where('contractor_id', $c->id)->where('description', 'رصيد مستحق')->sole();
+        $this->assertEquals(50, (float) $real->paid_jod);
+        $this->assertEquals([0.0], $this->roundingDues($c)->pluck('paid_jod')->map(fn ($v) => (float) $v)->all());
+        $this->assertEquals(-51, ContractorBalances::exactNet($c->id));
+    }
+
     public function test_paying_the_rounded_amount_settles_everything(): void
     {
         $c = $this->contractor();
