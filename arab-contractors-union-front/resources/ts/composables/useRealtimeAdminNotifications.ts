@@ -80,7 +80,7 @@ export function toggleNotificationSound() {
 
   // معاينة الصوت عند إعادة تفعيله — النقرة نفسها تفتح قفل الصوت في المتصفح
   if (!notificationSoundMuted.value)
-    playChime(false)
+    playChime()
 }
 
 let audioCtx: AudioContext | null = null
@@ -111,9 +111,16 @@ if (typeof window !== 'undefined') {
   )
 }
 
-// نغمة واضحة: ثلاث نوتات صاعدة، والمالية نغمة مختلفة (أربع نوتات تشبه «رنّة النقود»)
-// حتى يميّزها المحاسب بالأذن قبل أن ينظر للشاشة.
-function playChime(financial: boolean) {
+// صوت «آلة كاشير» لكل الإشعارات: طقّة قصيرة (ضجيج مُرشَّح) ثم رنّة جرس معدني.
+// اختاره المستخدم من بين عدة نغمات جُرّبت على Staging.
+let lastChimeAt = 0
+
+function playChime() {
+  // دفعة إشعارات متتالية (مثلاً عدة تحويلات معاً) تُصدر رنّة واحدة لا رنّات متراكبة
+  if (Date.now() - lastChimeAt < 1500)
+    return
+  lastChimeAt = Date.now()
+
   try {
     const ctx = getAudioContext()
     if (!ctx)
@@ -126,7 +133,7 @@ function playChime(financial: boolean) {
     // ضاغط + كسب رئيسي يرفعان الصوت بدون تشويه
     const master = ctx.createGain()
 
-    master.gain.value = 0.9
+    master.gain.value = 0.7
 
     const compressor = ctx.createDynamicsCompressor()
 
@@ -135,31 +142,41 @@ function playChime(financial: boolean) {
     master.connect(compressor)
     compressor.connect(ctx.destination)
 
-    const notes = financial
-      ? [1046.5, 1318.5, 1568, 2093] // C6 E6 G6 C7
-      : [784, 1046.5, 1318.5] // G5 C6 E6
+    // الطقّة: 60ms ضجيج أبيض يخفت تدريجياً، بعد مرشّح high-pass
+    const clickBuffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.06), ctx.sampleRate)
+    const samples = clickBuffer.getChannelData(0)
+    for (let i = 0; i < samples.length; i++)
+      samples[i] = (Math.random() * 2 - 1) * (1 - i / samples.length)
 
-    const step = financial ? 0.12 : 0.15
-    const tail = 0.55
+    const click = ctx.createBufferSource()
+    const highpass = ctx.createBiquadFilter()
+    const clickGain = ctx.createGain()
 
-    notes.forEach((freq, i) => {
-      const start = now + i * step
+    highpass.type = 'highpass'
+    highpass.frequency.value = 2500
+    clickGain.gain.value = 0.6
+    click.buffer = clickBuffer
+    click.connect(highpass)
+    highpass.connect(clickGain)
+    clickGain.connect(master)
+    click.start(now)
 
-      // نغمة أساسية + نغمة أعلى خفيفة لصوت «جرس» أوضح من الصفارة البسيطة
-      ;[[freq, 'triangle', 0.7], [freq * 2, 'sine', 0.25]].forEach(([f, type, level]) => {
-        const osc = ctx.createOscillator()
-        const gain = ctx.createGain()
+    // الرنّة: نغمات جزئية غير متناغمة (نسب جرس معدني) فوق G6
+    const bellStart = now + 0.1
 
-        osc.type = type as OscillatorType
-        osc.frequency.value = f as number
-        gain.gain.setValueAtTime(0.0001, start)
-        gain.gain.exponentialRampToValueAtTime(level as number, start + 0.015)
-        gain.gain.exponentialRampToValueAtTime(0.0001, start + tail)
-        osc.connect(gain)
-        gain.connect(master)
-        osc.start(start)
-        osc.stop(start + tail + 0.05)
-      })
+    ;[[1, 0.6, 1.3], [2.76, 0.25, 0.9], [5.4, 0.12, 0.5]].forEach(([ratio, level, decay]) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+
+      osc.type = 'sine'
+      osc.frequency.value = 1568 * ratio
+      gain.gain.setValueAtTime(0.0001, bellStart)
+      gain.gain.exponentialRampToValueAtTime(level, bellStart + 0.012)
+      gain.gain.exponentialRampToValueAtTime(0.0001, bellStart + decay)
+      osc.connect(gain)
+      gain.connect(master)
+      osc.start(bellStart)
+      osc.stop(bellStart + decay + 0.05)
     })
   }
   catch {
@@ -173,11 +190,9 @@ export function __simulateIncoming(notification: Record<string, any>) {
 }
 
 function handleIncoming(notification: Record<string, any>) {
-  const meta = notificationMeta(notification)
-
   notificationPulse.value++
   if (!notificationSoundMuted.value)
-    playChime(meta.financial)
+    playChime()
   pushToast(notification)
 }
 
