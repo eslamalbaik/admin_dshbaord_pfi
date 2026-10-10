@@ -27,8 +27,10 @@ export function useExchangeRates() {
       const res = await api.get('/api/v1/dashboard/exchange-rates')
       return res.data.items
     },
-    staleTime: 30000, // 30s
-    refetchInterval: 60000, // poll once a minute — backend cache itself is invalidated right after each successful fetch, so this stays live
+    staleTime: 300000, // 5 min
+    // Rates are fetched from the external API once a day (plus rare manual overrides),
+    // so polling every 10 minutes is plenty; a manual override in this tab refetches itself.
+    refetchInterval: 600000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     retry: 1,
