@@ -131,22 +131,65 @@ class EventAdminTest extends TestCase
         ])->assertStatus(201);
     }
 
-    public function test_switching_to_online_clears_the_stale_location(): void
+    public function test_location_survives_a_round_trip_through_online_back_to_hybrid(): void
     {
         $this->actingAsAdmin();
 
         $event = Event::create([
             'title' => 'فعالية', 'body' => 'نص', 'slug' => 'fmt-event',
-            'event_format' => 'onsite', 'event_location' => 'gaza',
+            'event_format' => 'hybrid', 'event_location' => 'gaza', 'stream_url' => 'https://zoom.us/j/1',
             'is_published' => true, 'published_at' => now()->subDay(),
         ]);
 
-        // الفورم بيخفي حقل المكان للأونلاين بس بيضل يبعت القيمة القديمة
+        // الفورم بيخفي حقل المكان للأونلاين بس بيضل يبعت القيمة — ما بتنمسح
         $this->putJson("/api/v1/admin/events/{$event->id}", [
             'event_format' => 'online', 'event_location' => 'gaza',
         ])->assertStatus(200);
+        $this->assertSame('gaza', $event->fresh()->event_location);
 
-        $this->assertNull($event->fresh()->event_location);
+        // رجوع لـ hybrid بتعديل لاحق: المكان ورابط Zoom المحفوظين بيرجعوا مثل ما هم
+        $this->putJson("/api/v1/admin/events/{$event->id}", ['event_format' => 'hybrid', 'event_location' => 'gaza'])
+            ->assertStatus(200)
+            ->assertJsonPath('items.event_location', 'gaza')
+            ->assertJsonPath('items.stream_url', 'https://zoom.us/j/1');
+    }
+
+    public function test_stream_url_survives_switching_to_onsite_and_back_to_hybrid(): void
+    {
+        $this->actingAsAdmin();
+
+        $event = Event::create([
+            'title' => 'فعالية', 'body' => 'نص', 'slug' => 'fmt-stream',
+            'event_format' => 'hybrid', 'event_location' => 'gaza', 'stream_url' => 'https://zoom.us/j/2',
+            'is_published' => true, 'published_at' => now()->subDay(),
+        ]);
+
+        $this->putJson("/api/v1/admin/events/{$event->id}", ['event_format' => 'onsite', 'event_location' => 'gaza'])
+            ->assertStatus(200);
+        $this->assertSame('https://zoom.us/j/2', $event->fresh()->stream_url);
+
+        $this->putJson("/api/v1/admin/events/{$event->id}", ['event_format' => 'hybrid', 'event_location' => 'gaza'])
+            ->assertStatus(200)
+            ->assertJsonPath('items.stream_url', 'https://zoom.us/j/2');
+    }
+
+    public function test_contractor_app_hides_stream_url_of_onsite_event(): void
+    {
+        // يوم الفعالية: رابط البث بيبين عادة — إلا لو الفعالية وجاهية فقط
+        $event = Event::create([
+            'title' => 'فعالية', 'body' => 'نص', 'slug' => 'onsite-stream',
+            'event_format' => 'onsite', 'event_location' => 'gaza', 'stream_url' => 'https://zoom.us/j/3',
+            'is_published' => true, 'published_at' => now()->subDay(), 'event_date' => now(),
+        ]);
+
+        Sanctum::actingAs($this->createContractor(), ['*']);
+
+        $this->getJson("/api/v1/contractor/events/{$event->id}")
+            ->assertStatus(200)
+            ->assertJsonPath('items.stream_url', null);
+        $this->getJson('/api/v1/events/onsite-stream')
+            ->assertStatus(200)
+            ->assertJsonPath('items.stream_url', null);
     }
 
     public function test_contractor_app_hides_location_of_online_event_with_legacy_value(): void
@@ -602,5 +645,52 @@ class EventAdminTest extends TestCase
 
         $this->assertNull($event->fresh()->video_url);
         $this->assertNull($event->fresh()->external_url);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    //  الروابط بلا قيد عدد أحرف (بند 18)
+    // ─────────────────────────────────────────────────────────────────────
+
+    public function test_store_accepts_very_long_links(): void
+    {
+        $this->actingAsAdmin();
+
+        $zoom = 'https://us02web.zoom.us/j/81234567890?pwd=' . str_repeat('aB3', 400);
+        $external = 'https://example.com/register?ref=' . str_repeat('x', 1500);
+
+        $res = $this->postJson('/api/v1/admin/events', [
+            'title' => 'فعالية', 'body' => 'نص', 'event_format' => 'online',
+            'stream_url' => $zoom, 'external_url' => $external,
+        ])->assertStatus(201);
+
+        $event = Event::find($res->json('items.id'));
+        $this->assertSame($zoom, $event->stream_url);
+        $this->assertSame($external, $event->external_url);
+    }
+
+    public function test_long_link_without_scheme_still_gets_https_and_bad_link_still_rejected(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/events', [
+            'title' => 'فعالية', 'body' => 'نص', 'event_format' => 'online',
+            'stream_url' => 'zoom.us/j/1?pwd=' . str_repeat('z', 700),
+        ])->assertStatus(201)
+            ->assertJsonPath('items.stream_url', 'https://zoom.us/j/1?pwd=' . str_repeat('z', 700));
+
+        $this->postJson('/api/v1/admin/events', [
+            'title' => 'فعالية', 'body' => 'نص', 'external_url' => 'not a link',
+        ])->assertStatus(422)->assertJsonValidationErrors(['external_url']);
+    }
+
+    public function test_links_are_optional_on_store_and_update(): void
+    {
+        $this->actingAsAdmin();
+
+        $id = $this->postJson('/api/v1/admin/events', ['title' => 'بلا روابط', 'body' => 'نص', 'video_url' => '', 'external_url' => ''])
+            ->assertStatus(201)->json('items.id');
+
+        $this->putJson("/api/v1/admin/events/{$id}", ['title' => 'بلا روابط 2', 'video_url' => '', 'external_url' => ''])
+            ->assertStatus(200);
     }
 }

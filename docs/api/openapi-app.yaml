@@ -2290,7 +2290,7 @@ paths:
       summary: Event details by slug (public)
       description: |
         Full event model plus `stream_available`, normalized `speakers`, and `author`.
-        `stream_url` is null except on the event day; `event_location` is null for online events.
+        `stream_url` is null except on the event day and always null for onsite events; `event_location` is null for online events.
       operationId: getEventBySlug
       security: []
       parameters:
@@ -4208,7 +4208,7 @@ components:
         event_location: { type: string, nullable: true, description: Always null for online events. }
         event_format: { $ref: "#/components/schemas/EventFormat" }
         is_international: { type: boolean }
-        stream_url: { type: string, format: uri, nullable: true, description: Only on the event day. }
+        stream_url: { type: string, format: uri, nullable: true, description: Only on the event day; always null for onsite events. }
         stream_available: { type: boolean }
         speakers:
           type: array
