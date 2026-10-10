@@ -20,6 +20,7 @@ declare module 'vue' {
     AppStepper: typeof import('./resources/ts/@core/components/AppStepper.vue')['default']
     AppTextarea: typeof import('./resources/ts/@core/components/app-form-elements/AppTextarea.vue')['default']
     AppTextField: typeof import('./resources/ts/@core/components/app-form-elements/AppTextField.vue')['default']
+    BalanceAdjustDialog: typeof import('./resources/ts/components/dialogs/BalanceAdjustDialog.vue')['default']
     BuyNow: typeof import('./resources/ts/@core/components/BuyNow.vue')['default']
     CardStatisticsHorizontal: typeof import('./resources/ts/@core/components/cards/CardStatisticsHorizontal.vue')['default']
     CardStatisticsVertical: typeof import('./resources/ts/@core/components/cards/CardStatisticsVertical.vue')['default']

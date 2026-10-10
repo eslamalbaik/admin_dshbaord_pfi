@@ -16,11 +16,13 @@ class CriticalEvents
     public const CATEGORY_MEMBERSHIP_FEE = 'membership_fee';
     public const CATEGORY_CERTIFICATE    = 'membership_certificate';
     public const CATEGORY_SUPERVISORS    = 'supervisors';
+    public const CATEGORY_BALANCES       = 'balances';
 
     public const CATEGORIES = [
         self::CATEGORY_MEMBERSHIP_FEE => 'رسوم العضوية',
         self::CATEGORY_CERTIFICATE    => 'إصدار شهادة العضوية',
         self::CATEGORY_SUPERVISORS    => 'المشرفون والصلاحيات',
+        self::CATEGORY_BALANCES       => 'أرصدة المقاولين',
     ];
 
     public const EVENTS = [
@@ -51,6 +53,16 @@ class CriticalEvents
             'fields'   => [
                 'discount_type'  => 'نوع الخصم',
                 'discount_value' => 'قيمة الخصم',
+            ],
+        ],
+
+        // ── أرصدة المقاولين ──
+        'balance.adjusted' => [
+            'label'    => 'تعديل رصيد مقاول يدوياً',
+            'category' => self::CATEGORY_BALANCES,
+            'fields'   => [
+                'net_jod' => 'الرصيد الصافي (د.أ)',
+                'status'  => 'حالة العضوية',
             ],
         ],
 
@@ -99,6 +111,7 @@ class CriticalEvents
         'grade_fee.updated',
         'due.discount_applied',
         'due.discount_applied_bulk',
+        'balance.adjusted',
         'certificate.regenerated',
         'supervisor.created',
         'supervisor.updated',

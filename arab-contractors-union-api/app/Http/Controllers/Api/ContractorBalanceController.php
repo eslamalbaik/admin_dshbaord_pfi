@@ -114,6 +114,62 @@ class ContractorBalanceController extends Controller
         return $this->success($statements->build($contractor));
     }
 
+    /**
+     * POST /api/v1/dashboard/balances/{contractor}/adjust
+     * تعديل رصيد المقاول يدوياً (زيادة/إنقاص/تحديد رصيد جديد) مع سبب إلزامي.
+     */
+    public function adjust(Request $request, Contractor $contractor, \App\Services\ContractorBalanceAdjustmentService $service)
+    {
+        $data = $request->validate([
+            'mode'   => 'required|in:increase,decrease,set',
+            'amount' => $request->input('mode') === 'set'
+                ? 'required|numeric|between:-10000000,10000000'
+                : 'required|numeric|min:0.01|max:10000000',
+            'reason' => 'required|string|min:3|max:500',
+        ], [
+            'mode.required'   => 'اختر نوع التعديل.',
+            'amount.required' => 'أدخل المبلغ.',
+            'amount.min'      => 'المبلغ لازم يكون أكبر من صفر.',
+            'reason.required' => 'سبب التعديل مطلوب.',
+            'reason.min'      => 'اكتب سبباً واضحاً للتعديل.',
+        ]);
+
+        $adjustment = $service->adjust($contractor, $data['mode'], (float) $data['amount'], trim($data['reason']), $request->user());
+
+        return $this->success([
+            'adjustment' => $this->formatAdjustment($adjustment->load('createdBy:id,name')),
+            'balance'    => $this->snapshot($contractor->id),
+        ], 'تم تعديل الرصيد بنجاح');
+    }
+
+    /** GET /api/v1/dashboard/balances/{contractor}/adjustments — سجل تعديلات الرصيد اليدوية */
+    public function adjustments(Contractor $contractor)
+    {
+        $items = \App\Models\ContractorBalanceAdjustment::with('createdBy:id,name')
+            ->where('contractor_id', $contractor->id)
+            ->latest('id')->limit(100)->get()
+            ->map(fn ($a) => $this->formatAdjustment($a));
+
+        return $this->success($items);
+    }
+
+    private function formatAdjustment(\App\Models\ContractorBalanceAdjustment $a): array
+    {
+        return [
+            'id'                 => $a->id,
+            'mode'               => $a->mode,
+            'mode_label'         => \App\Models\ContractorBalanceAdjustment::MODE_LABELS[$a->mode] ?? $a->mode,
+            'amount_jod'         => (float) $a->amount_jod,
+            'balance_before_jod' => (float) $a->balance_before_jod,
+            'balance_after_jod'  => (float) $a->balance_after_jod,
+            'status_before'      => $a->status_before,
+            'status_after'       => $a->status_after,
+            'reason'             => $a->reason,
+            'created_by'         => $a->createdBy?->name,
+            'created_at'         => $a->created_at?->toIso8601String(),
+        ];
+    }
+
     /** GET /api/v1/dashboard/balances/summary */
     public function summary()
     {
