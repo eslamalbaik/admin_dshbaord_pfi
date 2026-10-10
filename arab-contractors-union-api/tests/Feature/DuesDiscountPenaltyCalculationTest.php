@@ -103,7 +103,7 @@ class DuesDiscountPenaltyCalculationTest extends TestCase
         $this->assertSame('100.00', $due->original_amount_jod);
         $this->assertSame('30.00', $due->discount_amount_jod);
         $this->assertSame('fixed', $due->discount_type);
-        $this->assertStringEndsWith('(بعد خصم 30 د.أ)', $due->description);
+        $this->assertStringNotContainsString('بعد خصم', $due->description);
     }
 
     public function test_a_percent_discount_after_a_fixed_one_applies_to_the_discounted_amount(): void

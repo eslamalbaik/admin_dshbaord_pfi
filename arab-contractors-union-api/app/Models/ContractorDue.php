@@ -60,6 +60,12 @@ class ContractorDue extends Model
         return trim($title) ?: 'ذمة مالية';
     }
 
+    /** حذف لاحقة "(بعد خصم ...)" من نص البيان (الصيغة اللي كان يضيفها applyDiscount والاستيراد القديم) */
+    public static function stripDiscountSuffix(string $description): string
+    {
+        return trim(preg_replace('/\s*\(بعد خصم[^)]*\)/u', '', $description));
+    }
+
     public function getReceiptDateAttribute(): ?string
     {
         return $this->is_membership_fee ? "{$this->year}-12-31" : null;
@@ -242,10 +248,9 @@ class ContractorDue extends Model
         $effectiveType  = $projection['effective_type'];
         $effectiveValue = $projection['effective_value'];
 
-        // تحديث لاحقة "(بعد خصم ...)" بنص البيان لتعكس نسبة/مبلغ الخصم المتراكم الفعلي —
-        // بدونه يضل النص القديم (مثلاً 50%) ظاهر حتى بعد ما يصير الخصم الحقيقي 70%.
-        $suffix = $effectiveType === 'percent' ? "(بعد خصم {$effectiveValue}%)" : "(بعد خصم {$effectiveValue} د.أ)";
-        $baseDescription = trim(preg_replace('/\s*\(بعد خصم[^)]*\)\s*$/u', '', (string) $this->description));
+        // البيان بينحفظ بدون لاحقة "(بعد خصم ...)": الخصم بيُعرض من حقول discount_* لحالها.
+        // لو البيان فيه لاحقة قديمة (قبل هالتعديل) بنشيلها.
+        $baseDescription = self::stripDiscountSuffix((string) $this->description);
 
         $this->update([
             'original_amount_jod' => $projection['original'],
@@ -255,7 +260,7 @@ class ContractorDue extends Model
             'discount_reason'     => $reason,
             'discount_by'         => $byUserId,
             'amount_jod'          => $projection['new_amount'],
-            'description'         => "{$baseDescription} {$suffix}",
+            'description'         => $baseDescription,
         ]);
 
         if ($projection['refund_to_credit'] > 0) {

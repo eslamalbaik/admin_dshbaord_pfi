@@ -277,14 +277,14 @@ class LegacyDuesImporter
         if ($c['due_2020'] !== null) {
             $dues[] = [
                 'year'        => 2020,
-                'description' => 'رسوم اشتراك سنة 2020 (بعد خصم 50%)',
+                'description' => 'رسوم اشتراك سنة 2020',
                 'amount_jod'  => $c['due_2020'],
             ];
         }
         if ($c['due_2021'] !== null) {
             $dues[] = [
                 'year'        => 2021,
-                'description' => 'رسوم اشتراك سنة 2021 (بعد خصم 30%)',
+                'description' => 'رسوم اشتراك سنة 2021',
                 'amount_jod'  => $c['due_2021'],
             ];
         }
