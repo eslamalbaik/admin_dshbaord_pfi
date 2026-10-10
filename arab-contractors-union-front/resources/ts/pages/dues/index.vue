@@ -193,13 +193,40 @@ const dueForm = ref({
   year: '' as string | number,
   due_date: '',
   notes: '',
-  // تاريخ الاستحقاق محصور بتاريخ اليوم أو بعده، إلا بتفعيل هذين صراحةً لتسجيل ذمة
-  // متأخّرة سابقة (TASK-17 #7) — قرار واعٍ بسبب مكتوب، لا تاريخ مكتوب بالخطأ.
-  allow_backdate: false,
+  // نوع الذمة يختاره المستخدم أول الفورم (Trello #13)، والتاريخ يتقيّد حسبه — مش العكس:
+  // «جديدة» تاريخها من بكرة وما بعد، «قديمة» اليوم أو قبله مع سبب مكتوب (TASK-17 #7).
+  due_kind: '' as '' | 'old' | 'new',
   backdate_reason: '',
 })
 
-const todayIso = new Date().toISOString().slice(0, 10)
+// التاريخ المحلي (غزة) مش UTC: toISOString بعد منتصف الليل كان يرجّع تاريخ امبارح.
+const gazaDate = (offsetDays = 0) =>
+  new Date(Date.now() + offsetDays * 86400000).toLocaleDateString('en-CA', { timeZone: 'Asia/Gaza' })
+const todayIso = gazaDate()
+const tomorrowIso = gazaDate(1)
+const dueDateMin = computed(() => (!editingDue.value && dueForm.value.due_kind === 'new' ? tomorrowIso : undefined))
+const dueDateMax = computed(() => (!editingDue.value && dueForm.value.due_kind === 'old' ? todayIso : undefined))
+const dueDateRule = (v: string) => {
+  if (editingDue.value || !v)
+    return true
+  if (dueForm.value.due_kind === 'new' && v < tomorrowIso)
+    return 'الذمة الجديدة تاريخها من بكرة وما بعد'
+  if (dueForm.value.due_kind === 'old' && v > todayIso)
+    return 'الذمة القديمة تاريخها اليوم أو قبله'
+
+  return true
+}
+
+// تغيير النوع بعد اختيار تاريخ ما بيسيبه بقيمة مرفوضة: بنفضّيه ليختار من جديد.
+watch(() => dueForm.value.due_kind, () => {
+  if (dueForm.value.due_date && dueDateRule(dueForm.value.due_date) !== true) {
+    dueForm.value.due_date = ''
+    if (Number(dueForm.value.year) === autoYear) {
+      dueForm.value.year = ''
+      autoYear = null
+    }
+  }
+})
 
 // مبلغ الذمة/الغرامة لازم يكون أكبر من صفر — الرصيد الدائن يُسجَّل كدفعة، مش كذمة بالسالب.
 const isPositiveAmount = (v: unknown) => v !== '' && v !== null && Number(v) > 0
@@ -314,7 +341,7 @@ function openCreateDue(c?: ContractorRow) {
     year: '',
     due_date: '',
     notes: '',
-    allow_backdate: false,
+    due_kind: '',
     backdate_reason: '',
   }
   if (c)
@@ -335,7 +362,7 @@ function openEditDue(d: DueItem) {
     notes: d.notes ?? '',
     // التعديل لا يخضع لقاعدة التاريخ (مسار PATCH لا يفرضها): منع تعديل غير متعلّق بالتاريخ
     // على ذمة قديمة لأن تاريخها ماضٍ يكرّر نمط TASK-01 — قاعدة جديدة تقفل سجلات قائمة.
-    allow_backdate: false,
+    due_kind: '',
     backdate_reason: '',
   }
   dueDialog.value = true
@@ -353,10 +380,9 @@ const saveDueMutation = useMutation({
     if (editingDue.value)
       return (await api.patch(`/api/v1/dashboard/dues/${editingDue.value.id}`, payload)).data
     payload.contractor_id = dueForm.value.contractor_id
-    if (dueForm.value.allow_backdate) {
-      payload.allow_backdate = true
+    payload.due_kind = dueForm.value.due_kind
+    if (dueForm.value.due_kind === 'old')
       payload.backdate_reason = dueForm.value.backdate_reason
-    }
 
     return (await api.post('/api/v1/dashboard/dues', payload)).data
   },
@@ -367,6 +393,7 @@ const saveDueMutation = useMutation({
   },
   onError: (e: any) => flash(
     e?.response?.data?.errors?.amount_jod?.[0]
+    || e?.response?.data?.errors?.due_kind?.[0]
     || e?.response?.data?.errors?.due_date?.[0]
     || e?.response?.data?.errors?.year?.[0]
     || e?.response?.data?.errors?.backdate_reason?.[0]
@@ -1288,6 +1315,38 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
                 no-data-text="اكتب حرفين على الأقل للبحث"
               />
             </VCol>
+
+            <!-- أول قرار بالفورم: الذمة قديمة ولا جديدة؟ التاريخ بيتقيّد حسب الاختيار (Trello #13) -->
+            <VCol v-if="!editingDue" cols="12">
+              <div class="text-body-2 mb-1">نوع الذمة</div>
+              <VBtnToggle
+                v-model="dueForm.due_kind"
+                color="primary"
+                variant="outlined"
+                divided
+                mandatory
+                density="comfortable"
+              >
+                <VBtn value="new">ذمة جديدة</VBtn>
+                <VBtn value="old">ذمة قديمة (سابقة)</VBtn>
+              </VBtnToggle>
+              <div class="text-caption text-medium-emphasis mt-1">
+                <template v-if="dueForm.due_kind === 'new'">تاريخ الاستحقاق من بكرة وما بعد.</template>
+                <template v-else-if="dueForm.due_kind === 'old'">تاريخ الاستحقاق اليوم أو قبله، مع ذكر السبب.</template>
+                <template v-else>اختر نوع الذمة أولاً حتى تقدر تحدد تاريخ الاستحقاق.</template>
+              </div>
+            </VCol>
+            <VCol v-if="!editingDue && dueForm.due_kind === 'old'" cols="12">
+              <VTextField
+                v-model="dueForm.backdate_reason"
+                label="سبب تسجيل ذمة قديمة (إلزامي)"
+                dir="rtl"
+                :error="!dueForm.backdate_reason"
+                hint="يُحفظ بملاحظات الذمة وبسجل المالية"
+                persistent-hint
+              />
+            </VCol>
+
             <VCol cols="12" md="8">
               <VTextField v-model="dueForm.description" label="البيان" dir="rtl" />
             </VCol>
@@ -1310,28 +1369,10 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
                 v-model="dueForm.due_date"
                 label="تاريخ الاستحقاق"
                 type="date"
-                :min="!editingDue && !dueForm.allow_backdate ? todayIso : undefined"
-              />
-            </VCol>
-
-            <!-- تسجيل ذمة متأخّرة سابقة — حالة مشروعة لكنها تستحق أن تكون قراراً واعياً
-                 بسبب مكتوب، لا تاريخاً ماضياً مرَّ بالخطأ (TASK-17 #7). -->
-            <VCol v-if="!editingDue" cols="12">
-              <VCheckbox
-                v-model="dueForm.allow_backdate"
-                label="ذمة سابقة/متأخّرة — السماح بتاريخ استحقاق قبل اليوم"
-                density="compact"
-                hide-details
-              />
-            </VCol>
-            <VCol v-if="!editingDue && dueForm.allow_backdate" cols="12">
-              <VTextField
-                v-model="dueForm.backdate_reason"
-                label="سبب التاريخ السابق (إلزامي)"
-                dir="rtl"
-                :error="!dueForm.backdate_reason"
-                hint="يُحفظ بملاحظات الذمة وبسجل المالية"
-                persistent-hint
+                :min="dueDateMin"
+                :max="dueDateMax"
+                :disabled="!editingDue && !dueForm.due_kind"
+                :rules="[dueDateRule]"
               />
             </VCol>
 
@@ -1348,9 +1389,10 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
             :disabled="saveDueMutation.isPending.value
               || (!editingDue && !dueForm.contractor_id)
               || !isPositiveAmount(dueForm.amount_jod)
-              || (!editingDue && (!dueForm.year || !dueForm.due_date))
+              || (!editingDue && (!dueForm.due_kind || !dueForm.year || !dueForm.due_date))
+              || dueDateRule(dueForm.due_date) !== true
               || (dueForm.year !== '' && dueForm.year !== null && !isValidYear(dueForm.year))
-              || (dueForm.allow_backdate && !dueForm.backdate_reason)"
+              || (!editingDue && dueForm.due_kind === 'old' && !dueForm.backdate_reason)"
             @click="saveDueMutation.mutate()"
           >
             حفظ
