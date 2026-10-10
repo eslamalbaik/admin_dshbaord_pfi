@@ -74,7 +74,6 @@ class PaymentConfirmationService
 
             $payment->update($updateData);
 
-            $this->settleLinkedPenalty($payment, $authUser);
             $this->settleOutstandingDues($payment, $authUser);
 
             // إطلاق حدث للمكونات الأخرى (Membership, Equipment) للتفاعل مع الدفعة باستقلالية
@@ -107,8 +106,9 @@ class PaymentConfirmationService
      * دفعة من التطبيق بتسدّد دايماً **أقدم الذمم أولاً** (حسب السنة)، حتى لو المقاول اختار ذمة
      * سنة أحدث (contractor_due_id) أو بعتها "رسوم عضوية" (قاعدة eslam 10/10: عليه 150 لـ2025
      * و150 لـ2026 ودفع 150 لـ2026 ← بتنسدّ 2025):
-     * - سداد ذمم / دفعة مقدمة / رسوم عضوية ← أقدم الذمم، بعدين الغرامات المفتوحة، والباقي رصيد.
-     * - دفع غرامة ← الغرامات المفتوحة أولاً (بعد المربوطة)، بعدين الذمم، والباقي رصيد.
+     * - كل الأنواع ← أقدم الذمم، بعدين الغرامات المفتوحة (الأقدم أولاً)، والباقي رصيد (رسوم العضوية
+     *   ما بتسدّد غرامات). حتى الدفع من كرت غرامة محددة (penalty_id) بيسدّ أقدم ذمة أولاً — اختيار
+     *   eslam 10/10؛ الغرامة بتنسدّ لو ضل من المبلغ بعد الذمم.
      * كل تسديد بينسجّل بـpayment_allocations حتى ينعكس لو الدفعة رجعت أو انرفضت.
      */
     private function settleOutstandingDues(Payment $payment, User $authUser): void
@@ -126,7 +126,7 @@ class PaymentConfirmationService
             ->whereIn('status', ['unpaid', 'partially_paid'])
             ->orderBy('created_at')->orderBy('id')->lockForUpdate()->get();
 
-        $targets = $payment->type === 'penalty_payment' ? $penalties->concat($dues) : $dues->concat($penalties);
+        $targets = $dues->concat($penalties);
 
         $available = round((float) $payment->amount_jod - (float) $payment->used_amount_jod, 2);
 
@@ -155,38 +155,6 @@ class PaymentConfirmationService
                 ['contractor_id' => $target->contractor_id, 'amount_jod' => $amount, 'payment_id' => $payment->id],
             );
         }
-    }
-
-    /**
-     * تحويل مرفوع من التطبيق لدفع غرامة محددة (كرت الغرامة بالمستحقات): بيسدّدها أولاً بحدود
-     * المتبقي عليها، والباقي بيكمّل على باقي الغرامات والذمم (settleOutstandingDues).
-     */
-    private function settleLinkedPenalty(Payment $payment, User $authUser): void
-    {
-        if ($payment->type !== 'penalty_payment' || ! $payment->penalty_id) {
-            return;
-        }
-
-        $penalty = $payment->penalty()->lockForUpdate()->first();
-        if (! $penalty || $penalty->remaining <= 0) {
-            return;
-        }
-
-        $amount = min(round((float) $payment->amount_jod - (float) $payment->used_amount_jod, 2), $penalty->remaining);
-        if ($amount <= 0) {
-            return;
-        }
-
-        $payment->increment('used_amount_jod', $amount);
-        $penalty->applyPayment($amount);
-        PaymentAllocation::recordPenalty($payment, $penalty, $amount);
-
-        AuditLogService::record(
-            $authUser,
-            'penalty.settled',
-            $penalty,
-            ['contractor_id' => $penalty->contractor_id, 'amount_jod' => $amount, 'payment_id' => $payment->id],
-        );
     }
 
     /** عليه ذمم أو غرامات مفتوحة — الدفعة بلا نوع وقتها سداد ذمم، مش رسوم عضوية */
