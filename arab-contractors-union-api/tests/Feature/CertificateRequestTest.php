@@ -210,9 +210,10 @@ class CertificateRequestTest extends TestCase
             ->assertJsonPath('items.type', 'membership');
     }
 
-    public function test_store_membership_certificate_fails_without_active_membership(): void
+    /** بيانات ملف تعريفي كامل بدون إنشاء أي سجل عضوية */
+    private function completeProfile(): array
     {
-        $contractor = $this->createContractor([
+        return [
             'owner_name' => 'x', 'authorized_person' => 'x', 'phone' => '0590000002',
             'address' => 'x', 'license_number' => 'x', 'established_date' => '2010-01-01',
             'capital' => 1, 'legal_form' => 'x', 'registration_date' => '2010-01-01',
@@ -222,7 +223,75 @@ class CertificateRequestTest extends TestCase
             'lease_or_ownership_contract' => 'x', 'partners_ids' => 'x', 'authorization_letter' => 'x',
             'company_approval_letter' => 'x', 'full_time_engineer_certificate' => 'x', 'secretary_contract' => 'x',
             'accountant_certificate_or_contract' => 'x',
-        ]); // profile كامل لكن بدون عضوية نشطة
+        ];
+    }
+
+    /**
+     * بلاغ 2026-10-10: مقاول "فعّال" بالتطبيق وصفحة الأرصدة، ما عليه ذمم وملفه مكتمل، بس آخر
+     * سجل عضوية إله منتهي (أو ما إله سجل) — كان ينمنع بـ"لا يوجد اشتراك عضوية نشط".
+     */
+    public function test_membership_certificate_allowed_when_displayed_status_is_active_without_active_membership_row(): void
+    {
+        $contractor = $this->createContractor($this->completeProfile());
+        Membership::create([
+            'contractor_id' => $contractor->id,
+            'type'          => 'renewal',
+            'status'        => 'expired',
+            'expires_at'    => now()->subYear()->endOfYear(),
+        ]);
+        Sanctum::actingAs($contractor->fresh(), ['*']);
+
+        $this->getJson('/api/v1/contractor/certificates/status')
+            ->assertStatus(200)
+            ->assertJsonPath('items.membership.eligible', true)
+            ->assertJsonPath('items.membership.is_expired', false)
+            ->assertJsonPath('items.membership.requirement_issues', [])
+            ->assertJsonPath('items.membership.membership_valid_until', now()->endOfYear()->toDateString());
+
+        $this->getJson('/api/v1/contractor/certificate-requests')
+            ->assertJsonPath('items.can_request', true);
+
+        $this->postJson('/api/v1/contractor/certificate-requests', ['type' => 'membership'])
+            ->assertStatus(201);
+    }
+
+    public function test_classification_certificate_allowed_when_displayed_status_is_active_without_membership_row(): void
+    {
+        $contractor = $this->createContractor($this->completeProfile());
+        Sanctum::actingAs($contractor, ['*']);
+
+        $this->postJson('/api/v1/contractor/certificate-requests', ['type' => 'classification'])
+            ->assertStatus(201);
+    }
+
+    public function test_store_membership_certificate_fails_when_displayed_status_is_expired(): void
+    {
+        $contractor = $this->createContractor($this->completeProfile() + ['status' => 'expired']);
+        Sanctum::actingAs($contractor, ['*']);
+
+        $this->getJson('/api/v1/contractor/certificates/status')
+            ->assertJsonPath('items.membership.eligible', false)
+            ->assertJsonPath('items.membership.is_expired', true)
+            ->assertJsonPath('items.membership.requirement_issues.0.type', 'overdue_subscription');
+
+        $this->postJson('/api/v1/contractor/certificate-requests', ['type' => 'membership'])
+            ->assertStatus(403)->assertJsonPath('error', 'requirements_pending');
+    }
+
+    public function test_store_membership_certificate_fails_without_active_membership(): void
+    {
+        $contractor = $this->createContractor([
+            'status' => 'expired',
+            'owner_name' => 'x', 'authorized_person' => 'x', 'phone' => '0590000002',
+            'address' => 'x', 'license_number' => 'x', 'established_date' => '2010-01-01',
+            'capital' => 1, 'legal_form' => 'x', 'registration_date' => '2010-01-01',
+            'company_purposes' => 'x', 'city' => 'x',
+            'cr_file' => 'x', 'company_register' => 'x', 'municipal_license' => 'x',
+            'bank_dealing_letter' => 'x', 'articles_of_association' => 'x', 'internal_bylaws' => 'x',
+            'lease_or_ownership_contract' => 'x', 'partners_ids' => 'x', 'authorization_letter' => 'x',
+            'company_approval_letter' => 'x', 'full_time_engineer_certificate' => 'x', 'secretary_contract' => 'x',
+            'accountant_certificate_or_contract' => 'x',
+        ]); // profile كامل لكن عضويته منتهية
         Sanctum::actingAs($contractor, ['*']);
 
         $response = $this->postJson('/api/v1/contractor/certificate-requests', ['type' => 'membership']);

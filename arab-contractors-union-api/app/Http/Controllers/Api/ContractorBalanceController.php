@@ -244,6 +244,18 @@ class ContractorBalanceController extends Controller
         return (int) round($owed * 100) <= (int) round($allowed * 100) ? 'active' : 'expired';
     }
 
+    /**
+     * حالة العضوية المعروضة لمقاول واحد (نفس عمود "حالة العضوية" بصفحة الأرصدة وحالة
+     * الاشتراك بالتطبيق). أي فحص "هل عضويته سارية؟" لازم يمشي عليها، مش على سجل memberships،
+     * عشان ما يطلع المقاول "فعّال" بالتطبيق والداشبورد وممنوع من الشهادة بنفس الوقت.
+     */
+    public function statusFor(int $contractorId): string
+    {
+        $row = $this->balancesQuery()->where('contractors.id', $contractorId)->first();
+
+        return $row ? $this->membershipStatus($row) : 'expired';
+    }
+
     public function balancesQuery(): Builder
     {
         $types = "'" . implode("','", self::CREDIT_PAYMENT_TYPES) . "'";

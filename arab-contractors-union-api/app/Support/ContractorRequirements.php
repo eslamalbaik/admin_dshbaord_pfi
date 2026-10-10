@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Http\Controllers\Api\ContractorBalanceController;
 use App\Models\Contractor;
 use App\Models\Setting;
 
@@ -50,8 +51,11 @@ class ContractorRequirements
             ];
         }
 
-        // لا توجد عضوية نشطة
-        if (! $contractor->activeMembership) {
+        // العضوية غير سارية — حسب نفس الحالة المعروضة للمقاول بالتطبيق وصفحة الأرصدة
+        // (مشتقّة من الرصيد وقاعدة الـ95%)، مش حسب وجود سجل memberships بحالة active:
+        // كان المقاول اللي حالته "فعّالة" وما عليه شي ينمنع من الشهادة لأنه ما انعملّه
+        // سجل تجديد (2026-10-10).
+        if (! self::hasActiveMembership($contractor)) {
             $issues[] = [
                 'type'        => 'overdue_subscription',
                 'description' => 'لا يوجد اشتراك عضوية نشط — يُرجى تجديد العضوية.',
@@ -87,6 +91,22 @@ class ContractorRequirements
         }
 
         return $blockers;
+    }
+
+    /**
+     * هل للمقاول عضوية سارية: سجل عضوية نشط، أو حالته المعروضة "فعّالة"
+     * (ContractorBalanceController::membershipStatus — نفس صفحة الأرصدة والتطبيق).
+     * اللي عنده سجل نشط بس عليه ذمم بيضل يعدّي هون، وبيوقفه فحص الـ95% برسالة المبلغ
+     * المتبقي (ومسار الدفعة المعلّقة) بدل "لا يوجد اشتراك".
+     */
+    public static function hasActiveMembership(Contractor $contractor): bool
+    {
+        return $contractor->activeMembership !== null || self::displayedStatusIsActive($contractor);
+    }
+
+    public static function displayedStatusIsActive(Contractor $contractor): bool
+    {
+        return app(ContractorBalanceController::class)->statusFor($contractor->id) === 'active';
     }
 
     /** مفتاح تفعيل منع التجديد بالذمم — يبدأ مطفأً حتى اكتمال الاستيراد ومراجعته */
