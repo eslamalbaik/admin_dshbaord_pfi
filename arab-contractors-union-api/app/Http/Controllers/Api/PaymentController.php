@@ -233,7 +233,12 @@ class PaymentController extends Controller
     // GET /api/v1/payments/transactions
     public function index(Request $request)
     {
-        $query = Payment::with(['contractor', 'latestStatusChange.changer:id,name', ...Payment::TITLE_RELATIONS]);
+        // المقاول المحذوف (حذف ناعم) بيضل اسمه ورقمه ظاهرين على دفعاته القديمة
+        $query = Payment::with([
+            'contractor' => fn ($q) => $q->withTrashed(),
+            'latestStatusChange.changer:id,name',
+            ...Payment::TITLE_RELATIONS,
+        ]);
 
         // فتح دفعة محددة من إشعار في لوحة التحكم
         if ($request->filled('id')) {
@@ -242,21 +247,39 @@ class PaymentController extends Controller
 
         if ($request->filled('search')) {
             $q = $request->search;
-            $query->whereHas('contractor', fn ($qb) => $qb->where('name', 'like', "%{$q}%")
-                ->orWhere('membership_number', 'like', "%{$q}%"));
-        }
-
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
+            $query->where(fn ($w) => $w
+                ->whereHas('contractor', fn ($qb) => $qb->withTrashed()->where(fn ($c) => $c
+                    ->where('name', 'like', "%{$q}%")
+                    ->orWhere('membership_number', 'like', "%{$q}%")))
+                ->orWhere('transaction_number', 'like', "%{$q}%")
+                ->orWhere('reference_number', 'like', "%{$q}%"));
         }
 
         if ($request->filled('method')) {
             $query->where('method', $request->method);
         }
 
+        // ملخص الحالات حسب نفس الفلاتر (بدون فلتر الحالة نفسه) — استعلام تجميعي واحد
+        $summary = (clone $query)->setEagerLoads([])->reorder()
+            ->selectRaw('status, COUNT(*) as count, COALESCE(SUM(amount_jod), 0) as total_jod')
+            ->groupBy('status')
+            ->get()
+            ->mapWithKeys(fn ($r) => [$r->status => [
+                'count'     => (int) $r->count,
+                'total_jod' => round((float) $r->total_jod, 2),
+            ]]);
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
         $paginator = $query->latest()->paginate(15)->through(fn ($p) => new PaymentResource($p));
 
-        return $this->paginated($paginator);
+        $response = $this->paginated($paginator);
+        $payload = $response->getData(true);
+        $payload['summary'] = $summary;
+
+        return $response->setData($payload);
     }
 
     // POST /api/v1/payments/transactions

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/vue-query'
 import { useRoute, useRouter } from 'vue-router'
+import { useDisplay } from 'vuetify'
 import api from '@/plugins/axios'
 
 definePage({ meta: { requiresAdmin: true } })
@@ -14,6 +15,7 @@ interface Payment {
   contractor: string | null
   contractor_id: number
   contractor_membership_number?: string | null
+  contractor_deleted?: boolean
   amount: string
   currency: string
   exchange_rate: string | null
@@ -50,7 +52,7 @@ function fmtDateTime(d: string | null) {
 // ─── عرض إيصال الدفعة داخل الموقع (popup) بدل فتحه بتبويب جديد ───
 const receiptViewer = ref<{ url: string; title: string } | null>(null)
 const receiptViewerOpen = ref(false)
-const receiptIsPdf = computed(() => /\.pdf($|\?)/i.test(receiptViewer.value?.url ?? ''))
+const receiptIsPdf = computed(() => isPdf(receiptViewer.value?.url ?? null))
 
 function openReceipt(p: Payment) {
   if (!p.receipt_image_url)
@@ -108,8 +110,9 @@ const clearPaymentIdFilter = () => {
 
 watch([search, statusFilter], () => page.value = 1)
 
-const { data, isLoading } = useQuery({
+const { data, isLoading, isFetching } = useQuery({
   queryKey: ['payments-transactions', search, statusFilter, page, paymentIdFilter],
+  placeholderData: keepPreviousData,
   queryFn: async () => (await api.get('/api/v1/payments/transactions', {
     params: {
       id: paymentIdFilter.value || undefined,
@@ -357,10 +360,91 @@ const currencySymbol: Record<string, string> = { JOD: 'د.أ', ILS: '₪', USD: 
 function fmtDate(d: string | null) {
   return d ? new Date(d).toLocaleDateString('ar-EG') : '—'
 }
+
+// ─── عرض الصفحة: ملخص، تنسيقات، موبايل ───
+const display = useDisplay()
+const isMobile = computed(() => display.smAndDown.value)
+const items = computed<Payment[]>(() => data.value?.items ?? [])
+
+const typeLabel: Record<string, string> = {
+  membership_fee: 'رسوم عضوية',
+  renewal_fee: 'رسوم تجديد',
+  dues_payment: 'سداد ذمم',
+  penalty: 'غرامة',
+  penalty_payment: 'دفع غرامة',
+  advance_payment: 'دفعة مقدمة',
+  equipment_subscription: 'اشتراك سوق الآليات',
+}
+
+const statusIcon: Record<string, string> = {
+  pending: 'tabler-clock', paid: 'tabler-circle-check', rejected: 'tabler-circle-x', refunded: 'tabler-arrow-back-up', failed: 'tabler-alert-circle',
+}
+
+// الملخص بيرجع من السيرفر حسب البحث الحالي (بدون فلتر الحالة) — بطاقة لكل حالة
+const summaryCards = computed(() => {
+  const sum = (data.value?.summary ?? {}) as Record<string, { count: number; total_jod: number }>
+
+  const card = (value: string, title: string, color: string, icon: string) => {
+    const rows = value ? [sum[value]] : Object.values(sum)
+
+    return {
+      value,
+      title,
+      color,
+      icon,
+      count: rows.reduce((n, r) => n + (r?.count ?? 0), 0),
+      total: rows.reduce((n, r) => n + (r?.total_jod ?? 0), 0),
+    }
+  }
+
+  return [
+    card('', 'كل الدفعات', 'primary', 'tabler-receipt'),
+    card('pending', 'قيد المراجعة', 'warning', 'tabler-clock'),
+    card('paid', 'مؤكّدة', 'success', 'tabler-circle-check'),
+    card('rejected', 'مرفوضة', 'error', 'tabler-circle-x'),
+  ]
+})
+
+const hasFilters = computed(() => !!(search.value || statusFilter.value || paymentIdFilter.value))
+
+function clearFilters() {
+  search.value = ''
+  statusFilter.value = ''
+  if (paymentIdFilter.value)
+    clearPaymentIdFilter()
+}
+
+const rangeLabel = computed(() => {
+  const d = data.value
+  if (!d?.total)
+    return ''
+  const from = (d.current_page - 1) * d.per_page + 1
+  const to = Math.min(d.current_page * d.per_page, d.total)
+
+  return `${from}–${to} من ${d.total}`
+})
+
+function fmtMoney(v: string | number | null | undefined) {
+  const n = Number(v ?? 0)
+
+  return n.toLocaleString('en-US', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })
+}
+
+function fmtTime(d: string | null) {
+  return d ? new Date(d).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : ''
+}
+
+function initial(name: string | null) {
+  return (name ?? '؟').replace(/^(?:شركة|مؤسسة|مكتب)\s+/, '').trim().charAt(0) || '؟'
+}
+
+function isPdf(url: string | null) {
+  return /\.pdf(?:$|\?)/i.test(url ?? '')
+}
 </script>
 
 <template>
-  <div>
+  <div class="payments-log">
     <div class="mb-6 d-flex align-center justify-space-between flex-wrap gap-4">
       <div>
         <h1 class="text-h4 font-weight-bold">سجل المدفوعات</h1>
@@ -373,100 +457,244 @@ function fmtDate(d: string | null) {
       </VBtn>
     </div>
 
-    <VAlert v-if="successMessage" type="success" variant="tonal" class="mb-4">
+    <VAlert v-if="successMessage" type="success" variant="tonal" class="mb-4" closable @click:close="successMessage = ''">
       {{ successMessage }}
     </VAlert>
-    <VAlert v-if="errorMessage" type="error" variant="tonal" class="mb-4">
+    <VAlert v-if="errorMessage" type="error" variant="tonal" class="mb-4" closable @click:close="errorMessage = ''">
       {{ errorMessage }}
     </VAlert>
 
+    <!-- ─── ملخص الحالات (حسب البحث الحالي) — الضغط على البطاقة يفلتر الجدول ─── -->
+    <VRow class="mb-2" dense>
+      <VCol v-for="s in summaryCards" :key="s.value" cols="6" md="3">
+        <VCard
+          class="summary-card h-100"
+          :class="{ 'summary-card--active': statusFilter === s.value }"
+          :style="statusFilter === s.value ? `border-color: rgb(var(--v-theme-${s.color}))` : ''"
+          variant="outlined"
+          role="button"
+          :aria-pressed="statusFilter === s.value"
+          @click="statusFilter = s.value"
+        >
+          <VCardText class="d-flex align-center gap-3 pa-4">
+            <VAvatar :color="s.color" variant="tonal" rounded size="42">
+              <VIcon :icon="s.icon" size="24" />
+            </VAvatar>
+            <div class="min-w-0">
+              <div class="text-body-2 text-medium-emphasis">{{ s.title }}</div>
+              <div class="d-flex align-baseline gap-2 flex-wrap">
+                <span class="text-h5 font-weight-bold">{{ s.count }}</span>
+                <span class="text-caption text-medium-emphasis text-no-wrap" dir="ltr">{{ fmtMoney(s.total) }} د.أ</span>
+              </div>
+            </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+    </VRow>
+
     <VCard>
-      <VCardText class="d-flex gap-4 flex-wrap">
+      <VCardText class="d-flex gap-3 flex-wrap align-center">
         <VTextField
           v-model="search"
-          placeholder="بحث باسم المقاول أو رقم العضوية..."
+          placeholder="بحث باسم المقاول أو رقم العضوية أو الرقم المرجعي..."
           prepend-inner-icon="tabler-search"
           density="compact"
-          style="max-width: 300px;"
+          clearable
+          hide-details
+          class="search-field"
         />
-        <VSelect
-          v-model="statusFilter"
-          :items="[
-            { title: 'كل الحالات', value: '' },
-            { title: 'قيد المراجعة', value: 'pending' },
-            { title: 'مؤكّدة', value: 'paid' },
-            { title: 'مرفوضة', value: 'rejected' },
-          ]"
-          label="الحالة"
-          density="compact"
-          style="max-width: 170px;"
-        />
+        <VChip
+          v-if="statusFilter"
+          :color="statusColor[statusFilter]"
+          variant="tonal"
+          closable
+          @click:close="statusFilter = ''"
+        >
+          الحالة: {{ statusLabel[statusFilter] }}
+        </VChip>
         <VChip
           v-if="paymentIdFilter"
           color="primary"
           variant="tonal"
           closable
-          class="align-self-center"
           @click:close="clearPaymentIdFilter"
         >
           عرض الدفعة المرتبطة بالإشعار فقط
         </VChip>
+        <VSpacer />
+        <span v-if="data?.total" class="text-body-2 text-medium-emphasis">
+          {{ rangeLabel }}
+        </span>
       </VCardText>
 
-      <VProgressLinear v-if="isLoading" indeterminate color="primary" />
+      <VDivider />
 
-      <VTable>
+      <VProgressLinear v-if="isFetching && !isLoading" indeterminate color="primary" height="2" />
+
+      <!-- ─── تحميل ─── -->
+      <div v-if="isLoading" class="pa-4">
+        <VSkeletonLoader v-for="i in 6" :key="i" type="list-item-avatar-two-line" />
+      </div>
+
+      <!-- ─── لا نتائج ─── -->
+      <div v-else-if="!items.length" class="empty-state text-center py-12 px-4">
+        <VAvatar color="secondary" variant="tonal" size="64" class="mb-4">
+          <VIcon icon="tabler-receipt-off" size="32" />
+        </VAvatar>
+        <h3 class="text-h6 mb-1">لا توجد معاملات</h3>
+        <p class="text-body-2 text-medium-emphasis mb-4">
+          {{ hasFilters ? 'ما في دفعات مطابقة للبحث أو الفلتر الحالي.' : 'لما يرسل مقاول إشعار تحويل رح يظهر هون.' }}
+        </p>
+        <VBtn v-if="hasFilters" variant="tonal" color="primary" prepend-icon="tabler-filter-off" @click="clearFilters">
+          مسح الفلاتر
+        </VBtn>
+      </div>
+
+      <!-- ─── موبايل: بطاقات ─── -->
+      <div v-else-if="isMobile" class="pa-3 d-flex flex-column gap-3">
+        <VCard
+          v-for="p in items"
+          :key="p.id"
+          variant="outlined"
+          class="payment-card"
+          :class="{ 'payment-row--pending': p.status === 'pending' }"
+        >
+          <VCardText class="pa-4">
+            <div class="d-flex align-start justify-space-between gap-2 mb-3">
+              <div class="min-w-0">
+                <div class="font-weight-medium text-high-emphasis text-truncate">{{ p.contractor ?? 'مقاول غير معروف' }}</div>
+                <div class="d-flex align-center gap-2 mt-1">
+                  <span class="text-caption text-medium-emphasis" dir="ltr">{{ p.contractor_membership_number ?? 'بدون رقم عضوية' }}</span>
+                  <VChip v-if="p.contractor_deleted" size="x-small" color="error" variant="tonal">محذوف</VChip>
+                </div>
+              </div>
+              <VChip :color="statusColor[p.status]" size="small" variant="tonal" :prepend-icon="statusIcon[p.status]">
+                {{ statusLabel[p.status] ?? p.status }}
+              </VChip>
+            </div>
+
+            <div class="d-flex align-end justify-space-between gap-2">
+              <div>
+                <div class="text-h6 font-weight-bold" dir="ltr">{{ fmtMoney(p.amount) }} {{ currencySymbol[p.currency] ?? p.currency }}</div>
+                <div v-if="p.currency !== 'JOD' && p.amount_jod" class="text-caption text-medium-emphasis" dir="ltr">
+                  ≈ {{ fmtMoney(p.amount_jod) }} د.أ
+                </div>
+                <div class="text-caption text-medium-emphasis mt-1">
+                  {{ typeLabel[p.type] ?? p.type }} · {{ fmtDate(p.submitted_at ?? p.created_at) }}
+                </div>
+              </div>
+              <div class="d-flex align-center">
+                <VBtn v-if="p.receipt_image_url" icon size="small" variant="tonal" color="primary" aria-label="عرض الإيصال" @click="openReceipt(p)">
+                  <VIcon :icon="isPdf(p.receipt_image_url) ? 'tabler-file-type-pdf' : 'tabler-photo'" size="20" />
+                </VBtn>
+                <VBtn v-if="p.contractor_id" icon size="small" variant="text" color="primary" :to="balanceLink(p)" aria-label="سجل مدفوعات المقاول ورصيده">
+                  <VIcon icon="tabler-wallet" size="20" />
+                </VBtn>
+                <VMenu location="bottom end">
+                  <template #activator="{ props }">
+                    <VBtn icon size="small" variant="text" v-bind="props" aria-label="إجراءات">
+                      <VIcon icon="tabler-dots-vertical" />
+                    </VBtn>
+                  </template>
+                  <VList density="compact" min-width="230">
+                    <VListSubheader>دفعة #{{ p.id }}</VListSubheader>
+                    <VListItem prepend-icon="tabler-hash" title="الرقم المرجعي">
+                      <VListItemSubtitle dir="ltr" class="text-start">{{ p.transaction_number ?? '—' }}</VListItemSubtitle>
+                    </VListItem>
+                    <VListItem
+                      prepend-icon="tabler-clock"
+                      title="آخر إجراء"
+                      :subtitle="p.status !== 'pending' ? fmtDateTime(p.confirmed_at) : 'لا يوجد بعد'"
+                    />
+                    <VDivider class="my-1" />
+                    <VListItem v-if="p.receipt_image_url" prepend-icon="tabler-photo" title="عرض الإيصال" @click="openReceipt(p)" />
+                    <VListItem v-if="p.contractor_id" prepend-icon="tabler-wallet" title="كشف حساب المقاول" :to="balanceLink(p)" />
+                    <VListItem v-if="$can('finance.payments', 'update')" prepend-icon="tabler-transfer" title="تغيير الحالة" @click="openStatusChange(p)" />
+                  </VList>
+                </VMenu>
+              </div>
+            </div>
+          </VCardText>
+        </VCard>
+      </div>
+
+      <!-- ─── ديسكتوب: جدول ─── -->
+      <VTable v-else class="payments-table" hover>
         <thead>
           <tr>
-            <th>#</th>
             <th>المقاول</th>
             <th>المبلغ</th>
-            <th>المعادل (د.أ)</th>
             <th>النوع</th>
-            <th>الإيصال</th>
+            <th class="text-center">الإيصال</th>
             <th>الحالة</th>
             <th>التاريخ</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="p in (data?.items ?? [])" :key="p.id">
-            <td>{{ p.id }}</td>
+          <tr
+            v-for="p in items"
+            :key="p.id"
+            :class="{ 'payment-row--pending': p.status === 'pending' }"
+          >
             <td>
-              <div class="d-flex align-center gap-1">
+              <div class="d-flex align-center gap-3 py-2">
+                <VAvatar :color="p.contractor_deleted ? 'error' : 'primary'" variant="tonal" size="36">
+                  <span class="text-body-1 font-weight-medium">{{ initial(p.contractor) }}</span>
+                </VAvatar>
+                <div class="min-w-0">
+                  <div class="d-flex align-center gap-1">
+                    <span class="font-weight-medium text-high-emphasis contractor-name">{{ p.contractor ?? 'مقاول غير معروف' }}</span>
+                    <VChip v-if="p.contractor_deleted" size="x-small" color="error" variant="tonal">محذوف</VChip>
+                  </div>
+                  <div class="text-caption text-medium-emphasis" dir="ltr" style="text-align: end;">
+                    {{ p.contractor_membership_number ?? 'بدون رقم عضوية' }}
+                  </div>
+                </div>
                 <VBtn
                   v-if="p.contractor_id"
                   icon
                   size="x-small"
                   variant="text"
                   color="primary"
+                  class="ms-auto"
                   :to="balanceLink(p)"
                   aria-label="سجل مدفوعات المقاول ورصيده"
                 >
                   <VIcon icon="tabler-wallet" size="18" />
                   <VTooltip activator="parent">سجل مدفوعات المقاول ورصيده</VTooltip>
                 </VBtn>
-                <div>
-                  <div>{{ p.contractor ?? '—' }}</div>
-                  <div v-if="p.contractor_membership_number" class="text-caption text-medium-emphasis" dir="ltr">
-                    {{ p.contractor_membership_number }}
-                  </div>
-                </div>
               </div>
             </td>
-            <td dir="ltr">{{ p.amount }} {{ currencySymbol[p.currency] ?? p.currency }}</td>
-            <td dir="ltr">
-              {{ p.amount_jod ?? '—' }}
-              <span v-if="p.exchange_rate" class="text-disabled text-caption">({{ p.exchange_rate }})</span>
-            </td>
-            <td>{{ ({ membership_fee: 'رسوم عضوية', renewal_fee: 'رسوم تجديد', dues_payment: 'سداد ذمم', penalty: 'غرامة', penalty_payment: 'دفع غرامة', advance_payment: 'دفعة مقدمة', equipment_subscription: 'اشتراك سوق الآليات' } as Record<string, string>)[p.type] ?? p.type }}</td>
-            <td>
-              <VBtn v-if="p.receipt_image_url" icon size="small" variant="text" aria-label="عرض الإيصال" @click="openReceipt(p)">
-                <VIcon icon="tabler-photo" size="20" />
-              </VBtn>
-              <span v-else>—</span>
+            <td class="text-no-wrap">
+              <div class="font-weight-bold text-high-emphasis" dir="ltr" style="text-align: end;">
+                {{ fmtMoney(p.amount) }} {{ currencySymbol[p.currency] ?? p.currency }}
+              </div>
+              <div v-if="p.currency !== 'JOD'" class="text-caption text-medium-emphasis" dir="ltr" style="text-align: end;">
+                <template v-if="p.amount_jod">≈ {{ fmtMoney(p.amount_jod) }} د.أ</template>
+                <template v-else>بانتظار سعر الصرف</template>
+                <span v-if="p.exchange_rate" class="text-disabled"> (×{{ p.exchange_rate }})</span>
+              </div>
             </td>
             <td>
-              <VChip :color="statusColor[p.status]" size="small">
+              <VChip size="small" variant="tonal" color="secondary" label>
+                {{ typeLabel[p.type] ?? p.type }}
+              </VChip>
+            </td>
+            <td class="text-center">
+              <button
+                v-if="p.receipt_image_url"
+                type="button"
+                class="receipt-thumb"
+                aria-label="عرض الإيصال"
+                @click="openReceipt(p)"
+              >
+                <VIcon v-if="isPdf(p.receipt_image_url)" icon="tabler-file-type-pdf" size="22" color="error" />
+                <img v-else :src="p.receipt_image_url" alt="" loading="lazy">
+              </button>
+              <span v-else class="text-disabled">—</span>
+            </td>
+            <td>
+              <VChip :color="statusColor[p.status]" size="small" variant="tonal" :prepend-icon="statusIcon[p.status]">
                 {{ statusLabel[p.status] ?? p.status }}
                 <VIcon v-if="p.last_status_change || p.rejection_reason" icon="tabler-info-circle" size="14" class="ms-1" />
                 <VTooltip v-if="p.last_status_change" activator="parent" max-width="320">
@@ -481,14 +709,18 @@ function fmtDate(d: string | null) {
             </td>
             <td class="text-no-wrap">
               <div class="d-flex align-center justify-space-between gap-1">
-                <span>{{ fmtDate(p.submitted_at ?? p.created_at) }}</span>
+                <div>
+                  <div>{{ fmtDate(p.submitted_at ?? p.created_at) }}</div>
+                  <div class="text-caption text-medium-emphasis">{{ fmtTime(p.submitted_at ?? p.created_at) }}</div>
+                </div>
                 <VMenu location="bottom end">
                   <template #activator="{ props }">
                     <VBtn icon size="small" variant="text" v-bind="props" aria-label="إجراءات">
                       <VIcon icon="tabler-dots-vertical" />
                     </VBtn>
                   </template>
-                  <VList density="compact" min-width="200">
+                  <VList density="compact" min-width="230">
+                    <VListSubheader>دفعة #{{ p.id }}</VListSubheader>
                     <VListItem prepend-icon="tabler-hash" title="الرقم المرجعي">
                       <VListItemSubtitle dir="ltr" class="text-start">{{ p.transaction_number ?? '—' }}</VListItemSubtitle>
                     </VListItem>
@@ -497,23 +729,24 @@ function fmtDate(d: string | null) {
                       title="آخر إجراء"
                       :subtitle="p.status !== 'pending' ? fmtDateTime(p.confirmed_at) : 'لا يوجد بعد'"
                     />
+                    <VDivider class="my-1" />
+                    <VListItem v-if="p.receipt_image_url" prepend-icon="tabler-photo" title="عرض الإيصال" @click="openReceipt(p)" />
+                    <VListItem v-if="p.contractor_id" prepend-icon="tabler-wallet" title="كشف حساب المقاول" :to="balanceLink(p)" />
                     <VListItem v-if="$can('finance.payments', 'update')" prepend-icon="tabler-transfer" title="تغيير الحالة" @click="openStatusChange(p)" />
                   </VList>
                 </VMenu>
               </div>
             </td>
           </tr>
-          <tr v-if="!isLoading && !(data?.items ?? []).length">
-            <td colspan="8" class="text-center text-medium-emphasis py-8">
-              لا توجد معاملات
-            </td>
-          </tr>
         </tbody>
       </VTable>
 
-      <VCardText v-if="(data?.last_page ?? 1) > 1" class="d-flex justify-center">
-        <VPagination v-model="page" :length="data?.last_page ?? 1" :total-visible="$vuetify.display.xs ? 5 : 7" />
-      </VCardText>
+      <template v-if="(data?.last_page ?? 1) > 1">
+        <VDivider />
+        <VCardText class="d-flex justify-center">
+          <VPagination v-model="page" :length="data?.last_page ?? 1" :total-visible="$vuetify.display.xs ? 4 : 7" :density="$vuetify.display.xs ? 'compact' : 'default'" rounded="circle" />
+        </VCardText>
+      </template>
     </VCard>
 
     <!-- ─── Dialog تغيير الحالة ─── -->
@@ -761,3 +994,84 @@ function fmtDate(d: string | null) {
     </VDialog>
   </div>
 </template>
+
+<style scoped>
+.search-field {
+  flex: 1 1 280px;
+  max-inline-size: 420px;
+}
+
+.summary-card {
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.summary-card:hover {
+  box-shadow: 0 4px 14px rgba(var(--v-shadow-key-umbra-color), 0.08);
+  transform: translateY(-1px);
+}
+
+.summary-card--active {
+  border-width: 2px;
+}
+
+.payments-table :deep(th) {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.payments-table :deep(td) {
+  padding-block: 6px;
+}
+
+/* تمييز الدفعات قيد المراجعة: خط جانبي وخلفية خفيفة */
+.payment-row--pending {
+  background: rgba(var(--v-theme-warning), 0.05);
+}
+
+.payments-table .payment-row--pending td:first-child {
+  box-shadow: inset -3px 0 0 rgb(var(--v-theme-warning));
+}
+
+.payment-card.payment-row--pending {
+  border-inline-start: 3px solid rgb(var(--v-theme-warning));
+}
+
+.contractor-name {
+  display: inline-block;
+  max-inline-size: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.receipt-thumb {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 8px;
+  background: rgba(var(--v-theme-on-surface), 0.04);
+  block-size: 40px;
+  cursor: zoom-in;
+  inline-size: 40px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.receipt-thumb:hover {
+  box-shadow: 0 2px 8px rgba(var(--v-shadow-key-umbra-color), 0.15);
+  transform: scale(1.06);
+}
+
+.receipt-thumb img {
+  block-size: 100%;
+  inline-size: 100%;
+  object-fit: cover;
+}
+
+.min-w-0 {
+  min-inline-size: 0;
+}
+</style>
