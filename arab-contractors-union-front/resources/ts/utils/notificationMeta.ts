@@ -60,6 +60,9 @@ const CLASS_TO_TYPE: Record<string, string> = {
   ContractorProfileUpdatedNotification: 'contractor_profile_updated',
   EventJoinedNotification: 'event_joined',
   AdminBroadcastNotification: 'admin_broadcast',
+  CertificateRequestSubmittedNotification: 'certificate_request_submitted',
+  SupportTicketCreatedNotification: 'support_ticket_created',
+  SupportTicketContractorRepliedNotification: 'support_ticket_contractor_replied',
 }
 
 // أي نوع جديد اسمه يدل على حركة مالية يُعامل كمالي تلقائياً حتى لو لم يُضف للقائمة أعلاه.
