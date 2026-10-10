@@ -1,6 +1,11 @@
 <script lang="ts" setup>
 import { PerfectScrollbar } from 'vue3-perfect-scrollbar'
 import type { Notification } from '@layouts/types'
+import {
+  notificationPulse,
+  notificationSoundMuted,
+  toggleNotificationSound,
+} from '@/composables/useRealtimeAdminNotifications'
 
 interface Props {
   notifications: Notification[]
@@ -42,6 +47,17 @@ const totalUnseenNotifications = computed(() => {
   return props.unreadCount ?? props.notifications.filter(item => item.isSeen === false).length
 })
 
+// يهتز الجرس لحظة وصول إشعار فوري جديد
+const ringing = ref(false)
+watch(notificationPulse, () => {
+  ringing.value = false
+  requestAnimationFrame(() => { ringing.value = true })
+  setTimeout(() => { ringing.value = false }, 1600)
+})
+
+const accentColor = (n: Notification) =>
+  n.color?.startsWith('#') ? n.color : `rgb(var(--v-theme-${n.color || 'primary'}))`
+
 const toggleReadUnread = (isSeen: boolean, Id: number | string) => {
   if (isSeen)
     emit('unread', [Id])
@@ -51,7 +67,10 @@ const toggleReadUnread = (isSeen: boolean, Id: number | string) => {
 </script>
 
 <template>
-  <IconBtn id="notification-btn">
+  <IconBtn
+    id="notification-btn"
+    :class="{ 'notif-bell--ringing': ringing }"
+  >
     <VBadge
       v-bind="props.badgeProps"
       :model-value="totalUnseenNotifications > 0"
@@ -60,32 +79,54 @@ const toggleReadUnread = (isSeen: boolean, Id: number | string) => {
       offset-x="2"
       offset-y="3"
     >
-      <VIcon icon="tabler-bell" />
+      <VIcon
+        class="notif-bell__icon"
+        :icon="totalUnseenNotifications > 0 ? 'tabler-bell-ringing' : 'tabler-bell'"
+      />
     </VBadge>
 
     <VMenu
       activator="parent"
-      :width="$vuetify.display.smAndDown ? 330 : 380"
+      :width="$vuetify.display.smAndDown ? 340 : 400"
       :location="props.location"
       offset="12px"
       :close-on-content-click="false"
     >
-      <VCard class="d-flex flex-column">
+      <VCard class="d-flex flex-column notif-card">
         <!-- 👉 Header -->
         <VCardItem class="notification-section">
-          <VCardTitle class="text-h6">
+          <VCardTitle class="text-h6 font-weight-bold">
             {{ $t('notifications.title') }}
           </VCardTitle>
 
           <template #append>
             <VChip
-              v-show="props.notifications.some(n => !n.isSeen)"
+              v-show="totalUnseenNotifications > 0"
               size="small"
-              color="primary"
-              class="me-2"
+              color="error"
+              variant="tonal"
+              class="me-1"
             >
-              {{ totalUnseenNotifications }} {{ $t('notifications.new', 'New') }}
+              {{ totalUnseenNotifications }} جديد
             </VChip>
+
+            <IconBtn
+              size="34"
+              @click="toggleNotificationSound"
+            >
+              <VIcon
+                size="20"
+                :color="notificationSoundMuted ? 'disabled' : 'high-emphasis'"
+                :icon="notificationSoundMuted ? 'tabler-volume-off' : 'tabler-volume'"
+              />
+              <VTooltip
+                activator="parent"
+                location="bottom"
+              >
+                {{ notificationSoundMuted ? 'تشغيل صوت الإشعارات' : 'كتم صوت الإشعارات' }}
+              </VTooltip>
+            </IconBtn>
+
             <IconBtn
               v-show="props.notifications.length"
               size="34"
@@ -99,9 +140,9 @@ const toggleReadUnread = (isSeen: boolean, Id: number | string) => {
 
               <VTooltip
                 activator="parent"
-                location="start"
+                location="bottom"
               >
-                {{ !isAllMarkRead ? 'Mark all as unread' : 'Mark all as read' }}
+                {{ !isAllMarkRead ? 'تعليم الكل كغير مقروء' : 'تعليم الكل كمقروء' }}
               </VTooltip>
             </IconBtn>
           </template>
@@ -112,27 +153,32 @@ const toggleReadUnread = (isSeen: boolean, Id: number | string) => {
         <!-- 👉 Notifications list -->
         <PerfectScrollbar
           :options="{ wheelPropagation: false }"
-          style="max-block-size: 23.75rem;"
+          style="max-block-size: 26rem;"
         >
           <VList class="notification-list rounded-0 py-0">
             <template
               v-for="(notification, index) in props.notifications"
-              :key="notification.title"
+              :key="notification.id"
             >
               <VDivider v-if="index > 0" />
               <VListItem
                 link
                 lines="one"
                 min-height="66px"
-                class="list-item-hover-class"
+                class="list-item-hover-class notif-item"
+                :class="{
+                  'notif-item--unread': !notification.isSeen,
+                  'notif-item--financial': notification.financial,
+                }"
+                :style="{ '--notif-accent': accentColor(notification) }"
                 @click="$emit('click:notification', notification)"
               >
-                <!-- Slot: Prepend -->
-                <!-- Handles Avatar: Image, Icon, Text -->
                 <div class="d-flex align-start gap-3">
                   <VAvatar
                     :color="notification.color && !notification.img ? notification.color : undefined"
                     :variant="notification.img ? undefined : 'tonal' "
+                    rounded="lg"
+                    size="40"
                   >
                     <span v-if="notification.text">{{ avatarText(notification.text) }}</span>
                     <VImg
@@ -142,43 +188,47 @@ const toggleReadUnread = (isSeen: boolean, Id: number | string) => {
                     <VIcon
                       v-if="notification.icon"
                       :icon="notification.icon"
+                      size="22"
                     />
                   </VAvatar>
 
-                  <div>
-                    <p class="text-sm font-weight-medium mb-1">
-                      {{ notification.title }}
-                    </p>
+                  <div class="flex-grow-1" style="min-inline-size: 0;">
+                    <div class="d-flex align-center gap-2 mb-1">
+                      <span
+                        v-if="notification.financial"
+                        class="notif-tag"
+                      >مالي</span>
+                      <p
+                        class="text-sm mb-0"
+                        :class="notification.isSeen ? 'font-weight-medium' : 'font-weight-bold'"
+                      >
+                        {{ notification.title }}
+                      </p>
+                    </div>
                     <p
-                      class="text-body-2 mb-2"
-                      style=" letter-spacing: 0.4px !important; line-height: 18px;"
+                      class="text-body-2 mb-1 notif-item__text"
                     >
                       {{ notification.subtitle }}
                     </p>
-                    <p
-                      class="text-sm text-disabled mb-0"
-                      style=" letter-spacing: 0.4px !important; line-height: 18px;"
-                    >
+                    <p class="text-xs text-disabled mb-0">
                       {{ notification.time }}
                     </p>
                   </div>
-                  <VSpacer />
 
-                  <div class="d-flex flex-column align-end">
+                  <div class="d-flex flex-column align-center gap-2">
                     <VIcon
                       size="10"
                       icon="tabler-circle-filled"
-                      :color="!notification.isSeen ? 'primary' : '#a8aaae'"
+                      :color="!notification.isSeen ? 'error' : '#a8aaae'"
                       :class="`${notification.isSeen ? 'visible-in-hover' : ''}`"
-                      class="mb-2"
                       @click.stop="toggleReadUnread(notification.isSeen, notification.id)"
                     />
 
                     <VIcon
-                      size="20"
+                      size="18"
                       icon="tabler-x"
                       class="visible-in-hover"
-                      @click="$emit('remove', notification.id)"
+                      @click.stop="$emit('remove', notification.id)"
                     />
                   </div>
                 </div>
@@ -187,10 +237,14 @@ const toggleReadUnread = (isSeen: boolean, Id: number | string) => {
 
             <VListItem
               v-show="!props.notifications.length"
-              class="text-center text-medium-emphasis"
-              style="block-size: 56px;"
+              class="text-center text-medium-emphasis py-8"
             >
-              <VListItemTitle>No Notification Found!</VListItemTitle>
+              <VIcon
+                icon="tabler-bell-off"
+                size="36"
+                class="mb-2 opacity-50"
+              />
+              <VListItemTitle>لا توجد إشعارات</VListItemTitle>
             </VListItem>
           </VList>
         </PerfectScrollbar>
@@ -200,11 +254,12 @@ const toggleReadUnread = (isSeen: boolean, Id: number | string) => {
         <!-- 👉 Footer -->
         <VCardText
           v-show="props.notifications.length"
-          class="pa-4"
+          class="pa-3"
         >
           <VBtn
             block
             size="small"
+            variant="tonal"
             to="/notifications"
           >
             {{ $t('notifications.view_all') }}
@@ -238,6 +293,80 @@ const toggleReadUnread = (isSeen: boolean, Id: number | string) => {
     border-radius: 0 !important;
     margin: 0 !important;
     padding-block: 0.75rem !important;
+  }
+}
+
+// عنصر الإشعار: غير المقروء بخلفية خفيفة، والمالي بشريط ذهبي على طرفه
+.notif-item {
+  position: relative;
+
+  &::before {
+    position: absolute;
+    background: transparent;
+    content: "";
+    inline-size: 4px;
+    inset-block: 0;
+    inset-inline-start: 0;
+  }
+}
+
+.notif-item--unread {
+  background: rgba(var(--v-theme-primary), 0.04);
+
+  &::before {
+    background: var(--notif-accent);
+  }
+}
+
+.notif-item--financial {
+  background: rgba(246, 196, 83, 0.1);
+
+  &::before {
+    background: var(--notif-accent);
+  }
+
+  &.notif-item--unread {
+    background: rgba(246, 196, 83, 0.2);
+  }
+}
+
+.notif-item__text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  letter-spacing: 0.2px !important;
+  line-height: 1.5;
+}
+
+.notif-tag {
+  flex-shrink: 0;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--notif-accent);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.notif-bell--ringing .notif-bell__icon {
+  animation: notif-bell-ring 0.8s ease-in-out 2;
+  transform-origin: 50% 10%;
+}
+
+@keyframes notif-bell-ring {
+  0%, 100% { transform: rotate(0); }
+  15% { transform: rotate(18deg); }
+  30% { transform: rotate(-16deg); }
+  45% { transform: rotate(12deg); }
+  60% { transform: rotate(-8deg); }
+  75% { transform: rotate(4deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notif-bell--ringing .notif-bell__icon {
+    animation: none;
   }
 }
 

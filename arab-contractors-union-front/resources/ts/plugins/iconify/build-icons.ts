@@ -326,6 +326,14 @@ const sources: BundleScriptConfig = {
         'receipt-off',
         'report-money',
         'wallet',
+        // إشعارات لوحة التحكم (utils/notificationMeta.ts)
+        'bell-ringing',
+        'lifebuoy',
+        'user-edit',
+        'message-reply',
+        'speakerphone',
+        'user-exclamation',
+        'user-check',
       ],
     },
     {
