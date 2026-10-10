@@ -33,6 +33,8 @@ interface DueItem {
   due_date: string | null
   notes: string | null
   discount_amount_jod: string | number | null
+  discount_label?: string | null
+  original_amount_jod?: string | number | null
 }
 
 const successMessage = ref('')
@@ -599,6 +601,7 @@ const accumulatedRow = computed(() => {
   const amount = items.reduce((s, d) => s + Number(d.amount_jod || 0), 0)
   const paid = items.reduce((s, d) => s + Number(d.paid_jod || 0), 0)
   const remaining = items.reduce((s, d) => s + Number(d.remaining_jod || 0), 0)
+  const discount = items.reduce((s, d) => s + Number(d.discount_amount_jod || 0), 0)
   const status = remaining <= 0 ? 'paid' : paid > 0 ? 'partially_paid' : 'unpaid'
   const statusLabels: Record<string, string> = { paid: 'مسدَّدة', partially_paid: 'مسدَّدة جزئياً', unpaid: 'غير مسدَّدة' }
 
@@ -607,6 +610,9 @@ const accumulatedRow = computed(() => {
     amount_jod: amount.toFixed(2),
     paid_jod: paid.toFixed(2),
     remaining_jod: remaining.toFixed(2),
+    // الخصومات على ذمم 2025 وما قبل: بدونها الصف المجمّع ما كان يبيّن إنه في خصم
+    discount_jod: discount > 0 ? discount.toFixed(2) : null,
+    discount_labels: items.filter(d => d.discount_label).map(d => `${d.year}: ${d.discount_label}`),
     status,
     status_label: statusLabels[status],
   }
@@ -1000,7 +1006,15 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
                     <tr v-if="accumulatedRow" style="background: rgba(var(--v-theme-warning), 0.06);">
                       <td><VCheckboxBtn :model-value="accumulatedSelected" @update:model-value="toggleAccumulated" /></td>
                       <td>2025 وما قبل</td>
-                      <td class="font-weight-medium">إجمالي الرسوم المتراكمة</td>
+                      <td class="font-weight-medium">
+                        إجمالي الرسوم المتراكمة
+                        <VChip v-if="accumulatedRow.discount_jod" size="x-small" color="info" variant="tonal" class="ms-1">
+                          خصم {{ accumulatedRow.discount_jod }} د.أ
+                          <VTooltip activator="parent" location="top">
+                            <div v-for="l in accumulatedRow.discount_labels" :key="l">{{ l }}</div>
+                          </VTooltip>
+                        </VChip>
+                      </td>
                       <td>{{ accumulatedRow.amount_jod }}</td>
                       <td>{{ accumulatedRow.paid_jod }}</td>
                       <td>{{ accumulatedRow.remaining_jod }}</td>
@@ -1029,10 +1043,15 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
                         {{ d.description }}
                         <VChip v-if="d.source === 'fee_engine'" size="x-small" color="primary" variant="tonal" class="ms-1">محرّك الاحتساب</VChip>
                         <VChip v-if="d.discount_amount_jod" size="x-small" color="info" variant="tonal" class="ms-1">
-                          خصم {{ d.discount_amount_jod }} د.أ
+                          {{ d.discount_label || `خصم ${d.discount_amount_jod} د.أ` }}
                         </VChip>
                       </td>
-                      <td>{{ d.amount_jod }}</td>
+                      <td>
+                        {{ d.amount_jod }}
+                        <div v-if="d.discount_amount_jod && d.original_amount_jod" class="text-caption text-medium-emphasis text-decoration-line-through">
+                          {{ d.original_amount_jod }}
+                        </div>
+                      </td>
                       <td>{{ d.paid_jod }}</td>
                       <td>{{ d.remaining_jod }}</td>
                       <td>
