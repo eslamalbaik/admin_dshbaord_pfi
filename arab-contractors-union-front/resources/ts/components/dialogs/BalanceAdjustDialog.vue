@@ -28,9 +28,9 @@ const emit = defineEmits<{ saved: [] }>()
 const open = defineModel<boolean>({ default: false })
 
 const modes = [
-  { value: 'increase', title: 'زيادة الرصيد (له)', icon: 'tabler-plus' },
-  { value: 'decrease', title: 'إنقاص الرصيد (عليه)', icon: 'tabler-minus' },
-  { value: 'set', title: 'تحديد رصيد جديد', icon: 'tabler-equal' },
+  { value: 'increase', title: 'زيادة (له)', icon: 'tabler-plus' },
+  { value: 'decrease', title: 'إنقاص (عليه)', icon: 'tabler-minus' },
+  { value: 'set', title: 'رصيد جديد', icon: 'tabler-equal' },
 ] as const
 
 const mode = ref<'increase' | 'decrease' | 'set'>('increase')
@@ -170,11 +170,20 @@ async function save() {
           {{ error }}
         </VAlert>
 
-        <VBtnToggle v-model="mode" mandatory divided color="primary" variant="outlined" class="mb-4 flex-wrap h-auto">
-          <VBtn v-for="m in modes" :key="m.value" :value="m.value" :prepend-icon="m.icon">
-            {{ m.title }}
-          </VBtn>
-        </VBtnToggle>
+        <!-- أزرار منفصلة بتلف لسطر جديد بالشاشات الضيقة بدل VBtnToggle اللي كان يتداخل نصه ويطلع عليه سكرول -->
+        <VRow dense class="mb-4">
+          <VCol v-for="m in modes" :key="m.value" cols="12" sm="4">
+            <VBtn
+              block
+              :color="mode === m.value ? 'primary' : 'secondary'"
+              :variant="mode === m.value ? 'flat' : 'outlined'"
+              :prepend-icon="m.icon"
+              @click="mode = m.value"
+            >
+              {{ m.title }}
+            </VBtn>
+          </VCol>
+        </VRow>
 
         <VTextField
           v-model="amount"
