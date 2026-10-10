@@ -165,6 +165,26 @@ class AllPaymentPathsSettleOldestFirstTest extends TestCase
         $this->assertRemaining(0, 150);
     }
 
+    public function test_payment_from_a_penalty_card_settles_the_oldest_due_first(): void
+    {
+        $this->due2026->delete();
+        $penalty = \App\Models\Penalty::create([
+            'contractor_id' => $this->contractor->id, 'reason' => 'مخالفة', 'amount' => 50, 'status' => 'unpaid',
+        ]);
+
+        $id = $this->appPayment(50, ['penalty_id' => $penalty->id]);
+        $this->confirm($id);
+
+        $this->assertEquals(100, $this->due2025->fresh()->remaining_jod, 'الـ50 راحت على ذمة 2025');
+        $this->assertSame('unpaid', $penalty->fresh()->status, 'الغرامة بتضل مفتوحة');
+        $this->assertSame('ذمة 2025 2025-01-01', Payment::findOrFail($id)->title, 'عنوان الدفعة بيتبع اللي انسدّ');
+
+        // دفعة تغطي الكل: الذمة أولاً بعدين الغرامة
+        $this->confirm($this->appPayment(150, ['type' => 'penalty_payment']));
+        $this->assertEquals(0, $this->due2025->fresh()->remaining_jod);
+        $this->assertSame('paid', $penalty->fresh()->status);
+    }
+
     // ── (3) الرصيد الدائن على ذمة/غرامة جديدة ─────────────────────────
 
     public function test_new_penalty_spends_existing_credit_on_the_oldest_due_first(): void
