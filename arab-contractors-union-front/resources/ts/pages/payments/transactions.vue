@@ -428,7 +428,6 @@ function fmtDate(d: string | null) {
             <th>الحالة</th>
             <th>التاريخ</th>
             <th>آخر إجراء</th>
-            <th class="text-end">إجراءات</th>
           </tr>
         </thead>
         <tbody>
@@ -484,22 +483,24 @@ function fmtDate(d: string | null) {
               </VChip>
             </td>
             <td>{{ fmtDate(p.submitted_at ?? p.created_at) }}</td>
-            <td class="text-caption text-medium-emphasis">{{ p.status !== 'pending' ? fmtDateTime(p.confirmed_at) : '—' }}</td>
-            <td class="text-end text-no-wrap">
-              <VMenu location="bottom end">
-                <template #activator="{ props }">
-                  <VBtn icon size="small" variant="text" v-bind="props" aria-label="إجراءات">
-                    <VIcon icon="tabler-dots-vertical" />
-                  </VBtn>
-                </template>
-                <VList density="compact" min-width="160">
-                  <VListItem v-if="$can('finance.payments', 'update')" prepend-icon="tabler-transfer" title="تغيير الحالة" @click="openStatusChange(p)" />
-                </VList>
-              </VMenu>
+            <td class="text-caption text-medium-emphasis text-no-wrap">
+              <div class="d-flex align-center justify-space-between gap-1">
+                <span>{{ p.status !== 'pending' ? fmtDateTime(p.confirmed_at) : '—' }}</span>
+                <VMenu v-if="$can('finance.payments', 'update')" location="bottom end">
+                  <template #activator="{ props }">
+                    <VBtn icon size="small" variant="text" v-bind="props" aria-label="إجراءات">
+                      <VIcon icon="tabler-dots-vertical" />
+                    </VBtn>
+                  </template>
+                  <VList density="compact" min-width="160">
+                    <VListItem prepend-icon="tabler-transfer" title="تغيير الحالة" @click="openStatusChange(p)" />
+                  </VList>
+                </VMenu>
+              </div>
             </td>
           </tr>
           <tr v-if="!isLoading && !(data?.items ?? []).length">
-            <td colspan="11" class="text-center text-medium-emphasis py-8">
+            <td colspan="10" class="text-center text-medium-emphasis py-8">
               لا توجد معاملات
             </td>
           </tr>
