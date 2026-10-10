@@ -26,6 +26,12 @@ class ContractorBalanceController extends Controller
     /** فائض دفعات الذمم/الغرامات والدفعات المقدمة غير الموزَّع يُعتبر رصيداً للشركة */
     public const CREDIT_PAYMENT_TYPES = \App\Models\Payment::CREDIT_TYPES;
 
+    /**
+     * نسبة السداد اللي بتكفي لتنعرض العضوية "فعّالة" وهو لسا عليه باقي بسيط (قرار eslam 2026-10-10):
+     * سدّد 95% أو أكثر من مجموع ذممه وغراماته ← فعّالة، والباقي بيضل ذمة عليه.
+     */
+    public const ACTIVE_PAID_RATIO = 0.95;
+
     /** نفس تسميات عمود "حالة العضوية" بصفحة الأرصدة */
     public const STATUS_LABELS = [
         'active'    => 'فعّالة',
@@ -209,9 +215,9 @@ class ContractorBalanceController extends Controller
 
     /**
      * حالة العضوية الفعلية لحساب "فعّال" إدارياً، حسب الرصيد بس (قرار الإدارة 2026-10-05):
-     * - عليه رصيد صافي سالب (ذمم/غرامات ما بيغطيها رصيده) ← "منتهية".
-     * - رصيده صفر أو له ← "فعّالة"، حتى لو تاريخ آخر عضوية مسجّلة فات، لأن الرسوم السنوية
-     *   بتنزل كذمم، فمقاول ما عليه ذمم يعتبر مسدّد.
+     * - عليه رصيد صافي سالب أكبر من 5% من مجموع ذممه وغراماته ← "منتهية".
+     * - رصيده صفر أو له، أو اللي عليه ≤ 5% (يعني سدّد 95% فأكثر، قرار 2026-10-10) ← "فعّالة"،
+     *   حتى لو تاريخ آخر عضوية مسجّلة فات، لأن الرسوم السنوية بتنزل كذمم.
      * باقي الحالات الإدارية (معلّق، موقوف، منتهي) بتنعرض كما هي.
      */
     public function membershipStatus(object $row): string
@@ -220,7 +226,14 @@ class ContractorBalanceController extends Controller
             return $row->status;
         }
 
-        return (float) $row->net_jod < 0 ? 'expired' : 'active';
+        $owed = -(float) $row->net_jod;
+        if ($owed <= 0) {
+            return 'active';
+        }
+
+        $allowed = round((float) ($row->obligations_jod ?? 0) * (1 - self::ACTIVE_PAID_RATIO), 2);
+
+        return $owed <= $allowed ? 'active' : 'expired';
     }
 
     public function balancesQuery(): Builder
@@ -236,11 +249,18 @@ class ContractorBalanceController extends Controller
         $penalties = "(SELECT COALESCE(SUM(pe.amount - COALESCE(pe.paid_amount, 0)), 0) FROM penalties pe
                        WHERE pe.contractor_id = contractors.id AND pe.status IN ('unpaid', 'partially_paid'))";
 
+        // مجموع كل الذمم والغرامات (المسدَّد وغير المسدَّد) — نفس عمود "الإجمالي" بصفحة الذمم
+        $obligations = "((SELECT COALESCE(SUM(d.amount_jod), 0) FROM contractor_dues d
+                          WHERE d.contractor_id = contractors.id AND d.deleted_at IS NULL)
+                       + (SELECT COALESCE(SUM(pe.amount), 0) FROM penalties pe
+                          WHERE pe.contractor_id = contractors.id AND pe.status <> 'rejected'))";
+
         return Contractor::query()->toBase()->select([
             'contractors.id', 'contractors.name', 'contractors.membership_number', 'contractors.status',
         ])->selectRaw("ROUND({$credit}, 2) AS credit_jod")
             ->selectRaw("ROUND({$dues}, 2) AS dues_jod")
             ->selectRaw("ROUND({$penalties}, 2) AS penalties_jod")
-            ->selectRaw("ROUND({$credit} - {$dues} - {$penalties}, 2) AS net_jod");
+            ->selectRaw("ROUND({$credit} - {$dues} - {$penalties}, 2) AS net_jod")
+            ->selectRaw("ROUND({$obligations}, 2) AS obligations_jod");
     }
 }
