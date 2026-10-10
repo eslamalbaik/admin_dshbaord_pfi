@@ -242,7 +242,8 @@ class PaymentController extends Controller
 
         if ($request->filled('search')) {
             $q = $request->search;
-            $query->whereHas('contractor', fn ($qb) => $qb->where('name', 'like', "%{$q}%"));
+            $query->whereHas('contractor', fn ($qb) => $qb->where('name', 'like', "%{$q}%")
+                ->orWhere('membership_number', 'like', "%{$q}%"));
         }
 
         if ($request->filled('status')) {

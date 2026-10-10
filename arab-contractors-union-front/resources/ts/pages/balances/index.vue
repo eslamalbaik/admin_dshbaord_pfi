@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import api from '@/plugins/axios'
 import ContractorStatementDialog from '@/components/dialogs/ContractorStatementDialog.vue'
@@ -76,6 +77,18 @@ const statementOpen = ref(false)
 
 function openStatement(r: BalanceRow) {
   statementFor.value = r
+  statementOpen.value = true
+}
+
+// قادم من سجل المدفوعات (/balances?contractor_id=..): نفلتر على المقاول ونفتح سجل مدفوعاته
+const route = useRoute()
+const linkedContractorId = Number(route.query.contractor_id)
+if (linkedContractorId) {
+  const name = String(route.query.name ?? '')
+  const membershipNumber = String(route.query.membership_number ?? '')
+
+  search.value = membershipNumber || name
+  statementFor.value = { contractor_id: linkedContractorId, name, membership_number: membershipNumber } as BalanceRow
   statementOpen.value = true
 }
 

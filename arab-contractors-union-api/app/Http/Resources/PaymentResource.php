@@ -14,6 +14,7 @@ class PaymentResource extends JsonResource
             'transaction_number' => $this->transaction_number,
             'contractor'        => $this->contractor?->name,
             'contractor_id'     => $this->contractor_id,
+            'contractor_membership_number' => $this->contractor?->membership_number,
             'membership_id'     => $this->membership_id,
             'equipment_package_id' => $this->equipment_package_id,
             'contractor_due_id' => $this->contractor_due_id,
