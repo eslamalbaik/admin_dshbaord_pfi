@@ -168,7 +168,7 @@ class EventAdminTest extends TestCase
             ->assertStatus(200);
         $this->assertSame('https://zoom.us/j/2', $event->fresh()->stream_url);
 
-        $this->putJson("/api/v1/admin/events/{$event->id}", ['event_format' => 'hybrid'])
+        $this->putJson("/api/v1/admin/events/{$event->id}", ['event_format' => 'hybrid', 'event_location' => 'gaza'])
             ->assertStatus(200)
             ->assertJsonPath('items.stream_url', 'https://zoom.us/j/2');
     }
