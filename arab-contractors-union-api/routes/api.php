@@ -128,6 +128,7 @@ Route::prefix('v1')->group(function () {
         // شاشة العطاءات — تصفح موثَّق (فعّال/مؤرشف/مجالاتي) + حفظ بالمفضلة (REQ-09/11/13)
         Route::get('tenders',                   [TenderController::class, 'contractorIndex']);
         Route::get('tenders/bookmarked',         [TenderController::class, 'bookmarked']);
+        Route::get('tenders/categories',         [TenderCategoryController::class, 'contractorIndex']);
         Route::get('tenders/{tender}',           [TenderController::class, 'contractorShow']);
         Route::post('tenders/{tender}/bookmark', [TenderController::class, 'bookmark']);
         Route::delete('tenders/{tender}/bookmark', [TenderController::class, 'unbookmark']);
