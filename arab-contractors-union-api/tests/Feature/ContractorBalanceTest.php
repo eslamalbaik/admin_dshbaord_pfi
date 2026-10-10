@@ -185,6 +185,46 @@ class ContractorBalanceTest extends TestCase
         }
     }
 
+    /**
+     * سدّد 95% أو أكثر من مجموع ذممه وغراماته ← فعّالة رغم الباقي البسيط (حالة 9565_g: 830 من 840).
+     * أقل من 95% ← منتهية. وبالحالتين الباقي بيضل عليه بالرصيد.
+     */
+    public function test_paying_95_percent_of_obligations_shows_active(): void
+    {
+        $almost = $this->contractor('9565_g');
+        ContractorDue::create([
+            'contractor_id' => $almost->id, 'description' => 'رسوم 2025', 'year' => 2025,
+            'amount_jod' => 400, 'paid_jod' => 400, 'status' => 'paid',
+        ]);
+        ContractorDue::create([
+            'contractor_id' => $almost->id, 'description' => 'رسوم 2026', 'year' => 2026,
+            'amount_jod' => 430, 'paid_jod' => 430, 'status' => 'paid',
+        ]);
+        Penalty::create([
+            'contractor_id' => $almost->id, 'reason' => 'غرامة تأخير',
+            'amount' => 10, 'paid_amount' => 0, 'status' => 'unpaid',
+        ]);
+
+        $short = $this->contractor('9566_g');
+        ContractorDue::create([
+            'contractor_id' => $short->id, 'description' => 'رسوم 2026', 'year' => 2026,
+            'amount_jod' => 100, 'paid_jod' => 94, 'status' => 'partially_paid',
+        ]);
+
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']), ['*']);
+
+        $this->getJson('/api/v1/dashboard/balances?search=9565_g')->assertOk()
+            ->assertJsonPath('items.0.status', 'active')
+            ->assertJsonPath('items.0.net_jod', -10);
+        $this->getJson('/api/v1/contractors?search=9565_g')->assertJsonPath('items.0.membership_status', 'active');
+        $this->getJson('/api/v1/dashboard/balances?search=9566_g')->assertJsonPath('items.0.status', 'expired');
+
+        Sanctum::actingAs($almost, ['*']);
+        $this->getJson('/api/v1/contractor/balance')->assertOk()
+            ->assertJsonPath('items.subscription_status', 'active')
+            ->assertJsonPath('items.amount_due_jod', 10);
+    }
+
     public function test_requires_authentication(): void
     {
         $this->getJson('/api/v1/contractor/balance')->assertUnauthorized();
