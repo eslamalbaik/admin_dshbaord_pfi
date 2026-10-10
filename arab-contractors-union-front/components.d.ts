@@ -7,6 +7,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AdminNotificationToasts: typeof import('./resources/ts/components/AdminNotificationToasts.vue')['default']
     AppAutocomplete: typeof import('./resources/ts/@core/components/app-form-elements/AppAutocomplete.vue')['default']
     AppBarSearch: typeof import('./resources/ts/@core/components/AppBarSearch.vue')['default']
     AppCardActions: typeof import('./resources/ts/@core/components/cards/AppCardActions.vue')['default']
