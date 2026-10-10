@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import { notificationLink } from '@/utils/notificationLink'
+import { notificationMessage, notificationMeta, relativeTimeAr } from '@/utils/notificationMeta'
 import { computed } from 'vue'
 import type { Notification } from '@layouts/types'
 import { useRouter } from 'vue-router'
@@ -10,82 +11,24 @@ import { useNotifications } from '@/composables/useNotifications'
 const { rawNotifications, unreadCount, markRead, markReadMany } = useNotifications()
 
 const router = useRouter()
-const { t } = useI18n()
-
-const formatTime = (dateStr: string) => {
-  const date = new Date(dateStr)
-  return date.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
 
 // Derive the view-model reactively from the query cache. No local mirror state.
+// العنوان/الأيقونة/اللون من notificationMeta حتى يطابق التنبيه المنبثق وصفحة الإشعارات.
 const notifications = computed<Notification[]>(() =>
   rawNotifications.value.map(n => {
     const d = n.data || {}
-    let title = ''
-    let subtitle = ''
-    let color = 'primary'
-    let icon = 'tabler-bell'
-
-    if (d.type === 'course_rated') {
-      title = 'notifications.course_rated_title'
-      subtitle = 'notifications.course_rated_desc'
-      color = 'primary'
-      icon = 'tabler-star'
-    }
-    else if (d.type === 'course_commented') {
-      title = 'notifications.course_commented_title'
-      subtitle = 'notifications.course_commented_desc'
-      color = 'warning'
-      icon = 'tabler-message'
-    }
-    else if (d.type === 'course_completed') {
-      title = 'notifications.course_completed_title'
-      subtitle = 'notifications.course_completed_desc'
-      color = 'success'
-      icon = 'tabler-trophy'
-    }
-    else if (d.type === 'payment_submitted') {
-      title = 'notifications.title'
-      subtitle = d.message || ''
-      color = 'success'
-      icon = 'tabler-cash'
-    }
-    else if (d.type === 'contractor_activated') {
-      title = 'notifications.title'
-      subtitle = d.message || ''
-      color = 'info'
-      icon = 'tabler-user-check'
-    }
-    else if (d.type === 'event_joined') {
-      title = 'notifications.title'
-      subtitle = d.message || ''
-      color = 'warning'
-      icon = 'tabler-calendar-event'
-    }
-    else {
-      title = 'notifications.title'
-      subtitle = d.message || ''
-    }
+    const meta = notificationMeta(d)
 
     return {
       id: n.id,
-      title: t(title),
-      subtitle: t(subtitle, {
-        student: d.student_name || 'Student',
-        course: d.course_title || '',
-        rating: d.rating || '',
-        lesson: d.lesson_title || '',
-      }),
-      time: formatTime(n.created_at),
+      title: meta.title,
+      subtitle: notificationMessage(d, meta.title),
+      time: relativeTimeAr(n.created_at),
       isSeen: n.read_at !== null,
-      color,
-      icon,
-    } as any
+      color: meta.color,
+      icon: meta.icon,
+      financial: meta.financial,
+    } as Notification
   }),
 )
 

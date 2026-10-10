@@ -7,7 +7,8 @@ import initCore from '@core/initCore'
 import { initConfigStore, useConfigStore } from '@core/stores/config'
 import { hexToRgb } from '@core/utils/colorConverter'
 import { useAuthStore } from '@/stores/authStore'
-import { adminToasts, useRealtimeAdminNotifications } from '@/composables/useRealtimeAdminNotifications'
+import { useRealtimeAdminNotifications } from '@/composables/useRealtimeAdminNotifications'
+import AdminNotificationToasts from '@/components/AdminNotificationToasts.vue'
 import { useAppUpdateCheck } from '@/composables/useAppUpdateCheck'
 
 const route = useRoute()
@@ -113,19 +114,7 @@ watch(isOnline, (online, wasOnline) => {
       <RouterView />
       <ScrollToTop v-if="route.meta.layout !== 'pure'" />
 
-      <VSnackbar
-        v-for="(toast, index) in adminToasts"
-        :key="toast.id"
-        :model-value="true"
-        location="top end"
-        :style="{ marginTop: `${index * 64}px` }"
-        color="primary"
-        variant="elevated"
-        timeout="6000"
-        @update:model-value="adminToasts.splice(adminToasts.indexOf(toast), 1)"
-      >
-        {{ toast.text }}
-      </VSnackbar>
+      <AdminNotificationToasts v-if="authStore.isLoggedIn" />
     </component>
   </VLocaleProvider>
 </template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import api from '@/plugins/axios'
 import { notificationLink } from '@/utils/notificationLink'
+import { notificationMessage, notificationMeta, relativeTimeAr } from '@/utils/notificationMeta'
 
 definePage({
   meta: { requiresAdmin: true },
@@ -15,6 +16,7 @@ interface NotificationItem {
   isSeen: boolean
   color: string
   icon: string
+  financial: boolean
   link?: string
 }
 
@@ -29,76 +31,22 @@ const isError         = ref(false)
 const markingAllRead  = ref(false)
 
 // ─── Notification type map ────────────────────────────────────
+// العنوان/الأيقونة/اللون من notificationMeta — نفس شكل الجرس والتنبيه المنبثق.
 function mapRawNotification(n: any): NotificationItem {
   const d = n.data || {}
-
-  // تحديد العنوان والأيقونة واللون بحسب نوع الإشعار
-  // المفاتيح هنا يجب أن تطابق حرفياً قيمة 'type' في app/Notifications/*.php —
-  // أي مفتاح لا يطابق يسقط إلى 'general' فيضيع العنوان والأيقونة واللون.
-  const typeMap: Record<string, { title: string; icon: string; color: string }> = {
-    // طلبات المقاولين
-    name_change_request_submitted:   { title: 'طلب تعديل اسم شركة', icon: 'tabler-signature', color: 'warning' },
-    name_change_request_status:      { title: 'تحديث طلب تعديل الاسم', icon: 'tabler-signature', color: 'info' },
-    profile_update_request_submitted: { title: 'طلب تعديل بيانات', icon: 'tabler-user-edit', color: 'warning' },
-    profile_update_request_status:   { title: 'تحديث طلب تعديل البيانات', icon: 'tabler-user-edit', color: 'info' },
-    certificate_request_submitted:   { title: 'طلب شهادة جديد', icon: 'tabler-certificate', color: 'warning' },
-    certificate_request_status:      { title: 'تحديث طلب شهادة', icon: 'tabler-certificate', color: 'info' },
-    // حركة مالية
-    payment_submitted:   { title: 'إشعار تحويل بانتظار التأكيد', icon: 'tabler-cash', color: 'warning' },
-    payment_confirmed:   { title: 'تم تأكيد الدفعة', icon: 'tabler-circle-check', color: 'success' },
-    payment_rejected:    { title: 'رُفضت الدفعة', icon: 'tabler-credit-card-off', color: 'error' },
-    // عضوية
-    contractor_activated:            { title: 'تفعيل حساب مقاول', icon: 'tabler-user-check', color: 'info' },
-    complete_profile:                { title: 'استكمال الملف التعريفي', icon: 'tabler-user-exclamation', color: 'secondary' },
-    membership_expiry_reminder:      { title: 'العضوية على وشك الانتهاء', icon: 'tabler-clock-exclamation', color: 'warning' },
-    membership_grace_period_reminder: { title: 'مهلة تجديد العضوية', icon: 'tabler-clock-off', color: 'error' },
-    // فعاليات ودعم
-    event_joined:                    { title: 'تسجيل حضور فعالية', icon: 'tabler-calendar-event', color: 'primary' },
-    support_ticket_created:          { title: 'طلب دعم جديد', icon: 'tabler-lifebuoy', color: 'warning' },
-    support_ticket_replied:          { title: 'رد على طلب دعم', icon: 'tabler-message-reply', color: 'info' },
-    support_ticket_contractor_replied: { title: 'رد المقاول على طلب دعم', icon: 'tabler-message-reply', color: 'warning' },
-    // نظام
-    admin_broadcast:                 { title: 'إعلان من الاتحاد', icon: 'tabler-speakerphone', color: 'primary' },
-    pma_rates_fetch_failed:          { title: 'تعذّر جلب أسعار الصرف', icon: 'tabler-alert-triangle', color: 'error' },
-    // عام
-    general:             { title: 'إشعار',                    icon: 'tabler-bell', color: 'primary' },
-  }
-
-  const matched = typeMap[d.type] ?? typeMap['general']
-
-  // بناء نص الرسالة من بيانات الإشعار
-  let message = d.message || ''
-  if (!message) {
-    if (d.contractor_name) message = `المقاول: ${d.contractor_name}`
-    else if (d.amount)     message = `المبلغ: ${Number(d.amount).toLocaleString('ar-SA')} ₪`
-    else                   message = matched.title
-  }
+  const meta = notificationMeta(d)
 
   return {
-    id:      n.id,
-    title:   matched.title,
-    message,
-    time:    formatTime(n.created_at),
-    isSeen:  n.read_at !== null,
-    color:   matched.color,
-    icon:    matched.icon,
-    link:    d.link ?? undefined,
+    id:        n.id,
+    title:     meta.title,
+    message:   notificationMessage(d, meta.title),
+    time:      relativeTimeAr(n.created_at),
+    isSeen:    n.read_at !== null,
+    color:     meta.color,
+    icon:      meta.icon,
+    financial: meta.financial,
+    link:      d.link ?? undefined,
   }
-}
-
-function formatTime(dateStr: string): string {
-  if (!dateStr) return ''
-  const date = new Date(dateStr)
-  const now  = new Date()
-  const diff = now.getTime() - date.getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1)   return 'الآن'
-  if (mins < 60)  return `منذ ${mins} دقيقة`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24)   return `منذ ${hrs} ساعة`
-  const days = Math.floor(hrs / 24)
-  if (days < 7)   return `منذ ${days} يوم`
-  return date.toLocaleDateString('ar-SA', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 // ─── Fetch ────────────────────────────────────────────────────
@@ -231,21 +179,23 @@ onMounted(fetchNotifications)
 
           <VListItem
             link
-            class="py-4"
-            :class="!item.isSeen ? 'unread-item' : ''"
+            class="py-4 notif-row"
+            :class="{ 'unread-item': !item.isSeen, 'financial-item': item.financial }"
+            :style="{ '--notif-accent': item.color.startsWith('#') ? item.color : `rgb(var(--v-theme-${item.color}))` }"
             @click="handleClick(item)"
           >
             <!-- أيقونة -->
             <template #prepend>
-              <VAvatar :color="item.color" variant="tonal" class="me-4" size="42">
+              <VAvatar :color="item.color" variant="tonal" rounded="lg" class="me-4" size="44">
                 <VIcon :icon="item.icon" size="22" />
               </VAvatar>
             </template>
 
             <!-- العنوان والرسالة -->
-            <VListItemTitle class="font-weight-semibold mb-1 d-flex align-center gap-2">
+            <VListItemTitle class="mb-1 d-flex align-center gap-2" :class="item.isSeen ? 'font-weight-medium' : 'font-weight-bold'">
+              <span v-if="item.financial" class="financial-tag">مالي</span>
               {{ item.title }}
-              <VBadge v-if="!item.isSeen" dot inline color="primary" />
+              <VBadge v-if="!item.isSeen" dot inline color="error" />
             </VListItemTitle>
             <VListItemSubtitle class="text-body-2">
               {{ item.message }}
@@ -279,7 +229,43 @@ onMounted(fetchNotifications)
 </template>
 
 <style scoped>
+.notif-row {
+  position: relative;
+}
+
+.notif-row::before {
+  position: absolute;
+  background: transparent;
+  content: "";
+  inline-size: 4px;
+  inset-block: 0;
+  inset-inline-start: 0;
+}
+
 .unread-item {
   background-color: rgba(var(--v-theme-primary), 0.04);
+}
+
+.unread-item::before,
+.financial-item::before {
+  background: var(--notif-accent);
+}
+
+.financial-item {
+  background-color: rgba(246, 196, 83, 0.1);
+}
+
+.financial-item.unread-item {
+  background-color: rgba(246, 196, 83, 0.2);
+}
+
+.financial-tag {
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--notif-accent);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.6;
 }
 </style>

@@ -114,6 +114,8 @@ export type Notification = {
   time: string
   color?: string
   isSeen: boolean
+  /** إشعار مالي (دفعات، ذمم، غرامات...) — يُعرض بلون وأيقونة مميزين */
+  financial?: boolean
 } & (
   | { img: string; text?: never; icon?: never }
   | { img?: never; text: string; icon?: never }
