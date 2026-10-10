@@ -828,8 +828,8 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
 
     <!-- ─── ملخص ─── -->
     <VRow class="mb-2">
-      <VCol cols="12" md="3">
-        <VCard>
+      <VCol cols="12" sm="6" md="3">
+        <VCard class="h-100">
           <VCardText>
             <p class="text-body-2 text-medium-emphasis mb-1">إجمالي الذمم القائمة</p>
             <h3 class="text-h5">{{ summary?.items?.outstanding_total_jod ?? '—' }} د.أ</h3>
@@ -844,39 +844,30 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
           </VCardText>
         </VCard>
       </VCol>
-      <VCol cols="12" md="3">
-        <VCard>
+      <VCol cols="12" sm="6" md="3">
+        <VCard class="h-100">
           <VCardText>
             <p class="text-body-2 text-medium-emphasis mb-1">إجمالي المحصَّل</p>
             <h3 class="text-h5">{{ summary?.items?.collected_total_jod ?? '—' }} د.أ</h3>
           </VCardText>
         </VCard>
       </VCol>
-      <VCol cols="12" md="3">
-        <VCard>
+      <VCol cols="12" sm="6" md="3">
+        <VCard class="h-100">
           <VCardText>
             <p class="text-body-2 text-medium-emphasis mb-1">مقاولون عليهم ذمم</p>
             <h3 class="text-h5">{{ summary?.items?.contractors_with_dues ?? '—' }}</h3>
           </VCardText>
         </VCard>
       </VCol>
-      <VCol cols="12" md="3">
-        <VCard>
+      <VCol cols="12" sm="6" md="3">
+        <VCard class="h-100">
           <VCardText>
             <p class="text-body-2 text-medium-emphasis mb-1">أسعار الصرف → د.أ</p>
             <div class="d-flex gap-4">
               <span dir="ltr">ILS: {{ rates?.items?.latest?.ILS?.rate_to_jod ?? '—' }}</span>
               <span dir="ltr">USD: {{ rates?.items?.latest?.USD?.rate_to_jod ?? '—' }}</span>
             </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-      <VCol cols="12" md="3">
-        <VCard>
-          <VCardText>
-            <p class="text-body-2 text-medium-emphasis mb-1">رسوم تسجيل (أول انتساب)</p>
-            <h3 class="text-h5">{{ summary?.items?.registration_fees?.total_jod ?? '—' }} د.أ</h3>
-            <p class="text-caption text-medium-emphasis mb-0">{{ summary?.items?.registration_fees?.dues_count ?? 0 }} ذمة</p>
           </VCardText>
         </VCard>
       </VCol>
