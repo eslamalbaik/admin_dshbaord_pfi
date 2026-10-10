@@ -13,6 +13,7 @@ interface Payment {
   transaction_number: string | null
   contractor: string | null
   contractor_id: number
+  contractor_membership_number?: string | null
   amount: string
   currency: string
   exchange_rate: string | null
@@ -44,6 +45,33 @@ function firstFile(v: File | File[] | null | undefined): File | null {
 
 function fmtDateTime(d: string | null) {
   return d ? new Date(d).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' }) : '—'
+}
+
+// ─── عرض إيصال الدفعة داخل الموقع (popup) بدل فتحه بتبويب جديد ───
+const receiptViewer = ref<{ url: string; title: string } | null>(null)
+const receiptViewerOpen = ref(false)
+const receiptIsPdf = computed(() => /\.pdf($|\?)/i.test(receiptViewer.value?.url ?? ''))
+
+function openReceipt(p: Payment) {
+  if (!p.receipt_image_url)
+    return
+  receiptViewer.value = {
+    url: p.receipt_image_url,
+    title: [p.contractor, p.transaction_number].filter(Boolean).join(' — '),
+  }
+  receiptViewerOpen.value = true
+}
+
+// صفحة أرصدة المقاولين تفتح سجل المدفوعات (كشف الحساب) لهذا المقاول مباشرة
+function balanceLink(p: Payment) {
+  return {
+    path: '/balances',
+    query: {
+      contractor_id: String(p.contractor_id),
+      name: p.contractor ?? undefined,
+      membership_number: p.contractor_membership_number ?? undefined,
+    },
+  }
 }
 
 const successMessage = ref('')
@@ -356,7 +384,7 @@ function fmtDate(d: string | null) {
       <VCardText class="d-flex gap-4 flex-wrap">
         <VTextField
           v-model="search"
-          placeholder="بحث باسم المقاول..."
+          placeholder="بحث باسم المقاول أو رقم العضوية..."
           prepend-inner-icon="tabler-search"
           density="compact"
           style="max-width: 300px;"
@@ -407,7 +435,28 @@ function fmtDate(d: string | null) {
           <tr v-for="p in (data?.items ?? [])" :key="p.id">
             <td>{{ p.id }}</td>
             <td dir="ltr">{{ p.transaction_number ?? '—' }}</td>
-            <td>{{ p.contractor ?? '—' }}</td>
+            <td>
+              <div class="d-flex align-center gap-1">
+                <VBtn
+                  v-if="p.contractor_id"
+                  icon
+                  size="x-small"
+                  variant="text"
+                  color="primary"
+                  :to="balanceLink(p)"
+                  aria-label="سجل مدفوعات المقاول ورصيده"
+                >
+                  <VIcon icon="tabler-wallet" size="18" />
+                  <VTooltip activator="parent">سجل مدفوعات المقاول ورصيده</VTooltip>
+                </VBtn>
+                <div>
+                  <div>{{ p.contractor ?? '—' }}</div>
+                  <div v-if="p.contractor_membership_number" class="text-caption text-medium-emphasis" dir="ltr">
+                    {{ p.contractor_membership_number }}
+                  </div>
+                </div>
+              </div>
+            </td>
             <td dir="ltr">{{ p.amount }} {{ currencySymbol[p.currency] ?? p.currency }}</td>
             <td dir="ltr">
               {{ p.amount_jod ?? '—' }}
@@ -415,9 +464,9 @@ function fmtDate(d: string | null) {
             </td>
             <td>{{ ({ membership_fee: 'رسوم عضوية', renewal_fee: 'رسوم تجديد', dues_payment: 'سداد ذمم', penalty: 'غرامة', penalty_payment: 'دفع غرامة', advance_payment: 'دفعة مقدمة', equipment_subscription: 'اشتراك سوق الآليات' } as Record<string, string>)[p.type] ?? p.type }}</td>
             <td>
-              <a v-if="p.receipt_image_url" :href="p.receipt_image_url" target="_blank" rel="noopener">
+              <VBtn v-if="p.receipt_image_url" icon size="small" variant="text" aria-label="عرض الإيصال" @click="openReceipt(p)">
                 <VIcon icon="tabler-photo" size="20" />
-              </a>
+              </VBtn>
               <span v-else>—</span>
             </td>
             <td>
@@ -529,7 +578,7 @@ function fmtDate(d: string | null) {
                 </VAlert>
               </template>
 
-              <a v-if="changing?.receipt_image_url" :href="changing.receipt_image_url" target="_blank" rel="noopener" class="d-block mb-2 mt-3 text-body-2">
+              <a v-if="changing?.receipt_image_url" href="#" class="d-block mb-2 mt-3 text-body-2" @click.prevent="changing && openReceipt(changing)">
                 عرض صورة الإشعار الحالية
               </a>
               <VFileInput
@@ -665,5 +714,45 @@ function fmtDate(d: string | null) {
       </VCard>
     </VDialog>
 
+    <!-- إيصال الدفعة -->
+    <VDialog v-model="receiptViewerOpen" max-width="900" scrollable>
+      <VCard>
+        <VCardTitle class="d-flex align-center pa-4">
+          <span class="text-truncate">إيصال الدفعة<span v-if="receiptViewer?.title" class="text-medium-emphasis text-body-1"> — {{ receiptViewer.title }}</span></span>
+          <VSpacer />
+          <VBtn
+            v-if="receiptViewer"
+            :href="receiptViewer.url"
+            target="_blank"
+            rel="noopener"
+            variant="text"
+            size="small"
+            prepend-icon="tabler-external-link"
+          >
+            فتح بتبويب جديد
+          </VBtn>
+          <VBtn icon variant="text" size="small" aria-label="إغلاق" @click="receiptViewerOpen = false">
+            <VIcon icon="tabler-x" />
+          </VBtn>
+        </VCardTitle>
+        <VDivider />
+        <VCardText class="pa-2 text-center">
+          <template v-if="receiptViewer">
+            <iframe
+              v-if="receiptIsPdf"
+              :src="receiptViewer.url"
+              title="إيصال الدفعة"
+              style="inline-size: 100%; block-size: 75vh; border: 0;"
+            />
+            <img
+              v-else
+              :src="receiptViewer.url"
+              alt="إيصال الدفعة"
+              style="max-inline-size: 100%; max-block-size: 75vh; object-fit: contain;"
+            >
+          </template>
+        </VCardText>
+      </VCard>
+    </VDialog>
   </div>
 </template>
