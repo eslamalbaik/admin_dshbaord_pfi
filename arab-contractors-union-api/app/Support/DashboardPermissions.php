@@ -52,7 +52,7 @@ class DashboardPermissions
                 'finance.payments'       => ['label' => 'سجل المدفوعات', 'actions' => [self::VIEW, self::CREATE, self::UPDATE]],
                 'finance.dues'           => ['label' => 'الذمم المالية', 'actions' => self::CRUD],
                 'finance.dues_discounts' => ['label' => 'الخصومات على الذمم', 'actions' => [self::UPDATE]],
-                'finance.balances'       => ['label' => 'أرصدة المقاولين', 'actions' => [self::VIEW]],
+                'finance.balances'       => ['label' => 'أرصدة المقاولين', 'actions' => [self::VIEW, self::UPDATE]],
                 'finance.bank_accounts'  => ['label' => 'الحسابات البنكية', 'actions' => self::CRUD],
                 'finance.exchange_rates' => ['label' => 'أسعار الصرف', 'actions' => [self::VIEW, self::UPDATE]],
                 'finance.grade_fees'     => ['label' => 'رسوم الدرجات', 'actions' => [self::VIEW, self::UPDATE]],

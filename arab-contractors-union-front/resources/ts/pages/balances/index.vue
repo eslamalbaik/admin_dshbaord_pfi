@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { useQuery } from '@tanstack/vue-query'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import api from '@/plugins/axios'
 import ContractorStatementDialog from '@/components/dialogs/ContractorStatementDialog.vue'
+import BalanceAdjustDialog from '@/components/dialogs/BalanceAdjustDialog.vue'
 
 definePage({ meta: { requiresAdmin: true } })
 
@@ -76,6 +77,25 @@ const statementOpen = ref(false)
 function openStatement(r: BalanceRow) {
   statementFor.value = r
   statementOpen.value = true
+}
+
+// ─── تعديل رصيد شركة يدوياً (BalanceAdjustDialog) ───
+const queryClient = useQueryClient()
+const adjustFor = ref<BalanceRow | null>(null)
+const adjustOpen = ref(false)
+const adjustedMessage = ref('')
+const adjustedSnack = ref(false)
+
+function openAdjust(r: BalanceRow) {
+  adjustFor.value = r
+  adjustOpen.value = true
+}
+
+function onAdjusted() {
+  adjustedMessage.value = `تم تعديل رصيد ${adjustFor.value?.name ?? ''} بنجاح.`
+  adjustedSnack.value = true
+  queryClient.invalidateQueries({ queryKey: ['contractor-balances'] })
+  queryClient.invalidateQueries({ queryKey: ['contractor-balances-summary'] })
 }
 
 // ─── تصدير الجدول (حسب الفلتر الحالي) إلى ملف يفتح بالإكسل ───
@@ -221,9 +241,19 @@ async function exportCsv() {
               <td dir="ltr">{{ money(r.dues_jod) }}</td>
               <td dir="ltr">{{ money(r.penalties_jod) }}</td>
               <td dir="ltr" class="font-weight-bold" :class="netColor(r.net_jod)">{{ money(r.net_jod) }}</td>
-              <td>
+              <td class="text-no-wrap">
                 <VBtn size="small" variant="text" prepend-icon="tabler-list-details" @click="openStatement(r)">
                   سجل المدفوعات
+                </VBtn>
+                <VBtn
+                  v-if="$can('finance.balances', 'update')"
+                  size="small"
+                  variant="text"
+                  color="primary"
+                  prepend-icon="tabler-edit"
+                  @click="openAdjust(r)"
+                >
+                  تعديل الرصيد
                 </VBtn>
               </td>
             </tr>
@@ -245,5 +275,15 @@ async function exportCsv() {
       v-model="statementOpen"
       :contractor="statementFor"
     />
+
+    <BalanceAdjustDialog
+      v-model="adjustOpen"
+      :contractor="adjustFor"
+      @saved="onAdjusted"
+    />
+
+    <VSnackbar v-model="adjustedSnack" :timeout="4000" color="success" location="top">
+      {{ adjustedMessage }}
+    </VSnackbar>
   </div>
 </template>

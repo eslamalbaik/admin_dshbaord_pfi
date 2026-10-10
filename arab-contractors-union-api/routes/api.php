@@ -520,6 +520,8 @@ Route::prefix('v1')->group(function () {
             Route::get('dashboard/balances',            [\App\Http\Controllers\Api\ContractorBalanceController::class, 'index'])->middleware('perm:finance.balances');
             Route::get('dashboard/balances/summary',    [\App\Http\Controllers\Api\ContractorBalanceController::class, 'summary'])->middleware('perm:finance.balances');
             Route::get('dashboard/balances/{contractor}/statement', [\App\Http\Controllers\Api\ContractorBalanceController::class, 'statement'])->middleware('perm:finance.balances|finance.dues,view');
+            Route::get('dashboard/balances/{contractor}/adjustments', [\App\Http\Controllers\Api\ContractorBalanceController::class, 'adjustments'])->middleware('perm:finance.balances,view');
+            Route::post('dashboard/balances/{contractor}/adjust',     [\App\Http\Controllers\Api\ContractorBalanceController::class, 'adjust'])->middleware('perm:finance.balances,update');
 
             // أسعار الصرف (عرض + override يدوي)
             Route::get('dashboard/exchange-rates',  [\App\Http\Controllers\Api\ExchangeRateController::class, 'index'])->middleware('perm:finance.exchange_rates|finance.payments|finance.dues|finance.balances,view');
