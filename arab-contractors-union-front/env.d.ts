@@ -10,3 +10,8 @@ declare module 'vue-router' {
     public?: boolean
   }
 }
+
+declare global {
+  // معرّف البناء الحالي — يحقنه vite.config.ts
+  const __APP_BUILD_ID__: string
+}

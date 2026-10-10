@@ -8,6 +8,7 @@ import { initConfigStore, useConfigStore } from '@core/stores/config'
 import { hexToRgb } from '@core/utils/colorConverter'
 import { useAuthStore } from '@/stores/authStore'
 import { adminToasts, useRealtimeAdminNotifications } from '@/composables/useRealtimeAdminNotifications'
+import { useAppUpdateCheck } from '@/composables/useAppUpdateCheck'
 
 const route = useRoute()
 const { global } = useTheme()
@@ -30,6 +31,9 @@ useRealtimeAdminNotifications()
 // حالة الاتصال — شريط عام يطمئن المستخدم أن ما أدخله محفوظ محلياً أثناء الانقطاع.
 // مكتوب بعناصر HTML عادية لا مكوّنات Vuetify: صفحات layout='pure' تُصيَّر خارج
 // VApp فلا تعمل داخلها مكوّنات مثل VAlert/VSnackbar بشكل موثوق.
+// شريط «يتوفر تحديث جديد» — يظهر لمستخدمي اللوحة لما يُنشر إصدار أحدث من الواجهة
+const { showUpdateBar, reloadNow, snooze } = useAppUpdateCheck()
+
 const isOnline = useOnline()
 const justReconnected = ref(false)
 
@@ -68,6 +72,20 @@ watch(isOnline, (online, wasOnline) => {
       <div v-else-if="justReconnected" class="conn-bar conn-bar--online">
         <span class="conn-dot" />
         عاد الاتصال بالإنترنت — جارٍ استئناف العملية.
+      </div>
+
+      <div
+        v-if="showUpdateBar && authStore.isLoggedIn"
+        class="update-bar"
+        role="status"
+      >
+        <span class="update-bar__text">يتوفر تحديث جديد للوحة التحكم. حدّث الصفحة لتحصل على آخر التعديلات.</span>
+        <button type="button" class="update-bar__btn update-bar__btn--primary" @click="reloadNow">
+          حدّث الآن
+        </button>
+        <button type="button" class="update-bar__btn" @click="snooze">
+          لاحقاً
+        </button>
       </div>
 
       <RouterView />
@@ -119,6 +137,46 @@ watch(isOnline, (online, wasOnline) => {
 }
 
 .conn-bar--offline .conn-dot { animation: conn-pulse 1.2s ease-in-out infinite; }
+
+.update-bar {
+  position: fixed;
+  inset-block-end: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3000;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem 0.75rem;
+  max-inline-size: calc(100vw - 2rem);
+  inline-size: max-content;
+  padding: 0.65rem 1rem;
+  border-radius: 10px;
+  background: #1e3a5f;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.update-bar__text { text-align: center; }
+
+.update-bar__btn {
+  padding: 0.35rem 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 6px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+}
+
+.update-bar__btn--primary {
+  border-color: #fff;
+  background: #fff;
+  color: #1e3a5f;
+}
 
 @keyframes conn-pulse {
   50% { opacity: 0.25; }
