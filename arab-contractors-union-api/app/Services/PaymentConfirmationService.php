@@ -74,7 +74,6 @@ class PaymentConfirmationService
 
             $payment->update($updateData);
 
-            $this->settleLinkedDue($payment, $authUser);
             $this->settleLinkedPenalty($payment, $authUser);
             $this->settleOutstandingDues($payment, $authUser);
 
@@ -105,51 +104,16 @@ class PaymentConfirmationService
     }
 
     /**
-     * تحويل مرفوع من التطبيق لتسديد ذمة محددة: يُسدَّد من الذمة نفسها فور الاعتماد (بحدود
-     * المتبقي عليها)، وأي فائض يضل رصيداً للمقاول (used_amount_jod أقل من amount_jod).
-     */
-    private function settleLinkedDue(Payment $payment, User $authUser): void
-    {
-        if ($payment->type !== 'dues_payment' || ! $payment->contractor_due_id) {
-            return;
-        }
-
-        $due = $payment->due()->lockForUpdate()->first();
-        if (! $due || $due->status === 'paid') {
-            return;
-        }
-
-        $available = round((float) $payment->amount_jod - (float) $payment->used_amount_jod, 2);
-        $amount    = min($available, $due->remaining_jod);
-        if ($amount <= 0) {
-            return;
-        }
-
-        $payment->increment('used_amount_jod', $amount);
-        $due->applyPayment($amount);
-        PaymentAllocation::record($payment, $due, $amount);
-
-        AuditLogService::record(
-            $authUser,
-            'due.settled',
-            $due,
-            ['contractor_id' => $due->contractor_id, 'amount_jod' => $amount, 'payment_id' => $payment->id],
-        );
-    }
-
-    /**
-     * دفعة من التطبيق ما إلها ذمة محددة كانت تتأكد وتضل الذمم "غير مسدَّدة":
-     * - سداد ذمم بلا ذمة مربوطة / دفعة مقدمة ← أقدم الذمم، بعدين الغرامات المفتوحة، والباقي رصيد.
+     * دفعة من التطبيق بتسدّد دايماً **أقدم الذمم أولاً** (حسب السنة)، حتى لو المقاول اختار ذمة
+     * سنة أحدث (contractor_due_id) أو بعتها "رسوم عضوية" (قاعدة eslam 10/10: عليه 150 لـ2025
+     * و150 لـ2026 ودفع 150 لـ2026 ← بتنسدّ 2025):
+     * - سداد ذمم / دفعة مقدمة / رسوم عضوية ← أقدم الذمم، بعدين الغرامات المفتوحة، والباقي رصيد.
      * - دفع غرامة ← الغرامات المفتوحة أولاً (بعد المربوطة)، بعدين الذمم، والباقي رصيد.
-     * - رسوم عضوية ← بتسدّد ذمم رسوم الاشتراك السنوي أولاً (الأقدم أولاً)، والباقي على أقدم
-     *   الذمم الثانية: التطبيق بيبعت التحويل "رسوم عضوية" افتراضياً حتى لو المقاول بيدفع ذمة
-     *   عادية، وبدونها بيدفع وبتضل الذمة عليه وحالته "منتهية".
      * كل تسديد بينسجّل بـpayment_allocations حتى ينعكس لو الدفعة رجعت أو انرفضت.
      */
     private function settleOutstandingDues(Payment $payment, User $authUser): void
     {
-        $applies = ($payment->type === 'dues_payment' && ! $payment->contractor_due_id)
-            || in_array($payment->type, ['membership_fee', 'advance_payment', 'penalty_payment'], true);
+        $applies = in_array($payment->type, ['dues_payment', 'membership_fee', 'advance_payment', 'penalty_payment'], true);
 
         if (! $applies || ! $payment->contractor) {
             return;
@@ -157,11 +121,6 @@ class PaymentConfirmationService
 
         $dues = $payment->contractor->dues()->outstanding()
             ->orderByRaw('year IS NULL, year asc')->orderBy('id')->lockForUpdate()->get();
-
-        if ($payment->type === 'membership_fee') {
-            [$fees, $others] = $dues->partition(fn ($due) => $due->is_membership_fee);
-            $dues = $fees->concat($others);
-        }
 
         // رسوم العضوية ما بتسدّد غرامات (فائضها مش رصيد أصلاً)
         $penalties = $payment->type === 'membership_fee' ? collect() : $payment->contractor->penalties()
