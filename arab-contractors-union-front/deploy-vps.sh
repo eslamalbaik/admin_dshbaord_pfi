@@ -74,25 +74,38 @@ rsync -a --delete \
   --exclude='.env.production' \
   --exclude='node_modules' \
   --exclude='dist' \
+  --exclude='dist.new' \
+  --exclude='dist.old' \
   --exclude='.git' \
   "$MONOREPO_DIR/arab-contractors-union-front/" "$APP_DIR/"
 
 echo "==> مزامنة المكتبات"
 npm install --no-audit --no-fund
 
-echo "==> بناء الإنتاج (قد يستغرق عدة دقائق)"
-if ! npm run build; then
-  echo "✘ فشل البناء."
-  rollback
+# البناء يصير بمجلد جانبي dist.new والموقع ضال شغّال على dist القديم طول الوقت.
+# قبل هيك vite كان يفضّي dist أول البناء، فأي حدا يفتح/يحدّث الصفحة خلال
+# الدقيقة أو الدقيقتين تبع البناء ياخد 500 من nginx (ما في index.html).
+echo "==> بناء الإنتاج في dist.new (قد يستغرق عدة دقائق)"
+rm -rf dist.new
+if ! npm run build -- --outDir dist.new --emptyOutDir; then
+  echo "✘ فشل البناء — الموقع ما زال يعمل بالنسخة السابقة."
+  rm -rf dist.new
   exit 1
 fi
 
 # البناء قد ينتهي بنجاح ظاهري دون أن ينتج ملفاً — تحقّق فعلياً
-if [ ! -f dist/index.html ]; then
-  echo "✘ البناء لم ينتج dist/index.html."
-  rollback
+if [ ! -f dist.new/index.html ]; then
+  echo "✘ البناء لم ينتج index.html — الموقع ما زال يعمل بالنسخة السابقة."
+  rm -rf dist.new
   exit 1
 fi
+
+# تبديل شبه لحظي: mv على نفس القرص عملية rename
+echo "==> تبديل البناء الجديد مكان القديم"
+rm -rf dist.old
+if [ -d dist ]; then mv dist dist.old; fi
+mv dist.new dist
+rm -rf dist.old
 
 # ---------------------------------------------------------------
 #  تحقّق أن الدومين الصحيح مخبوز في الناتج
