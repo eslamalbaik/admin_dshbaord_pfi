@@ -220,7 +220,7 @@ function exportCsv() {
               variant="outlined"
               prepend-icon="tabler-id-badge-2"
             >
-              {{ contractor?.membership_number }}
+              <bdi dir="ltr">{{ contractor?.membership_number }}</bdi>
             </VChip>
             <VChip
               v-if="position"

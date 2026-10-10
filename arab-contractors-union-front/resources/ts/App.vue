@@ -216,14 +216,16 @@ watch(isOnline, (online, wasOnline) => {
   transition: background-color 0.15s, color 0.15s, box-shadow 0.15s;
 }
 
-.update-dialog__btn--primary {
+/* .update-dialog قبل الكلاس: قاعدة الثيم button, [type="button"] { color: inherit } إلها نفس
+   القوة وبتنحمّل بعدنا بالـ build، فكانت تخلّي نص الأزرار غامق بدل أبيض/أحمر */
+.update-dialog .update-dialog__btn--primary {
   background: #c62828;
   color: #fff;
 }
 
 .update-dialog__btn--primary:hover { background: #a91f1f; border-color: #a91f1f; }
 
-.update-dialog__btn--ghost {
+.update-dialog .update-dialog__btn--ghost {
   background: #fff;
   color: #c62828;
 }
