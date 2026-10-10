@@ -69,13 +69,74 @@ class ContractorDueAdminTest extends TestCase
         ]))->assertStatus(422)->assertJsonValidationErrors('due_date');
     }
 
-    public function test_today_is_accepted_as_a_due_date(): void
+    /** Trello #13: الذمة الجديدة تاريخها من بكرة وما بعد — اليوم نفسه مرفوض. */
+    public function test_a_new_due_rejects_today_and_accepts_tomorrow(): void
+    {
+        $this->actingAsAdmin();
+        $today = now(config('app.local_timezone'));
+
+        $this->postJson('/api/v1/dashboard/dues', $this->payload($this->contractor('928_g'), [
+            'due_kind' => 'new',
+            'due_date' => $today->toDateString(),
+        ]))->assertStatus(422)->assertJsonValidationErrors('due_date');
+
+        $this->postJson('/api/v1/dashboard/dues', $this->payload($this->contractor('929_g'), [
+            'due_kind' => 'new',
+            'due_date' => $today->copy()->addDay()->toDateString(),
+        ]))->assertCreated();
+    }
+
+    /** بدون due_kind (عميل أقدم) تُعامل الذمة جديدة: اليوم مرفوض. */
+    public function test_missing_due_kind_is_treated_as_a_new_due(): void
     {
         $this->actingAsAdmin();
 
         $this->postJson('/api/v1/dashboard/dues', $this->payload($this->contractor(), [
-            'due_date' => now()->toDateString(),
+            'due_date' => now(config('app.local_timezone'))->toDateString(),
+        ]))->assertStatus(422)->assertJsonValidationErrors('due_date');
+    }
+
+    public function test_an_old_due_accepts_a_past_date_and_today_with_a_reason(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/dashboard/dues', $this->payload($this->contractor('928_g'), [
+            'due_kind'        => 'old',
+            'due_date'        => '2023-06-01',
+            'backdate_reason' => 'من السجل الورقي',
         ]))->assertCreated();
+
+        $this->postJson('/api/v1/dashboard/dues', $this->payload($this->contractor('929_g'), [
+            'due_kind'        => 'old',
+            'due_date'        => now(config('app.local_timezone'))->toDateString(),
+            'backdate_reason' => 'من السجل الورقي',
+        ]))->assertCreated();
+    }
+
+    public function test_an_old_due_rejects_a_future_date(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/dashboard/dues', $this->payload($this->contractor(), [
+            'due_kind'        => 'old',
+            'due_date'        => now(config('app.local_timezone'))->addDays(3)->toDateString(),
+            'backdate_reason' => 'سبب',
+        ]))->assertStatus(422)->assertJsonValidationErrors('due_date');
+    }
+
+    public function test_an_old_due_requires_a_reason_and_a_valid_kind(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/dashboard/dues', $this->payload($this->contractor(), [
+            'due_kind' => 'old',
+            'due_date' => '2024-01-15',
+        ]))->assertStatus(422)->assertJsonValidationErrors('backdate_reason');
+
+        $this->postJson('/api/v1/dashboard/dues', $this->payload($this->contractor('929_g'), [
+            'due_kind' => 'other',
+            'due_date' => '2024-01-15',
+        ]))->assertStatus(422)->assertJsonValidationErrors('due_kind');
     }
 
     public function test_a_past_due_date_is_accepted_with_the_backdate_flag_and_a_reason(): void

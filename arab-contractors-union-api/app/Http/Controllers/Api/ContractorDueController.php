@@ -297,7 +297,7 @@ class ContractorDueController extends Controller
         // حتى يبقى للتاريخ السابق أثر مكتوب يُسأل عنه لاحقاً (TASK-17 #7).
         $allowBackdate  = (bool) ($data['allow_backdate'] ?? false);
         $backdateReason = $data['backdate_reason'] ?? null;
-        unset($data['allow_backdate'], $data['backdate_reason']);
+        unset($data['allow_backdate'], $data['backdate_reason'], $data['due_kind']);
 
         if ($allowBackdate && $backdateReason) {
             $data['notes'] = trim(($data['notes'] ?? '') . "\nذمة متأخّرة سابقة — سبب التاريخ السابق: {$backdateReason}");
