@@ -23,8 +23,7 @@ class ApplyDiscountBulkRequest extends FormRequest
             'ids.*'                   => 'integer|exists:contractor_dues,id',
             'criteria'                => 'required_if:mode,criteria|array',
             'criteria.year'           => 'nullable|integer|between:1990,2100',
-            // "paid" محذوفة عمداً: الذمة المسدَّدة بالكامل لا يمكن خصمها، فحصر الخصم بها
-            // لا يُنتج إلا قائمة متخطّاة — رفضها بالتحقق أصدق من إرجاع صفر بلا تفسير.
+            // بدون حصر بالحالة الذمم المسدَّدة بتنشمل (والفرق بيرجع رصيد)؛ فلتر "paid" لحاله مش مدعوم.
             'criteria.status'         => 'nullable|in:unpaid,partially_paid',
             'criteria.source'         => 'nullable|in:legacy_import,manual,fee_engine',
             'criteria.contractor_ids' => 'nullable|array|max:200',
@@ -40,7 +39,7 @@ class ApplyDiscountBulkRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'criteria.status.in' => 'لا يمكن حصر الخصم الجماعي بالذمم المسدَّدة بالكامل — لا خصم يُطبَّق عليها.',
+            'criteria.status.in' => 'فلتر الحالة يقبل غير مسدَّدة أو مسدَّدة جزئياً فقط.',
         ];
     }
 

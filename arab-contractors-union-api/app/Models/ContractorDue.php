@@ -183,7 +183,7 @@ class ContractorDue extends Model
      *
      * @return array{
      *     original: float, effective_type: string, effective_value: float, new_amount: float,
-     *     discount_amount: float, blocked_reason: ?string
+     *     discount_amount: float, refund_to_credit: float, blocked_reason: ?string
      * }
      */
     public function projectDiscount(string $type, float $value): array
@@ -217,17 +217,19 @@ class ContractorDue extends Model
             'effective_value' => $effectiveValue,
             'new_amount'      => $newAmount,
             'discount_amount' => round($original - $newAmount, 2),
-            'blocked_reason'  => $newAmount < (float) $this->paid_jod
-                ? 'الخصم يُنزل المبلغ تحت ما تم سداده فعلياً على هذه الذمة.'
-                : null,
+            // الذمة المسدَّدة (كلياً أو جزئياً) بتنخصم عادي، واللي انسدّ زيادة عن مبلغها الجديد
+            // بيرجع رصيد للمقاول. قبل هيك كانت تُتخطّى: 3 ذمم × 100 وحدة منها مسدَّدة من رصيد
+            // سابق ← خصم 20% بيطلع أثره 40 بدل 60 والإجمالي 260 بدل 240.
+            'refund_to_credit' => round(max(0, (float) $this->paid_jod - $newAmount), 2),
+            'blocked_reason'  => null,
         ];
     }
 
     /**
      * تطبيق خصم إداري (فردي أو جماعي — المادة 37/ت) على مبلغ الذمة.
-     * يحفظ original_amount_jod عند أول خصم فقط، ويرفض أي خصم يُنزل amount_jod تحت المسدَّد فعلاً.
-     *
-     * @throws \InvalidArgumentException لو تجاوز الخصم المبلغ الأصلي أو المتبقي أقل من المسدَّد
+     * يحفظ original_amount_jod عند أول خصم فقط. لو المسدَّد أكبر من المبلغ بعد الخصم، الفرق
+     * بيرجع رصيد للمقاول (releaseOverpayment) — صرفه على ذممه التانية مسؤولية المستدعي
+     * عبر ContractorCreditService::applyAvailableCredit.
      */
     public function applyDiscount(string $type, float $value, ?string $reason, int $byUserId): void
     {
@@ -256,6 +258,68 @@ class ContractorDue extends Model
             'description'         => "{$baseDescription} {$suffix}",
         ]);
 
+        if ($projection['refund_to_credit'] > 0) {
+            $this->releaseOverpayment($projection['refund_to_credit'], $byUserId);
+        }
+
         $this->applyPayment(0);
+    }
+
+    /**
+     * إرجاع ما انسدّ على الذمة زيادة عن مبلغها (بعد خصم) كرصيد للمقاول.
+     *
+     * الأحدث أولاً من سجل التوزيع: الجزء اللي إجى من دفعة رصيد (dues/penalty/advance) أو من
+     * رصيد دائن بيرجع لمصدره (used ينقص والتوزيع ينقص معه، فيضل ترجيع الدفعة لاحقاً صحيح).
+     * أي باقي ما إله مصدر قابل للإرجاع (تسديد قديم بلا توزيع، أو رسوم عضوية) بينسجّل رصيد دائن.
+     */
+    public function releaseOverpayment(float $excess, ?int $byUserId = null): void
+    {
+        $excess = round($excess, 2);
+
+        $allocations = PaymentAllocation::where('contractor_due_id', $this->id)
+            ->with(['payment', 'credit'])
+            ->orderByDesc('id')->lockForUpdate()->get();
+
+        foreach ($allocations as $allocation) {
+            if ($excess <= 0) {
+                break;
+            }
+
+            $payment = $allocation->payment;
+            $credit  = $allocation->credit;
+
+            $returnable = ($payment && in_array($payment->type, Payment::CREDIT_TYPES, true)) || $credit;
+            if (! $returnable) {
+                continue;
+            }
+
+            $take = round(min($excess, (float) $allocation->amount_jod), 2);
+
+            if ($payment) {
+                $payment->used_amount_jod = round(max(0, (float) $payment->used_amount_jod - $take), 2);
+                $payment->save();
+            } else {
+                $credit->used_jod = round(max(0, (float) $credit->used_jod - $take), 2);
+                $credit->save();
+            }
+
+            $left = round((float) $allocation->amount_jod - $take, 2);
+            $left > 0 ? $allocation->update(['amount_jod' => $left]) : $allocation->delete();
+
+            $excess = round($excess - $take, 2);
+        }
+
+        if ($excess > 0) {
+            ContractorCredit::create([
+                'contractor_id' => $this->contractor_id,
+                'amount_jod'    => $excess,
+                'used_jod'      => 0,
+                'description'   => 'فرق خصم على ذمة ' . ($this->reference_number ?: "#{$this->id}"),
+                'source'        => 'manual',
+                'created_by'    => $byUserId,
+            ]);
+        }
+
+        $this->update(['paid_jod' => min((float) $this->paid_jod, (float) $this->amount_jod)]);
     }
 }

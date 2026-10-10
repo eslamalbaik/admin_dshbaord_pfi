@@ -1569,6 +1569,9 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
                 <strong class="text-info">{{ selectedDiscountPreview.total_discount_impact_jod }}</strong>
               </VCol>
             </VRow>
+            <VAlert v-if="Number(selectedDiscountPreview.refund_to_credit_jod) > 0" type="info" variant="tonal" density="compact" class="mt-3">
+              {{ selectedDiscountPreview.refund_to_credit_jod }} د.أ كانت مسدَّدة زيادة عن المبلغ بعد الخصم، وبترجع رصيد للمقاول وبتنصرف على ذممه المفتوحة.
+            </VAlert>
           </template>
         </VCardText>
         <VCardActions class="justify-end pb-4 px-6">
@@ -1724,6 +1727,9 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
                 <strong class="text-info">{{ criteriaPreview.total_discount_impact_jod }}</strong>
               </VCol>
             </VRow>
+            <VAlert v-if="Number(criteriaPreview.refund_to_credit_jod) > 0" type="info" variant="tonal" density="compact" class="mt-3">
+              {{ criteriaPreview.refund_to_credit_jod }} د.أ كانت مسدَّدة زيادة عن المبلغ بعد الخصم، وبترجع رصيد للمقاولين وبتنصرف على ذممهم المفتوحة.
+            </VAlert>
 
             <!-- الذمم التي سيرفضها التطبيق — كانت تُعدّ ضمن "المطابقة" ويُضاف أثرها الكامل
                  للإجمالي، فيظهر للمستخدم رقم لا يتحقّق أبداً (TASK-17 #10). -->

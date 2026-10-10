@@ -531,7 +531,11 @@ class ContractorDueController extends Controller
         $before = $due->only($discountFields);
 
         try {
-            $due->applyDiscount($data['discount_type'], $data['discount_value'], $data['discount_reason'] ?? null, Auth::id());
+            DB::transaction(function () use ($due, $data) {
+                $due->applyDiscount($data['discount_type'], $data['discount_value'], $data['discount_reason'] ?? null, Auth::id());
+                // لو الخصم رجّع جزء من المسدَّد رصيداً، بينصرف على ذمم المقاول المفتوحة
+                app(\App\Services\ContractorCreditService::class)->applyAvailableCredit($due->contractor, Auth::user());
+            });
         } catch (\InvalidArgumentException $e) {
             return $this->error($e->getMessage(), 422);
         }
