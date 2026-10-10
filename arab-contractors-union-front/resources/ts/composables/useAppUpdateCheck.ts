@@ -5,7 +5,7 @@
 
 const CHECK_EVERY_MS = 3 * 60 * 1000
 const MIN_GAP_MS = 60 * 1000 // لا نفحص أكثر من مرة بالدقيقة حتى مع تبديل التبويبات
-const SNOOZE_MS = 15 * 60 * 1000
+const SNOOZE_MS = 15 * 60 * 1000 // «لاحقاً» أو الضغط خارج النافذة
 
 const updateAvailable = ref(false)
 const snoozedUntil = ref(0)
