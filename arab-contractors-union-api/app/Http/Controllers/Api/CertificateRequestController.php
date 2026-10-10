@@ -83,6 +83,8 @@ class CertificateRequestController extends Controller
             ->first();
 
         $activeMembership = $contractor->activeMembership;
+        $displayedActive  = \App\Support\ContractorRequirements::displayedStatusIsActive($contractor);
+        $rowValid         = (bool) $activeMembership?->expires_at?->isFuture();
         $blockingIssues = $this->eligibilityService->getBlockingIssues($contractor, 'membership');
 
         return $this->success([
@@ -97,8 +99,11 @@ class CertificateRequestController extends Controller
                 'outstanding_jod'   => $this->financialService->outstandingDuesTotal($contractor),
                 'requirement_issues' => $issues,
                 'profile_data_complete' => $contractor->profile_data_complete,
-                'membership_valid_until' => $activeMembership?->expires_at?->toDateString(),
-                'is_expired'        => $activeMembership ? $activeMembership->expires_at?->isPast() : true,
+                // نفس الحالة المعروضة للمقاول: الفعّال بدون سجل عضوية ساري بتنتهي عضويته 31/12 من السنة
+                'membership_valid_until' => $rowValid
+                    ? $activeMembership->expires_at->toDateString()
+                    : ($displayedActive ? now()->endOfYear()->toDateString() : $activeMembership?->expires_at?->toDateString()),
+                'is_expired'        => ! ($rowValid || $displayedActive),
                 'latest_request'    => $latestMembershipCert ? new CertificateRequestResource($latestMembershipCert) : null,
             ],
             'classification' => [

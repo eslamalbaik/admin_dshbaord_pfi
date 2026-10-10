@@ -299,6 +299,10 @@ class TenderController extends Controller
         if ($request->filled('category')) {
             $query->where('category', $request->category);
         }
+        // بديل بالـ id لتطبيق المقاول (التصنيف مربوط بالعطاء عبر الاسم)
+        if ($request->filled('category_id')) {
+            $query->where('category', TenderCategory::whereKey((int) $request->input('category_id'))->value('name') ?? '__none__');
+        }
         if ($request->filled('updated_from')) {
             $query->whereDate('updated_at', '>=', $request->date('updated_from'));
         }

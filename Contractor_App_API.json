@@ -601,7 +601,7 @@
         "tags": ["Dashboard"],
         "summary": "رصيد المقاول (له / عليه / الصافي)",
         "operationId": "contractorBalance",
-        "description": "رصيد المقاول الصافي مع الاتحاد بالدينار الأردني — نفس حسبة شاشة \"أرصدة المقاولين\" بالداشبورد، ويُحسب لحظياً. credit_jod (له) = الأرصدة الدائنة غير المستخدمة + فائض دفعات الذمم غير الموزَّع. debit_jod (عليه) = dues_jod + penalties_jod (المتبقي غير المسدَّد). net_jod = credit_jod − debit_jod (سالب = مطلوب من الشركة). position: credit | owes | settled.",
+        "description": "رصيد المقاول الصافي مع الاتحاد بالدينار الأردني — نفس حسبة شاشة \"أرصدة المقاولين\" بالداشبورد، ويُحسب لحظياً. credit_jod (له) = الأرصدة الدائنة غير المستخدمة + فائض دفعات الذمم غير الموزَّع. debit_jod (عليه) = dues_jod + penalties_jod (المتبقي غير المسدَّد). net_jod = credit_jod − debit_jod مجبوراً لدينار صحيح لصالح الاتحاد (رصيد الشركة للأقل 300.5 ← 300، المطلوب منها للأكثر 349.2- ← 350-؛ سالب = مطلوب من الشركة). الجبر مخزَّن فعلياً: الكسر يُسجَّل كذمة \"جبر كسور الرصيد\" (على الشركة) أو خصم من رصيدها (للشركة)، فيظهر ضمن dues_jod/credit_jod. net_exact_jod = الصافي من القيود المخزَّنة، ويساوي net_jod. position تُحسب من net_jod المجبور: credit | owes | settled.",
         "responses": {
           "200": {
             "description": "رصيد المقاول",
@@ -648,8 +648,13 @@
                           "format": "float"
                         },
                         "net_jod": {
+                          "type": "integer",
+                          "description": "الصافي مجبوراً لدينار صحيح لصالح الاتحاد"
+                        },
+                        "net_exact_jod": {
                           "type": "number",
-                          "format": "float"
+                          "format": "float",
+                          "description": "الصافي من القيود المخزَّنة — يساوي net_jod بعد قيد جبر الكسور"
                         },
                         "position": {
                           "type": "string",
@@ -672,10 +677,11 @@
                     "name": "شركة المثال للمقاولات",
                     "membership_number": "940_g",
                     "credit_jod": 40.0,
-                    "dues_jod": 100.0,
+                    "dues_jod": 101.0,
                     "penalties_jod": 15.0,
-                    "debit_jod": 115.0,
-                    "net_jod": -75.0,
+                    "debit_jod": 116.0,
+                    "net_jod": -76,
+                    "net_exact_jod": -76.0,
                     "position": "owes",
                     "currency": "JOD"
                   }

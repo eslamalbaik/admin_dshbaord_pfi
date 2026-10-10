@@ -66,6 +66,23 @@ class ContractorDue extends Model
         return trim(preg_replace('/\s*\(بعد خصم[^)]*\)/u', '', $description));
     }
 
+    /**
+     * نص الخصم الجاهز للعرض: "خصم 20 د.أ" أو "خصم 10%". الخصم الثابت (أو المختلط اللي
+     * بينحفظ ثابت) ما بينعرض كنسبة، لأن تحويله لنسبة من الأصل بيطلع رقم غلط (20 من 300 = 6%).
+     */
+    public function getDiscountLabelAttribute(): ?string
+    {
+        if ($this->discount_type === null || (float) $this->discount_amount_jod <= 0) {
+            return null;
+        }
+
+        $fmt = fn ($n) => rtrim(rtrim(number_format((float) $n, 2, '.', ''), '0'), '.');
+
+        return $this->discount_type === 'percent'
+            ? 'خصم ' . $fmt($this->discount_value) . '%'
+            : 'خصم ' . $fmt($this->discount_amount_jod) . ' د.أ';
+    }
+
     public function getReceiptDateAttribute(): ?string
     {
         return $this->is_membership_fee ? "{$this->year}-12-31" : null;
@@ -100,6 +117,25 @@ class ContractorDue extends Model
     public function scopeOutstanding($query)
     {
         return $query->where('status', '!=', 'paid');
+    }
+
+    /**
+     * ترتيب تسديد الذمم: الأقدم أولاً (قاعدة eslam 10/10). بالسنة، وذمة بلا سنة بتاخد سنة تاريخ
+     * استحقاقها أو إنشائها (كانت بتروح آخر شي حتى لو قديمة)، بعدين تاريخ الاستحقاق، بعدين الأقدم إدخالاً.
+     * كل مسار بيوزّع دفعة أو رصيد على الذمم لازم يمرّ من هون.
+     *
+     * ذمة "جبر كسور الرصيد" دايماً آخر شي: هي فرق تقريب على الرصيد كله مش فاتورة لها تاريخ،
+     * وبدون هيك تاريخ إنشائها كان يسبق ذمم تاريخ استحقاقها لاحق فتنسدّ قبل الأصل (QA R-06).
+     */
+    public static function sortOldestFirst(\Illuminate\Support\Collection $dues): \Illuminate\Support\Collection
+    {
+        return $dues->sortBy(fn (self $due) => sprintf(
+            '%d|%04d|%s|%012d',
+            $due->notes === \App\Services\BalanceRoundingService::TAG ? 1 : 0,
+            $due->year ?? $due->due_date?->year ?? $due->created_at?->year ?? 9999,
+            ($due->due_date ?? $due->created_at)?->format('Y-m-d') ?? '9999-12-31',
+            $due->id,
+        ))->values();
     }
 
     public function getRemainingJodAttribute(): float
@@ -189,7 +225,7 @@ class ContractorDue extends Model
      *
      * @return array{
      *     original: float, effective_type: string, effective_value: float, new_amount: float,
-     *     discount_amount: float, refund_to_credit: float, blocked_reason: ?string
+     *     discount_amount: float, impact: float, refund_to_credit: float, blocked_reason: ?string
      * }
      */
     public function projectDiscount(string $type, float $value): array
@@ -223,6 +259,9 @@ class ContractorDue extends Model
             'effective_value' => $effectiveValue,
             'new_amount'      => $newAmount,
             'discount_amount' => round($original - $newAmount, 2),
+            // أثر هالخصم لحاله = كم بينقص من صافي الذمة الحالي. discount_amount فوق هو إجمالي
+            // كل الخصومات من الأصل، فكانت المعاينة تعرض 40 لخصم 20 د.أ على ذمة سبق خصمها 10%.
+            'impact'          => round(max(0, $current - $newAmount), 2),
             // الذمة المسدَّدة (كلياً أو جزئياً) بتنخصم عادي، واللي انسدّ زيادة عن مبلغها الجديد
             // بيرجع رصيد للمقاول. قبل هيك كانت تُتخطّى: 3 ذمم × 100 وحدة منها مسدَّدة من رصيد
             // سابق ← خصم 20% بيطلع أثره 40 بدل 60 والإجمالي 260 بدل 240.

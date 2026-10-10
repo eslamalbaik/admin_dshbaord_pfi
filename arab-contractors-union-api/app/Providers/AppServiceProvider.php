@@ -61,6 +61,11 @@ class AppServiceProvider extends ServiceProvider
 
         \App\Models\User::observe(\App\Observers\UserObserver::class);
 
+        // جبر كسور رصيد المقاول لدينار صحيح بعد كل حركة مالية تمسّ الرصيد
+        foreach ([\App\Models\ContractorDue::class, \App\Models\ContractorCredit::class, \App\Models\Payment::class, \App\Models\Penalty::class] as $model) {
+            $model::observe(\App\Observers\BalanceRoundingObserver::class);
+        }
+
         // Register event listeners for app notifications
         \Illuminate\Support\Facades\Event::listen(
             \App\Events\AnnouncementPublished::class,

@@ -128,6 +128,7 @@ Route::prefix('v1')->group(function () {
         // شاشة العطاءات — تصفح موثَّق (فعّال/مؤرشف/مجالاتي) + حفظ بالمفضلة (REQ-09/11/13)
         Route::get('tenders',                   [TenderController::class, 'contractorIndex']);
         Route::get('tenders/bookmarked',         [TenderController::class, 'bookmarked']);
+        Route::get('tenders/categories',         [TenderCategoryController::class, 'contractorIndex']);
         Route::get('tenders/{tender}',           [TenderController::class, 'contractorShow']);
         Route::post('tenders/{tender}/bookmark', [TenderController::class, 'bookmark']);
         Route::delete('tenders/{tender}/bookmark', [TenderController::class, 'unbookmark']);
@@ -448,6 +449,7 @@ Route::prefix('v1')->group(function () {
             Route::get('dashboard/activity-logs',         [\App\Http\Controllers\Api\ActivityLogController::class, 'index'])->middleware('perm:settings.activity_log,view');
             Route::get('dashboard/activity-logs/actions',  [\App\Http\Controllers\Api\ActivityLogController::class, 'actions'])->middleware('perm:settings.activity_log,view');
             Route::get('dashboard/activity-logs/critical-summary', [\App\Http\Controllers\Api\ActivityLogController::class, 'criticalSummary'])->middleware('perm:settings.activity_log,view');
+            Route::get('dashboard/activity-logs/financial-summary', [\App\Http\Controllers\Api\ActivityLogController::class, 'financialSummary'])->middleware('perm:settings.activity_log,view');
         });
 
         // --------------------------------------------------------

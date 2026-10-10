@@ -119,8 +119,7 @@ class PaymentConfirmationService
             return;
         }
 
-        $dues = $payment->contractor->dues()->outstanding()
-            ->orderByRaw('year IS NULL, year asc')->orderBy('id')->lockForUpdate()->get();
+        $dues = \App\Models\ContractorDue::sortOldestFirst($payment->contractor->dues()->outstanding()->lockForUpdate()->get());
 
         // رسوم العضوية ما بتسدّد غرامات (فائضها مش رصيد أصلاً)
         $penalties = $payment->type === 'membership_fee' ? collect() : $payment->contractor->penalties()

@@ -163,8 +163,9 @@ class DuesBulkDiscountTest extends TestCase
 
         $this->postJson('/api/v1/dashboard/dues/discount/bulk', $payload)->assertOk();
 
-        // 30% ثم 30% = 60% إجماليّاً على المبلغ الأصلي، لا 30% مرتين على المخصوم
-        $this->assertSame(60.0, (float) $preview['total_discount_impact_jod']);
+        // 30% ثم 30% = 60% إجماليّاً على المبلغ الأصلي، لا 30% مرتين على المخصوم.
+        // أثر الخصم التاني لحاله = 70 ← 40 = 30 (مش مجموع الخصمين 60، بلاغ 10/10 #1)
+        $this->assertSame(30.0, (float) $preview['total_discount_impact_jod']);
         $this->assertSame('40.00', $due->fresh()->amount_jod);
     }
 

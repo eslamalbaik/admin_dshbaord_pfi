@@ -104,3 +104,11 @@ $alertOnFailure(
     'dues:generate-annual',
     'finance'
 );
+
+// شبكة أمان لجبر كسور أرصدة المقاولين — الجبر لحظي عبر BalanceRoundingObserver، وهذا
+// يلحق التعديلات الجماعية (where()->update()) التي لا تُطلق أحداث الموديل.
+$alertOnFailure(
+    Schedule::command('balances:round')->dailyAt('01:10'),
+    'balances:round',
+    'finance'
+);

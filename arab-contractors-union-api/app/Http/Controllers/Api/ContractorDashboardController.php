@@ -273,6 +273,8 @@ class ContractorDashboardController extends Controller
                         'discount_type'       => $hasDiscount ? $d->discount_type : null,
                         'discount_value'      => $hasDiscount ? $d->discount_value : null,
                         'discount_amount_jod' => $hasDiscount ? $d->discount_amount_jod : null,
+                        // نص جاهز للعرض ("خصم 20 د.أ" / "خصم 10%") — الكرت يعرضه بدل ما يحسب نسبة
+                        'discount_label'      => $d->discount_label,
                         'is_under_review'       => $pending !== null,
                         'pending_payment'       => $pending ? [
                             'id'                 => $pending->id,

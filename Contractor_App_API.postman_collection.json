@@ -1777,7 +1777,7 @@
 								"balance"
 							]
 						},
-						"description": "GET /api/v1/contractor/balance\n\nرصيد المقاول الصافي مع الاتحاد بالدينار الأردني — نفس حسبة شاشة \"أرصدة المقاولين\" بالداشبورد، ويُحسب لحظياً.\n\n- credit_jod (له): الأرصدة الدائنة غير المستخدمة + فائض دفعات الذمم غير الموزَّع على ذمم\n- dues_jod: المتبقي من الذمم غير المسدَّدة\n- penalties_jod: المتبقي من الغرامات غير المسدَّدة/المسدَّدة جزئياً\n- debit_jod (عليه) = dues_jod + penalties_jod\n- net_jod (الصافي) = credit_jod − debit_jod — سالب يعني مطلوب من الشركة\n- position: credit (له رصيد) | owes (عليه) | settled (متوازن)"
+						"description": "GET /api/v1/contractor/balance\n\nرصيد المقاول الصافي مع الاتحاد بالدينار الأردني — نفس حسبة شاشة \"أرصدة المقاولين\" بالداشبورد، ويُحسب لحظياً.\n\n- credit_jod (له): الأرصدة الدائنة غير المستخدمة + فائض دفعات الذمم غير الموزَّع على ذمم\n- dues_jod: المتبقي من الذمم غير المسدَّدة\n- penalties_jod: المتبقي من الغرامات غير المسدَّدة/المسدَّدة جزئياً\n- debit_jod (عليه) = dues_jod + penalties_jod\n- net_jod (الصافي) = credit_jod − debit_jod مجبوراً لدينار صحيح لصالح الاتحاد: رصيد الشركة للأقل (300.5 ← 300) والمطلوب منها للأكثر (349.2- ← 350-) — سالب يعني مطلوب من الشركة\n- الجبر مخزَّن فعلياً: الكسر يُسجَّل كذمة \"جبر كسور الرصيد\" (على الشركة) أو خصم من رصيدها (للشركة)، فيظهر ضمن dues_jod/credit_jod\n- net_exact_jod: الصافي من القيود المخزَّنة، ويساوي net_jod\n- position (من net_jod المجبور): credit (له رصيد) | owes (عليه) | settled (متوازن)"
 					},
 					"response": [
 						{
@@ -1805,7 +1805,7 @@
 									"value": "application/json"
 								}
 							],
-							"body": "{\n  \"status\": true,\n  \"message\": \"تمت العملية بنجاح\",\n  \"status_code\": 200,\n  \"items\": {\n    \"contractor_id\": 940,\n    \"name\": \"شركة المثال للمقاولات\",\n    \"membership_number\": \"940_g\",\n    \"credit_jod\": 40.0,\n    \"dues_jod\": 100.0,\n    \"penalties_jod\": 15.0,\n    \"debit_jod\": 115.0,\n    \"net_jod\": -75.0,\n    \"position\": \"owes\",\n    \"currency\": \"JOD\"\n  }\n}"
+							"body": "{\n  \"status\": true,\n  \"message\": \"تمت العملية بنجاح\",\n  \"status_code\": 200,\n  \"items\": {\n    \"contractor_id\": 940,\n    \"name\": \"شركة المثال للمقاولات\",\n    \"membership_number\": \"940_g\",\n    \"credit_jod\": 40.0,\n    \"dues_jod\": 101.0,\n    \"penalties_jod\": 15.0,\n    \"debit_jod\": 116.0,\n    \"net_jod\": -76,\n    \"net_exact_jod\": -76.0,\n    \"position\": \"owes\",\n    \"currency\": \"JOD\"\n  }\n}"
 						}
 					]
 				}

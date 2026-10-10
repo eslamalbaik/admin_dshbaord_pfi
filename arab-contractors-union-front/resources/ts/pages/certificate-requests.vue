@@ -104,11 +104,11 @@ const refresh = () => {
 // بتنطلب بنافذة عند الموافقة على طلب عضوية وعند الإصدار التلقائي، زي صفحة شهادات
 // العضوية. بتتعبّى من المحفوظ على الطلب (من الموافقة)، وإلا من ملف المقاول.
 const certFieldsOpen = ref(false)
-const certFieldsMode = ref<'approve' | 'issue'>('approve')
+const certFieldsMode = ref<'approve' | 'issue' | 'regenerate'>('approve')
 const certFieldsLoading = ref(false)
 const certFields = ref({ address: '', decision_number: '', decision_date: '' })
 
-async function openCertFields(mode: 'approve' | 'issue') {
+async function openCertFields(mode: 'approve' | 'issue' | 'regenerate') {
   const r = detail.value
 
   certFieldsMode.value = mode
@@ -141,7 +141,7 @@ function certFieldsPayload() {
   const f = certFields.value
   const payload: Record<string, string> = {}
 
-  if (certFieldsMode.value === 'issue' && f.address)
+  if (certFieldsMode.value !== 'approve' && f.address)
     payload.address = f.address
   if (f.decision_number)
     payload.decision_number = f.decision_number
@@ -205,9 +205,25 @@ const issueMutation = useMutation({
   onError: (e: any) => actionError.value = e?.response?.data?.message || 'فشل إصدار الشهادة.',
 })
 
+// شهادة صادرة سابقاً: تعديل رقم/تاريخ القرار (أو العنوان) وتوليدها من جديد بنفس الرقم
+const regenerateMutation = useMutation({
+  mutationFn: async (payload: Record<string, string>) =>
+    (await api.post(`/api/v1/dashboard/certificate-requests/${selected.value.id}/regenerate`, payload)).data,
+  onSuccess: (d: any) => {
+    refresh()
+    selected.value = d?.items ?? selected.value
+    certFieldsOpen.value = false
+    if (d?.items?.id)
+      openPreview(d.items.id)
+  },
+  onError: (e: any) => actionError.value = e?.response?.data?.message || 'تعذّرت إعادة إصدار الشهادة.',
+})
+
 function submitCertFields() {
   if (certFieldsMode.value === 'approve')
     approveMutation.mutate(certFieldsPayload())
+  else if (certFieldsMode.value === 'regenerate')
+    regenerateMutation.mutate(certFieldsPayload())
   else
     issueMutation.mutate(certFieldsPayload())
 }
@@ -418,6 +434,16 @@ function fmtDate(d: string | null) {
           >
             عرض الشهادة وحالة وصولها
           </VBtn>
+          <VBtn
+            v-if="detail.status === 'issued' && detail.type === 'membership' && $can('services.certificate_requests', 'update')"
+            color="primary"
+            variant="text"
+            prepend-icon="tabler-edit"
+            class="mb-4 ms-2"
+            @click="openCertFields('regenerate')"
+          >
+            تعديل رقم وتاريخ القرار وإعادة الإصدار
+          </VBtn>
 
           <VAlert
             v-if="detail.awaiting_payment_confirmation"
@@ -526,12 +552,14 @@ function fmtDate(d: string | null) {
         <VCardItem>
           <VCardTitle class="d-flex align-center gap-2">
             <VIcon :icon="certFieldsMode === 'approve' ? 'tabler-check' : 'tabler-certificate'" :color="certFieldsMode === 'approve' ? 'info' : 'success'" />
-            {{ certFieldsMode === 'approve' ? 'الموافقة على طلب شهادة العضوية' : 'إصدار شهادة العضوية' }}
+            {{ certFieldsMode === 'approve' ? 'الموافقة على طلب شهادة العضوية' : certFieldsMode === 'regenerate' ? 'تعديل بيانات الشهادة وإعادة إصدارها' : 'إصدار شهادة العضوية' }}
           </VCardTitle>
           <VCardSubtitle>
             {{ certFieldsMode === 'approve'
               ? 'رقم وتاريخ قرار لجنة التصنيف — بينحفظوا على الطلب وبينطبعوا بالشهادة عند إصدارها.'
-              : 'بتتولّد الشهادة PDF بهذه البيانات وبيوصل للمقاول إشعار.' }}
+              : certFieldsMode === 'regenerate'
+                ? 'بتتولّد الشهادة من جديد بنفس الرقم بهذه البيانات، وبيتسجّل التعديل بسجل المحددات الهامة.'
+                : 'بتتولّد الشهادة PDF بهذه البيانات وبيوصل للمقاول إشعار.' }}
           </VCardSubtitle>
         </VCardItem>
 
@@ -541,7 +569,7 @@ function fmtDate(d: string | null) {
           </VAlert>
 
           <VTextField
-            v-if="certFieldsMode === 'issue'"
+            v-if="certFieldsMode !== 'approve'"
             v-model="certFields.address"
             label="عنوان الشركة"
             dir="rtl"
@@ -580,11 +608,11 @@ function fmtDate(d: string | null) {
           <VBtn
             :color="certFieldsMode === 'approve' ? 'info' : 'success'"
             :prepend-icon="certFieldsMode === 'approve' ? 'tabler-check' : 'tabler-certificate'"
-            :loading="approveMutation.isPending.value || issueMutation.isPending.value"
+            :loading="approveMutation.isPending.value || issueMutation.isPending.value || regenerateMutation.isPending.value"
             :disabled="certFieldsLoading"
             @click="submitCertFields"
           >
-            {{ certFieldsMode === 'approve' ? 'موافقة' : 'إصدار الشهادة' }}
+            {{ certFieldsMode === 'approve' ? 'موافقة' : certFieldsMode === 'regenerate' ? 'إعادة الإصدار' : 'إصدار الشهادة' }}
           </VBtn>
         </VCardActions>
       </VCard>

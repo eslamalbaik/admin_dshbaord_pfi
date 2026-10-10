@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\Contractor;
+use App\Support\ContractorBalances;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +17,12 @@ use Illuminate\Support\Facades\DB;
  *         والدفعات المقدمة (Payment::CREDIT_TYPES) الذي لم يُوزَّع على ذمم.
  * عليه  = المتبقي من الذمم غير المسدَّدة + المتبقي من الغرامات غير المسدَّدة (بالدينار).
  * الصافي = له − عليه (سالب = الشركة مطلوب منها للاتحاد).
+ * الحسبة نفسها في App\Support\ContractorBalances.
+ *
+ * جبر الصافي لدينار صحيح لصالح الاتحاد: رصيد الشركة يُجبر للأقل (300.5 ← 300)
+ * والمطلوب منها يُجبر للأكثر (349.2- ← 350-) — يعني floor في الحالتين.
+ * الجبر مخزَّن فعلياً (BalanceRoundingService يسجّل قيد "جبر كسور الرصيد")،
+ * فـnet_jod وnet_exact_jod متساويان عادةً؛ أي فرق بينهما يعني قيد جبر لم يُحدَّث بعد.
  *
  * يُحسب لحظياً، فأي ذمة أو غرامة أو رسوم جديدة أو دفعة تنعكس مباشرة.
  */
@@ -24,7 +31,7 @@ class ContractorBalanceController extends Controller
     use ApiResponseTrait;
 
     /** فائض دفعات الذمم/الغرامات والدفعات المقدمة غير الموزَّع يُعتبر رصيداً للشركة */
-    public const CREDIT_PAYMENT_TYPES = \App\Models\Payment::CREDIT_TYPES;
+    public const CREDIT_PAYMENT_TYPES = ContractorBalances::CREDIT_PAYMENT_TYPES;
 
     /**
      * نسبة السداد اللي بتكفي لتنعرض العضوية "فعّالة" وهو لسا عليه باقي بسيط (قرار eslam 2026-10-10):
@@ -209,7 +216,8 @@ class ContractorBalanceController extends Controller
             'dues_jod'          => round((float) $row->dues_jod, 2),
             'penalties_jod'     => round((float) $row->penalties_jod, 2),
             'debit_jod'         => round((float) $row->dues_jod + (float) $row->penalties_jod, 2),
-            'net_jod'           => round((float) $row->net_jod, 2),
+            'net_jod'           => (int) $row->net_jod,
+            'net_exact_jod'     => round((float) $row->net_exact_jod, 2),
         ];
     }
 
@@ -222,45 +230,43 @@ class ContractorBalanceController extends Controller
      */
     public function membershipStatus(object $row): string
     {
-        if ($row->status !== 'active') {
+        // "منتهية" إدارياً كمان بتمشي على قاعدة الـ95% إذا انحسبت عليه رسوم السنة الحالية:
+        // المقاول اللي سدّد 95% من كل اللي عليه (ومنها رسوم هالسنة) عضويته سارية، حتى لو ما
+        // انعملّه تجديد يدوي (حالة 9565_g: 608 من 640). بدون ذمة للسنة الحالية بتضل "منتهية"،
+        // عشان المنتهي القديم اللي ما عليه شي ما ينقلب "فعّالة" لحاله.
+        $eligible = $row->status === 'active'
+            || ($row->status === 'expired' && ! empty($row->has_current_year_due));
+
+        if (! $eligible) {
             return $row->status;
         }
 
-        $owed = -(float) $row->net_jod;
+        $owed = round(-(float) $row->net_jod, 2);
         if ($owed <= 0) {
             return 'active';
         }
 
         $allowed = round((float) ($row->obligations_jod ?? 0) * (1 - self::ACTIVE_PAID_RATIO), 2);
 
-        return $owed <= $allowed ? 'active' : 'expired';
+        // مقارنة بالقروش (أعداد صحيحة) عشان حالة الـ95% بالضبط ما تفشل بفرق كسور عشرية
+        return (int) round($owed * 100) <= (int) round($allowed * 100) ? 'active' : 'expired';
     }
 
+    /**
+     * حالة العضوية المعروضة لمقاول واحد (نفس عمود "حالة العضوية" بصفحة الأرصدة وحالة
+     * الاشتراك بالتطبيق). أي فحص "هل عضويته سارية؟" لازم يمشي عليها، مش على سجل memberships،
+     * عشان ما يطلع المقاول "فعّال" بالتطبيق والداشبورد وممنوع من الشهادة بنفس الوقت.
+     */
+    public function statusFor(int $contractorId): string
+    {
+        $row = $this->balancesQuery()->where('contractors.id', $contractorId)->first();
+
+        return $row ? $this->membershipStatus($row) : 'expired';
+    }
+
+    /** الحسبة نفسها في ContractorBalances — مشتركة مع جبر الكسور (BalanceRoundingService) */
     public function balancesQuery(): Builder
     {
-        $types = "'" . implode("','", self::CREDIT_PAYMENT_TYPES) . "'";
-
-        $credit = "((SELECT COALESCE(SUM(cr.amount_jod - cr.used_jod), 0) FROM contractor_credits cr
-                     WHERE cr.contractor_id = contractors.id AND cr.deleted_at IS NULL)
-                  + (SELECT COALESCE(SUM(p.amount_jod - COALESCE(p.used_amount_jod, 0)), 0) FROM payments p
-                     WHERE p.contractor_id = contractors.id AND p.status = 'paid' AND p.type IN ({$types})))";
-        $dues = "(SELECT COALESCE(SUM(d.amount_jod - d.paid_jod), 0) FROM contractor_dues d
-                  WHERE d.contractor_id = contractors.id AND d.status <> 'paid' AND d.deleted_at IS NULL)";
-        $penalties = "(SELECT COALESCE(SUM(pe.amount - COALESCE(pe.paid_amount, 0)), 0) FROM penalties pe
-                       WHERE pe.contractor_id = contractors.id AND pe.status IN ('unpaid', 'partially_paid'))";
-
-        // مجموع كل الذمم والغرامات (المسدَّد وغير المسدَّد) — نفس عمود "الإجمالي" بصفحة الذمم
-        $obligations = "((SELECT COALESCE(SUM(d.amount_jod), 0) FROM contractor_dues d
-                          WHERE d.contractor_id = contractors.id AND d.deleted_at IS NULL)
-                       + (SELECT COALESCE(SUM(pe.amount), 0) FROM penalties pe
-                          WHERE pe.contractor_id = contractors.id AND pe.status <> 'rejected'))";
-
-        return Contractor::query()->toBase()->select([
-            'contractors.id', 'contractors.name', 'contractors.membership_number', 'contractors.status',
-        ])->selectRaw("ROUND({$credit}, 2) AS credit_jod")
-            ->selectRaw("ROUND({$dues}, 2) AS dues_jod")
-            ->selectRaw("ROUND({$penalties}, 2) AS penalties_jod")
-            ->selectRaw("ROUND({$credit} - {$dues} - {$penalties}, 2) AS net_jod")
-            ->selectRaw("ROUND({$obligations}, 2) AS obligations_jod");
+        return ContractorBalances::query();
     }
 }

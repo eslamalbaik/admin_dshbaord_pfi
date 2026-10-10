@@ -45,6 +45,29 @@ class TenderCategoryController extends Controller
         );
     }
 
+    // GET /api/v1/contractor/tenders/categories — تطبيق المقاول (موثَّق): الفعّالة بالترتيب
+    // مع عدد العطاءات المفتوحة (status=open وغير مؤرشفة) وعدد الفعّالة (غير مؤرشفة) بكل تصنيف.
+    // قيمة الفلتر على GET /contractor/tenders هي ?category={name} أو ?category_id={id}.
+    public function contractorIndex()
+    {
+        $categories = TenderCategory::where('is_active', true)->ordered()
+            ->withCount([
+                'tenders as open_tenders_count'   => fn ($q) => $q->where('status', 'open')->whereNull('archived_at'),
+                'tenders as active_tenders_count' => fn ($q) => $q->whereNull('archived_at'),
+            ])
+            ->get();
+
+        return $this->success($categories->map(fn (TenderCategory $c) => [
+            'id'                   => $c->id,
+            'name'                 => $c->name,
+            'value'                => $c->name,
+            'image_url'            => $c->image_url,
+            'sort_order'           => $c->sort_order,
+            'open_tenders_count'   => (int) $c->open_tenders_count,
+            'active_tenders_count' => (int) $c->active_tenders_count,
+        ])->values());
+    }
+
     // POST /api/v1/tender-categories (multipart)
     public function store(Request $request)
     {
