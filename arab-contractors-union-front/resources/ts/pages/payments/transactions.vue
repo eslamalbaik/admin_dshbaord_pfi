@@ -419,7 +419,6 @@ function fmtDate(d: string | null) {
         <thead>
           <tr>
             <th>#</th>
-            <th>الرقم المرجعي</th>
             <th>المقاول</th>
             <th>المبلغ</th>
             <th>المعادل (د.أ)</th>
@@ -432,7 +431,6 @@ function fmtDate(d: string | null) {
         <tbody>
           <tr v-for="p in (data?.items ?? [])" :key="p.id">
             <td>{{ p.id }}</td>
-            <td dir="ltr">{{ p.transaction_number ?? '—' }}</td>
             <td>
               <div class="d-flex align-center gap-1">
                 <VBtn
@@ -491,6 +489,9 @@ function fmtDate(d: string | null) {
                     </VBtn>
                   </template>
                   <VList density="compact" min-width="200">
+                    <VListItem prepend-icon="tabler-hash" title="الرقم المرجعي">
+                      <VListItemSubtitle dir="ltr" class="text-start">{{ p.transaction_number ?? '—' }}</VListItemSubtitle>
+                    </VListItem>
                     <VListItem
                       prepend-icon="tabler-clock"
                       title="آخر إجراء"
@@ -503,7 +504,7 @@ function fmtDate(d: string | null) {
             </td>
           </tr>
           <tr v-if="!isLoading && !(data?.items ?? []).length">
-            <td colspan="9" class="text-center text-medium-emphasis py-8">
+            <td colspan="8" class="text-center text-medium-emphasis py-8">
               لا توجد معاملات
             </td>
           </tr>
