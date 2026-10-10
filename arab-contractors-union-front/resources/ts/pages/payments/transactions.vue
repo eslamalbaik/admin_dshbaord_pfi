@@ -427,7 +427,6 @@ function fmtDate(d: string | null) {
             <th>الإيصال</th>
             <th>الحالة</th>
             <th>التاريخ</th>
-            <th>آخر إجراء</th>
           </tr>
         </thead>
         <tbody>
@@ -482,25 +481,29 @@ function fmtDate(d: string | null) {
                 </VTooltip>
               </VChip>
             </td>
-            <td>{{ fmtDate(p.submitted_at ?? p.created_at) }}</td>
-            <td class="text-caption text-medium-emphasis text-no-wrap">
+            <td class="text-no-wrap">
               <div class="d-flex align-center justify-space-between gap-1">
-                <span>{{ p.status !== 'pending' ? fmtDateTime(p.confirmed_at) : '—' }}</span>
-                <VMenu v-if="$can('finance.payments', 'update')" location="bottom end">
+                <span>{{ fmtDate(p.submitted_at ?? p.created_at) }}</span>
+                <VMenu location="bottom end">
                   <template #activator="{ props }">
                     <VBtn icon size="small" variant="text" v-bind="props" aria-label="إجراءات">
                       <VIcon icon="tabler-dots-vertical" />
                     </VBtn>
                   </template>
-                  <VList density="compact" min-width="160">
-                    <VListItem prepend-icon="tabler-transfer" title="تغيير الحالة" @click="openStatusChange(p)" />
+                  <VList density="compact" min-width="200">
+                    <VListItem
+                      prepend-icon="tabler-clock"
+                      title="آخر إجراء"
+                      :subtitle="p.status !== 'pending' ? fmtDateTime(p.confirmed_at) : 'لا يوجد بعد'"
+                    />
+                    <VListItem v-if="$can('finance.payments', 'update')" prepend-icon="tabler-transfer" title="تغيير الحالة" @click="openStatusChange(p)" />
                   </VList>
                 </VMenu>
               </div>
             </td>
           </tr>
           <tr v-if="!isLoading && !(data?.items ?? []).length">
-            <td colspan="10" class="text-center text-medium-emphasis py-8">
+            <td colspan="9" class="text-center text-medium-emphasis py-8">
               لا توجد معاملات
             </td>
           </tr>
