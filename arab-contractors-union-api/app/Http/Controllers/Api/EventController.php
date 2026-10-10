@@ -95,6 +95,8 @@ class EventController extends Controller
     {
         // رابط البث "يُفعَّل يوم الفعالية" — يُخفى قبلها ولو كان مُعبّأً بالإدارة
         $streamAvailable = $e->event_date && now()->isSameDay($e->event_date);
+        // الحقل اللي ما بيخص نوع الحضور الحالي (مكان لفعالية أونلاين، رابط بث لفعالية وجاهية) بيضل
+        // محفوظ بالعمود عشان يرجع لو رجعت الفعالية hybrid — بس ما بيطلع للتطبيق ولا للموقع
 
         return [
             'id'                => $e->id,
@@ -111,7 +113,7 @@ class EventController extends Controller
             // نوع الحضور: onsite (وجاهي) | online (أونلاين) | hybrid (وجاهي + أونلاين)
             'event_format'      => $e->event_format,
             'is_international'  => (bool) $e->is_international,
-            'stream_url'        => $streamAvailable ? $e->stream_url : null,
+            'stream_url'        => $streamAvailable && $e->event_format !== 'onsite' ? $e->stream_url : null,
             'stream_available'  => $streamAvailable,
             'speakers'          => $this->normalizeSpeakers($e->speakers ?? []),
             'attendees_count'   => $e->registrations_count ?? 0,
@@ -147,8 +149,8 @@ class EventController extends Controller
     //  الموقع العام (Public) — بدون توثيق
     // ═════════════════════════════════════════════════════════════════════════
 
-    // فعالية أونلاين ما إلها مكان بالقوائم العامة كمان — نفس قاعدة formatEvent/show، لأن صفوف قديمة
-    // انحفظت قبل clearFieldsHiddenByFormat وضل فيها المكان (مثلاً "gaza" لفعالية event-event على staging)
+    // فعالية أونلاين ما إلها مكان بالقوائم العامة كمان — نفس قاعدة formatEvent/show، لأن المكان بيضل
+    // محفوظ بالعمود بعد تحويل الفعالية لأونلاين (عشان يرجع لو رجعت hybrid)
     private const PUBLIC_LOCATION_COLUMN = "CASE WHEN event_format = 'online' THEN NULL ELSE event_location END AS event_location";
 
     // GET /api/v1/events
@@ -189,7 +191,7 @@ class EventController extends Controller
         // رابط البث يُخفى قبل يوم الفعالية حتى بالصفحة العامة — نفس قاعدة formatEvent
         $streamAvailable = $event->event_date && now()->isSameDay($event->event_date);
         $data = $event->toArray();
-        $data['stream_url'] = $streamAvailable ? $event->stream_url : null;
+        $data['stream_url'] = $streamAvailable && $event->event_format !== 'onsite' ? $event->stream_url : null;
         if ($event->event_format === 'online')
             $data['event_location'] = null;
         $data['stream_available'] = $streamAvailable;
@@ -220,18 +222,6 @@ class EventController extends Controller
         }
 
         return $this->paginated($query->paginate(15));
-    }
-
-    // الحقل اللي بينخفى بالفورم حسب نوع الحضور بيضل محتفظ بقيمته القديمة (مثلاً مكان "gaza" بعد
-    // تحويل الفعالية لأونلاين) — نصفّره هون بدل ما نعتمد على الفرونت يبعته فاضي
-    private function clearFieldsHiddenByFormat(array &$validated, ?Event $event = null): void
-    {
-        $format = array_key_exists('event_format', $validated) ? $validated['event_format'] : $event?->event_format;
-
-        if ($format === 'online')
-            $validated['event_location'] = null;
-        elseif ($format === 'onsite')
-            $validated['stream_url'] = null;
     }
 
     // أقرب تاريخ مسموح لموعد الفعالية ولتاريخ النشر المجدول: اليوم +1 بالتوقيت المحلي (Y-m-d)
@@ -266,8 +256,9 @@ class EventController extends Controller
     {
         return [
             'image'          => 'nullable|image|mimes:jpg,jpeg,png,webp|max:10240',
-            'video_url'      => 'nullable|url|max:500',
-            'external_url'   => 'nullable|url|max:500',
+            // الروابط بلا حد عملي للطول (روابط Zoom مع pwd بتطوّل) — الأعمدة text، والحد بس سقف العمود
+            'video_url'      => 'nullable|url|max:65535',
+            'external_url'   => 'nullable|url|max:65535',
             'is_published'   => 'boolean',
             // تاريخ النشر المجدول وموعد الفعالية: من اليوم +1 (النشر المباشر ما بيبعت تاريخ أصلاً)
             'published_at'   => ['nullable', 'date', $this->fromTomorrowRule($event, 'published_at', 'تاريخ النشر المجدول')],
@@ -277,7 +268,7 @@ class EventController extends Controller
             'event_location' => 'required_if:event_format,onsite,hybrid|nullable|string|max:255',
             'event_format'      => 'nullable|in:onsite,online,hybrid',
             'event_type'        => ['nullable', Rule::in(Event::EVENT_TYPES)],
-            'stream_url'        => 'nullable|url|max:500',
+            'stream_url'        => 'nullable|url|max:65535',
             'speakers'                  => 'nullable|array',
             'speakers.*.name'           => 'required_with:speakers|string|max:255',
             'speakers.*.title'          => 'nullable|string|max:255',
@@ -362,7 +353,6 @@ class EventController extends Controller
         unset($validated['gallery']);
 
         $this->mergeSpeakerPhotosAndEnforceSingleKeynote($request, $validated);
-        $this->clearFieldsHiddenByFormat($validated);
 
         $validated['slug']       = Event::generateSlug($validated['title']);
         $validated['created_by'] = $request->user()->id;
@@ -405,7 +395,6 @@ class EventController extends Controller
         unset($validated['gallery']);
 
         $this->mergeSpeakerPhotosAndEnforceSingleKeynote($request, $validated);
-        $this->clearFieldsHiddenByFormat($validated, $event);
 
         if (isset($validated['title']))
             $validated['slug'] = Event::generateSlug($validated['title'], $event->id);

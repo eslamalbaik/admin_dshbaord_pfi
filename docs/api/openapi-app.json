@@ -4877,7 +4877,7 @@
           "Events"
         ],
         "summary": "Event details by slug (public)",
-        "description": "Full event model plus `stream_available`, normalized `speakers`, and `author`.\n`stream_url` is null except on the event day; `event_location` is null for online events.\n",
+        "description": "Full event model plus `stream_available`, normalized `speakers`, and `author`.\n`stream_url` is null except on the event day and always null for onsite events; `event_location` is null for online events.\n",
         "operationId": "getEventBySlug",
         "security": [],
         "parameters": [
@@ -9493,7 +9493,7 @@
             "type": "string",
             "format": "uri",
             "nullable": true,
-            "description": "Only on the event day."
+            "description": "Only on the event day; always null for onsite events."
           },
           "stream_available": {
             "type": "boolean"

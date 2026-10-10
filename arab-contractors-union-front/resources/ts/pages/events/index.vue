@@ -290,6 +290,11 @@ const statusOf = (item: any) => {
 const eventTypeLabel = (t: string) => eventTypeOptions.find(o => o.value === t)?.title ?? t
 const eventFormatLabel = (f: string) => eventFormatOptions.find(o => o.value === f)?.title ?? f
 
+// المكان ورابط البث بيضلّوا محفوظين لو تغيّر نوع الحضور (عشان يرجعوا لو رجعت hybrid) —
+// بالعرض بنبيّن بس اللي بيخص النوع الحالي، مثل التطبيق والموقع
+const shownLocation = (item: any) => item.event_format === 'online' ? null : item.event_location
+const shownStreamUrl = (item: any) => item.event_format === 'onsite' ? null : item.stream_url
+
 const saveEvent = async () => {
   if (!form.value.title || !form.value.body) {
     notify('العنوان والمحتوى مطلوبان', 'error')
@@ -345,8 +350,9 @@ const saveEvent = async () => {
     else if (mode === 'now' && isEditing.value && originalPublishMode.value !== 'now')
       fd.append('publish_now', '1')
     if (form.value.event_date) fd.append('event_date', form.value.event_date)
-    if (form.value.event_location) fd.append('event_location', form.value.event_location)
-    if (form.value.event_format) fd.append('event_format', form.value.event_format)
+    // بالتعديل بينبعتوا حتى لو فاضيين: مسح نوع الحضور (زر ×) أو المكان لازم ينحفظ كمان
+    if (form.value.event_location || isEditing.value) fd.append('event_location', form.value.event_location ?? '')
+    if (form.value.event_format || isEditing.value) fd.append('event_format', form.value.event_format ?? '')
     fd.append('event_type', form.value.event_type)
     // الروابط اختيارية: الفارغ بالتعديل بينبعت فاضي عشان يمسح الرابط القديم بدل ما يضل محفوظ
     for (const f of ['video_url', 'external_url', 'stream_url'] as const) {
@@ -534,7 +540,7 @@ const deleteEvent = async () => {
         </template>
 
         <template #item.event_location="{ item }">
-          {{ item.event_location || '—' }}
+          {{ shownLocation(item) || '—' }}
         </template>
 
         <template #item.registrations_count="{ item }">
@@ -853,7 +859,7 @@ const deleteEvent = async () => {
             </VCol>
             <VCol cols="6" md="4">
               <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">المكان</span>
-              <span style="font-family:Cairo,sans-serif">{{ viewingItem.event_location || '—' }}</span>
+              <span style="font-family:Cairo,sans-serif">{{ shownLocation(viewingItem) || '—' }}</span>
             </VCol>
             <VCol cols="6" md="4">
               <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">نوع الحضور</span>
@@ -863,9 +869,9 @@ const deleteEvent = async () => {
               <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">نوع الفعالية</span>
               <span style="font-family:Cairo,sans-serif">{{ viewingItem.event_type ? eventTypeLabel(viewingItem.event_type) : '—' }}</span>
             </VCol>
-            <VCol v-if="viewingItem.stream_url" cols="6" md="4">
+            <VCol v-if="shownStreamUrl(viewingItem)" cols="12">
               <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">رابط البث</span>
-              <a :href="viewingItem.stream_url" target="_blank" dir="ltr">{{ viewingItem.stream_url }}</a>
+              <a :href="shownStreamUrl(viewingItem)" target="_blank" dir="ltr" class="text-break">{{ shownStreamUrl(viewingItem) }}</a>
             </VCol>
           </VRow>
 
