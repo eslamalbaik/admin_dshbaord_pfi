@@ -89,8 +89,7 @@ class ContractorCreditService
 
     private function openTargets(Contractor $contractor): Collection
     {
-        $dues = $contractor->dues()->outstanding()
-            ->orderByRaw('year IS NULL, year asc')->orderBy('id')->lockForUpdate()->get();
+        $dues = ContractorDue::sortOldestFirst($contractor->dues()->outstanding()->lockForUpdate()->get());
 
         $penalties = $contractor->penalties()->whereIn('status', ['unpaid', 'partially_paid'])
             ->orderBy('created_at')->orderBy('id')->lockForUpdate()->get();

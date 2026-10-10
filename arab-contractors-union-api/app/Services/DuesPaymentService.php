@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Contractor;
+use App\Models\ContractorDue;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
 use Illuminate\Support\Facades\DB;
@@ -66,11 +67,7 @@ class DuesPaymentService
             $remaining = $amountJod;
             $settled   = [];
 
-            $dues = $contractor->dues()
-                ->outstanding()
-                ->orderByRaw('year IS NULL, year asc')
-                ->orderBy('id')
-                ->get();
+            $dues = ContractorDue::sortOldestFirst($contractor->dues()->outstanding()->lockForUpdate()->get());
 
             foreach ($dues as $due) {
                 if ($remaining <= 0) {

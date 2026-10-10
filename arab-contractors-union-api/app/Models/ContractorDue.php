@@ -119,6 +119,21 @@ class ContractorDue extends Model
         return $query->where('status', '!=', 'paid');
     }
 
+    /**
+     * ترتيب تسديد الذمم: الأقدم أولاً (قاعدة eslam 10/10). بالسنة، وذمة بلا سنة بتاخد سنة تاريخ
+     * استحقاقها أو إنشائها (كانت بتروح آخر شي حتى لو قديمة)، بعدين تاريخ الاستحقاق، بعدين الأقدم إدخالاً.
+     * كل مسار بيوزّع دفعة أو رصيد على الذمم لازم يمرّ من هون.
+     */
+    public static function sortOldestFirst(\Illuminate\Support\Collection $dues): \Illuminate\Support\Collection
+    {
+        return $dues->sortBy(fn (self $due) => sprintf(
+            '%04d|%s|%012d',
+            $due->year ?? $due->due_date?->year ?? $due->created_at?->year ?? 9999,
+            ($due->due_date ?? $due->created_at)?->format('Y-m-d') ?? '9999-12-31',
+            $due->id,
+        ))->values();
+    }
+
     public function getRemainingJodAttribute(): float
     {
         return round(max(0, (float) $this->amount_jod - (float) $this->paid_jod), 2);
