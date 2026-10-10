@@ -12,6 +12,25 @@ import MetaLayouts from 'vite-plugin-vue-meta-layouts'
 import vuetify from 'vite-plugin-vuetify'
 import svgLoader from 'vite-svg-loader'
 import { visualizer } from 'rollup-plugin-visualizer'
+import type { Plugin } from 'vite'
+
+// معرّف فريد لكل بناء: يُخبَز في الكود (__APP_BUILD_ID__) ويُكتب في dist/version.json.
+// الواجهة المفتوحة تقارن الاثنين لتعرف أن إصداراً جديداً نُشر (useAppUpdateCheck).
+const BUILD_ID = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+
+function buildVersionFile(): Plugin {
+  return {
+    name: 'pcu-build-version',
+    apply: 'build',
+    generateBundle() {
+      this.emitFile({
+        type: 'asset',
+        fileName: 'version.json',
+        source: JSON.stringify({ build: BUILD_ID, builtAt: new Date().toISOString() }),
+      })
+    },
+  }
+}
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -80,6 +99,7 @@ export default defineConfig({
       ],
     }),
     svgLoader(),
+    buildVersionFile(),
     visualizer({
       filename: 'stats.html',
       open: false,
@@ -87,7 +107,10 @@ export default defineConfig({
       brotliSize: true,
     }),
   ],
-  define: { 'process.env': {} },
+  define: {
+    'process.env': {},
+    '__APP_BUILD_ID__': JSON.stringify(BUILD_ID),
+  },
   resolve: {
     alias: {
       '@core-scss': fileURLToPath(new URL('./resources/styles/@core', import.meta.url)),
