@@ -114,7 +114,7 @@ class DuesBulkDiscountTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrors('criteria.status');
     }
 
-    public function test_criteria_mode_excludes_fully_paid_dues_from_the_matched_set(): void
+    public function test_criteria_mode_includes_fully_paid_dues_and_refunds_the_difference(): void
     {
         $this->actingAsAdmin();
 
@@ -128,7 +128,11 @@ class DuesBulkDiscountTest extends TestCase
             'discount_type'  => 'percent',
             'discount_value' => 10,
             'dry_run'        => true,
-        ])->assertOk()->assertJsonPath('items.matched_count', 1);
+        ])->assertOk()
+            ->assertJsonPath('items.matched_count', 2)
+            ->assertJsonPath('items.applicable_count', 2)
+            ->assertJsonPath('items.total_discount_impact_jod', 20)
+            ->assertJsonPath('items.refund_to_credit_jod', 10);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -165,53 +169,39 @@ class DuesBulkDiscountTest extends TestCase
     }
 
     /**
-     * الذمة التي سيُنزلها الخصم تحت المسدَّد فعلاً تُرفض عند التطبيق. كانت المعاينة تعدّها
-     * "مطابقة" وتضيف أثرها الكامل للإجمالي، فيظهر للمستخدم رقم لا يتحقّق أبداً.
+     * الذمة اللي انسدّ عليها أكتر من مبلغها بعد الخصم ما عادت تُتخطّى: بتنخصم والفرق بيرجع
+     * رصيد للمقاول وبينصرف على ذممه المفتوحة. المعاينة بتعرض نفس الأثر اللي بيتطبّق.
      */
-    public function test_preview_reports_unapplicable_dues_as_skipped_not_matched(): void
+    public function test_preview_and_apply_agree_on_a_partially_paid_due(): void
     {
         $this->actingAsAdmin();
 
         $contractor = $this->contractor('928_g');
         $clean   = $this->due($contractor, 100);
-        $blocked = $this->due($contractor, 100, ['paid_jod' => 90, 'status' => 'partially_paid']);
-
-        $preview = $this->postJson('/api/v1/dashboard/dues/discount/bulk', [
-            'mode'           => 'ids',
-            'ids'            => [$clean->id, $blocked->id],
-            'discount_type'  => 'percent',
-            'discount_value' => 50,
-            'dry_run'        => true,
-        ])->assertOk()->json('items');
-
-        $this->assertSame(2, $preview['matched_count']);
-        $this->assertSame(1, $preview['applicable_count']);
-        $this->assertSame(50.0, (float) $preview['total_discount_impact_jod']);
-        $this->assertSame($blocked->id, $preview['skipped'][0]['due_id']);
-    }
-
-    public function test_apply_reports_the_same_counts_the_preview_did(): void
-    {
-        $this->actingAsAdmin();
-
-        $contractor = $this->contractor('928_g');
-        $clean   = $this->due($contractor, 100);
-        $blocked = $this->due($contractor, 100, ['paid_jod' => 90, 'status' => 'partially_paid']);
+        $overpaid = $this->due($contractor, 100, ['paid_jod' => 90, 'status' => 'partially_paid']);
 
         $payload = [
             'mode'           => 'ids',
-            'ids'            => [$clean->id, $blocked->id],
+            'ids'            => [$clean->id, $overpaid->id],
             'discount_type'  => 'percent',
             'discount_value' => 50,
         ];
 
-        $preview = $this->postJson('/api/v1/dashboard/dues/discount/bulk', $payload + ['dry_run' => true])->json('items');
-        $applied = $this->postJson('/api/v1/dashboard/dues/discount/bulk', $payload)->assertOk()->json('items');
+        $preview = $this->postJson('/api/v1/dashboard/dues/discount/bulk', $payload + ['dry_run' => true])->assertOk()->json('items');
+        $this->assertSame(2, $preview['applicable_count']);
+        $this->assertSame(100.0, (float) $preview['total_discount_impact_jod']);
+        $this->assertSame(40.0, (float) $preview['refund_to_credit_jod']);
+        $this->assertSame([], $preview['skipped']);
 
-        $this->assertSame($preview['matched_count'], $applied['matched_count']);
-        $this->assertSame($preview['applicable_count'], $applied['applied_count']);
-        $this->assertSame('100.00', $blocked->fresh()->amount_jod, 'الذمة المرفوضة تبقى بمبلغها الأصلي');
-        $this->assertNull($blocked->fresh()->discount_type, 'ولا يُسجَّل عليها أي خصم');
+        $applied = $this->postJson('/api/v1/dashboard/dues/discount/bulk', $payload)->assertOk()->json('items');
+        $this->assertSame(2, $applied['applied_count']);
+
+        // 50 مسدَّدة كلياً، والـ40 الزايدة انصرفت على الذمة التانية (50 ← متبقي 10)
+        $this->assertSame('50.00', $overpaid->fresh()->amount_jod);
+        $this->assertSame('50.00', $overpaid->fresh()->paid_jod);
+        $this->assertSame('paid', $overpaid->fresh()->status);
+        $this->assertSame('50.00', $clean->fresh()->amount_jod);
+        $this->assertSame('40.00', $clean->fresh()->paid_jod);
     }
 
     public function test_negative_or_over_100_percent_discount_is_rejected(): void

@@ -2,7 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\Contractor;
 use App\Models\ContractorDue;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 class DuesDiscountService
 {
@@ -40,12 +43,10 @@ class DuesDiscountService
             // بدون هذا الشرط كان «خصم جماعي بمعايير» يطابق ذمم كل المقاولين بنفس السنة،
             // لا ذمم المقاولين المقصودين — وهو سبب ظهور ذمّتين كستّ.
             if (! empty($criteria['contractor_ids'])) $query->whereIn('contractor_id', $criteria['contractor_ids']);
-
-            // الذمة المسدَّدة بالكامل لا يمكن خصمها إطلاقاً (الخصم سيُنزل المبلغ تحت المسدَّد)،
-            // فعدّها «مطابقة» تضليل محض. في مود ids تبقى ظاهرة ضمن skipped لأن المستخدم
-            // اختارها صراحةً ويستحق أن يعرف لماذا استُثنيت.
-            $query->where('status', '!=', 'paid');
         }
+
+        // الذمم المسدَّدة من ضمن المطابقة: الخصم بينطبق عليها والفرق بيرجع رصيد للمقاول.
+        // استثناؤها كان يخلّي خصم 20% على 3 ذمم × 100 (وحدة منها مسدَّدة) يطلع 40 بدل 60.
 
         $dues = $query->get();
 
@@ -70,32 +71,45 @@ class DuesDiscountService
                 'applicable_count' => $usable->count(),
                 'contractors_count' => $dues->pluck('contractor_id')->unique()->count(),
                 'total_discount_impact_jod' => round($usable->sum(fn ($p) => $p['projection']['discount_amount']), 2),
+                'refund_to_credit_jod' => round($usable->sum(fn ($p) => $p['projection']['refund_to_credit']), 2),
                 'skipped'          => $skipped,
                 'is_dry_run'       => true,
             ];
         }
 
         $applied = 0;
+        $refunded = 0.0;
 
-        foreach ($usable as $p) {
-            try {
-                $p['due']->applyDiscount(
-                    $discountData['discount_type'],
-                    (float) $discountData['discount_value'],
-                    $discountData['discount_reason'] ?? null,
-                    $authId
-                );
-                $applied++;
-            } catch (\InvalidArgumentException $e) {
-                $skipped[] = ['due_id' => $p['due']->id, 'reason' => $e->getMessage()];
+        DB::transaction(function () use ($usable, $discountData, $authId, &$applied, &$refunded, &$skipped) {
+            foreach ($usable as $p) {
+                try {
+                    $p['due']->applyDiscount(
+                        $discountData['discount_type'],
+                        (float) $discountData['discount_value'],
+                        $discountData['discount_reason'] ?? null,
+                        $authId
+                    );
+                    $applied++;
+                    $refunded += $p['projection']['refund_to_credit'];
+                } catch (\InvalidArgumentException $e) {
+                    $skipped[] = ['due_id' => $p['due']->id, 'reason' => $e->getMessage()];
+                }
             }
-        }
+
+            // الرصيد اللي رجع من ذمة مسدَّدة بينصرف على ذمم المقاول المفتوحة (بعد الخصم)
+            if ($refunded > 0) {
+                $by = User::find($authId);
+                Contractor::whereIn('id', $usable->pluck('due.contractor_id')->unique())->get()
+                    ->each(fn ($contractor) => app(ContractorCreditService::class)->applyAvailableCredit($contractor, $by));
+            }
+        });
 
         return [
             'matched_count'     => $dues->count(),
             'applicable_count'  => $usable->count(),
             'contractors_count' => $dues->pluck('contractor_id')->unique()->count(),
             'applied_count'     => $applied,
+            'refund_to_credit_jod' => round($refunded, 2),
             'skipped'           => $skipped,
             'is_dry_run'        => false,
         ];
