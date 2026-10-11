@@ -245,7 +245,7 @@ async function exportCsv() {
           <tbody>
             <tr v-for="r in (data?.items ?? []) as BalanceRow[]" :key="r.contractor_id">
               <td>{{ r.name }}</td>
-              <td>{{ r.membership_number }}</td>
+              <td dir="ltr" class="text-start">{{ r.membership_number }}</td>
               <td>
                 <VChip size="small" :color="statusLabels[r.status]?.color ?? 'default'" label>
                   {{ statusLabels[r.status]?.text ?? r.status }}

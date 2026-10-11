@@ -340,7 +340,7 @@ function fmtDate(d: string | null) {
             <tr v-for="r in requests" :key="r.id" style="cursor: pointer" @click="openRequest(r)">
               <td>{{ r.id }}</td>
               <td class="font-weight-medium">{{ r.contractor ?? '—' }}</td>
-              <td>{{ r.membership_number ?? '—' }}</td>
+              <td dir="ltr" class="text-start">{{ r.membership_number ?? '—' }}</td>
               <td>{{ r.type_label ?? r.type }}</td>
               <td>
                 <VChip size="x-small" :color="statusColor[r.status] ?? 'secondary'">
@@ -391,7 +391,7 @@ function fmtDate(d: string | null) {
 
           <div class="d-flex flex-wrap gap-4 mb-4 text-body-2">
             <div><strong>المقاول:</strong> {{ detail.contractor ?? '—' }}</div>
-            <div><strong>رقم العضوية:</strong> {{ detail.membership_number ?? '—' }}</div>
+            <div><strong>رقم العضوية:</strong> <bdi dir="ltr">{{ detail.membership_number ?? '—' }}</bdi></div>
             <div><strong>تاريخ الطلب:</strong> {{ fmtDate(detail.request_date) }}</div>
             <div v-if="detail.issue_date"><strong>تاريخ الإصدار:</strong> {{ fmtDate(detail.issue_date) }}</div>
             <div v-if="detail.decision_number"><strong>رقم قرار التصنيف:</strong> {{ detail.decision_number }}</div>
@@ -550,11 +550,11 @@ function fmtDate(d: string | null) {
     <VDialog v-model="certFieldsOpen" max-width="520">
       <VCard>
         <VCardItem>
-          <VCardTitle class="d-flex align-center gap-2">
+          <VCardTitle class="d-flex align-center gap-2 text-wrap">
             <VIcon :icon="certFieldsMode === 'approve' ? 'tabler-check' : 'tabler-certificate'" :color="certFieldsMode === 'approve' ? 'info' : 'success'" />
             {{ certFieldsMode === 'approve' ? 'الموافقة على طلب شهادة العضوية' : certFieldsMode === 'regenerate' ? 'تعديل بيانات الشهادة وإعادة إصدارها' : 'إصدار شهادة العضوية' }}
           </VCardTitle>
-          <VCardSubtitle>
+          <VCardSubtitle class="text-wrap">
             {{ certFieldsMode === 'approve'
               ? 'رقم وتاريخ قرار لجنة التصنيف — بينحفظوا على الطلب وبينطبعوا بالشهادة عند إصدارها.'
               : certFieldsMode === 'regenerate'
@@ -565,7 +565,7 @@ function fmtDate(d: string | null) {
 
         <VCardText>
           <VAlert type="info" variant="tonal" density="compact" class="mb-4">
-            <strong>المقاول:</strong> {{ detail?.contractor ?? '—' }} — {{ detail?.membership_number ?? '—' }}
+            <strong>المقاول:</strong> {{ detail?.contractor ?? '—' }} — <bdi dir="ltr">{{ detail?.membership_number ?? '—' }}</bdi>
           </VAlert>
 
           <VTextField
