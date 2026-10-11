@@ -165,7 +165,7 @@ class ContractorDashboardController extends Controller
         foreach ($dues as $due) {
             $statement->push([
                 'date'        => ($due->due_date ?? $due->created_at)?->toDateString(),
-                'description' => $due->description . ($due->year ? " ({$due->year})" : ''),
+                'description' => $due->title . ($due->year ? " ({$due->year})" : ''),
                 'type'        => 'due',
                 'direction'   => $due->status === 'paid' ? 'credit' : 'debit',
                 'amount'      => (string) $due->remaining_jod,
@@ -259,7 +259,7 @@ class ContractorDashboardController extends Controller
                         'year'             => $d->year,
                         'period'           => $d->period,
                         'reference_number' => $d->reference_number,
-                        'description'      => $d->description,
+                        'description'      => $d->title,
                         'amount_jod'    => $d->amount_jod,
                         'paid_jod'      => $d->paid_jod,
                         'remaining_jod' => $d->remaining_jod,

@@ -7,6 +7,7 @@ use App\Models\ContractorCredit;
 use App\Models\ContractorDue;
 use App\Models\User;
 use App\Services\BalanceRoundingService;
+use App\Services\ContractorCreditService;
 use App\Services\DuesPaymentService;
 use App\Support\ContractorBalances;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -136,6 +137,49 @@ class BalanceRoundingTest extends TestCase
         $this->pay($c, 995.60); // فائض 3.60 بعد 992
 
         $this->assertEquals(3, ContractorBalances::exactNet($c->id));
+    }
+
+    /** فرق عملة (سداد بالشيكل زاد 0.18) انشطب بالجبر: الذمة الجديدة بتضل 200 كاملة، بلا ذمة جبر 0.18 */
+    public function test_absorbed_surplus_is_not_revived_by_a_new_due(): void
+    {
+        $c = $this->contractor();
+        $this->due($c, 10);
+        $this->pay($c, 10.18);
+        $this->assertEquals([-0.18], $this->roundingCredits($c)->pluck('amount_jod')->map(fn ($v) => (float) $v)->all());
+
+        $new = $this->due($c, 200);
+        app(ContractorCreditService::class)->applyAvailableCredit($c->fresh());
+
+        $this->assertEquals(0, (float) $new->fresh()->paid_jod);
+        $this->assertCount(0, $this->roundingDues($c));
+        $this->assertEquals([-0.18], $this->roundingCredits($c)->pluck('amount_jod')->map(fn ($v) => (float) $v)->all());
+        $this->assertEquals(-200, ContractorBalances::exactNet($c->id));
+    }
+
+    public function test_absorbed_surplus_still_rounds_a_fractional_new_due_to_a_whole_dinar(): void
+    {
+        $c = $this->contractor();
+        $this->due($c, 10);
+        $this->pay($c, 10.18);
+
+        $this->due($c, 3.90);
+        app(ContractorCreditService::class)->applyAvailableCredit($c->fresh());
+
+        $this->assertEquals(-4, ContractorBalances::exactNet($c->id));
+    }
+
+    public function test_app_due_title_drops_the_discount_suffix(): void
+    {
+        $c = $this->contractor();
+        ContractorDue::create([
+            'contractor_id' => $c->id, 'description' => 'رسوم عضوية (بعد خصم 40 د.أ)', 'year' => 2026,
+            'amount_jod' => 160, 'paid_jod' => 0, 'status' => 'unpaid',
+        ]);
+        Sanctum::actingAs($c, ['*']);
+
+        $this->getJson('/api/v1/contractor/financial')
+            ->assertOk()
+            ->assertJsonPath('items.dues.0.description', 'رسوم عضوية');
     }
 
     public function test_deleting_the_debt_removes_the_rounding_entry(): void

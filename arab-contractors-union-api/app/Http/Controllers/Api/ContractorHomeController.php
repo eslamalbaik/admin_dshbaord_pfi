@@ -153,7 +153,7 @@ class ContractorHomeController extends Controller
             'has_overdue'     => $hasOverdue,
             'last_invoice'    => $lastDue ? [
                 'id'          => $lastDue->id,
-                'description' => $lastDue->description . ($lastDue->year ? " ({$lastDue->year})" : ''),
+                'description' => $lastDue->title . ($lastDue->year ? " ({$lastDue->year})" : ''),
                 'amount_jod'  => $lastDue->amount_jod,
                 'status'      => $lastDue->status,
                 'due_date'    => $lastDue->due_date?->toDateString(),
@@ -303,7 +303,7 @@ class ContractorHomeController extends Controller
             ->map(fn ($due) => [
                 'type'         => 'finance',
                 'reference_id' => $due->id,
-                'title'        => $due->description . ($due->year ? " ({$due->year})" : ''),
+                'title'        => $due->title . ($due->year ? " ({$due->year})" : ''),
                 'subtitle'     => $due->status_label,
                 'has_attachment' => false,
                 'is_new'       => $due->created_at->gt(now()->subHours(self::NEW_BADGE_HOURS)),

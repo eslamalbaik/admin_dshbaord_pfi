@@ -75,10 +75,18 @@ class BalanceRoundingService
 
         $fraction = (($base % 100) + 100) % 100; // floor(base) = base − fraction
 
-        $wantDue    = $base < 0 ? $fraction : 0;
-        $wantCredit = $base > 0 ? $fraction : 0;
-
         $current = [(int) round((float) ($due?->amount_jod ?? 0) * 100), (int) round((float) ($credit?->amount_jod ?? 0) * -100)];
+
+        if ($base > 0) {
+            $wantDue    = 0;
+            $wantCredit = $fraction;
+        } else {
+            // كسر رصيد انشطب لصالح الاتحاد (فرق عملة مثلاً) بيضل مشطوب لما الشركة تصير مدينة —
+            // ما بيرجع ينصرف على الذمة الجديدة ثم ينحسب عليها كذمة جبر — طالما الفائض اللي بيقابله ما انصرف
+            $surplus    = (int) round(app(ContractorCreditService::class)->availableCredit(Contractor::findOrFail($contractorId)) * 100);
+            $wantCredit = min($current[1], $surplus, $fraction);
+            $wantDue    = $fraction - $wantCredit;
+        }
         if ($current === [$wantDue, $wantCredit]) {
             return null;
         }

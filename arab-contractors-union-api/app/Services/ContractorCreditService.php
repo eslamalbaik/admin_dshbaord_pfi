@@ -34,21 +34,28 @@ class ContractorCreditService
                 return 0.0;
             }
 
+            // الكسر اللي شطبه جبر كسور الرصيد لصالح الاتحاد مش إلو يرجع ينصرف على ذمم
+            $budget = round($sources->sum(fn ($s) => $this->available($s)) - $this->absorbedByRounding($contractor), 2);
+            if ($budget <= 0) {
+                return 0.0;
+            }
+
             $targets = $this->openTargets($contractor);
             $applied = 0.0;
 
             foreach ($targets as $target) {
                 $need = $target instanceof ContractorDue ? $target->remaining_jod : $target->remaining;
 
-                while ($need > 0 && $sources->isNotEmpty()) {
+                while ($need > 0 && $budget > 0 && $sources->isNotEmpty()) {
                     $source    = $sources->first();
                     $available = $this->available($source);
-                    $amount    = round(min($need, $available), 2);
+                    $amount    = round(min($need, $available, $budget), 2);
 
                     if ($amount > 0) {
                         $this->spend($source, $target, $amount, $by);
                         $need    = round($need - $amount, 2);
                         $applied = round($applied + $amount, 2);
+                        $budget  = round($budget - $amount, 2);
                     }
 
                     if ($this->available($source) <= 0) {
@@ -56,7 +63,7 @@ class ContractorCreditService
                     }
                 }
 
-                if ($sources->isEmpty()) {
+                if ($sources->isEmpty() || $budget <= 0) {
                     break;
                 }
             }
@@ -65,10 +72,17 @@ class ContractorCreditService
         });
     }
 
-    /** الرصيد الدائن المتاح للمقاول بالدينار (نفس "له" بصفحة الأرصدة) */
+    /** مجموع الرصيد الدائن غير المصروف بالدينار، قبل خصم قيد جبر الكسور السالب */
     public function availableCredit(Contractor $contractor): float
     {
         return round($this->creditSources($contractor)->sum(fn ($s) => $this->available($s)), 2);
+    }
+
+    private function absorbedByRounding(Contractor $contractor): float
+    {
+        return round(-(float) ContractorCredit::where('contractor_id', $contractor->id)
+            ->where('notes', BalanceRoundingService::TAG)->where('used_jod', 0)
+            ->where('amount_jod', '<', 0)->sum('amount_jod'), 2);
     }
 
     private function creditSources(Contractor $contractor): Collection
