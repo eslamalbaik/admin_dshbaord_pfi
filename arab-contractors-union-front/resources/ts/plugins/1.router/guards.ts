@@ -1,7 +1,6 @@
 import type { RouteNamedMap, _RouterTyped } from 'unplugin-vue-router'
 import { watch } from 'vue'
-import NProgress from 'nprogress'
-import 'nprogress/nprogress.css'
+import { useRouteLoading } from '@/composables/useRouteLoading'
 import { useAuthStore } from '@/stores/authStore'
 import { themeConfig } from '@themeConfig'
 import { DASHBOARD_ROLES, canAccessRoute, firstAllowedRoute, isSupervisor } from '@/utils/permissions'
@@ -44,9 +43,6 @@ function redirectStudentToLanding(targetPath = '/student/dashboard') {
   window.location.href = url.toString()
 }
 
-// Configure NProgress
-NProgress.configure({ showSpinner: false, speed: 400 })
-
 const SITE_TITLE = themeConfig.app.title
 
 const ROUTE_TAB_TITLES: Record<string, string> = {
@@ -80,9 +76,11 @@ function resolveDocumentTitle(routeName: string | symbol | null | undefined): st
 }
 
 export const setupGuards = (router: _RouterTyped<RouteNamedMap & { [key: string]: any }>) => {
+  // شعار الاتحاد المتحرّك أثناء التنقل بين الصفحات (AppLoadingIndicator) بدل شريط NProgress
+  const routeLoading = useRouteLoading()
+
   router.beforeEach(async to => {
-    // Start progress bar
-    NProgress.start()
+    routeLoading.start()
 
     /*
      * Public routes: accessible by everyone without any restrictions.
@@ -164,8 +162,11 @@ export const setupGuards = (router: _RouterTyped<RouteNamedMap & { [key: string]
       return { name: 'not-authorized' }
   })
 
+  // afterEach بيتنادى كمان للتنقل الملغى أو المحوَّل، أما فشل تحميل الصفحة نفسها فبيروح لـonError
   router.afterEach(to => {
     document.title = resolveDocumentTitle(to.name)
-    NProgress.done()
+    routeLoading.done()
   })
+
+  router.onError(() => routeLoading.done())
 }

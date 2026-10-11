@@ -1,42 +1,23 @@
 <script setup lang="ts">
-const bufferValue = ref(20)
-const progressValue = ref(10)
+import { useRouteLoading } from '@/composables/useRouteLoading'
+
+/**
+ * شعار الاتحاد المتحرّك (تجميع القطع) أثناء التنقل بين الصفحات.
+ * بيظهر بحالتين: تنقل الـrouter (useRouteLoading من guards.ts)، وانتظار Suspense لصفحة
+ * إلها setup غير متزامن (fallbackHandle/resolveHandle من الـlayouts).
+ * الملف ثابت بـpublic/ فبينحمّل مرة وحدة وبيضل بالكاش، والحركة SMIL جوّاه فبتشتغل بـ<img>.
+ */
+const { isRouteLoading } = useRouteLoading()
 const isFallbackState = ref(false)
-const interval = ref<ReturnType<typeof setInterval>>()
-const showProgress = ref(false)
 
-watch([progressValue, isFallbackState], () => {
-  if (progressValue.value > 80 && isFallbackState.value)
-    progressValue.value = 82
-
-  startBuffer()
-})
-
-function startBuffer() {
-  clearInterval(interval.value)
-  interval.value = setInterval(() => {
-    progressValue.value += Math.random() * (15 - 5) + 5
-    bufferValue.value += Math.random() * (15 - 5) + 6
-  }, 800)
-}
+const visible = computed(() => isRouteLoading.value || isFallbackState.value)
 
 const fallbackHandle = () => {
-  showProgress.value = true
-  progressValue.value = 10
   isFallbackState.value = true
-  startBuffer()
 }
 
 const resolveHandle = () => {
   isFallbackState.value = false
-  progressValue.value = 100
-
-  setTimeout(() => {
-    clearInterval(interval.value)
-    progressValue.value = 0
-    bufferValue.value = 20
-    showProgress.value = false
-  }, 300)
 }
 
 defineExpose({
@@ -46,18 +27,65 @@ defineExpose({
 </script>
 
 <template>
-  <!-- loading state via #fallback slot -->
-  <div
-    v-if="showProgress"
-    class="position-fixed"
-    style="z-index: 9999; inset-block-start: 0; inset-inline: 0 0;"
-  >
-    <VProgressLinear
-      v-model="progressValue"
-      :buffer-value="bufferValue"
-      color="primary"
-      height="2"
-      bg-color="background"
-    />
-  </div>
+  <Transition name="app-loading-fade">
+    <div
+      v-if="visible"
+      class="app-loading-overlay"
+      role="status"
+      aria-live="polite"
+    >
+      <img
+        src="/images/loader/logo-assemble.svg"
+        alt=""
+        class="app-loading-logo"
+      >
+      <span class="app-loading-sr">جاري التحميل…</span>
+    </div>
+  </Transition>
 </template>
+
+<style lang="scss" scoped>
+.app-loading-overlay {
+  position: fixed;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+  background: rgba(var(--v-theme-background), 0.72);
+  inset: 0;
+}
+
+.app-loading-logo {
+  inline-size: clamp(120px, 18vw, 180px);
+  max-inline-size: 60vw;
+  pointer-events: none;
+  user-select: none;
+}
+
+.app-loading-sr {
+  position: absolute;
+  overflow: hidden;
+  block-size: 1px;
+  clip-path: inset(50%);
+  inline-size: 1px;
+  white-space: nowrap;
+}
+
+.app-loading-fade-enter-active,
+.app-loading-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.app-loading-fade-enter-from,
+.app-loading-fade-leave-to {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-loading-fade-enter-active,
+  .app-loading-fade-leave-active {
+    transition: none;
+  }
+}
+</style>
