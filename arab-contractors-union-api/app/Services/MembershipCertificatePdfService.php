@@ -124,6 +124,9 @@ class MembershipCertificatePdfService
         $membershipNumber = e($contractor->membership_number);
         if (! str_ends_with(strtolower($contractor->membership_number ?? ''), '_g')) {
             $membershipNumber .= '/غ';
+        } else {
+            // "1004_g" جوّا سطر عربي بينقلب لـ "g_1004" بدون عزل الاتجاه، زي الرقم التسلسلي فوق
+            $membershipNumber = '<span dir="ltr">' . $membershipNumber . '</span>';
         }
 
         // أحجام الخطوط والألوان والمحاذاة أدناه منقولة حرفياً من قالب Word المعتمد
