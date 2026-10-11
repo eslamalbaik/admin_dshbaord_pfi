@@ -42,9 +42,24 @@ class MembershipRenewalService
     }
 
     /**
-     * رسوم اشتراك سنة معيّنة انسدّت كاملة من رصيد المقاول (مثلاً لما تتولّد رسوم 1/1) ← عضوية
-     * فعّالة بتنتهي 31/12 من سنة الذمة. ما بتنعمل وحدة ثانية لو في عضوية فعّالة بتغطي السنة أصلاً.
-     * العضوية بتنعلّم بالذمة، عشان ترجيع الدفعة يلغيها (deactivateForDue).
+     * نقطة الدخول الوحيدة لـ"ذمة انسدّت ← فعّل العضوية": أي مسار بيسدّد ذمة (رصيد دائن، دفعة
+     * يدوية، تأكيد تحويل التطبيق، تسوية يدوية من شاشة الذمم) بيستدعيها بعد applyPayment().
+     * بتفعّل بس لو الذمة رسوم اشتراك سنوية وانسدّت كاملة. قبل هيك كان التفعيل بمسار الرصيد
+     * لحاله، فاللي سدّد رسومه بدفعة يدوية تطلع حالته "فعّالة" بلا عضوية مسجّلة لسنته (QA M-03).
+     */
+    public function activateIfFeeSettled(ContractorDue $due, ?int $reviewerId = null): ?Membership
+    {
+        if (! $due->is_membership_fee || $due->status !== 'paid') {
+            return null;
+        }
+
+        return $this->activateForDue($due, $reviewerId);
+    }
+
+    /**
+     * رسوم اشتراك سنة معيّنة انسدّت كاملة ← عضوية فعّالة بتنتهي 31/12 من سنة الذمة. ما بتنعمل
+     * وحدة ثانية لو في عضوية فعّالة بتغطي السنة أصلاً. العضوية بتنعلّم بالذمة، عشان ترجيع
+     * الدفعة اللي سدّتها يلغيها (deactivateForDue). استدعِ activateIfFeeSettled() مش هاي مباشرة.
      */
     public function activateForDue(ContractorDue $due, ?int $reviewerId = null): ?Membership
     {
@@ -70,7 +85,7 @@ class MembershipRenewalService
             'amount'      => $due->amount_jod,
             'starts_at'   => $startsAt,
             'expires_at'  => \Carbon\Carbon::create($year, 12, 31)->startOfDay(),
-            'notes'       => self::creditDueMarker($due),
+            'notes'       => self::dueMarker($due),
             'reviewed_by' => $reviewerId,
             'reviewed_at' => now(),
         ]);
@@ -82,7 +97,7 @@ class MembershipRenewalService
         return $membership;
     }
 
-    /** الذمة رجعت مش مسدّدة (ترجيع الدفعة اللي سدّتها) ← العضوية اللي فعّلها الرصيد بتنرفض */
+    /** الذمة رجعت مش مسدّدة (ترجيع الدفعة اللي سدّتها) ← العضوية اللي فعّلتها بتنرفض */
     public function deactivateForDue(ContractorDue $due): void
     {
         if ($due->status === 'paid') {
@@ -91,11 +106,17 @@ class MembershipRenewalService
 
         $due->contractor->memberships()
             ->where('status', 'active')
-            ->where('notes', self::creditDueMarker($due))
+            ->whereIn('notes', [self::dueMarker($due), self::legacyCreditDueMarker($due)])
             ->update(['status' => 'rejected']);
     }
 
-    private static function creditDueMarker(ContractorDue $due): string
+    private static function dueMarker(ContractorDue $due): string
+    {
+        return "تفعيل تلقائي بعد تسديد رسوم الاشتراك — ذمة #{$due->id}";
+    }
+
+    /** نص العلامة قبل ما يصير التفعيل لكل مسارات التسديد — عضويات قديمة لسا بتحمله */
+    private static function legacyCreditDueMarker(ContractorDue $due): string
     {
         return "تفعيل تلقائي من رصيد المقاول — ذمة #{$due->id}";
     }

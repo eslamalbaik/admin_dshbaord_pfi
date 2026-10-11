@@ -146,6 +146,12 @@ class PaymentConfirmationService
             $isDue
                 ? PaymentAllocation::record($payment, $target, $amount)
                 : PaymentAllocation::recordPenalty($payment, $target, $amount);
+
+            // دفعة "رسوم عضوية" بتجدّد عضويتها بنفسها (renewFromPayment عبر PaymentConfirmed)،
+            // فتفعيلها من الذمة كمان كان بيعمل عضويتين لنفس السنة
+            if ($isDue && $payment->type !== 'membership_fee') {
+                app(MembershipRenewalService::class)->activateIfFeeSettled($target, $authUser->id);
+            }
             $available = round($available - $amount, 2);
 
             AuditLogService::record(

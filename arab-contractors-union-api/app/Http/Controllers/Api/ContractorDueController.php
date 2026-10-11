@@ -400,6 +400,8 @@ class ContractorDueController extends Controller
                 \App\Models\PaymentAllocation::record($payment, $due, $amount);
             }
 
+            app(\App\Services\MembershipRenewalService::class)->activateIfFeeSettled($due, Auth::id());
+
             if (! empty($data['notes'])) {
                 $due->update(['notes' => trim($due->notes . "\n" . $data['notes'])]);
             }

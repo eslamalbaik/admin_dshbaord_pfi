@@ -77,6 +77,7 @@ class DuesPaymentService
                 $applied = min($remaining, $due->remaining_jod);
                 $due->applyPayment($applied);
                 PaymentAllocation::record($payment, $due, $applied);
+                app(MembershipRenewalService::class)->activateIfFeeSettled($due, $authId);
                 $remaining = round($remaining - $applied, 2);
 
                 $settled[] = [
