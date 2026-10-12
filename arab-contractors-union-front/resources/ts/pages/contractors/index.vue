@@ -44,8 +44,8 @@ const headers = [
 const statusOptions = [
   { title: 'الكل', value: '' },
   { title: 'نشط', value: 'active' },
-  { title: 'معلّق', value: 'pending' },
   { title: 'موقوف', value: 'suspended' },
+  { title: 'منتهي', value: 'expired' },
 ]
 
 const accountStatusOptions = [
@@ -212,7 +212,6 @@ const confirmDelete = async () => {
 
 const statusChangeOptions = [
   { title: 'نشط', value: 'active' },
-  { title: 'معلّق', value: 'pending' },
   { title: 'موقوف', value: 'suspended' },
   { title: 'منتهي', value: 'expired' },
 ]
