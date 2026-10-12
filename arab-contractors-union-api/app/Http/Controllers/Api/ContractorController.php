@@ -322,6 +322,15 @@ class ContractorController extends Controller
     {
         $this->normalizeMembershipNumber($request);
         $validated = $request->validate($this->getValidationRules(),$this->getValidationMessages(), $this->getValidationAttributes());
+        // مقاول قديم بننقله للنظام: آخر سنة عضوية مدفوعة إله بتحدد حالته من أول يوم
+        // (2025 والحالية 2026 ← منتهية). عضو جديد جداً (بدون التأشير) بيضل "قيد المراجعة" متل قبل.
+        $membershipHistory = $request->validate([
+            'is_existing_member'   => 'nullable|boolean',
+            'last_membership_year' => 'required_if_accepted:is_existing_member|nullable|integer|min:1990|max:' . now()->year,
+        ], [
+            'last_membership_year.required_if_accepted' => 'حدد آخر سنة عضوية للعضو القديم.',
+        ], ['last_membership_year' => 'آخر سنة عضوية']);
+        $lastYear = $request->boolean('is_existing_member') ? ($membershipHistory['last_membership_year'] ?? null) : null;
         $this->handleFileUploads($request, $validated);
         $this->syncLocation($validated);
 
@@ -329,11 +338,41 @@ class ContractorController extends Controller
             $validated['specialties'] = json_decode($validated['specialties'], true);
         }
 
-        $contractor = Contractor::create($validated);
+        $contractor = \Illuminate\Support\Facades\DB::transaction(function () use ($validated, $lastYear) {
+            $contractor = Contractor::create($validated);
+
+            if ($lastYear) {
+                $this->applyLastMembershipYear($contractor, (int) $lastYear);
+            }
+
+            return $contractor;
+        });
 
         \App\Services\AuditLogService::record($request->user(), 'contractor.created', $contractor, ['name' => $contractor->name, 'membership_number' => $contractor->membership_number]);
 
         return $this->success($contractor->toArray(), 'تم إضافة المقاول بنجاح.', 201);
+    }
+
+    /**
+     * عضوية تاريخية لمقاول منقول: بتغطي 1/1–31/12 من آخر سنة دفعها. لو السنة الحالية
+     * عضويته فعّالة، ولو أقدم بتنحفظ منتهية وحالته "منتهية" لحد ما يدفع رسوم سنة جديدة.
+     */
+    private function applyLastMembershipYear(Contractor $contractor, int $year): void
+    {
+        $isCurrent = $year >= now()->year;
+
+        $contractor->memberships()->create([
+            'type'        => 'new',
+            'status'      => $isCurrent ? 'active' : 'expired',
+            'starts_at'   => \Carbon\Carbon::create($year, 1, 1)->startOfDay(),
+            'expires_at'  => \Carbon\Carbon::create($year, 12, 31)->startOfDay(),
+            'reviewed_by' => auth()->id(),
+            'reviewed_at' => now(),
+            'notes'       => "آخر عضوية قبل النقل للنظام ({$year})",
+        ]);
+
+        // الحالة بتنقرر هون بغض النظر عن قيمة status بالفورم
+        $contractor->update(['status' => $isCurrent ? 'active' : 'expired']);
     }
 
     // GET /api/contractors/{id}

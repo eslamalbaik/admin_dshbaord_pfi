@@ -52,6 +52,9 @@ const form = ref({
   name: '',
   capital: '',
   registration_date: '',
+  // عضو قديم بننقله للنظام: آخر سنة دفع فيها بتحدد حالته (أقدم من السنة الحالية = منتهية)
+  is_existing_member: false,
+  last_membership_year: '' as string | number,
   legal_form: '',
   company_purposes: '',
 
@@ -250,7 +253,7 @@ const uploadedDocsCount = computed(() => documentKeys.filter(k => hasFile(k)).le
 // أي خطوة يتبع لها كل حقل — لإرجاع المستخدم للخطوة الصحيحة عند خطأ من الخادم
 // ولتعليم الخطوة بعلامة خطأ في الشريط.
 const STEP_FIELDS: Record<number, string[]> = {
-  1: ['membership_number', 'commercial_register', 'name', 'capital', 'registration_date', 'legal_form', 'company_purposes'],
+  1: ['membership_number', 'commercial_register', 'name', 'capital', 'registration_date', 'is_existing_member', 'last_membership_year', 'legal_form', 'company_purposes'],
   2: ['owner_name', 'partners', 'authorized_person', 'authorized_person_id_number', 'authorized_person_phone', 'authorized_person_whatsapp'],
   3: ['phone', 'fax', 'email', 'governorate_id', 'city_id', 'district', 'address', 'building', 'floor', 'license_number', 'established_date', 'classification', 'specialties'],
 }
@@ -262,6 +265,9 @@ const stepHasServerError = (s: number) =>
 
 const filled = (v: any) => v !== null && v !== undefined && String(v).trim() !== ''
 const membershipValid = (v: string) => /^[0-9]+(_g)?$/.test(v ?? '') && Number.parseInt(v) >= 1
+const currentYear = new Date().getFullYear()
+const lastMembershipYearValid = (v: string | number) =>
+  /^[0-9]{4}$/.test(String(v ?? '').trim()) && Number(v) >= 1990 && Number(v) <= currentYear
 
 // الحقول التي يرفض الخادم الحفظ بدونها — لا ننتقل للخطوة التالية قبل تعبئتها لأن الحفظ
 // سيفشل حتماً. باقي الحقول المعلّمة بـ* تُظهر رسالتها تحت الحقل دون أن تمنع الانتقال،
@@ -273,6 +279,7 @@ const blockingMissing = (s: number): string[] => {
     if (!filled(f.name)) missing.push('اسم طالب الانتساب')
     if (!membershipValid(f.membership_number)) missing.push('رقم العضوية')
     if (!/^[0-9]{9}$/.test(f.commercial_register ?? '')) missing.push('رقم السجل التجاري')
+    if (f.is_existing_member && !lastMembershipYearValid(f.last_membership_year)) missing.push('آخر سنة عضوية')
   }
   if (s === 3) {
     if (!f.governorate_id) missing.push('المحافظة')
@@ -367,6 +374,13 @@ const reviewItems = computed(() => [
   { step: 1, label: 'اسم المنشأة', value: form.value.name },
   { step: 1, label: 'رقم العضوية', value: form.value.membership_number },
   { step: 1, label: 'السجل التجاري', value: form.value.commercial_register },
+  {
+    step: 1,
+    label: 'العضوية',
+    value: form.value.is_existing_member
+      ? `عضو قديم — آخر عضوية ${form.value.last_membership_year} (${Number(form.value.last_membership_year) >= currentYear ? 'فعّالة' : 'منتهية'})`
+      : 'عضو جديد',
+  },
   { step: 2, label: 'المفوض بالتوقيع', value: form.value.authorized_person },
   { step: 2, label: 'عدد الشركاء', value: form.value.partners.length ? String(form.value.partners.length) : '' },
   { step: 3, label: 'الجوال', value: form.value.phone ? `+970${form.value.phone}` : '', ltr: true },
@@ -393,6 +407,12 @@ const submit = async () => {
   try {
     const fd = new FormData()
     Object.entries(form.value).forEach(([k, v]) => {
+      if (k === 'is_existing_member') {
+        fd.append(k, v ? '1' : '0')
+        return
+      }
+      if (k === 'last_membership_year' && !form.value.is_existing_member)
+        return
       // VFileInput يُعيد [] (وليس null) عند تفريغ حقل الملف — بدون هذا الفحص كان
       // يُرسَل مصفوفة فارغة كقيمة للحقل فيرفضها الخادم بخطأ "يجب أن يكون ملفاً" (REQ-01 #4)
       if (Array.isArray(v) && v.length === 0 && k !== 'partners' && k !== 'specialties')
@@ -575,6 +595,51 @@ const submit = async () => {
                   label="تاريخ التسجيل"
                   type="date"
                   :error-messages="validationErrors.registration_date"
+                />
+              </VCol>
+              <VCol
+                cols="12"
+                md="5"
+                class="d-flex align-center"
+              >
+                <VCheckbox
+                  v-model="form.is_existing_member"
+                  color="primary"
+                  hide-details
+                >
+                  <template #label>
+                    <div>
+                      <div class="font-weight-medium text-high-emphasis">
+                        عضو قديم إله عضوية سابقة
+                      </div>
+                      <div class="text-caption text-medium-emphasis">
+                        اتركه فاضي للعضو الجديد جداً
+                      </div>
+                    </div>
+                  </template>
+                </VCheckbox>
+              </VCol>
+              <VCol
+                v-if="form.is_existing_member"
+                cols="12"
+                sm="6"
+                md="4"
+              >
+                <VTextField
+                  v-model="form.last_membership_year"
+                  label="آخر سنة عضوية مدفوعة *"
+                  type="number"
+                  :min="1990"
+                  :max="currentYear"
+                  :placeholder="String(currentYear - 1)"
+                  :hint="lastMembershipYearValid(form.last_membership_year)
+                    ? (Number(form.last_membership_year) >= currentYear ? 'رح تنحفظ عضويته فعّالة لـ 31/12' : 'رح تنحفظ عضويته منتهية')
+                    : 'السنة اللي آخر مرة دفع فيها رسوم العضوية'"
+                  persistent-hint
+                  :error-messages="validationErrors.last_membership_year"
+                  :rules="[
+                    v => lastMembershipYearValid(v) || `أدخل سنة بين 1990 و ${currentYear}`,
+                  ]"
                 />
               </VCol>
             </VRow>
