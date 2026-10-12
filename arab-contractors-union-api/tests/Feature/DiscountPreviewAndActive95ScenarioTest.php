@@ -108,7 +108,7 @@ class DiscountPreviewAndActive95ScenarioTest extends TestCase
     }
 
     /**
-     * #6: الذمم 160 + 280 والغرامة 200 = 640؛ انسدّ 608 (95% بالضبط) والمتبقي 32 ← "فعّالة"
+     * #6: الذمم 160 + 480 = 640؛ انسدّ 608 (95% بالضبط) والمتبقي 32 ← "فعّالة"
      * بصفحة الأرصدة وقائمة المقاولين والتطبيق، سواء حالته بالنظام "فعّال" أو "منتهي".
      */
     public function test_exactly_95_percent_paid_shows_active_everywhere(): void
@@ -118,9 +118,7 @@ class DiscountPreviewAndActive95ScenarioTest extends TestCase
             ContractorDue::create(['contractor_id' => $c->id, 'year' => 2026, 'description' => 'رسوم عضوية (2026)',
                 'amount_jod' => 160, 'paid_jod' => 160, 'status' => 'paid', 'source' => 'manual']);
             ContractorDue::create(['contractor_id' => $c->id, 'year' => 2025, 'description' => 'رسوم 2025',
-                'amount_jod' => 280, 'paid_jod' => 280, 'status' => 'paid', 'source' => 'manual']);
-            Penalty::create(['contractor_id' => $c->id, 'reason' => 'غرامة تأخير',
-                'amount' => 200, 'paid_amount' => 168, 'status' => 'partially_paid']);
+                'amount_jod' => 480, 'paid_jod' => 448, 'status' => 'partially_paid', 'source' => 'manual']);
 
             $this->getJson('/api/v1/dashboard/balances?search=9565_g')->assertOk()
                 ->assertJsonPath('items.0.net_jod', -32)
@@ -138,6 +136,24 @@ class DiscountPreviewAndActive95ScenarioTest extends TestCase
             Sanctum::actingAs(User::factory()->create(['role' => 'admin']), ['*']);
             $c->forceDelete();
         }
+    }
+
+    /** الغرامات برّا قاعدة الـ95%: ذممه كلها مسدَّدة بس عليه 10 من غرامة ← "منتهية" بكل الشاشات */
+    public function test_an_open_penalty_keeps_membership_expired_even_with_all_dues_paid(): void
+    {
+        $c = $this->contractor();
+        ContractorDue::create(['contractor_id' => $c->id, 'year' => 2026, 'description' => 'رسوم عضوية (2026)',
+            'amount_jod' => 340, 'paid_jod' => 340, 'status' => 'paid', 'source' => 'manual']);
+        Penalty::create(['contractor_id' => $c->id, 'reason' => 'غرامة تأخير',
+            'amount' => 100, 'paid_amount' => 90, 'status' => 'partially_paid']);
+
+        $this->getJson('/api/v1/dashboard/balances?search=9565_g')->assertOk()
+            ->assertJsonPath('items.0.net_jod', -10)
+            ->assertJsonPath('items.0.status', 'expired');
+        $this->getJson('/api/v1/contractors?search=9565_g')->assertJsonPath('items.0.membership_status', 'expired');
+
+        Sanctum::actingAs($c, ['*']);
+        $this->getJson('/api/v1/contractor/balance')->assertOk()->assertJsonPath('items.subscription_status', 'expired');
     }
 
     /** منتهي قديم ما عليه ولا ذمة لهالسنة بيضل "منتهية" حتى لو رصيده صفر */

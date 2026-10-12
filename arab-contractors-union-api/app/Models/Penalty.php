@@ -7,9 +7,27 @@ use Illuminate\Database\Eloquent\Model;
 class Penalty extends Model
 {
     protected $fillable = [
-        'contractor_id', 'reason', 'amount', 'paid_amount', 'status',
+        'contractor_id', 'reference_number', 'reason', 'amount', 'paid_amount', 'status',
         'notes', 'reject_reason', 'paid_at',
     ];
+
+    protected static function booted(): void
+    {
+        static::created(function (self $penalty) {
+            if (! $penalty->reference_number) {
+                $penalty->reference_number = self::referenceFor($penalty->id, $penalty->created_at);
+                $penalty->saveQuietly();
+            }
+        });
+    }
+
+    /** رقم مرجعي بصيغة PEN-<سنة الإنشاء>-<رقم الغرامة بـ3 خانات> — نفس نمط INV- للذمم */
+    public static function referenceFor(int $id, mixed $createdAt): string
+    {
+        $year = $createdAt ? \Illuminate\Support\Carbon::parse($createdAt)->year : now()->year;
+
+        return 'PEN-' . $year . '-' . str_pad((string) $id, 3, '0', STR_PAD_LEFT);
+    }
 
     protected $casts = [
         'amount'      => 'decimal:2',

@@ -34,8 +34,9 @@ class ContractorBalances
         $exact = "ROUND({$credit} - {$dues} - {$penalties}, 2)";
 
         // مجموع كل الذمم والغرامات (المسدَّد وغير المسدَّد) — نفس عمود "الإجمالي" بصفحة الذمم
-        $obligations = "((SELECT COALESCE(SUM(d.amount_jod), 0) FROM contractor_dues d
-                          WHERE d.contractor_id = contractors.id AND d.deleted_at IS NULL)
+        $duesObligations = "(SELECT COALESCE(SUM(d.amount_jod), 0) FROM contractor_dues d
+                          WHERE d.contractor_id = contractors.id AND d.deleted_at IS NULL)";
+        $obligations = "({$duesObligations}
                        + (SELECT COALESCE(SUM(pe.amount), 0) FROM penalties pe
                           WHERE pe.contractor_id = contractors.id AND pe.status <> 'rejected'))";
 
@@ -50,6 +51,7 @@ class ContractorBalances
             ->selectRaw("{$exact} AS net_exact_jod")
             ->selectRaw("ROUND({$exact} - 0.495, 0) AS net_jod")
             ->selectRaw("ROUND({$obligations}, 2) AS obligations_jod")
+            ->selectRaw("ROUND({$duesObligations}, 2) AS dues_obligations_jod")
             ->selectRaw('EXISTS(SELECT 1 FROM contractor_dues cy WHERE cy.contractor_id = contractors.id
                           AND cy.deleted_at IS NULL AND cy.year = ?) AS has_current_year_due', [now()->year]);
     }

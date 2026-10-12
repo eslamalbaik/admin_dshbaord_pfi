@@ -91,6 +91,22 @@ class EventController extends Controller
         return $this->success(message: 'تم إلغاء انضمامك للفعالية.');
     }
 
+    /**
+     * أي سطر يعرضه التطبيق والموقع: مكان الانعقاد للوجاهي والمختلط، وسطر رابط البث (حتى قبل
+     * يوم الفعالية، بنص "سيتم تفعيل الرابط") للأونلاين والمختلط. بدون نوع حضور: حسب المعبّأ.
+     */
+    private function displayFlags(Event $e): array
+    {
+        return [
+            'show_location'   => $e->event_format === null || $e->event_format === ''
+                ? filled($e->event_location)
+                : in_array($e->event_format, ['onsite', 'hybrid'], true) && filled($e->event_location),
+            'show_stream_url' => $e->event_format === null || $e->event_format === ''
+                ? filled($e->stream_url)
+                : in_array($e->event_format, ['online', 'hybrid'], true),
+        ];
+    }
+
     private function formatEvent(Event $e, ?Contractor $contractor = null): array
     {
         // رابط البث "يُفعَّل يوم الفعالية" — يُخفى قبلها ولو كان مُعبّأً بالإدارة
@@ -115,6 +131,7 @@ class EventController extends Controller
             'is_international'  => (bool) $e->is_international,
             'stream_url'        => $streamAvailable && $e->event_format !== 'onsite' ? $e->stream_url : null,
             'stream_available'  => $streamAvailable,
+            ...$this->displayFlags($e),
             'speakers'          => $this->normalizeSpeakers($e->speakers ?? []),
             'attendees_count'   => $e->registrations_count ?? 0,
             'is_registered'     => $contractor
@@ -195,6 +212,7 @@ class EventController extends Controller
         if ($event->event_format === 'online')
             $data['event_location'] = null;
         $data['stream_available'] = $streamAvailable;
+        $data += $this->displayFlags($event);
         $data['speakers'] = $this->normalizeSpeakers($data['speakers'] ?? []);
 
         return $this->success($data);

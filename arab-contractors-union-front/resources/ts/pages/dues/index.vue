@@ -612,6 +612,7 @@ const accumulatedRow = computed(() => {
     remaining_jod: remaining.toFixed(2),
     // الخصومات على ذمم 2025 وما قبل: بدونها الصف المجمّع ما كان يبيّن إنه في خصم
     discount_jod: discount > 0 ? discount.toFixed(2) : null,
+    original_jod: discount > 0 ? (amount + discount).toFixed(2) : null,
     discount_labels: items.filter(d => d.discount_label).map(d => `${d.year}: ${d.discount_label}`),
     status,
     status_label: statusLabels[status],
@@ -1006,7 +1007,12 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
                           </VTooltip>
                         </VChip>
                       </td>
-                      <td>{{ accumulatedRow.amount_jod }}</td>
+                      <td>
+                        {{ accumulatedRow.amount_jod }}
+                        <div v-if="accumulatedRow.original_jod" class="text-caption text-medium-emphasis text-decoration-line-through">
+                          {{ accumulatedRow.original_jod }}
+                        </div>
+                      </td>
                       <td>{{ accumulatedRow.paid_jod }}</td>
                       <td>{{ accumulatedRow.remaining_jod }}</td>
                       <td>

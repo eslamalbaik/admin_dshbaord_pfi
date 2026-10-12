@@ -107,7 +107,7 @@ class ContractorDashboardController extends Controller
                 'transaction_number' => $p->transaction_number,
                 'status'           => $p->status,
                 'method'           => $p->method,
-                'reference_number' => $p->reference_number,
+                'reference_number' => $p->display_reference_number,
                 'notes'            => $p->notes,
                 'paid_at'          => $p->paid_at?->toDateString(),
                 'created_at'       => $p->created_at->toDateString(),
@@ -157,7 +157,7 @@ class ContractorDashboardController extends Controller
                 // المفتوحة بالمتبقي منها (زي الذمم)، بعد ما صارت الدفعات تسدّد الغرامات جزئياً
                 'amount'      => (string) ($pen->status === 'partially_paid' ? $pen->remaining : $pen->amount),
                 'status'      => $pen->status,
-                'reference'   => null,
+                'reference'   => $pen->reference_number,
             ]);
         }
 
@@ -239,57 +239,14 @@ class ContractorDashboardController extends Controller
                 'notes'             => $p->notes,
                 'amount'            => $p->amount,
                 'currency'          => $p->currency ?? 'JOD',
-                'reference_number'  => $p->reference_number,
+                'reference_number'  => $p->display_reference_number,
                 'receipt_image_url' => $p->receipt_image_url,
                 'submitted_at'      => $p->submitted_at,
             ])->values(),
             // فلتر شاشة "الرسوم المالية" بالتطبيق: ?status=unpaid|partially_paid|paid|overdue
             // "متأخرة" محسوبة (غير مسدَّدة بالكامل + تجاوز موعد الاستحقاق) وليست عموداً بقاعدة البيانات.
             'dues' => $this->filterDuesByStatus($dues, $request->string('status')->toString())
-                ->map(function ($d) {
-                    // آخر تحويل مرفوع من التطبيق لهالذمة: قيد المراجعة يقلب الكرت لـ"قيد المراجعة"،
-                    // والمرفوض يعرض سببه لحد ما يرفع المقاول إشعار جديد
-                    $lastTransfer = $d->payments->first();
-                    $pending      = $lastTransfer?->status === 'pending' ? $lastTransfer : null;
-                    $rejected     = $lastTransfer?->status === 'rejected' ? $lastTransfer : null;
-                    $hasDiscount  = $d->discount_type !== null && (float) $d->discount_amount_jod > 0;
-
-                    return [
-                        'id'               => $d->id,
-                        'year'             => $d->year,
-                        'period'           => $d->period,
-                        'reference_number' => $d->reference_number,
-                        'description'      => $d->title,
-                        'amount_jod'    => $d->amount_jod,
-                        'paid_jod'      => $d->paid_jod,
-                        'remaining_jod' => $d->remaining_jod,
-                        'status'        => $d->status,
-                        'status_label'  => $d->status_label,
-                        'due_date'      => $d->due_date?->toDateString(),
-                        // تاريخ سند القبض: 31/12 لرسوم الاشتراك السنوي، null للرسوم المتراكمة
-                        'receipt_date'  => $d->receipt_date,
-                        // الخصم — amount_jod أعلاه هو المبلغ بعد الخصم؛ null لما ما في خصم
-                        'original_amount_jod' => $hasDiscount ? $d->original_amount_jod : null,
-                        'discount_type'       => $hasDiscount ? $d->discount_type : null,
-                        'discount_value'      => $hasDiscount ? $d->discount_value : null,
-                        'discount_amount_jod' => $hasDiscount ? $d->discount_amount_jod : null,
-                        // نص جاهز للعرض ("خصم 20 د.أ" / "خصم 10%") — الكرت يعرضه بدل ما يحسب نسبة
-                        'discount_label'      => $d->discount_label,
-                        'is_under_review'       => $pending !== null,
-                        'pending_payment'       => $pending ? [
-                            'id'                 => $pending->id,
-                            'transaction_number' => $pending->transaction_number,
-                            'amount'             => $pending->amount,
-                            'currency'           => $pending->currency ?? 'JOD',
-                            'reference_number'   => $pending->reference_number,
-                            'notes'              => $pending->notes,
-                            'receipt_image_url'  => $pending->receipt_image_url,
-                            'submitted_at'       => $pending->submitted_at,
-                        ] : null,
-                        'last_rejection_reason' => $rejected?->rejection_reason,
-                        'last_rejected_at'      => $rejected?->confirmed_at,
-                    ];
-                })->values(),
+                ->map(fn ($d) => $this->dueCard($d))->values(),
             // كروت الغرامات بتبويب "المستحقات" (مستقلة عن الذمم): المفتوحة أولاً، والمرفوضة مخفية.
             // "ادفع الآن" على الكرت = POST contractor/payments/transfer مع penalty_id
             'penalties' => $penalties->where('status', '!=', 'rejected')
@@ -302,6 +259,7 @@ class ContractorDashboardController extends Controller
                     return [
                         'id'            => $pen->id,
                         'kind'          => 'penalty',
+                        'reference_number' => $pen->reference_number,
                         'title'         => $pen->reason ?: 'غرامة',
                         'type_label'    => 'غرامة',
                         'amount_jod'    => $pen->amount,
@@ -317,7 +275,7 @@ class ContractorDashboardController extends Controller
                             'transaction_number' => $pending->transaction_number,
                             'amount'             => $pending->amount,
                             'currency'           => $pending->currency ?? 'JOD',
-                            'reference_number'   => $pending->reference_number,
+                            'reference_number'   => $pending->reference_number ?: ($pen->reference_number ?: $pending->transaction_number),
                             'notes'              => $pending->notes,
                             'receipt_image_url'  => $pending->receipt_image_url,
                             'submitted_at'       => $pending->submitted_at,
@@ -331,6 +289,78 @@ class ContractorDashboardController extends Controller
                 ->where('status', '!=', 'rejected')
                 ->values(),
         ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  GET /api/v1/contractor/financial/dues?year=2026
+    //  ذمم السنوات الجديدة بس: بدون year ← السنة الحالية وما بعدها، ومع year ← هالسنة بس.
+    //  نفس شكل كرت الذمة بـcontractor/financial (dues[]).
+    // ─────────────────────────────────────────────────────────────────────────
+    public function yearDues(Request $request)
+    {
+        $request->validate(['year' => 'nullable|integer|min:2000|max:2100']);
+
+        $year  = $request->integer('year') ?: null;
+        $query = $request->user()->dues()->with(['payments' => fn ($q) => $q->latest('id')]);
+        $year ? $query->where('year', $year) : $query->where('year', '>=', now()->year);
+
+        $dues = \App\Models\ContractorDue::sortOldestFirst($query->get());
+
+        return $this->success([
+            'year'          => $year,
+            'from_year'     => $year ?? now()->year,
+            'total_jod'     => number_format((float) $dues->sum('amount_jod'), 2, '.', ''),
+            'paid_jod'      => number_format((float) $dues->sum('paid_jod'), 2, '.', ''),
+            'remaining_jod' => number_format((float) $dues->sum(fn ($d) => $d->remaining_jod), 2, '.', ''),
+            'dues'          => $dues->map(fn ($d) => $this->dueCard($d))->values(),
+        ]);
+    }
+
+    /** كرت الذمة بتبويب "المستحقات" — يتطلّب payments محمّلة الأحدث أولاً */
+    private function dueCard(\App\Models\ContractorDue $d): array
+    {
+        // آخر تحويل مرفوع من التطبيق لهالذمة: قيد المراجعة يقلب الكرت لـ"قيد المراجعة"،
+        // والمرفوض يعرض سببه لحد ما يرفع المقاول إشعار جديد
+        $lastTransfer = $d->payments->first();
+        $pending      = $lastTransfer?->status === 'pending' ? $lastTransfer : null;
+        $rejected     = $lastTransfer?->status === 'rejected' ? $lastTransfer : null;
+        $hasDiscount  = $d->discount_type !== null && (float) $d->discount_amount_jod > 0;
+
+        return [
+            'id'               => $d->id,
+            'year'             => $d->year,
+            'period'           => $d->period,
+            'reference_number' => $d->reference_number,
+            'description'      => $d->title,
+            'amount_jod'    => $d->amount_jod,
+            'paid_jod'      => $d->paid_jod,
+            'remaining_jod' => $d->remaining_jod,
+            'status'        => $d->status,
+            'status_label'  => $d->status_label,
+            'due_date'      => $d->due_date?->toDateString(),
+            // تاريخ سند القبض: 31/12 لرسوم الاشتراك السنوي، null للرسوم المتراكمة
+            'receipt_date'  => $d->receipt_date,
+            // الخصم — amount_jod أعلاه هو المبلغ بعد الخصم؛ null لما ما في خصم
+            'original_amount_jod' => $hasDiscount ? $d->original_amount_jod : null,
+            'discount_type'       => $hasDiscount ? $d->discount_type : null,
+            'discount_value'      => $hasDiscount ? $d->discount_value : null,
+            'discount_amount_jod' => $hasDiscount ? $d->discount_amount_jod : null,
+            // نص جاهز للعرض ("خصم 20 د.أ" / "خصم 10%") — الكرت يعرضه بدل ما يحسب نسبة
+            'discount_label'      => $d->discount_label,
+            'is_under_review'       => $pending !== null,
+            'pending_payment'       => $pending ? [
+                'id'                 => $pending->id,
+                'transaction_number' => $pending->transaction_number,
+                'amount'             => $pending->amount,
+                'currency'           => $pending->currency ?? 'JOD',
+                'reference_number'   => $pending->reference_number ?: ($d->reference_number ?: $pending->transaction_number),
+                'notes'              => $pending->notes,
+                'receipt_image_url'  => $pending->receipt_image_url,
+                'submitted_at'       => $pending->submitted_at,
+            ] : null,
+            'last_rejection_reason' => $rejected?->rejection_reason,
+            'last_rejected_at'      => $rejected?->confirmed_at,
+        ];
     }
 
     /** فلترة قائمة الذمم حسب تبويب شاشة الرسوم المالية (فارغ = بلا فلترة) */

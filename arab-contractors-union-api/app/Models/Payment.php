@@ -160,6 +160,16 @@ class Payment extends Model
         });
     }
 
+    /**
+     * الرقم المرجعي المعروض للمقاول: رقم الحوالة اللي كتبه، وإلا رقم الذمة/الغرامة اللي رُفع لها
+     * التحويل، وإلا رقم العملية — reference_number الخام بيضل للوحة (هو رقم الحوالة البنكي).
+     */
+    public function getDisplayReferenceNumberAttribute(): ?string
+    {
+        return $this->reference_number
+            ?: ($this->due?->reference_number ?: ($this->penalty?->reference_number ?: $this->transaction_number));
+    }
+
     /** رابط صورة إشعار التحويل الكامل */
     public function getReceiptImageUrlAttribute(): ?string
     {

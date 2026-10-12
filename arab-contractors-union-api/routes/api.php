@@ -115,6 +115,7 @@ Route::prefix('v1')->group(function () {
 
         // شاشة الملف المالي — كشف حساب "ما له وما عليه"
         Route::get('financial', [ContractorDashboardController::class, 'financial']);
+        Route::get('financial/dues', [ContractorDashboardController::class, 'yearDues']);
 
         // أهلية تجديد العضوية (تُمنع مع ذمم غير مسدَّدة)
         Route::get('renewal-eligibility', [ContractorDashboardController::class, 'renewalEligibility']);

@@ -36,7 +36,10 @@ class PaymentResource extends JsonResource
             'status'            => $this->status,
             'status_label'      => $this->status_label,
             'method'            => $this->method,
-            'reference_number'  => $this->reference_number,
+            // للمقاول: رقم بديل لما ما يكون كتب رقم حوالة (Payment::display_reference_number)
+            'reference_number'  => $request->user() instanceof \App\Models\Contractor
+                ? $this->display_reference_number
+                : $this->reference_number,
             'receipt_image_url' => $this->receipt_image_url,
             'receipt_pdf_url'   => $this->receipt_pdf_url,
             'rejection_reason'  => $this->rejection_reason,

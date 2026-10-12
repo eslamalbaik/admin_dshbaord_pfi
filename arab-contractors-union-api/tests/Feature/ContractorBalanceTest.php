@@ -243,7 +243,7 @@ class ContractorBalanceTest extends TestCase
     }
 
     /**
-     * سدّد 95% أو أكثر من مجموع ذممه وغراماته ← فعّالة رغم الباقي البسيط (حالة 9565_g: 830 من 840).
+     * سدّد 95% أو أكثر من مجموع ذممه ← فعّالة رغم الباقي البسيط (حالة 9565_g: 830 من 840).
      * أقل من 95% ← منتهية. وبالحالتين الباقي بيضل عليه بالرصيد.
      */
     public function test_paying_95_percent_of_obligations_shows_active(): void
@@ -255,11 +255,7 @@ class ContractorBalanceTest extends TestCase
         ]);
         ContractorDue::create([
             'contractor_id' => $almost->id, 'description' => 'رسوم 2026', 'year' => 2026,
-            'amount_jod' => 430, 'paid_jod' => 430, 'status' => 'paid',
-        ]);
-        Penalty::create([
-            'contractor_id' => $almost->id, 'reason' => 'غرامة تأخير',
-            'amount' => 10, 'paid_amount' => 0, 'status' => 'unpaid',
+            'amount_jod' => 440, 'paid_jod' => 430, 'status' => 'partially_paid',
         ]);
 
         $short = $this->contractor('9566_g');
