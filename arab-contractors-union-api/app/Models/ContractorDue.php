@@ -43,7 +43,21 @@ class ContractorDue extends Model
             if ($due->exists && $due->isDirty('amount_jod') && ! $due->isDirty('rounding_jod') && (float) $due->rounding_jod > 0) {
                 $due->rounding_jod = 0;
             }
+
+            // جبر كسور كل ذمة لحالها لدينار كامل لفوق (قاعدة eslam 12/10): 45.20 ← 46.
+            // جبر الرصيد نفسه (BalanceRoundingService) بيعدّل المبلغ عن قصد، فما بنلمسه.
+            if ($due->isDirty('amount_jod') && ! \App\Services\BalanceRoundingService::isSyncing()) {
+                $due->amount_jod = self::ceilToDinar((float) $due->amount_jod);
+            }
         });
+    }
+
+    /** أقرب دينار كامل لفوق، بالقروش حتى ما تدخل أخطاء الفاصلة العائمة (45.00 بتضل 45) */
+    public static function ceilToDinar(float $amount): float
+    {
+        $cents = (int) round($amount * 100);
+
+        return (float) (intdiv($cents + 99, 100) - ($cents < 0 && $cents % 100 !== 0 ? 1 : 0));
     }
 
     public function contractor()
