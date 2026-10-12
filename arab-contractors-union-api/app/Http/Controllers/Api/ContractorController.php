@@ -116,7 +116,9 @@ class ContractorController extends Controller
                 'digits:5',
                 $this->uniqueIgnoringSoftDeleted('license_number', $isUpdate, $contractorId),
             ],
-            'status'                        => 'sometimes|in:active,pending,expired,suspended',
+            // "معلّق" ما بينختار يدوياً: المقاول إما نشط أو منتهي أو موقوف (طلبات العضوية
+            // المعلّقة مكانها جدول memberships مش حالة المقاول)
+            'status'                        => 'sometimes|in:active,expired,suspended',
             'classification'                => 'nullable|string|max:10',
             'field_lk_type'                 => 'nullable|integer',
             'specialization_lk_type'        => 'nullable|integer',
@@ -329,6 +331,10 @@ class ContractorController extends Controller
             $validated['specialties'] = json_decode($validated['specialties'], true);
         }
 
+        // المقاول اللي بتضيفه الإدارة بيبدأ "نشط" (عمود الـDB افتراضه pending، وكان يخلّيه
+        // يطلع "معلّق" لحد ما يفتح حساب بالتطبيق)
+        $validated['status'] ??= 'active';
+
         $contractor = Contractor::create($validated);
 
         \App\Services\AuditLogService::record($request->user(), 'contractor.created', $contractor, ['name' => $contractor->name, 'membership_number' => $contractor->membership_number]);
@@ -389,7 +395,7 @@ class ContractorController extends Controller
     public function changeStatus(Request $request, Contractor $contractor)
     {
         $validated = $request->validate([
-            'status' => 'required|in:active,pending,expired,suspended',
+            'status' => 'required|in:active,expired,suspended',
         ]);
 
         $oldStatus = $contractor->status;
