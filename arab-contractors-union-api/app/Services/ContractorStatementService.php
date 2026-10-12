@@ -223,7 +223,13 @@ class ContractorStatementService
                 'unused_jod'            => $payment->status === 'paid' && in_array($payment->type, Payment::CREDIT_TYPES, true)
                     ? round($amountJod - (float) $payment->used_amount_jod, 2) : 0.0,
                 'rejection_reason'      => $payment->rejection_reason,
-                'allocations'           => $payment->allocations->map(fn ($a) => $this->allocationRow($a))->values(),
+                // كسر الفائض اللي انشطب بجبر الرصيد (BalanceRoundingService) بينعرض جوّا الدفعة نفسها،
+                // فالرصيد بعدها بيطلع مفهوم (599 − 0.10 جبر) بلا سطر منفصل
+                'allocations'           => $payment->allocations->map(fn ($a) => $this->allocationRow($a))
+                    ->when((float) $payment->rounding_jod > 0 && $payment->status === 'paid', fn ($rows) => $rows->push([
+                        'kind' => 'rounding', 'id' => $payment->id, 'title' => 'جبر كسور',
+                        'reference_number' => null, 'amount_jod' => round((float) $payment->rounding_jod, 2),
+                    ]))->values(),
             ],
         );
     }
