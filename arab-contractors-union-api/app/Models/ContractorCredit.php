@@ -12,12 +12,13 @@ class ContractorCredit extends Model
 
     protected $fillable = [
         'contractor_id', 'amount_jod', 'used_jod', 'description',
-        'source', 'notes', 'created_by',
+        'source', 'notes', 'created_by', 'rounding_jod',
     ];
 
     protected $casts = [
         'amount_jod' => 'decimal:2',
         'used_jod'   => 'decimal:2',
+        'rounding_jod' => 'decimal:2',
     ];
 
     public function contractor()

@@ -83,7 +83,7 @@ class QaContractorScenariosTest extends TestCase
 
     // ── R: الجبر من طرف المقاول ─────────────────────────────
 
-    public function test_R09_home_last_invoice_is_not_the_rounding_due(): void
+    public function test_R09_home_last_invoice_is_the_rounded_real_due(): void
     {
         $c = $this->contractor('960_g');
         $this->due($c, 100.40);
@@ -91,7 +91,8 @@ class QaContractorScenariosTest extends TestCase
         Sanctum::actingAs($c, ['*']);
         $home = $this->getJson('/api/v1/contractor/home')->assertOk()->json('items.financial');
 
-        $this->assertEquals(100.40, (float) $home['last_invoice']['amount_jod']);
+        // الجبر صار على نفس الذمة (100.40 ← 101)، مش ذمة جبر لحالها
+        $this->assertEquals(101, (float) $home['last_invoice']['amount_jod']);
         $this->assertEquals(-101, $this->balance($c)['net_jod']);
     }
 

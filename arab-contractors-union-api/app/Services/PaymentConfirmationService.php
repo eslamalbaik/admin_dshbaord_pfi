@@ -183,7 +183,8 @@ class PaymentConfirmationService
         }
 
         // التسديد بيترجع بس لو كله مسجّل بـpayment_allocations (دفعات من 6/10/2026 وطالع)
-        $used = round((float) $payment->used_amount_jod, 2);
+        // جبر الكسور محسوب ضمن used_amount_jod بلا سجل توزيع، وبيسقط لحاله لما الدفعة ترجع
+        $used = round((float) $payment->used_amount_jod - (float) $payment->rounding_jod, 2);
         if ($used > 0 && round((float) $payment->allocations()->sum('amount_jod'), 2) !== $used) {
             return 'هذه الدفعة سدّدت ذمماً قبل تفعيل سجل التوزيع، فلا يمكن ترجيع تسديدها تلقائياً — ألغِ التسديد من شاشة الذمم أولاً.';
         }
@@ -280,7 +281,7 @@ class PaymentConfirmationService
             $allocation->delete();
         }
 
-        $payment->update(['used_amount_jod' => 0]);
+        $payment->update(['used_amount_jod' => 0, 'rounding_jod' => 0]);
     }
 
     /**

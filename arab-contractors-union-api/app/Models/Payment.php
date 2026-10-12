@@ -12,7 +12,7 @@ class Payment extends Model
         'currency', 'exchange_rate', 'amount_jod', 'used_amount_jod', 'rate_source',
         'type', 'status', 'method', 'reference_number', 'transaction_number', 'receipt_image',
         'notes', 'paid_at', 'submitted_at', 'confirmed_by', 'confirmed_at',
-        'rejection_reason', 'receipt_pdf_path',
+        'rejection_reason', 'receipt_pdf_path', 'rounding_jod',
     ];
 
     protected $casts = [
