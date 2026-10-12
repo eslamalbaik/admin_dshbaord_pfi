@@ -14,7 +14,7 @@ class ContractorDue extends Model
         'amount_jod', 'paid_jod', 'status', 'source',
         'due_date', 'notes', 'created_by',
         'discount_type', 'discount_value', 'discount_amount_jod', 'discount_reason',
-        'discount_by', 'original_amount_jod', 'fee_breakdown',
+        'discount_by', 'original_amount_jod', 'fee_breakdown', 'rounding_jod',
     ];
 
     protected $casts = [
@@ -26,6 +26,7 @@ class ContractorDue extends Model
         'discount_amount_jod'  => 'decimal:2',
         'original_amount_jod'  => 'decimal:2',
         'fee_breakdown'        => 'array',
+        'rounding_jod'         => 'decimal:2',
     ];
 
     public const STATUS_LABELS = [
@@ -33,6 +34,17 @@ class ContractorDue extends Model
         'partially_paid' => 'مسدَّدة جزئياً',
         'paid'           => 'مسدَّدة',
     ];
+
+    protected static function booted(): void
+    {
+        // مبلغ الذمة انعدّل من برّا (تعديل إداري، خصم): القيمة الجديدة أصلية بلا جبر،
+        // وBalanceRoundingService بيرجع يجبر الصافي بعد الحفظ
+        static::saving(function (self $due) {
+            if ($due->exists && $due->isDirty('amount_jod') && ! $due->isDirty('rounding_jod') && (float) $due->rounding_jod > 0) {
+                $due->rounding_jod = 0;
+            }
+        });
+    }
 
     public function contractor()
     {
@@ -230,8 +242,9 @@ class ContractorDue extends Model
      */
     public function projectDiscount(string $type, float $value): array
     {
-        $original = (float) ($this->original_amount_jod ?? $this->amount_jod);
-        $current  = (float) $this->amount_jod;
+        // جبر الكسور (rounding_jod) مش جزء من قيمة الذمة اللي بينحسب عليها الخصم
+        $current  = round((float) $this->amount_jod - (float) $this->rounding_jod, 2);
+        $original = (float) ($this->original_amount_jod ?? $current);
         $previous = $this->discount_type;
 
         if ($type === 'percent' && ($previous === null || $previous === 'percent')) {
