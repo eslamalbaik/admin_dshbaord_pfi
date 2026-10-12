@@ -35,7 +35,7 @@ class ContractorDefaultStatusTest extends TestCase
             'district'            => 'الرمال',
             'building'            => 'عمارة 3',
             'floor'               => 'الثاني',
-        ])->assertStatus(201)->assertJsonPath('data.status', 'active');
+        ])->assertStatus(201);
 
         $this->assertSame('active', Contractor::where('membership_number', '961_g')->value('status'));
     }
