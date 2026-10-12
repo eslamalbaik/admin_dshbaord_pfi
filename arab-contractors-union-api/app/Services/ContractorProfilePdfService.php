@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Contractor;
 use App\Support\ContractorLookups;
+use Illuminate\Support\Carbon;
 use Mpdf\Mpdf;
 
 /**
@@ -80,7 +81,8 @@ class ContractorProfilePdfService
         }
 
         $generatedAt = now()->format('Y-m-d H:i');
-        $regDate = $contractor->registration_date ? $contractor->registration_date->format('Y-m-d') : 'غير محدد';
+        // registration_date بلا cast في الموديل فيرجع نصاً لا Carbon — ->format() عليه كان يكسر تصدير الملف
+        $regDate = $contractor->registration_date ? Carbon::parse($contractor->registration_date)->format('Y-m-d') : 'غير محدد';
         $estDate = $contractor->established_date ? $contractor->established_date->format('Y-m-d') : ($contractor->established_year ?? 'غير محدد');
 
         return <<<HTML
