@@ -40,6 +40,21 @@ class ContractorDefaultStatusTest extends TestCase
         $this->assertSame('active', Contractor::where('membership_number', '961_g')->value('status'));
     }
 
+    public function test_migration_turns_existing_pending_contractors_active(): void
+    {
+        $pending = Contractor::create([
+            'name' => 'شركة معلّقة', 'membership_number' => '963_g', 'commercial_register' => '563963123', 'status' => 'pending',
+        ]);
+        $suspended = Contractor::create([
+            'name' => 'شركة موقوفة', 'membership_number' => '964_g', 'commercial_register' => '563964123', 'status' => 'suspended',
+        ]);
+
+        (require database_path('migrations/2026_10_12_100001_activate_pending_contractors.php'))->up();
+
+        $this->assertSame('active', $pending->fresh()->status);
+        $this->assertSame('suspended', $suspended->fresh()->status);
+    }
+
     public function test_pending_cannot_be_chosen_manually(): void
     {
         $contractor = Contractor::create([
