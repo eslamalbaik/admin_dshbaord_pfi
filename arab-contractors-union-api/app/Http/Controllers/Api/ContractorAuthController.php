@@ -39,11 +39,35 @@ class ContractorAuthController extends Controller
 
     // ─────────────────────────────────────────────────────────────────────────
     //  POST /api/contractor/auth/login
-    //  الحقول: identifier (email أو phone) + password + fcm_token (اختياري)
+    //  الحقول: identifier (رقم العضوية أو جوال المفوض بالتوقيع) + password + fcm_token (اختياري)
+    //  membership_number مقبول كاسم قديم لنفس الحقل (توافق مع نسخ التطبيق الحالية)
     // ─────────────────────────────────────────────────────────────────────────
     public function login(LoginRequest $request)
     {
-        $contractor = Contractor::where('membership_number', \App\Rules\MembershipNumber::normalize($request->membership_number))->first();
+        $identifier = trim((string) ($request->identifier ?? $request->membership_number));
+
+        $contractor = Contractor::where('membership_number', \App\Rules\MembershipNumber::normalize($identifier))->first();
+
+        if (! $contractor && \App\Support\PhoneNumber::looksLikeMobile($identifier)) {
+            // جوال المفوض: الرقم المعتمد للدخول. ممكن نفس المفوض يكون مسجّل لأكثر من شركة،
+            // فبنحدد الشركة بكلمة السر؛ إذا انطبقت على أكثر من شركة بنطلب رقم العضوية.
+            $candidates = Contractor::where('authorized_person_phone', \App\Support\PhoneNumber::normalize($identifier))->get();
+
+            if ($candidates->isEmpty()) {
+                return $this->error(ApiMessages::AUTHORIZED_PHONE_NOT_FOUND, 404, null, 'authorized_phone_not_found');
+            }
+
+            $matches = $candidates->filter(fn (Contractor $c) => $c->password && Hash::check($request->password, $c->password));
+
+            if ($matches->count() > 1) {
+                return $this->error(ApiMessages::AUTHORIZED_PHONE_AMBIGUOUS, 409, null, 'authorized_phone_ambiguous');
+            }
+            if ($matches->isEmpty()) {
+                return $this->error(ApiMessages::INVALID_CREDENTIALS, 401, null, 'invalid_credentials');
+            }
+
+            $contractor = $matches->first();
+        }
 
         // التحقق من العضوية أولاً (REQ-05): غير موجود = رسالة عضوية واضحة، وليس خطأ اعتماديات
         if (! $contractor) {

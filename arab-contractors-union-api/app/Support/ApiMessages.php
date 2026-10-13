@@ -11,6 +11,8 @@ class ApiMessages
     // Auth — الرسائل الدقيقة المتفق عليها في الاجتماع
     public const NO_MEMBERSHIP       = 'لا توجد لديك عضوية في الاتحاد';
     public const INVALID_CREDENTIALS = 'بيانات الاعتماد غير صحيحة';
+    public const AUTHORIZED_PHONE_NOT_FOUND = 'رقم جوال المفوض غير مسجّل لأي شركة. تواصل مع الاتحاد لتسجيله، أو ادخل برقم العضوية.';
+    public const AUTHORIZED_PHONE_AMBIGUOUS = 'رقم جوال المفوض مسجّل لأكثر من شركة. ادخل برقم العضوية.';
     public const UNAUTHENTICATED     = 'غير مصرح بالوصول. يرجى تسجيل الدخول';
     public const ACCOUNT_FROZEN      = 'تم تجميد حسابك. تواصل مع الاتحاد للمزيد من المعلومات';
     public const ACCOUNT_SUSPENDED   = 'تم تعليق حسابك. تواصل مع الاتحاد للمزيد من المعلومات';

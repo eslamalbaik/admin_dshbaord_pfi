@@ -292,6 +292,12 @@ class Contractor extends Authenticatable
         return count($this->missing_profile_fields) === 0;
     }
 
+    /** جوال المفوض بيتخزن بصيغة موحّدة (05XXXXXXXX) — لأنه صار معرّف دخول للتطبيق. */
+    public function setAuthorizedPersonPhoneAttribute($value): void
+    {
+        $this->attributes['authorized_person_phone'] = \App\Support\PhoneNumber::normalize($value);
+    }
+
     /** فتح حساب على التطبيق = أكمل التحقق من الهوية وضبط كلمة مرور (نفس شرط تسجيل الدخول). */
     public function getHasAppAccountAttribute(): bool
     {

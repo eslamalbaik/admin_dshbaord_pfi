@@ -53,6 +53,11 @@ info:
     ## Membership numbers
     Format is `<number>_g` (e.g. `184_g`). Login also accepts the bare number (`184`), which is normalized to `184_g`.
 
+    ## Login identifier
+    The official login number is the **authorized signatory's mobile** (`authorized_person_phone`, رقم جوال المفوض),
+    in any common format (`0599123456`, `599123456`, `+970599123456`, `00970 599 123 456`); the membership number still works.
+    Send it as `identifier` (preferred) or in the old `membership_number` field.
+
     ## Money
     Dues, balances and credits are in **JOD**. Transfers may be submitted in `JOD`, `ILS` or `USD`;
     the accountant converts to JOD on confirmation.
@@ -106,9 +111,14 @@ paths:
   /contractor/auth/login:
     post:
       tags: [Auth]
-      summary: Log in with membership number and password
+      summary: Log in with the authorized signatory's mobile (or membership number) and password
       description: |
-        Checks membership first, then password, then eligibility (frozen account / phone not verified).
+        `identifier` is the authorized signatory's mobile (رقم جوال المفوض, the official login number) or the
+        membership number. A membership number is matched first; otherwise a mobile-looking value is normalized
+        to `05XXXXXXXX` and matched against `authorized_person_phone`. When one signatory is registered for several
+        companies, the password picks the company; if the password matches more than one, `409 authorized_phone_ambiguous`
+        asks the user to log in with the membership number.
+        Then checks password and eligibility (frozen account / phone not verified).
         Deletes all previous tokens (single active session). Updates `fcm_token` if sent.
         Rate limited to 5/min/IP.
       operationId: contractorLogin
@@ -119,11 +129,18 @@ paths:
           application/json:
             schema:
               type: object
-              required: [membership_number, password]
+              required: [password]
+              description: Send `identifier` or `membership_number` (at least one).
               properties:
+                identifier:
+                  type: string
+                  maxLength: 50
+                  description: Authorized signatory's mobile (any format) or membership number (with or without `_g`).
+                  example: "0599123456"
                 membership_number:
                   type: string
-                  description: With or without the `_g` suffix.
+                  maxLength: 50
+                  description: Old name of `identifier`, kept for current app versions. Accepts the same values.
                   example: "184_g"
                 password:
                   type: string
@@ -161,7 +178,10 @@ paths:
           description: "`error: account_frozen` or `phone_not_verified` (registration not completed)."
           content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
         "404":
-          description: "No contractor with this membership number (`error: no_membership`)."
+          description: "No contractor with this membership number (`error: no_membership`), or no company has this authorized signatory mobile (`error: authorized_phone_not_found`)."
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+        "409":
+          description: "The mobile belongs to the signatory of several companies and the password matches more than one (`error: authorized_phone_ambiguous`); log in with the membership number."
           content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
         "422": { $ref: "#/components/responses/ValidationError" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
