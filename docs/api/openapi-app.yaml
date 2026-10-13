@@ -552,8 +552,8 @@ paths:
         `commercial_register`, `owner_name`, `authorized_person*`, `partners`, `specialties`,
         `classification`. Attempts to change `classification`/`specialties` are logged server-side.
 
-        **Changing the phone** requires `profile/phone/request-otp` + `profile/phone/verify-otp`
-        first (within 15 minutes), otherwise `422 phone_verification_required`.
+        **Changing the phone** is direct: send the new `phone` here, no OTP needed (since 2026-10-13).
+        It must be unique across contractors (`422` otherwise). An empty `phone` is ignored (does not clear the number).
 
         An empty `established_date` is ignored (does not clear the stored date).
         Each uploaded file replaces the previous one. Admins are notified of changed text fields.
@@ -610,7 +610,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/ForceLogout" }
         "422":
-          description: "`phone_verification_required`, city not in governorate, or validation error."
+          description: "Phone already used by another contractor, city not in governorate, or validation error."
           content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
 
   /contractor/auth/profile/phone/request-otp:
@@ -618,6 +618,7 @@ paths:
       tags: [Profile]
       summary: "Change phone step 1: send OTP to the new number"
       operationId: requestPhoneChangeOtp
+      deprecated: true
       requestBody:
         required: true
         content:
@@ -653,8 +654,9 @@ paths:
     post:
       tags: [Profile]
       summary: "Change phone step 2: verify OTP"
-      description: On success, the new phone may be saved via `POST /contractor/auth/profile/update` within 15 minutes.
+      description: "Deprecated since 2026-10-13: `POST /contractor/auth/profile/update` no longer requires this step. Kept only for older app versions."
       operationId: verifyPhoneChangeOtp
+      deprecated: true
       requestBody:
         required: true
         content:
