@@ -1048,8 +1048,10 @@ paths:
       tags: [Home]
       summary: Full updates feed ("View all")
       description: |
-        Merged feed of open tenders, news, pinned circulars, the contractor's dues, memberships and
-        certificate requests. 20 per page. Each source is capped at 30 records before merging.
+        Merged feed of public union content only: open tenders, published events, news, published
+        circulars and active legal-library files. Financial items (dues, penalties, payments, balances)
+        and membership/classification certificates are NOT included (they reach the contractor as
+        notifications and on their own screens). 20 per page. Each source is capped at 30 records before merging.
       operationId: getHomeUpdates
       parameters:
         - $ref: "#/components/parameters/Page"
@@ -4117,19 +4119,27 @@ components:
       properties:
         type:
           type: string
-          enum: [tender, news, circular, finance, member]
+          enum: [tender, event, news, circular, legal_file]
           description: |
-            Where `reference_id` points: `tender` → tender id, `news` → news id, `circular` → announcement id,
-            `finance` → due id, `member` → membership id **or** certificate request id (both use type `member`).
+            Where `reference_id` points: `tender` → tender id, `event` → event id (`/contractor/events/{id}`),
+            `news` → news id, `circular` → announcement id, `legal_file` → legal file id (no details endpoint:
+            open `url` directly). Financial types and certificates were removed from this feed on 2026-10-13.
         reference_id: { type: integer }
         title: { type: string }
         subtitle: { type: string, nullable: true }
         badges:
           type: array
           items: { type: string }
-          description: Arabic badges, any of "ملحق" (attachment), "جديد" (new), "مرفوض" (rejected).
-        priority: { type: string, enum: [normal, high] }
+          description: Arabic badges, any of "ملحق" (attachment), "جديد" (new).
+        priority:
+          type: string
+          enum: [normal, high]
+          description: "`high` only for an urgent circular the contractor has not acknowledged yet."
         created_at: { type: string, format: date-time }
+        url:
+          type: string
+          nullable: true
+          description: Direct file URL for `legal_file` items; null for every other type.
 
     # ---------- Tenders ----------
     Tender:
