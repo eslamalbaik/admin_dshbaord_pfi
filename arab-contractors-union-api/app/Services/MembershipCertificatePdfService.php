@@ -49,6 +49,14 @@ class MembershipCertificatePdfService
         ];
     }
 
+    /**
+     * "سارية المفعول حتى" على شهادة العضوية: انتهاء العضوية النشطة، وإلا سنة من اليوم.
+     */
+    public static function validUntil(Contractor $contractor): \Illuminate\Support\Carbon
+    {
+        return $contractor->activeMembership?->expires_at?->copy() ?? now()->addYear();
+    }
+
     public function generate(CertificateRequest $certRequest, array $overrides = [], bool $preview = false): string
     {
         $contractor = $certRequest->contractor;
@@ -66,7 +74,10 @@ class MembershipCertificatePdfService
             $decisionDate = \Illuminate\Support\Carbon::parse($decisionDate)->format('d/m/Y');
         }
         $decisionNumber = $overrides['decision_number'] ?? ($defaults['decision_number'] ?? '—');
-        $validUntil = $membership?->expires_at?->format('d/m/Y') ?? now()->addYear()->format('d/m/Y');
+        $validUntilDate = self::validUntil($contractor);
+        $validUntil     = $validUntilDate->format('d/m/Y');
+        // نفس التاريخ المطبوع بيرجع للتطبيق (expiry_date) — بينحفظ مع update() الإصدار
+        $certRequest->valid_until = $validUntilDate->toDateString();
 
         $address = $overrides['address'] ?? ($defaults['address'] ?? '—');
 
