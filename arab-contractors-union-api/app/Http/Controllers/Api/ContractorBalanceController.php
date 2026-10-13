@@ -105,6 +105,10 @@ class ContractorBalanceController extends Controller
         $balance['subscription_status_label'] = self::STATUS_LABELS[$balance['subscription_status']]
             ?? $balance['subscription_status'];
 
+        // تاريخ انتهاء آخر عضوية (نشطة أو منتهية) — مثلاً 2025-12-31 لعضوية منتهية، null لو ما في عضوية أبداً
+        $balance['membership_expires_at'] = \App\Models\Contractor::find($contractorId)
+            ?->display_membership?->expires_at?->toDateString();
+
         // له / عليه / متوازن — لتلوين البطاقة بالتطبيق بدون ما يقارن الرقم بصفر بنفسه
         $balance['position'] = match (true) {
             $balance['net_jod'] > 0 => 'credit',

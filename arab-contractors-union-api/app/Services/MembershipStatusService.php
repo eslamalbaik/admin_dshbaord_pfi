@@ -28,16 +28,19 @@ class MembershipStatusService
 
         $blockers = ContractorRequirements::renewalBlockers($contractor);
 
+        // تاريخ الانتهاء يُرجَع حتى للعضوية المنتهية (آخر عضوية) — الـ badge يبقى كما هو.
+        $display = $membership ?? $contractor->latestMembership;
+
         return [
             'id'                    => $membership?->id,
             'type'                  => $membership?->type,
             'membership_status'     => $membership?->status,
             'badge'                 => $badge,
-            'starts_at'             => $membership?->starts_at?->toDateString(),
-            'expires_at'            => $membership?->expires_at?->toDateString(),
+            'starts_at'             => $display?->starts_at?->toDateString(),
+            'expires_at'            => $display?->expires_at?->toDateString(),
             'amount'                => $membership?->amount,
             'expiring_soon'         => (bool) $membership?->expiring_soon,
-            'days_remaining'        => $membership?->expires_at ? max(0, (int) now()->diffInDays($membership->expires_at, false)) : null,
+            'days_remaining'        => $display?->expires_at ? max(0, (int) now()->diffInDays($display->expires_at, false)) : null,
             'can_renew'             => count($blockers) === 0,
             'renewal_blockers'      => $blockers,
             'outstanding_total_jod' => $this->financialService->outstandingDuesTotal($contractor),
