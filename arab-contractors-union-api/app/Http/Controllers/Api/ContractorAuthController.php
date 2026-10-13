@@ -171,7 +171,7 @@ class ContractorAuthController extends Controller
 
     // ─────────────────────────────────────────────────────────────────────────
     //  POST /api/v1/contractor/auth/profile/phone/request-otp
-    //  الخطوة 1: طلب رمز تحقق لرقم الجوال الجديد قبل تعديل الملف التعريفي
+    //  (اختياري، للتوافق) طلب رمز تحقق لرقم جوال جديد — لم يعد شرطاً لتعديله
     // ─────────────────────────────────────────────────────────────────────────
     public function requestPhoneChangeOtp(RequestPhoneChangeOtpRequest $request)
     {
@@ -207,7 +207,7 @@ class ContractorAuthController extends Controller
 
     // ─────────────────────────────────────────────────────────────────────────
     //  POST /api/v1/contractor/auth/profile/phone/verify-otp
-    //  الخطوة 2: تأكيد الرمز — يُتيح إرسال نفس الرقم بـ profile/update بعدها
+    //  (اختياري، للتوافق) تأكيد الرمز — profile/update لم يعد يشترطه
     // ─────────────────────────────────────────────────────────────────────────
     public function verifyPhoneChangeOtp(VerifyPhoneChangeOtpRequest $request)
     {
@@ -281,22 +281,16 @@ class ContractorAuthController extends Controller
             unset($validated['established_date']);
         }
 
-        // تغيير رقم الجوال يتطلب تحقق OTP مسبق (phone/request-otp + phone/verify-otp)
-        // — لا يُقبل مباشرة ولو مختلف عن القيمة المخزَّنة، لأن الجوال يُستخدم لتفعيل/دخول الحساب.
-        if (array_key_exists('phone', $validated) && $validated['phone'] && $validated['phone'] !== $contractor->phone) {
-            $verifiedPhone = $this->otpService->getVerifiedResult('profile_phone', $contractor->id);
-
-            if ($verifiedPhone !== $validated['phone']) {
-                return $this->error(
-                    'يجب التحقق من رقم الجوال الجديد أولاً عبر رمز التحقق (OTP) قبل حفظ التعديل.',
-                    422,
-                    null,
-                    'phone_verification_required',
-                );
+        // رقم الجوال يتعدّل مباشرة بدون OTP (قرار المالك 2026-10-13). التفرّد مضمون بـ
+        // UpdateFullProfileRequest. الفراغ لا يعني "احذف الرقم": الجوال معرّف دخول، ونموذج
+        // التطبيق قد يرسل الحقل فارغاً فكان سيمسح الرقم ويقفل الحساب.
+        // مسارا phone/request-otp و phone/verify-otp باقيان لتوافق نسخ التطبيق القديمة، لكن
+        // لم يبقَ شيء يشترطهما.
+        if (array_key_exists('phone', $validated)) {
+            $validated['phone'] = is_string($validated['phone']) ? trim($validated['phone']) : $validated['phone'];
+            if (empty($validated['phone'])) {
+                unset($validated['phone']);
             }
-
-            $this->otpService->forgetVerifiedResult('profile_phone', $contractor->id);
-            $validated['phone_verified_at'] = now();
         }
 
         $this->rejectFeeRelevantFields($request, $contractor);
