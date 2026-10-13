@@ -9,6 +9,8 @@ use App\Models\ContractorDue;
 use App\Models\Equipment;
 use App\Models\EquipmentType;
 use App\Models\Event;
+use App\Models\LegalFile;
+use App\Models\LegalFileCategory;
 use App\Models\Membership;
 use App\Models\News;
 use App\Models\Payment;
@@ -473,41 +475,69 @@ class ContractorHomeTest extends TestCase
         $this->assertNotContains('جديد', $updates['عطاء قديم شوي']['badges']);
     }
 
-    public function test_rejected_certificate_request_shows_rejected_badge_and_high_priority(): void
+    /**
+     * آخر التحديثات = عطاءات، فعاليات، أخبار، تعاميم، مكتبة قانونية فقط —
+     * لا ذمم ولا غرامات ولا دفعات ولا عضويات ولا شهادات (طلب م. إسلام 2026-10-13).
+     */
+    public function test_latest_updates_only_include_public_content_types(): void
     {
         $contractor = $this->createContractor();
-        CertificateRequest::create([
-            'contractor_id' => $contractor->id,
-            'type'          => 'membership',
-            'status'        => 'rejected',
-            'reject_reason' => 'مستندات ناقصة',
+
+        Tender::create(['title' => 'عطاء مفتوح', 'status' => 'open']);
+        Event::create([
+            'title' => 'فعالية منشورة', 'slug' => 'feed-event', 'body' => 'x',
+            'is_published' => true, 'published_at' => now(), 'event_date' => now()->addDays(3),
+            'event_location' => 'غزة', 'event_format' => 'onsite',
+        ]);
+        News::create([
+            'title' => 'خبر منشور', 'slug' => 'feed-news', 'body' => 'x',
+            'is_published' => true, 'published_at' => now(),
+        ]);
+        Announcement::create([
+            'title' => 'تعميم عادي', 'body' => 'x', 'is_published' => true, 'published_at' => now(),
+        ]);
+        LegalFileCategory::create(['key' => 'law', 'label' => 'تشريعات']);
+        LegalFile::create(['title' => 'قانون المقاولات', 'category' => 'law', 'file_path' => 'legal/law.pdf']);
+        LegalFile::create(['title' => 'ملف موقوف', 'category' => 'law', 'file_path' => 'legal/off.pdf', 'is_active' => false]);
+
+        ContractorDue::create(['contractor_id' => $contractor->id, 'description' => 'ذمة', 'amount_jod' => 40, 'status' => 'unpaid']);
+        Penalty::create(['contractor_id' => $contractor->id, 'reason' => 'تأخير', 'amount' => 20, 'status' => 'unpaid']);
+        CertificateRequest::create(['contractor_id' => $contractor->id, 'type' => 'membership', 'status' => 'rejected']);
+
+        Sanctum::actingAs($contractor, ['*']);
+
+        foreach (['/api/v1/contractor/home' => 'items.latest_updates', '/api/v1/contractor/home/updates' => 'items'] as $url => $path) {
+            $updates = collect($this->getJson($url)->json($path));
+
+            $this->assertEqualsCanonicalizing(
+                ['tender', 'event', 'news', 'circular', 'legal_file'],
+                $updates->pluck('type')->unique()->values()->all(),
+                $url,
+            );
+        }
+
+        $updates = collect($this->getJson('/api/v1/contractor/home/updates')->json('items'))->keyBy('type');
+        $this->assertEquals('تشريعات', $updates['legal_file']['subtitle']);
+        $this->assertNotNull($updates['legal_file']['url']);
+        $this->assertStringContainsString('غزة', $updates['event']['subtitle']);
+        $this->assertSame(5, $this->getJson('/api/v1/contractor/home')->json('items.latest_updates_total'));
+    }
+
+    public function test_urgent_circular_awaiting_acknowledgement_is_high_priority(): void
+    {
+        $contractor = $this->createContractor();
+
+        Announcement::create([
+            'title' => 'تعميم عاجل', 'body' => 'x', 'is_pinned' => true,
+            'is_published' => true, 'published_at' => now()->subDays(3),
         ]);
 
         Sanctum::actingAs($contractor, ['*']);
-        $updates = $this->getJson('/api/v1/contractor/home')->json('items.latest_updates');
+        $item = collect($this->getJson('/api/v1/contractor/home')->json('items.latest_updates'))->firstWhere('type', 'circular');
 
-        $item = collect($updates)->firstWhere('type', 'member');
-        $this->assertNotNull($item);
-        $this->assertContains('مرفوض', $item['badges']);
         $this->assertEquals('high', $item['priority']);
-    }
-
-    public function test_finance_feed_item_is_scoped_to_owning_contractor(): void
-    {
-        $me      = $this->createContractor(['membership_number' => '903_g']);
-        $another = $this->createContractor(['membership_number' => '904_g', 'name' => 'مقاول آخر']);
-
-        ContractorDue::create([
-            'contractor_id' => $another->id,
-            'description'   => 'ذمة تخص مقاول آخر',
-            'amount_jod'    => 40,
-            'status'        => 'unpaid',
-        ]);
-
-        Sanctum::actingAs($me, ['*']);
-        $updates = $this->getJson('/api/v1/contractor/home')->json('items.latest_updates');
-
-        $this->assertFalse(collect($updates)->contains('title', 'ذمة تخص مقاول آخر'));
+        $this->assertContains('جديد', $item['badges']);
+        $this->assertEquals('بانتظار الإقرار بالقراءة', $item['subtitle']);
     }
 
     // ─────────────────────────────────────────────────────────────────────

@@ -6,10 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\Announcement;
 use App\Models\AnnouncementAcknowledgement;
-use App\Models\CertificateRequest;
 use App\Models\Contractor;
 use App\Models\Event;
-use App\Models\Membership;
+use App\Models\LegalFile;
+use App\Models\LegalFileCategory;
 use App\Models\News;
 use App\Models\Tender;
 use Illuminate\Http\Request;
@@ -21,7 +21,7 @@ use Illuminate\Support\Collection;
  * الذمم المالية، الإحصائيات، وآخر التحديثات. الخدمات السريعة أزرار تنقّل ثابتة
  * داخل التطبيق نفسه، لا تحتاج API (تأكيد م. مؤمن عياض).
  * لا يوجد جدول "updates" منفصل — كل شيء يُقرأ حياً من الجداول الأساسية
- * (عطاءات/أخبار/ذمم/عضويات) في كل طلب.
+ * (عطاءات/فعاليات/أخبار/تعاميم/مكتبة قانونية) في كل طلب.
  */
 class ContractorHomeController extends Controller
 {
@@ -193,16 +193,17 @@ class ContractorHomeController extends Controller
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  دمج المصادر الأربعة (عطاءات/أخبار/مالية/عضوية) في تغذية واحدة مرتّبة بالأحدث
+    //  "آخر التحديثات" = محتوى الاتحاد العام فقط: عطاءات، فعاليات، أخبار، تعاميم،
+    //  مكتبة قانونية — مرتّبة بالأحدث. الأمور المالية (ذمم/غرامات/دفعات) وشهادات
+    //  العضوية والتصنيف ما بتطلع هون (قرار م. إسلام 2026-10-13)؛ بتوصل كإشعارات وبشاشاتها.
     // ─────────────────────────────────────────────────────────────────────────
     private function buildFeed(Contractor $contractor): Collection
     {
         return $this->tenderUpdates()
+            ->concat($this->eventUpdates())
             ->concat($this->newsUpdates())
             ->concat($this->announcementUpdates($contractor))
-            ->concat($this->financeUpdates($contractor))
-            ->concat($this->penaltyUpdates($contractor))
-            ->concat($this->memberUpdates($contractor))
+            ->concat($this->legalFileUpdates())
             // created_at وحده غير كافٍ كمفتاح ترتيب — سجلات كتيرة بنفس الثانية ممكنة (استيراد جماعي مثلاً)
             ->sort(fn ($a, $b) => [$b['created_at'], $b['reference_id']] <=> [$a['created_at'], $a['reference_id']])
             ->values();
@@ -215,7 +216,6 @@ class ContractorHomeController extends Controller
             $badges = [];
             if ($item['has_attachment'] ?? false) $badges[] = 'ملحق';
             if ($item['is_new'] ?? false)          $badges[] = 'جديد';
-            if ($item['rejected'] ?? false)         $badges[] = 'مرفوض';
 
             return [
                 'type'         => $item['type'],
@@ -225,6 +225,7 @@ class ContractorHomeController extends Controller
                 'badges'       => $badges,
                 'priority'     => $item['priority'],
                 'created_at'   => $item['created_at']->toIso8601String(),
+                'url'          => $item['url'] ?? null,
             ];
         })->values();
     }
@@ -269,106 +270,75 @@ class ContractorHomeController extends Controller
             ]);
     }
 
-    // تعميمات مثبّتة (is_pinned) — بادج "غير مقروء" حتى يُقرّها المقاول (REQ-20)
+    // كل التعاميم المنشورة؛ العاجلة (is_pinned) عليها بادج "جديد" وأولوية عالية حتى يُقرّها المقاول (REQ-20)
     private function announcementUpdates(Contractor $contractor): Collection
     {
         $acknowledgedIds = AnnouncementAcknowledgement::where('contractor_id', $contractor->id)->pluck('announcement_id');
 
         return Announcement::published()
-            ->where('is_pinned', true)
-            ->select(['id', 'title', 'image', 'published_at'])
+            ->select(['id', 'title', 'image', 'is_pinned', 'published_at'])
             ->latest('published_at')
             ->limit(self::FEED_POOL_LIMIT)
             ->get()
-            ->map(fn (Announcement $a) => [
-                'type'         => 'circular',
-                'reference_id' => $a->id,
-                'title'        => $a->title,
-                'subtitle'     => $acknowledgedIds->contains($a->id) ? null : 'بانتظار الإقرار بالقراءة',
-                'has_attachment' => (bool) $a->image,
-                'is_new'       => ! $acknowledgedIds->contains($a->id),
-                'priority'     => $acknowledgedIds->contains($a->id) ? 'normal' : 'high',
-                'created_at'   => $a->published_at,
+            ->map(function (Announcement $a) use ($acknowledgedIds) {
+                $awaitingAck = $a->is_pinned && ! $acknowledgedIds->contains($a->id);
+
+                return [
+                    'type'         => 'circular',
+                    'reference_id' => $a->id,
+                    'title'        => $a->title,
+                    'subtitle'     => $awaitingAck ? 'بانتظار الإقرار بالقراءة' : null,
+                    'has_attachment' => (bool) $a->image,
+                    'is_new'       => $awaitingAck || $a->published_at->gt(now()->subHours(self::NEW_BADGE_HOURS)),
+                    'priority'     => $awaitingAck ? 'high' : 'normal',
+                    'created_at'   => $a->published_at,
+                ];
+            });
+    }
+
+    private function eventUpdates(): Collection
+    {
+        return Event::published()
+            ->select(['id', 'title', 'image', 'event_date', 'event_location', 'event_format', 'published_at'])
+            ->latest('published_at')
+            ->limit(self::FEED_POOL_LIMIT)
+            ->get()
+            ->map(fn (Event $e) => [
+                'type'         => 'event',
+                'reference_id' => $e->id,
+                'title'        => $e->title,
+                'subtitle'     => collect([
+                    $e->event_date?->format('Y-m-d'),
+                    $e->event_format === 'online' ? null : $e->event_location,
+                ])->filter()->implode(' — ') ?: null,
+                'has_attachment' => (bool) $e->image,
+                'is_new'       => $e->published_at->gt(now()->subHours(self::NEW_BADGE_HOURS)),
+                'priority'     => 'normal',
+                'created_at'   => $e->published_at,
             ]);
     }
 
-    // نوع "Finance" = فواتير/ذمم المقاول فقط (خاصة به)
-    private function financeUpdates(Contractor $contractor): Collection
+    // ملفات المكتبة القانونية المفعّلة — العنوان الفرعي اسم التصنيف
+    private function legalFileUpdates(): Collection
     {
-        return $contractor->dues()
-            ->select(['id', 'contractor_id', 'description', 'year', 'amount_jod', 'paid_jod', 'status', 'due_date', 'created_at'])
+        $categoryLabels = LegalFileCategory::pluck('label', 'key');
+
+        return LegalFile::where('is_active', true)
+            ->select(['id', 'title', 'category', 'file_path', 'disk', 'created_at'])
             ->latest('created_at')
             ->limit(self::FEED_POOL_LIMIT)
             ->get()
-            ->map(fn ($due) => [
-                'type'         => 'finance',
-                'reference_id' => $due->id,
-                'title'        => $due->title . ($due->year ? " ({$due->year})" : ''),
-                'subtitle'     => $due->status_label,
-                'has_attachment' => false,
-                'is_new'       => $due->created_at->gt(now()->subHours(self::NEW_BADGE_HOURS)),
-                'priority'     => ($due->status !== 'paid' && $due->due_date && $due->due_date->isPast()) ? 'high' : 'normal',
-                'created_at'   => $due->created_at,
+            ->map(fn (LegalFile $f) => [
+                'type'         => 'legal_file',
+                'reference_id' => $f->id,
+                'title'        => $f->title,
+                'subtitle'     => $categoryLabels[$f->category] ?? null,
+                'has_attachment' => (bool) $f->file_path,
+                'is_new'       => $f->created_at->gt(now()->subHours(self::NEW_BADGE_HOURS)),
+                'priority'     => 'normal',
+                'created_at'   => $f->created_at,
+                // ما في endpoint تفاصيل لملف قانوني بتطبيق المقاول — التطبيق يفتح الملف مباشرة
+                'url'          => $f->file_path ? $f->url : null,
             ]);
-    }
-
-    // نوع "penalty" = غرامات المقاول (كرت مستقل عن الذمم)
-    private function penaltyUpdates(Contractor $contractor): Collection
-    {
-        return $contractor->penalties()
-            ->where('status', '!=', 'rejected')
-            ->latest('created_at')
-            ->limit(self::FEED_POOL_LIMIT)
-            ->get()
-            ->map(fn ($penalty) => [
-                'type'         => 'penalty',
-                'reference_id' => $penalty->id,
-                'title'        => 'غرامة: ' . ($penalty->reason ?: 'غرامة مالية'),
-                'subtitle'     => $penalty->status_label . ($penalty->remaining > 0 ? ' — المتبقي ' . number_format($penalty->remaining, 2, '.', '') . ' د.أ' : ''),
-                'has_attachment' => false,
-                'is_new'       => $penalty->created_at->gt(now()->subHours(self::NEW_BADGE_HOURS)),
-                'priority'     => $penalty->remaining > 0 ? 'high' : 'normal',
-                'created_at'   => $penalty->created_at,
-            ]);
-    }
-
-    // نوع "Member" = تغييرات العضوية + طلبات الشهادات/تغيير الاسم الخاصة بالمقاول
-    private function memberUpdates(Contractor $contractor): Collection
-    {
-        $memberships = $contractor->memberships()
-            ->select(['id', 'contractor_id', 'type', 'status', 'document_url', 'expires_at', 'updated_at'])
-            ->latest('updated_at')
-            ->limit(self::FEED_POOL_LIMIT)
-            ->get()
-            ->map(fn (Membership $m) => [
-                'type'         => 'member',
-                'reference_id' => $m->id,
-                'title'        => 'عضوية ' . $m->type,
-                'subtitle'     => $m->status,
-                'has_attachment' => (bool) $m->document_url,
-                'is_new'       => $m->updated_at->gt(now()->subHours(self::NEW_BADGE_HOURS)),
-                'priority'     => $m->expiring_soon ? 'high' : 'normal',
-                'created_at'   => $m->updated_at,
-                'rejected'     => false,
-            ]);
-
-        $certificates = CertificateRequest::where('contractor_id', $contractor->id)
-            ->select(['id', 'contractor_id', 'type', 'status', 'attachment', 'updated_at'])
-            ->latest('updated_at')
-            ->limit(self::FEED_POOL_LIMIT)
-            ->get()
-            ->map(fn (CertificateRequest $c) => [
-                'type'         => 'member',
-                'reference_id' => $c->id,
-                'title'        => $c->type_label,
-                'subtitle'     => $c->status_label,
-                'has_attachment' => (bool) $c->attachment,
-                'is_new'       => $c->updated_at->gt(now()->subHours(self::NEW_BADGE_HOURS)),
-                'priority'     => $c->status === 'rejected' ? 'high' : 'normal',
-                'created_at'   => $c->updated_at,
-                'rejected'     => $c->status === 'rejected',
-            ]);
-
-        return $memberships->concat($certificates);
     }
 }

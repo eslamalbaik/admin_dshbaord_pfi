@@ -2109,7 +2109,7 @@
           "Home"
         ],
         "summary": "Full updates feed (\"View all\")",
-        "description": "Merged feed of open tenders, news, pinned circulars, the contractor's dues, memberships and\ncertificate requests. 20 per page. Each source is capped at 30 records before merging.\n",
+        "description": "Merged feed of public union content only: open tenders, published events, news, published\ncirculars and active legal-library files. Financial items (dues, penalties, payments, balances)\nand membership/classification certificates are NOT included (they reach the contractor as\nnotifications and on their own screens). 20 per page. Each source is capped at 30 records before merging.\n",
         "operationId": "getHomeUpdates",
         "parameters": [
           {
@@ -9151,12 +9151,12 @@
             "type": "string",
             "enum": [
               "tender",
+              "event",
               "news",
               "circular",
-              "finance",
-              "member"
+              "legal_file"
             ],
-            "description": "Where `reference_id` points: `tender` → tender id, `news` → news id, `circular` → announcement id,\n`finance` → due id, `member` → membership id **or** certificate request id (both use type `member`).\n"
+            "description": "Where `reference_id` points: `tender` → tender id, `event` → event id (`/contractor/events/{id}`),\n`news` → news id, `circular` → announcement id, `legal_file` → legal file id (no details endpoint:\nopen `url` directly). Financial types and certificates were removed from this feed on 2026-10-13.\n"
           },
           "reference_id": {
             "type": "integer"
@@ -9173,18 +9173,24 @@
             "items": {
               "type": "string"
             },
-            "description": "Arabic badges, any of \"ملحق\" (attachment), \"جديد\" (new), \"مرفوض\" (rejected)."
+            "description": "Arabic badges, any of \"ملحق\" (attachment), \"جديد\" (new)."
           },
           "priority": {
             "type": "string",
             "enum": [
               "normal",
               "high"
-            ]
+            ],
+            "description": "`high` only for an urgent circular the contractor has not acknowledged yet."
           },
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "url": {
+            "type": "string",
+            "nullable": true,
+            "description": "Direct file URL for `legal_file` items; null for every other type."
           }
         }
       },
