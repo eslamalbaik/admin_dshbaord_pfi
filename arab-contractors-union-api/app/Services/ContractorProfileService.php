@@ -27,7 +27,7 @@ class ContractorProfileService
 
     public function liteResource(Contractor $contractor): array
     {
-        $membership = $contractor->activeMembership;
+        $membership = $contractor->display_membership;
 
         return [
             'id'                   => $contractor->id,

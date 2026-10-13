@@ -138,6 +138,24 @@ class Contractor extends Authenticatable
             ->latestOfMany();
     }
 
+    /**
+     * آخر عضوية فعلية (نشطة أو منتهية) بحسب تاريخ الانتهاء — لعرض تاريخ الانتهاء
+     * حتى لما تكون العضوية منتهية (مثلاً 31/12/2025) بدل null.
+     */
+    public function latestMembership()
+    {
+        return $this->hasOne(Membership::class)
+            ->ofMany(['expires_at' => 'max', 'id' => 'max'], function ($q) {
+                $q->whereIn('status', ['active', 'expired'])->whereNotNull('expires_at');
+            });
+    }
+
+    /** العضوية النشطة إن وُجدت، وإلا آخر عضوية منتهية. */
+    public function getDisplayMembershipAttribute(): ?Membership
+    {
+        return $this->activeMembership ?? $this->latestMembership;
+    }
+
     public function payments()
     {
         return $this->hasMany(Payment::class);

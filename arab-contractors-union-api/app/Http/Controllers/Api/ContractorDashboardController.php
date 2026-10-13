@@ -24,7 +24,8 @@ class ContractorDashboardController extends Controller
         $activeMembership = $contractor->memberships()
             ->where('status', 'active')
             ->latest('starts_at')
-            ->first();
+            ->first()
+            ?? $contractor->latestMembership;
 
         return $this->success([
             'contractor' => [

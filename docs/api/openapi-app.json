@@ -1968,7 +1968,9 @@
                                 "expires_at": {
                                   "type": "string",
                                   "format": "date",
-                                  "nullable": true
+                                  "nullable": true,
+                                  "example": "2025-12-31",
+                                  "description": "Expiry of the active membership, or of the LAST expired membership when none is active (e.g. 2025-12-31). null only when the contractor never had a membership."
                                 },
                                 "expiring_soon": {
                                   "type": "boolean"
@@ -2661,6 +2663,13 @@
                               "type": "string",
                               "example": "منتهية",
                               "description": "Arabic label as shown on the dashboard (فعّالة / منتهية / قيد المراجعة / موقوفة)."
+                            },
+                            "membership_expires_at": {
+                              "type": "string",
+                              "format": "date",
+                              "nullable": true,
+                              "example": "2025-12-31",
+                              "description": "Expiry of the active membership, or of the LAST expired membership when none is active (e.g. 2025-12-31). null only when the contractor never had a membership."
                             },
                             "currency": {
                               "type": "string",
@@ -7994,6 +8003,7 @@
           "membership": {
             "type": "object",
             "nullable": true,
+            "description": "Active membership, or the last expired one (status expired, is_expired true) when none is active. null only when the contractor never had a membership.",
             "properties": {
               "id": {
                 "type": "integer"
@@ -8426,7 +8436,9 @@
           "expires_at": {
             "type": "string",
             "format": "date",
-            "nullable": true
+            "nullable": true,
+            "example": "2025-12-31",
+            "description": "Expiry of the active membership, or of the LAST expired membership when none is active (e.g. 2025-12-31). null only when the contractor never had a membership."
           },
           "amount": {
             "type": "string",
