@@ -4007,6 +4007,7 @@ components:
         certificate_url: { type: string, format: uri, nullable: true, description: Set once issued. }
         request_date: { type: string, format: date-time }
         issue_date: { type: string, format: date-time, nullable: true }
+        expiry_date: { type: string, format: date, nullable: true, description: 'Membership certificate expiry ("valid until" printed on it), Y-m-d. Set only for type=membership and status=issued; null otherwise.' }
         reviewed_by: { type: string, nullable: true }
 
     # ---------- Support ----------
