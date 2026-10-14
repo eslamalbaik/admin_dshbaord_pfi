@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import api from '@/plugins/axios'
+import { UPLOAD_TIMEOUT_MS, describeRequestError } from '@/utils/requestError'
 import { contractorDocumentLabels } from '@/utils/contractorDocuments'
 import type { ContractorDocumentKey } from '@/utils/contractorDocuments'
 import { useRouter } from 'vue-router'
@@ -11,6 +12,7 @@ const router = useRouter()
 const { smAndDown } = useDisplay()
 const step = ref(1)
 const loading = ref(false)
+const uploadProgress = ref(0)
 const errorMsg = ref('')
 
 const isNewMembership = ref(true)
@@ -402,6 +404,7 @@ const submit = async () => {
   }
 
   loading.value = true
+  uploadProgress.value = 0
   errorMsg.value = ''
   validationErrors.value = {}
   try {
@@ -429,7 +432,13 @@ const submit = async () => {
         }
       }
     })
-    await api.post('/api/v1/contractors', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+    await api.post('/api/v1/contractors', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: UPLOAD_TIMEOUT_MS,
+      onUploadProgress: e => {
+        uploadProgress.value = e.total ? Math.round((e.loaded / e.total) * 100) : 0
+      },
+    })
     router.push({ name: 'contractors' })
   }
   catch (err: any) {
@@ -444,7 +453,7 @@ const submit = async () => {
       return
     }
 
-    errorMsg.value = err?.response?.data?.message || 'فشل تسجيل المقاول. يرجى التحقق من المدخلات.'
+    errorMsg.value = describeRequestError(err, 'فشل تسجيل المقاول. يرجى التحقق من المدخلات.')
 
     const errors = err?.response?.data?.errors
     if (errors) {
@@ -1376,16 +1385,30 @@ const submit = async () => {
             السابق
           </VBtn>
           <div class="flex-grow-1 wizard-progress">
-            <div class="d-flex justify-space-between text-caption mb-1">
-              <span class="font-weight-medium">الخطوة {{ step }} من {{ steps.length }}</span>
-              <span class="text-medium-emphasis">اكتمال الطلب {{ overallProgress }}%</span>
-            </div>
-            <VProgressLinear
-              :model-value="overallProgress"
-              color="primary"
-              rounded
-              height="6"
-            />
+            <template v-if="loading">
+              <div class="d-flex justify-space-between text-caption mb-1">
+                <span class="font-weight-medium">جاري رفع المرفقات وحفظ المقاول…</span>
+                <span class="text-medium-emphasis">{{ uploadProgress }}%</span>
+              </div>
+              <VProgressLinear
+                :model-value="uploadProgress"
+                color="success"
+                rounded
+                height="6"
+              />
+            </template>
+            <template v-else>
+              <div class="d-flex justify-space-between text-caption mb-1">
+                <span class="font-weight-medium">الخطوة {{ step }} من {{ steps.length }}</span>
+                <span class="text-medium-emphasis">اكتمال الطلب {{ overallProgress }}%</span>
+              </div>
+              <VProgressLinear
+                :model-value="overallProgress"
+                color="primary"
+                rounded
+                height="6"
+              />
+            </template>
           </div>
           <VBtn
             v-if="step < steps.length"
