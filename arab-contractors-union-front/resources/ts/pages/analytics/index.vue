@@ -448,7 +448,7 @@ onMounted(fetchSummary)
                 class="d-flex flex-column align-center justify-center"
                 style="height:240px;"
               >
-                <VIcon icon="tabler-check-circle" size="48" color="success" class="mb-2" />
+                <VIcon icon="tabler-circle-check" size="48" color="success" class="mb-2" />
                 <span class="text-body-2 text-medium-emphasis">لا توجد غرامات في هذه الفترة</span>
               </div>
 
