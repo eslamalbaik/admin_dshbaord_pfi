@@ -87,6 +87,17 @@ class CertificateRequestController extends Controller
         $latestMembershipCert = $contractor->certificateRequests()
             ->where('type', 'membership')
             ->latest()
+            ->latest('id')
+            ->first();
+
+        // آخر شهادة عضوية صادرة فعلاً — بتضل ظاهرة للمقاول حتى لو قدّم طلب جديد بعدها أو
+        // انضافت عليه ذمم (latest_request بيصير الطلب الجديد، فكانت الصادرة تختفي من البطاقة)
+        $latestIssuedMembershipCert = $contractor->certificateRequests()
+            ->where('type', 'membership')
+            ->where('status', 'issued')
+            ->whereNotNull('certificate_path')
+            ->latest('issued_at')
+            ->latest('id')
             ->first();
 
         $latestClassificationCert = $contractor->certificateRequests()
@@ -117,6 +128,7 @@ class CertificateRequestController extends Controller
                     : ($displayedActive ? now()->endOfYear()->toDateString() : $activeMembership?->expires_at?->toDateString()),
                 'is_expired'        => ! ($rowValid || $displayedActive),
                 'latest_request'    => $latestMembershipCert ? new CertificateRequestResource($latestMembershipCert) : null,
+                'latest_issued'     => $latestIssuedMembershipCert ? new CertificateRequestResource($latestIssuedMembershipCert) : null,
             ],
             'classification' => [
                 'has_certificate' => (bool) $latestClassificationCert?->certificate_path,

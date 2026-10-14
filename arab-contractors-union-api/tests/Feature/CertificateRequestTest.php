@@ -582,4 +582,27 @@ class CertificateRequestTest extends TestCase
             ->assertOk()
             ->assertJsonPath('items.status', 'issued');
     }
+
+    /** الشهادة الصادرة بتضل ظاهرة بعد ذمّة جديدة أو طلب تاني، والطلب التاني مسموح */
+    public function test_issued_certificate_stays_visible_after_new_dues_and_a_second_request(): void
+    {
+        $contractor = $this->createCompliantContractor();
+        Sanctum::actingAs($contractor, ['*']);
+        $id = $this->postJson('/api/v1/contractor/certificate-requests', ['type' => 'membership'])->assertCreated()->json('items.id');
+
+        $this->actingAsAdmin();
+        $this->postJson("/api/v1/dashboard/certificate-requests/{$id}/issue")->assertOk();
+
+        Sanctum::actingAs($contractor, ['*']);
+        $second = $this->postJson('/api/v1/contractor/certificate-requests', ['type' => 'membership'])->assertCreated()->json('items.id');
+        $this->addCurrentYearDue($contractor);
+
+        $status = $this->getJson('/api/v1/contractor/certificates/status')->assertOk();
+        $this->assertSame($second, $status->json('items.membership.latest_request.id'));
+        $this->assertSame($id, $status->json('items.membership.latest_issued.id'));
+        $this->assertNotNull($status->json('items.membership.latest_issued.certificate_url'));
+
+        $this->assertNotNull(collect($this->getJson('/api/v1/contractor/certificate-requests')->json('items.requests'))
+            ->firstWhere('id', $id)['certificate_url']);
+    }
 }
