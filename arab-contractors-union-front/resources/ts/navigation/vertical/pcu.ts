@@ -79,7 +79,34 @@ export function buildPcuNav(user: NavUser): VerticalNavItems {
     to: 'dashboards',
   })
 
-  // 2. الإعلام والتواصل (الأخبار والفعاليات والتعميمات للأدمن، الإشعارات مشتركة)
+  // 2. إدارة الأعضاء وخدماتهم (للأدمن فقط)
+  if (!isAccountant) {
+    menuItems.push({ heading: 'إدارة الأعضاء', subtitle: 'المقاولون وطلبات الانتساب والشهادات' })
+    menuItems.push({
+      title: 'المقاولون',
+      icon: { icon: 'tabler-building-factory-2' },
+      children: [
+        { title: 'قائمة المقاولين', to: 'contractors' },
+        { title: 'تسجيل مقاول جديد', to: 'contractors-create' },
+        { title: 'طلبات الانتساب', to: 'contractors-memberships' },
+      ],
+    })
+    menuItems.push({
+      title: 'الشهادات',
+      icon: { icon: 'tabler-certificate' },
+      children: [
+        { title: 'طلبات الشهادات', to: 'certificate-requests' },
+        { title: 'شهادة العضوية', to: 'membership-certificates' },
+      ],
+    })
+    menuItems.push({
+      title: 'الدعم الفني والشكاوى',
+      icon: { icon: 'tabler-headset' },
+      to: 'support-tickets',
+    })
+  }
+
+  // 3. الإعلام والتواصل (الأخبار والفعاليات والتعميمات للأدمن، الإشعارات مشتركة)
   menuItems.push({ heading: 'الإعلام والتواصل', subtitle: 'المحتوى والتواصل مع أعضاء الاتحاد' })
   if (!isAccountant) {
     menuItems.push({
@@ -106,33 +133,6 @@ export function buildPcuNav(user: NavUser): VerticalNavItems {
     icon: { icon: 'tabler-bell' },
     to: 'notifications',
   })
-
-  // 3. إدارة الأعضاء وخدماتهم (للأدمن فقط)
-  if (!isAccountant) {
-    menuItems.push({ heading: 'إدارة الأعضاء', subtitle: 'المقاولون وطلبات الانتساب والشهادات' })
-    menuItems.push({
-      title: 'المقاولون',
-      icon: { icon: 'tabler-building-factory-2' },
-      children: [
-        { title: 'قائمة المقاولين', to: 'contractors' },
-        { title: 'تسجيل مقاول جديد', to: 'contractors-create' },
-        { title: 'طلبات الانتساب', to: 'contractors-memberships' },
-      ],
-    })
-    menuItems.push({
-      title: 'الشهادات',
-      icon: { icon: 'tabler-certificate' },
-      children: [
-        { title: 'طلبات الشهادات', to: 'certificate-requests' },
-        { title: 'شهادة العضوية', to: 'membership-certificates' },
-      ],
-    })
-    menuItems.push({
-      title: 'الدعم الفني والشكاوى',
-      icon: { icon: 'tabler-headset' },
-      to: 'support-tickets',
-    })
-  }
 
   // 4. الشؤون المالية (مشتركة)
   menuItems.push({ heading: 'الشؤون المالية', subtitle: 'المدفوعات والذمم وأرصدة المقاولين' })
