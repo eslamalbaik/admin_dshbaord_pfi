@@ -50,6 +50,8 @@ export interface AclProperties {
 // 👉 Vertical nav section title
 export interface NavSectionTitle extends Partial<AclProperties> {
   heading: string
+  /** سطر وصف صغير تحت عنوان المجموعة (بيختفي لما القائمة مطوية) */
+  subtitle?: string
 }
 
 // 👉 Vertical nav link
