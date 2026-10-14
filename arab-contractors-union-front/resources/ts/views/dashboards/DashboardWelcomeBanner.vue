@@ -42,10 +42,16 @@ const roleBadge = computed(() => ROLE_BADGES[authStore.user?.role ?? ''] ?? '')
 </template>
 
 <style scoped>
+/* هوية الاتحاد: كحلي الشعار (primary) مع الأصفر الذهبي */
+.welcome-banner {
+  background: linear-gradient(72.47deg, rgb(var(--v-theme-primary)) 22.16%, rgba(var(--v-theme-primary), 0.7) 76.47%) !important;
+  box-shadow: 0 4px 16px rgba(0, 2, 105, 0.2) !important;
+}
+
 .welcome-banner__text {
-  color: rgba(var(--v-theme-on-surface), 0.75);
+  color: #fff;
   font-size: 1.375rem;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.4;
 }
 
@@ -53,8 +59,8 @@ const roleBadge = computed(() => ROLE_BADGES[authStore.user?.role ?? ''] ?? '')
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  background: #6b0a1e;
-  color: #fff;
+  background: #ffbe1a;
+  color: #000269;
   font-size: 0.8125rem;
   font-weight: 700;
   line-height: 1;
