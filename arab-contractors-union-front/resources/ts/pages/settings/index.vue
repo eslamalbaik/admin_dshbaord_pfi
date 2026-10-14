@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import api from '@/plugins/axios'
 import { useAuthStore } from '@/stores/authStore'
-import { canAccessRoute, isSupervisor } from '@/utils/permissions'
+import { canAccessRoute } from '@/utils/permissions'
 
 definePage({ meta: { requiresAdmin: true } })
 
@@ -75,14 +75,6 @@ const uploadAvatar = async () => {
               :title="$t('My Profile')"
               :active="currentTab === 'profile'"
               @click="currentTab = 'profile'"
-            />
-            <VListItem
-              v-if="!isSupervisor(authStore.user)"
-              value="branding"
-              prepend-icon="tabler-palette"
-              :title="$t('Branding')"
-              :active="currentTab === 'branding'"
-              @click="currentTab = 'branding'"
             />
 
             <VDivider class="my-2" />
@@ -192,15 +184,6 @@ const uploadAvatar = async () => {
             <VBtn color="primary" :loading="isUploading" :disabled="!avatarFile" @click="uploadAvatar">
               {{ $t('Upload Picture') }}
             </VBtn>
-          </VCardText>
-
-          <!-- Branding -->
-          <VCardText v-if="currentTab === 'branding'">
-            <h5 class="text-h5 mb-4">Branding</h5>
-            <VTextField label="Primary Color" placeholder="#7C3AED" class="mb-4" />
-            <VTextField label="Secondary Color" placeholder="#06B6D4" class="mb-4" />
-            <VSelect label="Font Family" :items="['Inter', 'Roboto', 'Outfit', 'Cairo']" class="mb-4" />
-            <VBtn color="primary">Save Changes</VBtn>
           </VCardText>
         </VCard>
       </VCol>
