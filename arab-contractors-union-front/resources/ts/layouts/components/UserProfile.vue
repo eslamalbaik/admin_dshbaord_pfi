@@ -1,22 +1,14 @@
 <script setup lang="ts">
 import { PerfectScrollbar } from 'vue3-perfect-scrollbar'
 import { useAuthStore } from '@/stores/authStore'
+import { UNION_NAME, avatarUrl as toAvatarUrl } from '@/utils/avatarUrl'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
 const userData = computed(() => authStore.user)
 
-const API_ORIGIN = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/$/, '')
-const avatarUrl = computed(() => {
-  const a = (userData.value as any)?.avatar
-  if (!a)
-    return ''
-  // Absolute URLs (e.g. Google) pass through; relative paths get the storage prefix.
-  return /^https?:\/\//.test(a) ? a : `${API_ORIGIN}/storage/${a}`
-})
-
-import api from '@/plugins/axios'
+const avatarUrl = computed(() => toAvatarUrl((userData.value as any)?.avatar))
 
 const logout = async () => {
   await authStore.revokeSession()
@@ -28,9 +20,10 @@ const landingUrl = (import.meta.env.VITE_LANDING_URL || 'http://localhost:8080')
 const isStudent = computed(() => userData.value?.role === 'student')
 
 const displayName = computed(() => {
-  if (userData.value?.role === 'admin')
-    return 'اتحاد مقاولين العرب'
-  return userData.value?.fullName || userData.value?.name || ''
+  const name = userData.value?.fullName || userData.value?.name || ''
+  if (userData.value?.role === 'admin' && (!name.trim() || /^admin$/i.test(name.trim())))
+    return UNION_NAME
+  return name
 })
 
 const displayRole = computed(() => {
@@ -54,6 +47,7 @@ const userProfileList = computed(() => {
   }
   return [
     { type: 'divider' },
+    { type: 'navItem', icon: 'tabler-user-circle', title: 'الملف الشخصي', to: { name: 'profile' } },
     { type: 'navItem', icon: 'tabler-layout-dashboard', title: 'لوحة التحكم', to: { name: 'dashboards' } },
     { type: 'divider' },
   ]

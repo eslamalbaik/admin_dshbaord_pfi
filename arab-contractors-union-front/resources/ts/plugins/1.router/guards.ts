@@ -51,6 +51,7 @@ const ROUTE_TAB_TITLES: Record<string, string> = {
   'register': 'إنشاء حساب',
   'admin-login': 'دخول المشرف',
   'not-authorized': 'غير مصرح',
+  'profile': 'الملف الشخصي',
   'dashboards': 'لوحة التحكم',
   'contractors': 'المقاولون',
   'contractors-create': 'إضافة مقاول',

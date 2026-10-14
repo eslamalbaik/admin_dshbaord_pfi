@@ -317,6 +317,13 @@ Route::prefix('v1')->group(function () {
             });
         });
 
+        // الملف الشخصي لمستخدم لوحة التحكم (أدمن/محاسب/مشرف) — حسابه هو بس
+        Route::prefix('account')->group(function () {
+            Route::get('profile',   [\App\Http\Controllers\Api\AccountProfileController::class, 'show']);
+            Route::post('profile',  [\App\Http\Controllers\Api\AccountProfileController::class, 'update']);
+            Route::post('password', [\App\Http\Controllers\Api\AccountProfileController::class, 'updatePassword']);
+        });
+
         // --------------------------------------------------------
         //  Dashboard
         // --------------------------------------------------------
