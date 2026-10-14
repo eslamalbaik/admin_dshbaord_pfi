@@ -7,7 +7,6 @@ import CurrencyRatesWidget from '@/layouts/components/CurrencyRatesWidget.vue'
 import Footer from '@/layouts/components/Footer.vue'
 import NavBarNotifications from '@/layouts/components/NavBarNotifications.vue'
 import NavSearchBar from '@/layouts/components/NavSearchBar.vue'
-import NavbarShortcuts from '@/layouts/components/NavbarShortcuts.vue'
 import NavbarThemeSwitcher from '@/layouts/components/NavbarThemeSwitcher.vue'
 import UserProfile from '@/layouts/components/UserProfile.vue'
 
@@ -40,7 +39,6 @@ const navItems = computed(() => buildPcuNav(authStore.user))
         <VSpacer />
 
         <NavbarThemeSwitcher />
-        <NavbarShortcuts />
         <CurrencyRatesWidget />
         <NavBarNotifications class="me-1" />
         <UserProfile />
