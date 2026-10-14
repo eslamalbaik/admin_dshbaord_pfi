@@ -6,6 +6,7 @@ use App\Models\CertificateRequest;
 use App\Models\Contractor;
 use App\Models\ContractorDue;
 use App\Models\Membership;
+use App\Models\Penalty;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -558,5 +559,50 @@ class CertificateRequestTest extends TestCase
         $this->postJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}/issue")
             ->assertOk()
             ->assertJsonPath('items.status', 'issued');
+    }
+
+    /** الغرامات ما بتمنع شهادة العضوية (قرار 2026-10-14)، بس بتضل ظاهرة بالمتطلبات */
+    public function test_open_penalty_does_not_block_the_membership_certificate(): void
+    {
+        $contractor = $this->createCompliantContractor();
+        Penalty::create(['contractor_id' => $contractor->id, 'reason' => 'غرامة تأخير تسليم مشروع',
+            'amount' => 600, 'paid_amount' => 0, 'status' => 'unpaid']);
+        Sanctum::actingAs($contractor, ['*']);
+
+        $this->getJson('/api/v1/contractor/certificate-requests')
+            ->assertOk()
+            ->assertJsonPath('items.can_request', true)
+            ->assertJsonPath('items.requirement_issues.0.type', 'late_fees');
+
+        $id = $this->postJson('/api/v1/contractor/certificate-requests', ['type' => 'membership'])
+            ->assertCreated()->json('items.id');
+
+        $this->actingAsAdmin();
+        $this->postJson("/api/v1/dashboard/certificate-requests/{$id}/issue")
+            ->assertOk()
+            ->assertJsonPath('items.status', 'issued');
+    }
+
+    /** الشهادة الصادرة بتضل ظاهرة بعد ذمّة جديدة أو طلب تاني، والطلب التاني مسموح */
+    public function test_issued_certificate_stays_visible_after_new_dues_and_a_second_request(): void
+    {
+        $contractor = $this->createCompliantContractor();
+        Sanctum::actingAs($contractor, ['*']);
+        $id = $this->postJson('/api/v1/contractor/certificate-requests', ['type' => 'membership'])->assertCreated()->json('items.id');
+
+        $this->actingAsAdmin();
+        $this->postJson("/api/v1/dashboard/certificate-requests/{$id}/issue")->assertOk();
+
+        Sanctum::actingAs($contractor, ['*']);
+        $second = $this->postJson('/api/v1/contractor/certificate-requests', ['type' => 'membership'])->assertCreated()->json('items.id');
+        $this->addCurrentYearDue($contractor);
+
+        $status = $this->getJson('/api/v1/contractor/certificates/status')->assertOk();
+        $this->assertSame($second, $status->json('items.membership.latest_request.id'));
+        $this->assertSame($id, $status->json('items.membership.latest_issued.id'));
+        $this->assertNotNull($status->json('items.membership.latest_issued.certificate_url'));
+
+        $this->assertNotNull(collect($this->getJson('/api/v1/contractor/certificate-requests')->json('items.requests'))
+            ->firstWhere('id', $id)['certificate_url']);
     }
 }
