@@ -44,7 +44,12 @@ class CertificateRequestController extends Controller
     {
         $contractor = $request->user();
         $issues     = $this->eligibilityService->getIssues($contractor);
-        $blockingIssues = $this->eligibilityService->getBlockingIssues($contractor, 'membership');
+        // نفس فحص التقديم بالضبط (POST)، عشان التطبيق يعرف قبل ما يضغط المقاول "تقديم"
+        $eligibility = $this->eligibilityService->checkEligibility($contractor, 'membership');
+
+        if (($eligibility['code'] ?? null) === 'dues_below_threshold') {
+            array_unshift($issues, $this->thresholdRequirementIssue($eligibility));
+        }
 
         return $this->success([
             'contractor' => [
@@ -53,7 +58,10 @@ class CertificateRequestController extends Controller
                 'status'            => $contractor->status,
                 'is_frozen'         => (bool) $contractor->is_frozen,
             ],
-            'can_request'             => count($blockingIssues) === 0 && $contractor->profile_data_complete,
+            'can_request'             => $eligibility['eligible'],
+            'cannot_request_reason'   => $eligibility['eligible'] ? null : $eligibility['reason'],
+            'cannot_request_code'     => $eligibility['eligible'] ? null : $eligibility['code'],
+            'remaining_to_95_jod'     => $this->financialService->remainingToReach95PercentJod($contractor),
             'requirement_issues'      => $issues,
             'profile_data_complete'   => $contractor->profile_data_complete,
             'missing_profile_fields'  => $contractor->missing_profile_fields,
@@ -71,6 +79,10 @@ class CertificateRequestController extends Controller
         $contractor = $request->user();
         $issues     = $this->eligibilityService->getIssues($contractor);
         $percent    = $this->financialService->currentYearDuesPaidPercentage($contractor);
+
+        if ($threshold = $this->eligibilityService->membershipThresholdIssue($contractor)) {
+            array_unshift($issues, $this->thresholdRequirementIssue($threshold));
+        }
 
         $latestMembershipCert = $contractor->certificateRequests()
             ->where('type', 'membership')
@@ -204,6 +216,11 @@ class CertificateRequestController extends Controller
         $data['requirement_issues'] = $certificateRequest->contractor
             ? $this->eligibilityService->getIssues($certificateRequest->contractor)
             : [];
+
+        if ($certificateRequest->type === 'membership' && $certificateRequest->contractor
+            && $threshold = $this->eligibilityService->membershipThresholdIssue($certificateRequest->contractor)) {
+            array_unshift($data['requirement_issues'], $this->thresholdRequirementIssue($threshold));
+        }
         $data['delivery'] = $this->deliveryStatus($certificateRequest);
 
         return $this->success($data);
@@ -302,10 +319,50 @@ class CertificateRequestController extends Controller
         );
     }
 
+    /**
+     * شرط الـ95% بيرجع ينفحص عند الموافقة والإصدار، مش بس عند التقديم: ذمّة بتنضاف بعد
+     * ما قدّم المقاول طلبه كانت بتعدّي، وينطبع له شهادة وهو عليه المبلغ (2026-10-14).
+     * الطلب بيضل على حاله (معلّق/موافق) لحد ما يسدّد.
+     */
+    private function blockedByMembershipThreshold(CertificateRequest $certificateRequest): ?\Illuminate\Http\JsonResponse
+    {
+        if ($certificateRequest->type !== 'membership' || ! $certificateRequest->contractor) {
+            return null;
+        }
+
+        $threshold = $this->eligibilityService->membershipThresholdIssue($certificateRequest->contractor);
+
+        if (! $threshold) {
+            return null;
+        }
+
+        return $this->error(
+            "لا يمكن إصدار شهادة العضوية: يتبقى على المقاول سداد {$threshold['context']['remaining_to_95_jod']} دينار للوصول إلى حد الـ 95%. يبقى الطلب معلّقاً حتى السداد.",
+            422,
+            $threshold['context'],
+            'dues_below_threshold',
+        );
+    }
+
+    /** عائق الـ95% بنفس شكل عناصر requirement_issues */
+    private function thresholdRequirementIssue(array $threshold): array
+    {
+        return [
+            'type'        => 'dues_below_threshold',
+            'description' => $threshold['reason'],
+            'amount'      => $threshold['context']['remaining_to_95_jod'],
+            'due_date'    => null,
+        ];
+    }
+
     /** POST /api/v1/dashboard/certificate-requests/{certificateRequest}/approve */
     public function approve(Request $request, CertificateRequest $certificateRequest)
     {
         if ($blocked = $this->blockedByUnconfirmedPayment($certificateRequest)) {
+            return $blocked;
+        }
+
+        if ($blocked = $this->blockedByMembershipThreshold($certificateRequest)) {
             return $blocked;
         }
 
@@ -360,6 +417,10 @@ class CertificateRequestController extends Controller
     public function issue(IssueCertificateRequestRequest $request, CertificateRequest $certificateRequest)
     {
         if ($blocked = $this->blockedByUnconfirmedPayment($certificateRequest)) {
+            return $blocked;
+        }
+
+        if ($blocked = $this->blockedByMembershipThreshold($certificateRequest)) {
             return $blocked;
         }
 

@@ -72,28 +72,50 @@ class CertificateEligibilityService
                 ];
             }
 
-            return [
-                'eligible' => false,
-                'reason' => "يتبقى لك سداد {$this->financialService->remainingToReach95PercentJod($contractor)} دينار للوصول إلى حد الـ 95% واستخراج شهادتك تلقائياً.",
-                'code' => 'dues_below_threshold',
-                'context' => [
-                    'paid_percentage'   => $this->financialService->currentYearDuesPaidPercentage($contractor),
-                    'outstanding_jod'   => $this->financialService->outstandingDuesTotal($contractor),
-                    'remaining_to_95_jod' => $this->financialService->remainingToReach95PercentJod($contractor),
-                    'current_year'      => now()->year,
-                    'remaining_dues'   => $contractor->dues()->outstanding()->get()->map(fn ($d) => [
-                        'id'           => $d->id,
-                        'description'  => $d->description,
-                        'year'         => $d->year,
-                        'amount_jod'   => $d->amount_jod,
-                        'remaining_jod' => $d->remaining_jod,
-                        'status'       => $d->status,
-                    ])->values(),
-                ],
-            ];
+            return ['eligible' => false] + $this->belowThresholdDetails($contractor);
         }
 
         return ['eligible' => true];
+    }
+
+    /**
+     * سبب منع شهادة العضوية لأن المقاول تحت حدّ الـ95% من ذمم السنة الحالية، أو null.
+     *
+     * نفس القاعدة بتنفحص بثلاث محطات: عرض قائمة الطلبات للمقاول (can_request)، التقديم،
+     * والموافقة/الإصدار من اللوحة — ذمّة بتنضاف بعد التقديم لازم توقف الطلب القائم كمان.
+     */
+    public function membershipThresholdIssue(Contractor $contractor): ?array
+    {
+        if ($this->financialService->isEligibleForMembershipCertificate($contractor)) {
+            return null;
+        }
+
+        return $this->belowThresholdDetails($contractor);
+    }
+
+    /** @return array{reason: string, code: string, context: array} */
+    private function belowThresholdDetails(Contractor $contractor): array
+    {
+        $remaining = $this->financialService->remainingToReach95PercentJod($contractor);
+
+        return [
+            'reason' => "يتبقى لك سداد {$remaining} دينار للوصول إلى حد الـ 95% واستخراج شهادتك تلقائياً.",
+            'code' => 'dues_below_threshold',
+            'context' => [
+                'paid_percentage'   => $this->financialService->currentYearDuesPaidPercentage($contractor),
+                'outstanding_jod'   => $this->financialService->outstandingDuesTotal($contractor),
+                'remaining_to_95_jod' => $remaining,
+                'current_year'      => now()->year,
+                'remaining_dues'   => $contractor->dues()->outstanding()->get()->map(fn ($d) => [
+                    'id'           => $d->id,
+                    'description'  => $d->description,
+                    'year'         => $d->year,
+                    'amount_jod'   => $d->amount_jod,
+                    'remaining_jod' => $d->remaining_jod,
+                    'status'       => $d->status,
+                ])->values(),
+            ],
+        ];
     }
 
     /**

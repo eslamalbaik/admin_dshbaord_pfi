@@ -257,6 +257,7 @@ const confirmDelete = (r: any) => {
 
 function requirementTypeLabel(type: string): string {
   const labels: Record<string, string> = {
+    dues_below_threshold: 'نسبة السداد أقل من 95%',
     late_fees: 'غرامات التأخير',
     overdue_subscription: 'رسوم الاشتراك المتأخرة',
     pending_dispute: 'نزاع قيد المعالجة',
@@ -415,7 +416,7 @@ function fmtDate(d: string | null) {
               <li v-for="(issue, i) in detail.requirement_issues" :key="i" class="mb-1">
                 <strong>{{ requirementTypeLabel(issue.type) }}:</strong>
                 {{ issue.description }}
-                <template v-if="issue.amount"> — {{ issue.amount }} ₪</template>
+                <template v-if="issue.amount && issue.type !== 'dues_below_threshold'"> — {{ issue.amount }} ₪</template>
               </li>
             </ul>
           </VAlert>
