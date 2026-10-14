@@ -2,6 +2,7 @@
 import ContractorWizardStepper from '@/components/contractors/ContractorWizardStepper.vue'
 import type { WizardStepState } from '@/components/contractors/ContractorWizardStepper.vue'
 import api from '@/plugins/axios'
+import { UPLOAD_TIMEOUT_MS, describeRequestError } from '@/utils/requestError'
 import { contractorDocumentLabels } from '@/utils/contractorDocuments'
 import type { ContractorDocumentKey } from '@/utils/contractorDocuments'
 import { useRoute, useRouter } from 'vue-router'
@@ -508,6 +509,7 @@ const submit = async () => {
 
     await api.post(`/api/v1/contractors/${route.params.id}`, fd, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: UPLOAD_TIMEOUT_MS,
       onUploadProgress: e => {
         uploadProgress.value = e.total ? Math.round((e.loaded / e.total) * 100) : 0
       },
@@ -526,7 +528,7 @@ const submit = async () => {
       return
     }
 
-    errorMsg.value = err?.response?.data?.message || 'فشل تحديث المقاول. يرجى التحقق من المدخلات.'
+    errorMsg.value = describeRequestError(err, 'فشل تحديث المقاول. يرجى التحقق من المدخلات.')
 
     const errors = err?.response?.data?.errors
     if (errors) {
