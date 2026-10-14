@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\CertificateRequest;
 use App\Models\Contractor;
+use App\Models\ContractorDue;
 use App\Models\Membership;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -474,5 +475,88 @@ class CertificateRequestTest extends TestCase
             \Mockery::type(CertificateRequest::class),
             ['address' => 'خانيونس', 'decision_number' => '07/2023', 'decision_date' => '2023-05-14'],
         );
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    //  شرط الـ95% — ذمّة انضافت بعد التقديم (2026-10-14)
+    // ─────────────────────────────────────────────────────────────────────
+
+    private function addCurrentYearDue(Contractor $contractor, float $amount = 600): void
+    {
+        ContractorDue::create([
+            'contractor_id' => $contractor->id,
+            'year'          => now()->year,
+            'description'   => 'ذمة مالية',
+            'amount_jod'    => $amount,
+            'paid_jod'      => 0,
+            'status'        => 'unpaid',
+            'source'        => 'manual',
+        ]);
+    }
+
+    public function test_index_reports_the_95_percent_block_before_submitting(): void
+    {
+        $contractor = $this->createCompliantContractor();
+        Sanctum::actingAs($contractor, ['*']);
+
+        $this->getJson('/api/v1/contractor/certificate-requests')
+            ->assertOk()
+            ->assertJsonPath('items.can_request', true)
+            ->assertJsonPath('items.cannot_request_reason', null);
+
+        $this->addCurrentYearDue($contractor);
+
+        $response = $this->getJson('/api/v1/contractor/certificate-requests')
+            ->assertOk()
+            ->assertJsonPath('items.can_request', false)
+            ->assertJsonPath('items.cannot_request_code', 'dues_below_threshold')
+            ->assertJsonPath('items.requirement_issues.0.type', 'dues_below_threshold');
+
+        $this->assertEquals(570, $response->json('items.remaining_to_95_jod'));
+        $this->assertEquals(570, $response->json('items.requirement_issues.0.amount'));
+
+        // نفس الرسالة اللي بترجع لو ضغط تقديم
+        $store = $this->postJson('/api/v1/contractor/certificate-requests', ['type' => 'membership'])->assertStatus(403);
+        $this->assertSame($store->json('message'), $response->json('items.cannot_request_reason'));
+    }
+
+    public function test_approve_is_refused_when_a_due_was_added_after_the_request(): void
+    {
+        $contractor = $this->createCompliantContractor();
+        $certRequest = $contractor->certificateRequests()->create(['type' => 'membership', 'status' => 'pending']);
+        $this->addCurrentYearDue($contractor);
+        $this->actingAsAdmin();
+
+        $this->postJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}/approve")
+            ->assertStatus(422)
+            ->assertJsonPath('error', 'dues_below_threshold');
+
+        $this->assertSame('pending', $certRequest->fresh()->status);
+
+        $this->getJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}")
+            ->assertJsonPath('items.requirement_issues.0.type', 'dues_below_threshold');
+    }
+
+    public function test_issue_is_refused_when_a_due_was_added_after_the_request(): void
+    {
+        $contractor = $this->createCompliantContractor();
+        $certRequest = $contractor->certificateRequests()->create(['type' => 'membership', 'status' => 'pending']);
+        $this->addCurrentYearDue($contractor);
+        $this->actingAsAdmin();
+
+        $this->postJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}/issue")
+            ->assertStatus(422)
+            ->assertJsonPath('error', 'dues_below_threshold');
+
+        $certRequest->refresh();
+        $this->assertSame('pending', $certRequest->status);
+        $this->assertNull($certRequest->certificate_path);
+
+        // بعد ما يسدّد 95% بيمشي الإصدار
+        $contractor->dues()->update(['paid_jod' => 570, 'status' => 'partially_paid']);
+
+        $this->postJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}/issue")
+            ->assertOk()
+            ->assertJsonPath('items.status', 'issued');
     }
 }
