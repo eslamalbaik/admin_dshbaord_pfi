@@ -43,6 +43,10 @@ class CertificateRequestResource extends JsonResource
             'certificate_address' => $this->certificate_address,
             'decision_number'     => $this->decision_number,
             'decision_date'       => $this->decision_date?->toDateString(),
+            // تاريخ انتهاء شهادة العضوية ("سارية المفعول حتى") كما انطبع عليها — null لغير العضوية أو قبل الإصدار
+            'expiry_date'         => $this->type === 'membership' && $this->status === 'issued'
+                ? $this->valid_until?->toDateString()
+                : null,
             $this->mergeUnless($forContractor, [
                 'viewed_at'      => $this->viewed_at,
                 'last_viewed_at' => $this->last_viewed_at,

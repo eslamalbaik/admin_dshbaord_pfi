@@ -459,6 +459,11 @@ class CertificateRequestController extends Controller
             ? $this->pdfService->generate($certificateRequest, $certificateRequest->certificateOverrides())
             : $request->file('certificate')->store('certificates/membership', 'public');
 
+        // ملف مرفوع يدوياً لشهادة عضوية: نفس قاعدة التاريخ المطبوع بالتوليد
+        if (! $generated && $certificateRequest->type === 'membership') {
+            $certificateRequest->valid_until = MembershipCertificatePdfService::validUntil($certificateRequest->contractor)->toDateString();
+        }
+
         if ($oldPath && $oldPath !== $path) {
             Storage::disk('public')->delete($oldPath);
         }
