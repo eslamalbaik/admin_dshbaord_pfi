@@ -78,6 +78,7 @@ declare module 'vue-router/auto-routes' {
     'notifications': RouteRecordInfo<'notifications', '/notifications', Record<never, never>, Record<never, never>>,
     'payments-coupons': RouteRecordInfo<'payments-coupons', '/payments/coupons', Record<never, never>, Record<never, never>>,
     'payments-transactions': RouteRecordInfo<'payments-transactions', '/payments/transactions', Record<never, never>, Record<never, never>>,
+    'profile': RouteRecordInfo<'profile', '/profile', Record<never, never>, Record<never, never>>,
     'reset-password': RouteRecordInfo<'reset-password', '/reset-password', Record<never, never>, Record<never, never>>,
     'settings': RouteRecordInfo<'settings', '/settings', Record<never, never>, Record<never, never>>,
     'settings-activity-log': RouteRecordInfo<'settings-activity-log', '/settings/activity-log', Record<never, never>, Record<never, never>>,

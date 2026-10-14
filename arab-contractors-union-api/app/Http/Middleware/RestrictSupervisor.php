@@ -10,7 +10,7 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * حماية افتراضية للمشرفين على كل مسارات لوحة التحكم: المشرف المعطّل بينطرد، والمشرف
  * الفعّال بيوصل فقط للمسارات اللي عليها perm:... (وهي اللي بتفحص صلاحيته) أو لمساراته
- * الشخصية (بياناته، تسجيل الخروج، إشعاراته). أي route جديد بدون perm مقفول على المشرف
+ * الشخصية (بياناته وملفه الشخصي، تسجيل الخروج، إشعاراته). أي route جديد بدون perm مقفول على المشرف
  * تلقائياً بدل ما ينفتح بالغلط.
  *
  * الأدوار التانية (أدمن، محاسب...) ما بتتأثر.
@@ -22,6 +22,8 @@ class RestrictSupervisor
         'user',
         'auth/me',
         'auth/logout',
+        'account/profile',
+        'account/password',
         'notifications',
         'notifications/unread-count',
         'notifications/read',

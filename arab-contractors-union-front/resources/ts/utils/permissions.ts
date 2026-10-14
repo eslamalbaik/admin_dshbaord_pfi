@@ -66,7 +66,7 @@ const ROUTE_ACTIONS: Record<string, PermissionAction> = {
 }
 
 /** صفحات شخصية مفتوحة لأي مشرف (ملفي، الإشعارات) */
-const PERSONAL_ROUTES = ['settings', 'notifications', 'not-authorized']
+const PERSONAL_ROUTES = ['settings', 'profile', 'notifications', 'not-authorized']
 
 /** صفحات للأدمن فقط بغض النظر عن أي صلاحية */
 export const ADMIN_ONLY_ROUTES = ['supervisors']

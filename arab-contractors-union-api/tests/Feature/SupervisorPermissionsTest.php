@@ -186,7 +186,7 @@ class SupervisorPermissionsTest extends TestCase
     {
         // أي route جديد بلوحة التحكم لازم يكون عليه perm:... أو يكون أدمن فقط —
         // وإلا RestrictSupervisor بيقفله على المشرفين (هاد الاختبار بيذكّر بالسبب).
-        $personal = ['api/v1/user', 'api/v1/auth/me', 'api/v1/auth/logout', 'api/v1/notifications',
+        $personal = ['api/v1/user', 'api/v1/auth/me', 'api/v1/auth/logout', 'api/v1/account/profile', 'api/v1/account/password', 'api/v1/notifications',
             'api/v1/notifications/unread-count', 'api/v1/notifications/read', 'api/v1/notifications/{id}/mark-as-read'];
 
         $unguarded = collect(app('router')->getRoutes()->getRoutes())
