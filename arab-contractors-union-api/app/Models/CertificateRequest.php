@@ -36,6 +36,7 @@ class CertificateRequest extends Model
             'address'         => $this->certificate_address,
             'decision_number' => $this->decision_number,
             'decision_date'   => $this->decision_date?->toDateString(),
+            'valid_until'     => $this->valid_until?->toDateString(),
         ], fn ($v) => filled($v));
     }
 

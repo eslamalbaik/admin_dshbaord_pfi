@@ -106,7 +106,7 @@ const refresh = () => {
 const certFieldsOpen = ref(false)
 const certFieldsMode = ref<'approve' | 'issue' | 'regenerate'>('approve')
 const certFieldsLoading = ref(false)
-const certFields = ref({ address: '', decision_number: '', decision_date: '' })
+const certFields = ref({ address: '', decision_number: '', decision_date: '', valid_until: '' })
 
 async function openCertFields(mode: 'approve' | 'issue' | 'regenerate') {
   const r = detail.value
@@ -116,6 +116,8 @@ async function openCertFields(mode: 'approve' | 'issue' | 'regenerate') {
     address: r?.certificate_address || '',
     decision_number: r?.decision_number || '',
     decision_date: r?.decision_date || '',
+    // تاريخ انتهاء الشهادة: المحفوظ على الطلب، وإلا آخر عضوية للمقاول (تُعبَّا بعد التحميل)
+    valid_until: r?.expiry_date || '',
   }
   actionError.value = ''
   certFieldsOpen.value = true
@@ -130,6 +132,7 @@ async function openCertFields(mode: 'approve' | 'issue' | 'regenerate') {
     certFields.value.address ||= c?.city || c?.address || 'غزة'
     certFields.value.decision_number ||= c?.classification_decision_number || ''
     certFields.value.decision_date ||= c?.classification_decision_date?.slice(0, 10) || ''
+    certFields.value.valid_until ||= c?.active_membership?.expires_at?.slice(0, 10) || ''
   }
   catch {}
   finally {
@@ -147,6 +150,8 @@ function certFieldsPayload() {
     payload.decision_number = f.decision_number
   if (f.decision_date)
     payload.decision_date = f.decision_date
+  if (detail.value?.type === 'membership' && f.valid_until)
+    payload.valid_until = f.valid_until
 
   return payload
 }
@@ -593,6 +598,17 @@ function fmtDate(d: string | null) {
             class="mb-4"
             :loading="certFieldsLoading"
             placeholder="غزة"
+          />
+          <VTextField
+            v-if="detail?.type === 'membership'"
+            v-model="certFields.valid_until"
+            label="سارية المفعول حتى"
+            type="date"
+            dir="rtl"
+            class="mb-4"
+            :loading="certFieldsLoading"
+            hint="افتراضياً آخر عضوية للمقاول (31/12 من سنة العضوية) — عدّله إذا لزم"
+            persistent-hint
           />
           <VRow dense>
             <VCol cols="6">

@@ -384,6 +384,7 @@ class CertificateRequestController extends Controller
             'address'         => 'nullable|string|max:255',
             'decision_number' => 'nullable|string|max:100',
             'decision_date'   => 'nullable|date',
+            'valid_until'     => 'nullable|date',
         ]);
 
         $certificateRequest->update([
@@ -448,6 +449,11 @@ class CertificateRequestController extends Controller
         $oldIssuedAt = $certificateRequest->issued_at;
         $generated   = ! $request->hasFile('certificate');
 
+        // تاريخ الانتهاء المُدخل بيتطبع بالتوليد ويرجع بالـAPI، حتى لو الملف مرفوع يدوياً
+        if ($certificateRequest->type === 'membership' && $request->filled('valid_until')) {
+            $certificateRequest->valid_until = $request->validated()['valid_until'];
+        }
+
         // بيانات نافذة الإصدار بتغلب على المحفوظة من الموافقة، والفارغ بيرجع لملف المقاول
         $fields = [];
         if ($generated) {
@@ -459,8 +465,8 @@ class CertificateRequestController extends Controller
             ? $this->pdfService->generate($certificateRequest, $certificateRequest->certificateOverrides())
             : $request->file('certificate')->store('certificates/membership', 'public');
 
-        // ملف مرفوع يدوياً لشهادة عضوية: نفس قاعدة التاريخ المطبوع بالتوليد
-        if (! $generated && $certificateRequest->type === 'membership') {
+        // ملف مرفوع يدوياً بدون تاريخ: بياخد آخر عضوية للمقاول (نفس الافتراضي للتوليد)
+        if (! $generated && $certificateRequest->type === 'membership' && blank($certificateRequest->valid_until)) {
             $certificateRequest->valid_until = MembershipCertificatePdfService::validUntil($certificateRequest->contractor)->toDateString();
         }
 
@@ -667,6 +673,7 @@ class CertificateRequestController extends Controller
             'certificate_address' => $data['address'] ?? null,
             'decision_number'     => $data['decision_number'] ?? null,
             'decision_date'       => $data['decision_date'] ?? null,
+            'valid_until'         => $data['valid_until'] ?? null,
         ], fn ($v) => filled($v));
     }
 
@@ -746,7 +753,8 @@ class CertificateRequestController extends Controller
             'type_label'              => $certRequest->type_label,
             'serial'                  => $serial,
             'issued_at'               => $certRequest->issued_at,
-            'membership_valid_until'  => $certRequest->contractor?->activeMembership?->expires_at?->toDateString(),
+            'membership_valid_until'  => $certRequest->valid_until?->toDateString()
+                ?? $certRequest->contractor?->activeMembership?->expires_at?->toDateString(),
         ]);
     }
 }

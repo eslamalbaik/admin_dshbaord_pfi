@@ -436,6 +436,20 @@ class CertificateRequestTest extends TestCase
         $this->assertNull($requests[$pending->id]['expiry_date']);
     }
 
+    public function test_issue_accepts_manual_expiry_date_and_prints_it(): void
+    {
+        $contractor = $this->createCompliantContractor();
+        $contractor->memberships()->update(['expires_at' => '2026-12-31']);
+        $certRequest = $contractor->certificateRequests()->create(['type' => 'membership', 'status' => 'approved']);
+        $this->actingAsAdmin();
+
+        $this->postJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}/issue", ['valid_until' => '2027-06-30'])
+            ->assertOk()
+            ->assertJsonPath('items.expiry_date', '2027-06-30');
+
+        $this->assertSame('2027-06-30', $certRequest->fresh()->valid_until->toDateString());
+    }
+
     public function test_issue_other_types_without_file_is_refused(): void
     {
         $contractor = $this->createCompliantContractor();

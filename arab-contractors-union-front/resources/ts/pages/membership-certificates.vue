@@ -61,6 +61,7 @@ const issueError = ref('')
 const issueAddress = ref('')
 const issueDecisionNumber = ref('')
 const issueDecisionDate = ref('')
+const issueValidUntil = ref('')
 const loadingIssueDefaults = ref(false)
 
 async function openIssueDialog(c: any) {
@@ -74,6 +75,7 @@ async function openIssueDialog(c: any) {
   issueAddress.value = ''
   issueDecisionNumber.value = ''
   issueDecisionDate.value = ''
+  issueValidUntil.value = ''
   isIssueOpen.value = true
 
   loadingIssueDefaults.value = true
@@ -82,6 +84,7 @@ async function openIssueDialog(c: any) {
     issueAddress.value = full?.city || full?.address || 'غزة'
     issueDecisionNumber.value = full?.classification_decision_number || ''
     issueDecisionDate.value = full?.classification_decision_date?.slice(0, 10) || ''
+    issueValidUntil.value = full?.active_membership?.expires_at?.slice(0, 10) || ''
   } finally {
     loadingIssueDefaults.value = false
   }
@@ -95,6 +98,7 @@ const issueMutation = useMutation({
       address: issueAddress.value || undefined,
       decision_number: issueDecisionNumber.value || undefined,
       decision_date: issueDecisionDate.value || undefined,
+      valid_until: issueValidUntil.value || undefined,
     })).data
   },
   onSuccess: (data: any) => {
@@ -620,6 +624,16 @@ const contractorStatusLabel: Record<string, string> = {
               />
             </VCol>
           </VRow>
+
+          <VTextField
+            v-model="issueValidUntil"
+            label="سارية المفعول حتى"
+            type="date"
+            class="mt-4"
+            :loading="loadingIssueDefaults"
+            hint="افتراضياً آخر عضوية للمقاول (31/12 من سنة العضوية) — عدّله إذا لزم"
+            persistent-hint
+          />
 
           <VTextarea
             v-model="issueNotes"
