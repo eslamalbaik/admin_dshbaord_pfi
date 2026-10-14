@@ -46,10 +46,12 @@ const shallRenderIcon = configStore.isVerticalNavMini()
   block-size: auto;
   margin-block-end: 0.75rem !important;
 
+  // عنوان المجموعة ووصفها على نفس الخط العمودي مع أسماء العناصر (بعد عرض الأيقونة والفراغ)
   .title-wrapper {
     display: flex;
     flex-direction: column;
     gap: 2px;
+    padding-inline-start: 30px;
   }
 
   .title-text {
