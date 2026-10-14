@@ -138,22 +138,40 @@ class DiscountPreviewAndActive95ScenarioTest extends TestCase
         }
     }
 
-    /** الغرامات برّا قاعدة الـ95%: ذممه كلها مسدَّدة بس عليه 10 من غرامة ← "منتهية" بكل الشاشات */
-    public function test_an_open_penalty_keeps_membership_expired_even_with_all_dues_paid(): void
+    /**
+     * الغرامات ما إلها علاقة بالعضوية (قرار 2026-10-14): ذممه كلها مسدَّدة وعليه غرامة 600
+     * ← "فعّالة" بكل الشاشات، والغرامة بتضل محسوبة بالرصيد.
+     */
+    public function test_an_open_penalty_does_not_affect_membership_status(): void
     {
         $c = $this->contractor();
         ContractorDue::create(['contractor_id' => $c->id, 'year' => 2026, 'description' => 'رسوم عضوية (2026)',
             'amount_jod' => 340, 'paid_jod' => 340, 'status' => 'paid', 'source' => 'manual']);
         Penalty::create(['contractor_id' => $c->id, 'reason' => 'غرامة تأخير',
-            'amount' => 100, 'paid_amount' => 90, 'status' => 'partially_paid']);
+            'amount' => 700, 'paid_amount' => 100, 'status' => 'partially_paid']);
 
         $this->getJson('/api/v1/dashboard/balances?search=9565_g')->assertOk()
-            ->assertJsonPath('items.0.net_jod', -10)
-            ->assertJsonPath('items.0.status', 'expired');
-        $this->getJson('/api/v1/contractors?search=9565_g')->assertJsonPath('items.0.membership_status', 'expired');
+            ->assertJsonPath('items.0.net_jod', -600)
+            ->assertJsonPath('items.0.penalties_jod', 600)
+            ->assertJsonPath('items.0.status', 'active');
+        $this->getJson('/api/v1/contractors?search=9565_g')->assertJsonPath('items.0.membership_status', 'active');
 
         Sanctum::actingAs($c, ['*']);
-        $this->getJson('/api/v1/contractor/balance')->assertOk()->assertJsonPath('items.subscription_status', 'expired');
+        $this->getJson('/api/v1/contractor/balance')->assertOk()->assertJsonPath('items.subscription_status', 'active');
+    }
+
+    /** الغرامة ما بتغطّي على ذمم تحت الـ95%: الحالة بتنحسب من الذمم لحالها */
+    public function test_dues_below_95_percent_still_expire_regardless_of_penalties(): void
+    {
+        $c = $this->contractor();
+        ContractorDue::create(['contractor_id' => $c->id, 'year' => 2026, 'description' => 'رسوم عضوية (2026)',
+            'amount_jod' => 340, 'paid_jod' => 200, 'status' => 'partially_paid', 'source' => 'manual']);
+        Penalty::create(['contractor_id' => $c->id, 'reason' => 'غرامة انضباطية',
+            'amount' => 50, 'paid_amount' => 0, 'status' => 'unpaid']);
+
+        $this->getJson('/api/v1/dashboard/balances?search=9565_g')->assertOk()
+            ->assertJsonPath('items.0.net_jod', -190)
+            ->assertJsonPath('items.0.status', 'expired');
     }
 
     /** منتهي قديم ما عليه ولا ذمة لهالسنة بيضل "منتهية" حتى لو رصيده صفر */

@@ -20,14 +20,15 @@ class CertificateEligibilityService
 
     /**
      * حساب العوائق المحظّرة للطلب.
-     * لشهادة العضوية، نستثني 'unpaid_dues' لأن لها استثناء نسبة الـ 95%.
+     * لشهادة العضوية، نستثني 'unpaid_dues' لأن لها استثناء نسبة الـ 95%، و'late_fees' لأن
+     * الغرامات ما إلها علاقة بالعضوية ومميزاتها (قرار 2026-10-14) — بتضل ظاهرة بالقائمة بس ما بتمنع.
      */
     public function getBlockingIssues(Contractor $contractor, string $type = 'membership'): array
     {
         $issues = $this->getIssues($contractor);
 
         if ($type === 'membership') {
-            return array_values(array_filter($issues, fn ($i) => $i['type'] !== 'unpaid_dues'));
+            return array_values(array_filter($issues, fn ($i) => ! in_array($i['type'], ['unpaid_dues', 'late_fees'], true)));
         }
 
         return $issues;
