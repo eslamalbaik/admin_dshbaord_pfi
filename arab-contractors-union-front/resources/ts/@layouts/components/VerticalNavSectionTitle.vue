@@ -43,14 +43,15 @@ const shallRenderIcon = configStore.isVerticalNavMini()
 
 <style lang="scss">
 .layout-vertical-nav .nav-section-title.has-subtitle {
-  block-size: auto;
-  margin-block-end: 0.75rem !important;
+  // ℹ️ !important: قاعدة القالب (block-size ثابت 1.25rem) بتيجي بعد هاد الملف ببناء الإنتاج
+  block-size: auto !important;
+  margin-block-end: 1rem !important;
 
   // عنوان المجموعة ووصفها على نفس الخط العمودي مع أسماء العناصر (بعد عرض الأيقونة والفراغ)
   .title-wrapper {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
     padding-inline-start: 30px;
   }
 
@@ -62,7 +63,7 @@ const shallRenderIcon = configStore.isVerticalNavMini()
   .title-subtitle {
     color: rgba(var(--v-theme-on-surface), var(--v-disabled-opacity));
     font-size: 0.6875rem;
-    line-height: 1rem;
+    line-height: 1.125rem;
     text-transform: none;
     white-space: nowrap;
     overflow: hidden;
