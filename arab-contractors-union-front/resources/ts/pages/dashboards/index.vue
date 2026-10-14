@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { defineAsyncComponent, onMounted, computed } from 'vue'
 import { useDashboardStore } from '@/stores/dashboardStore'
+import DashboardWelcomeBanner from '@/views/dashboards/DashboardWelcomeBanner.vue'
 
 const StatsCards = defineAsyncComponent(() => import('@/views/dashboards/lms/StatsCards.vue'))
 const RevenueChart = defineAsyncComponent(() => import('@/views/dashboards/lms/RevenueChart.vue'))
@@ -28,6 +29,8 @@ const handleRefresh = () => {
 
 <template>
   <div>
+    <DashboardWelcomeBanner />
+
     <div class="d-flex justify-space-between align-center flex-wrap gap-4 mb-6">
       <div>
         <h1 class="text-h4 font-weight-bold" style="font-family: Cairo, sans-serif;">

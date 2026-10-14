@@ -17,9 +17,9 @@ export const { themeConfig, layoutConfig } = defineThemeConfig({
         alt: 'اتحاد المقاولين الفلسطينيين',
         style: 'height:60px;width:auto;object-fit:contain;display:block;flex-shrink:0;',
       }),
-      h('div', { style: 'display:flex;flex-direction:column;line-height:1.3;' }, [
-        h('span', { style: 'font-family:Cairo,sans-serif;font-size:13px;font-weight:700;color:#000269;white-space:nowrap;' }, 'اتحاد المقاولين الفلسطينيين'),
-        h('span', { style: 'font-family:Cairo,sans-serif;font-size:10px;font-weight:400;color:#6B7280;white-space:nowrap;' }, 'Palestinian Contractors Union'),
+      h('div', { style: 'display:flex;flex-direction:column;line-height:1.35;gap:1px;' }, [
+        h('span', { style: 'font-family:Tajawal,sans-serif;font-size:11.5px;font-weight:700;color:#000269;white-space:nowrap;' }, 'اتحاد المقاولين الفلسطينيين'),
+        h('span', { style: 'font-family:Tajawal,sans-serif;font-size:9.5px;font-weight:500;color:#6B7280;white-space:nowrap;' }, 'Palestinian Contractors Union'),
       ]),
     ]),
     contentWidth: ContentWidth.Boxed,
