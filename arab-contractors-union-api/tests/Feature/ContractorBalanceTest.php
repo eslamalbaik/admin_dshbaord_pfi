@@ -118,7 +118,7 @@ class ContractorBalanceTest extends TestCase
         $this->assertEquals($exact, $items['net_exact_jod']);
     }
 
-    /** الجبر مخزَّن بقيد "جبر كسور الرصيد"، فالصافي الدقيق نفسه صار عدداً صحيحاً */
+    /** رصيد الشركة بينجبر مخزَّن (عدد صحيح)، والمطلوب منها بيضل بكسره والعرض بس بيجبره لفوق */
     public static function roundingCases(): array
     {
         return [
@@ -126,8 +126,8 @@ class ContractorBalanceTest extends TestCase
             'credit 300.50 → 300'   => [300.50, 0, 300, 300],
             'credit 300.99 → 300'   => [300.99, 0, 300, 300],
             'credit 0.50 → settled' => [0.50, 0, 0, 0],
-            'owes 349.20 → 350'     => [0, 349.20, -350, -350],
-            'owes 349.01 → 350'     => [0, 349.01, -350, -350],
+            'owes 349.20 → 350'     => [0, 349.20, -350, -349.20],
+            'owes 349.01 → 350'     => [0, 349.01, -350, -349.01],
             'owes 349.00 stays'     => [0, 349.00, -349, -349],
             'credit 300.00 stays'   => [300.00, 0, 300, 300],
         ];
