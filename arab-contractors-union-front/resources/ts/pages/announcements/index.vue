@@ -90,6 +90,11 @@ const localDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1)
 const todayStr = () => localDateStr(new Date())
 const yesterdayStr = () => localDateStr(new Date(Date.now() - 24 * 60 * 60 * 1000))
 
+// تاريخ النشر المجدول بيتنسى لما المستخدم يرجع لـ"نشر مباشرة" بالإنشاء (ما إله معنى وقتها)
+watch(() => form.value.publishMode, mode => {
+  if (mode !== 'schedule' && !isEditing.value) form.value.published_at = ''
+})
+
 const minPublishDate = computed(() => (isEditing.value ? yesterdayStr() : todayStr()))
 
 // حقل تاريخ النشر يظهر فقط بالجدولة، أو بتعديل تعميم منشور (لتصحيح تاريخه)
@@ -172,7 +177,9 @@ const saveAnnouncement = async () => {
     notify(isEditing.value ? 'يجب أن يكون تاريخ النشر أمس أو بعده' : 'يجب أن يكون تاريخ النشر اليوم أو بعده', 'error')
     return
   }
-  if (!isDraft.value && form.value.expires_at && form.value.published_at && form.value.expires_at <= form.value.published_at) {
+  // تاريخ النشر بيدخل بالتحقق فقط لما يكون ظاهر (مجدول، أو تعديل تعميم منشور)
+  const effectivePublishedAt = showPublishDate.value ? form.value.published_at : ''
+  if (!isDraft.value && form.value.expires_at && effectivePublishedAt && form.value.expires_at <= effectivePublishedAt) {
     notify('يجب أن يكون تاريخ انتهاء التعميم بعد تاريخ النشر', 'error')
     return
   }
@@ -443,7 +450,7 @@ const deleteAnnouncement = async () => {
                   v-model="form.expires_at"
                   label="تاريخ انتهاء التعميم (اختياري — أرشفة تلقائية)"
                   type="date"
-                  :min="form.published_at || todayStr()"
+                  :min="(showPublishDate ? form.published_at : '') || todayStr()"
                   hint="بعد هذا التاريخ يصبح التعميم مؤرشفاً ويختفي من تطبيق المقاول"
                   persistent-hint
                   clearable
