@@ -119,6 +119,36 @@ class ContractorDocumentRemovalTest extends TestCase
         $this->assertNotNull($fresh->municipal_license);
     }
 
+    /**
+     * «كتاب اعتماد التوقيع» (authorized_signature) يرفعه التطبيق، لكنه كان ناقصاً من
+     * FILE_FIELDS وقواعد التحقق باللوحة: الرفع من صفحة التعديل كان يُتجاهل بصمت فيبقى
+     * authorized_signature_url = null بالتطبيق.
+     */
+    public function test_dashboard_upload_of_authorized_signature_reaches_the_app_profile(): void
+    {
+        $contractor = $this->createContractorWithDocuments();
+
+        $this->actingAsAdmin();
+
+        $this->post("/api/v1/contractors/{$contractor->id}", $this->payload($contractor, [
+            '_method'              => 'PUT',
+            'authorized_signature' => UploadedFile::fake()->image('signature.jpg'),
+        ]), ['Accept' => 'application/json'])->assertStatus(200);
+
+        $path = $contractor->fresh()->authorized_signature;
+        $this->assertNotNull($path);
+        $this->assertStringStartsWith('contractors/signatures/', $path);
+        Storage::disk('public')->assertExists($path);
+
+        $this->getJson("/api/v1/contractors/{$contractor->id}")
+            ->assertJsonPath('items.authorized_signature_url', fn ($url) => is_string($url) && str_contains($url, $path));
+
+        $this->putJson("/api/v1/contractors/{$contractor->id}", $this->payload($contractor, [
+            'remove_documents' => ['authorized_signature'],
+        ]))->assertStatus(200);
+        $this->assertNull($contractor->fresh()->authorized_signature);
+    }
+
     public function test_remove_documents_can_remove_several_at_once(): void
     {
         $contractor = $this->createContractorWithDocuments();

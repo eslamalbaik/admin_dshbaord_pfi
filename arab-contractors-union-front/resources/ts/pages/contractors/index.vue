@@ -529,6 +529,7 @@ const documentFields = ([
   { key: 'accountant_certificate_or_contract', icon: 'tabler-report-money' },
   { key: 'partners_ids', icon: 'tabler-id-badge-2' },
   { key: 'authorization_letter', icon: 'tabler-signature' },
+  { key: 'authorized_signature', icon: 'tabler-writing-sign' },
 ] as Array<{ key: ContractorDocumentKey, icon: string }>)
   .map(d => ({ ...d, label: contractorDocumentLabels[d.key] }))
 

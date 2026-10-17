@@ -133,6 +133,7 @@ const sources: BundleScriptConfig = {
         'license',
         'map-2',
         'signature',
+        'writing-sign',
         'rubber-stamp',
         'target-arrow',
         'users-group',

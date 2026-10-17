@@ -169,6 +169,7 @@ class ContractorController extends Controller
             'accountant_certificate_or_contract' => $fileRule,
             'partners_ids'                  => $fileRule,
             'authorization_letter'          => $fileRule,
+            'authorized_signature'          => $fileRule,
 
             // حذف مستندات قائمة (TASK-16 #4) — محصور بمفاتيح FILE_FIELDS حتى لا يُمرَّر
             // اسم عمود عشوائي فيُفرَّغ من قاعدة البيانات.
@@ -197,6 +198,8 @@ class ContractorController extends Controller
         'accountant_certificate_or_contract' => 'contractors/accountant_certs',
         'partners_ids'                  => 'contractors/partners_ids',
         'authorization_letter'          => 'contractors/authorization_letters',
+        // نفس مسار رفع التطبيق (ContractorFileService) — كان ناقصاً هنا فما في طريقة ترفعه من اللوحة.
+        'authorized_signature'          => 'contractors/signatures',
     ];
 
     private function handleFileUploads(Request $request, &$validated, $contractor = null)
