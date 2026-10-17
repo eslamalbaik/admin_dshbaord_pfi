@@ -8855,6 +8855,12 @@
             "format": "date-time",
             "nullable": true
           },
+          "expiry_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Membership certificate expiry (\"valid until\" printed on it), Y-m-d. Set by the dashboard at approve/issue (default: last membership expiry, 31/12 of its year; editable). Set only for type=membership and status=issued; null otherwise."
+          },
           "reviewed_by": {
             "type": "string",
             "nullable": true

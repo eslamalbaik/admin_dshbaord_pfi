@@ -12,7 +12,7 @@ class CertificateRequest extends Model
         'contractor_id', 'type', 'status', 'notes', 'attachment',
         'reject_reason', 'certificate_path', 'issued_at', 'reviewed_by', 'reviewed_at',
         'pending_payment_id', 'viewed_at', 'last_viewed_at', 'views_count',
-        'certificate_address', 'decision_number', 'decision_date',
+        'certificate_address', 'decision_number', 'decision_date', 'valid_until',
     ];
 
     protected $casts = [
@@ -22,6 +22,7 @@ class CertificateRequest extends Model
         'last_viewed_at' => 'datetime',
         'views_count'    => 'integer',
         'decision_date'  => 'date',
+        'valid_until'    => 'date',
     ];
 
     /**
@@ -35,6 +36,7 @@ class CertificateRequest extends Model
             'address'         => $this->certificate_address,
             'decision_number' => $this->decision_number,
             'decision_date'   => $this->decision_date?->toDateString(),
+            'valid_until'     => $this->valid_until?->toDateString(),
         ], fn ($v) => filled($v));
     }
 

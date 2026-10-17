@@ -410,6 +410,46 @@ class CertificateRequestTest extends TestCase
         );
     }
 
+    public function test_issued_membership_certificate_returns_expiry_date_to_the_app(): void
+    {
+        $contractor = $this->createCompliantContractor();
+        $contractor->memberships()->update(['expires_at' => '2026-12-31']);
+        $certRequest = $contractor->certificateRequests()->create(['type' => 'membership', 'status' => 'approved']);
+        $pending     = $contractor->certificateRequests()->create(['type' => 'good_standing', 'status' => 'pending']);
+        $this->actingAsAdmin();
+
+        $this->postJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}/issue")
+            ->assertOk()
+            ->assertJsonPath('items.expiry_date', '2026-12-31');
+
+        $this->assertSame('2026-12-31', $certRequest->fresh()->valid_until->toDateString());
+
+        // العضوية تجدّدت بعد الإصدار: التطبيق بيضل يعرض التاريخ المطبوع على الشهادة
+        $contractor->memberships()->update(['expires_at' => '2027-12-31']);
+
+        Sanctum::actingAs($contractor->fresh(), ['*']);
+        $requests = collect($this->getJson('/api/v1/contractor/certificate-requests')
+            ->assertOk()
+            ->json('items.requests'))->keyBy('id');
+
+        $this->assertSame('2026-12-31', $requests[$certRequest->id]['expiry_date']);
+        $this->assertNull($requests[$pending->id]['expiry_date']);
+    }
+
+    public function test_issue_accepts_manual_expiry_date_and_prints_it(): void
+    {
+        $contractor = $this->createCompliantContractor();
+        $contractor->memberships()->update(['expires_at' => '2026-12-31']);
+        $certRequest = $contractor->certificateRequests()->create(['type' => 'membership', 'status' => 'approved']);
+        $this->actingAsAdmin();
+
+        $this->postJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}/issue", ['valid_until' => '2027-06-30'])
+            ->assertOk()
+            ->assertJsonPath('items.expiry_date', '2027-06-30');
+
+        $this->assertSame('2027-06-30', $certRequest->fresh()->valid_until->toDateString());
+    }
+
     public function test_issue_other_types_without_file_is_refused(): void
     {
         $contractor = $this->createCompliantContractor();

@@ -19,6 +19,7 @@ class AdminIssueMembershipCertificateRequest extends FormRequest
             'address'         => 'nullable|string|max:255',
             'decision_number' => 'nullable|string|max:100',
             'decision_date'   => 'nullable|date',
+            'valid_until'     => 'nullable|date', // تاريخ انتهاء الشهادة (سارية حتى) — فاضي = آخر عضوية للمقاول
         ];
     }
 }
