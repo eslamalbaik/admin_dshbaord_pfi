@@ -106,7 +106,21 @@ export function buildPcuNav(user: NavUser): VerticalNavItems {
     })
   }
 
-  // 3. الإعلام والتواصل (الأخبار والفعاليات والتعميمات للأدمن، الإشعارات مشتركة)
+  // 3. الشؤون المالية (مشتركة، مباشرة بعد المقاولين)
+  menuItems.push({ heading: 'الشؤون المالية', subtitle: 'المدفوعات والذمم وأرصدة المقاولين' })
+  menuItems.push({
+    title: 'المدفوعات',
+    icon: { icon: 'tabler-credit-card' },
+    children: [
+      { title: 'سجل المدفوعات', to: 'payments-transactions' },
+      { title: 'الذمم المالية', to: 'dues' },
+      { title: 'أرصدة المقاولين', to: 'balances' },
+      { title: 'الغرامات والمخالفات', to: 'contractors-penalties' },
+      { title: 'الحسابات البنكية', to: 'settings-bank-accounts' },
+    ],
+  })
+
+  // 4. الإعلام والتواصل (الأخبار والفعاليات والتعميمات للأدمن، الإشعارات مشتركة)
   menuItems.push({ heading: 'الإعلام والتواصل', subtitle: 'المحتوى والتواصل مع أعضاء الاتحاد' })
   if (!isAccountant) {
     menuItems.push({
@@ -132,20 +146,6 @@ export function buildPcuNav(user: NavUser): VerticalNavItems {
     title: 'الإشعارات',
     icon: { icon: 'tabler-bell' },
     to: 'notifications',
-  })
-
-  // 4. الشؤون المالية (مشتركة)
-  menuItems.push({ heading: 'الشؤون المالية', subtitle: 'المدفوعات والذمم وأرصدة المقاولين' })
-  menuItems.push({
-    title: 'المدفوعات',
-    icon: { icon: 'tabler-credit-card' },
-    children: [
-      { title: 'سجل المدفوعات', to: 'payments-transactions' },
-      { title: 'الذمم المالية', to: 'dues' },
-      { title: 'أرصدة المقاولين', to: 'balances' },
-      { title: 'الغرامات والمخالفات', to: 'contractors-penalties' },
-      { title: 'الحسابات البنكية', to: 'settings-bank-accounts' },
-    ],
   })
 
   // 5. العطاءات والوثائق (للأدمن فقط)
