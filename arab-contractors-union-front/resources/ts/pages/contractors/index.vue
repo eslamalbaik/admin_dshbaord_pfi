@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import api from '@/plugins/axios'
 import { type ContractorDocumentKey, contractorDocumentLabels } from '@/utils/contractorDocuments'
+import { contractorRules, vNumeric } from '@/utils/contractorValidation'
 
 definePage({ meta: { requiresAdmin: true, adminOnly: true } })
 
@@ -355,6 +356,13 @@ const openContactEdit = () => {
 }
 
 const saveContactEdit = async () => {
+  const invalid = contractorRules.personName(contactForm.value.authorized_person) !== true
+    || contractorRules.mobile(contactForm.value.phone) !== true
+  if (invalid) {
+    contactEditError.value = 'صحّح الخانات المعلّمة باللون الأحمر قبل الحفظ.'
+
+    return
+  }
   contactEditLoading.value = true
   contactEditError.value = ''
   try {
@@ -502,6 +510,12 @@ const contactRows = computed(() => {
   ]
 })
 
+// العضوية النشطة إن وُجدت، وإلا آخر عضوية منتهية (مثلاً 31/12/2025) — نفس منطق display_membership بالخادم.
+const membershipExpiry = (t: any) => {
+  const expires = t?.active_membership?.expires_at ?? t?.latest_membership?.expires_at
+  return expires ? String(expires).substring(0, 10) : '—'
+}
+
 const activityRows = computed(() => {
   const t = detailsTarget.value
   if (!t) return []
@@ -509,6 +523,7 @@ const activityRows = computed(() => {
     { label: 'التصنيف العام', value: getGradeTitle(t.classification), icon: 'tabler-award' },
     { label: 'رقم رخصة البلدية', value: t.license_number || '—', icon: 'tabler-license' },
     { label: 'تاريخ التأسيس', value: t.established_date ? String(t.established_date).substring(0, 10) : '—', icon: 'tabler-calendar-star' },
+    { label: 'تاريخ انتهاء العضوية', value: membershipExpiry(t), icon: 'tabler-calendar-exclamation' },
   ]
 })
 
@@ -913,6 +928,7 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
           <VTextField
             v-model="contactForm.authorized_person"
             label="المفوض بالتوقيع"
+            :rules="[contractorRules.personName]"
             class="mb-4"
             style="font-family:Cairo,sans-serif"
           />
@@ -920,6 +936,10 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
             v-model="contactForm.phone"
             label="رقم الجوال"
             dir="ltr"
+            v-numeric="'phone'"
+            inputmode="tel"
+            maxlength="16"
+            :rules="[contractorRules.mobile]"
           />
         </VCardText>
         <VCardActions>
