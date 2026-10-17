@@ -518,7 +518,7 @@ const documentFields = ([
   { key: 'cr_file', icon: 'tabler-file-certificate' },
   { key: 'id_file', icon: 'tabler-id' },
   { key: 'company_register', icon: 'tabler-building' },
-  { key: 'municipal_license', icon: 'tabler-stamp' },
+  { key: 'municipal_license', icon: 'tabler-rubber-stamp' },
   { key: 'company_approval_letter', icon: 'tabler-checkbox' },
   { key: 'lease_or_ownership_contract', icon: 'tabler-home' },
   { key: 'articles_of_association', icon: 'tabler-file-text' },
@@ -529,6 +529,7 @@ const documentFields = ([
   { key: 'accountant_certificate_or_contract', icon: 'tabler-report-money' },
   { key: 'partners_ids', icon: 'tabler-id-badge-2' },
   { key: 'authorization_letter', icon: 'tabler-signature' },
+  { key: 'authorized_signature', icon: 'tabler-writing-sign' },
 ] as Array<{ key: ContractorDocumentKey, icon: string }>)
   .map(d => ({ ...d, label: contractorDocumentLabels[d.key] }))
 
@@ -847,27 +848,27 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
                         class="d-flex align-center gap-2 pa-2 rounded-lg"
                         :style="`background: rgba(var(--v-theme-on-surface), ${documentUrl(doc.key) ? 0.03 : 0.015});`"
                       >
-                        <VAvatar :color="documentUrl(doc.key) ? 'primary' : 'secondary'" variant="tonal" size="32" rounded="lg">
+                        <VAvatar :color="documentUrl(doc.key) ? 'primary' : 'secondary'" variant="tonal" size="32" rounded="lg" class="flex-shrink-0">
                           <VIcon :icon="doc.icon" size="16" />
                         </VAvatar>
                         <span
                           class="text-body-2 text-truncate flex-grow-1"
                           :class="documentUrl(doc.key) ? 'font-weight-medium' : 'text-medium-emphasis'"
-                          style="font-family:Cairo,sans-serif"
+                          style="font-family:Cairo,sans-serif; min-width:0"
                         >
                           {{ doc.label }}
                         </span>
                         <template v-if="documentUrl(doc.key)">
-                          <VBtn icon size="x-small" variant="text" color="primary" @click="viewFile(documentUrl(doc.key))">
+                          <VBtn icon size="x-small" variant="text" color="primary" class="flex-shrink-0" @click="viewFile(documentUrl(doc.key))">
                             <VIcon icon="tabler-eye" size="16" />
                             <VTooltip activator="parent">عرض</VTooltip>
                           </VBtn>
-                          <VBtn icon size="x-small" variant="text" color="primary" @click="downloadFile(documentUrl(doc.key), doc.label)">
+                          <VBtn icon size="x-small" variant="text" color="primary" class="flex-shrink-0" @click="downloadFile(documentUrl(doc.key), doc.label)">
                             <VIcon icon="tabler-download" size="16" />
                             <VTooltip activator="parent">تحميل</VTooltip>
                           </VBtn>
                         </template>
-                        <VIcon v-else icon="tabler-file-off" size="16" color="secondary" />
+                        <VIcon v-else icon="tabler-file-off" size="16" color="secondary" class="flex-shrink-0" />
                       </div>
                     </VCol>
                   </VRow>

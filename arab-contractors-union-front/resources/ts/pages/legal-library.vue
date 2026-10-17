@@ -14,7 +14,7 @@ const page = ref(1)
 
 const catStyle: Record<string, { color: string; icon: string }> = {
   legislation: { color: 'primary',   icon: 'tabler-scale' },
-  mou:         { color: 'success',   icon: 'tabler-handshake' },
+  mou:         { color: 'success',   icon: 'tabler-heart-handshake' },
   other:       { color: 'secondary', icon: 'tabler-files' },
 }
 const customStyle = { color: 'info', icon: 'tabler-folder' }

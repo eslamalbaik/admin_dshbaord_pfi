@@ -257,7 +257,7 @@ class Contractor extends Authenticatable
      */
     public const DOCUMENT_LABELS = [
         'cr_file'                       => 'السجل التجاري',
-        'id_file'                       => 'صورة الهوية',
+        'id_file'                       => 'صورة الهوية الشخصية للمفوض',
         'company_register'              => 'مستخرج عن سجل الشركة',
         'municipal_license'             => 'رخصة المهن (الحرف) سارية المفعول',
         'bank_dealing_letter'           => 'شهادة تعامل للشركة مع بنك',
@@ -270,7 +270,7 @@ class Contractor extends Authenticatable
         'full_time_engineer_certificate'=> 'شهادة مهندس متفرغ',
         'accountant_certificate_or_contract' => 'شهادة تفرغ محاسب من نقابة المحاسبين / أو عقد مع مكتب محاسبين معتمد',
         'secretary_contract'            => 'عقد سكرتير',
-        'authorized_signature'          => 'نموذج التوقيع',
+        'authorized_signature'          => 'كتاب اعتماد التوقيع',
     ];
 
     /** المستندات المطلوبة لاكتمال الملف (بترتيب نموذج التسجيل) — أسماؤها من DOCUMENT_LABELS. */

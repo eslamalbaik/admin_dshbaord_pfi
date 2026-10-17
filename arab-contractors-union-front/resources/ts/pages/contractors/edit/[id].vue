@@ -70,6 +70,7 @@ const form = ref({
   accountant_certificate_or_contract: null as File | null,
   partners_ids: null as File | null,
   authorization_letter: null as File | null,
+  authorized_signature: null as File | null,
   notes: '',
 })
 
@@ -204,7 +205,7 @@ const documentKeys: ContractorDocumentKey[] = [
   'cr_file', 'id_file', 'company_register', 'municipal_license', 'bank_dealing_letter',
   'articles_of_association', 'internal_bylaws', 'lease_or_ownership_contract', 'partners_ids',
   'authorization_letter', 'company_approval_letter', 'full_time_engineer_certificate',
-  'accountant_certificate_or_contract', 'secretary_contract',
+  'accountant_certificate_or_contract', 'secretary_contract', 'authorized_signature',
 ]
 
 // روابط الملفات المرفوعة مسبقاً — تُعرض للمعاينة/التحميل جنب كل حقل رفع، بدل ما يظهر الحقل فاضي
@@ -377,7 +378,7 @@ const starredChecks = computed<Record<number, boolean[]>>(() => {
       filled(f.building), filled(f.floor), /^[0-9]{5}$/.test(f.license_number ?? ''), filled(f.established_date),
       f.specialties.every(sp => !!sp.field_lk_type && !!sp.specialization_lk_type && !!sp.classification),
     ],
-    4: documentKeys.filter(k => k !== 'id_file').map(k => docPresent(k)),
+    4: documentKeys.filter(k => k !== 'id_file' && k !== 'authorized_signature').map(k => docPresent(k)),
   }
 })
 
