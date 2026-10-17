@@ -187,7 +187,9 @@ class AnnouncementController extends Controller
             // تاريخ انتهاء اختياري (أرشفة تلقائية) — لازم يكون بعد تاريخ النشر الفعلي (المُدخل أو now() الافتراضي)
             'expires_at'   => ['nullable', 'date', function ($attribute, $value, $fail) use ($request, $isDraft) {
                 if ($isDraft) return;
-                $publishedAt = $request->filled('published_at') ? now()->parse($request->published_at) : now();
+                // تاريخ النشر بيُقارن فقط لو مجدول بالمستقبل؛ النشر المباشر يعتمد وقت الحفظ
+                $scheduledAt = $request->filled('published_at') ? now()->parse($request->published_at) : null;
+                $publishedAt = $scheduledAt && $scheduledAt->isFuture() ? $scheduledAt : now();
                 if (now()->parse($value)->lessThanOrEqualTo($publishedAt))
                     $fail('يجب أن يكون تاريخ انتهاء التعميم بعد تاريخ النشر.');
             }],

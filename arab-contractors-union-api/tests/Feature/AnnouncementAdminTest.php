@@ -243,6 +243,26 @@ class AnnouncementAdminTest extends TestCase
         $this->assertNull($announcement->expires_at);
     }
 
+    public function test_store_immediate_publish_ignores_stale_past_published_at_for_expiry(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/announcements', [
+            'title'        => 'مباشر',
+            'body'         => 'نص',
+            'is_published' => true,
+            'expires_at'   => now()->addDays(2)->toDateString(),
+        ])->assertStatus(201);
+
+        $this->postJson('/api/v1/admin/announcements', [
+            'title'        => 'مجدول',
+            'body'         => 'نص',
+            'is_published' => true,
+            'published_at' => now()->addDays(5)->toDateString(),
+            'expires_at'   => now()->addDays(2)->toDateString(),
+        ])->assertStatus(422);
+    }
+
     public function test_update_to_draft_clears_expiry_and_pin(): void
     {
         $this->actingAsAdmin();
