@@ -4,6 +4,7 @@ import type { WizardStepState } from '@/components/contractors/ContractorWizardS
 import api from '@/plugins/axios'
 import { UPLOAD_TIMEOUT_MS, describeRequestError } from '@/utils/requestError'
 import { contractorDocumentLabels } from '@/utils/contractorDocuments'
+import { contractorRules, invalidFormatFields, vNumeric } from '@/utils/contractorValidation'
 import type { ContractorDocumentKey } from '@/utils/contractorDocuments'
 import { useRoute, useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
@@ -78,7 +79,7 @@ const newPartnerName = ref('')
 
 const addPartner = () => {
   const name = newPartnerName.value.trim()
-  if (name) {
+  if (name && contractorRules.personName(name) === true) {
     if (!form.value.partners) {
       form.value.partners = []
     }
@@ -364,6 +365,9 @@ const blockingMissing = (s: number): string[] => {
     if (!filled(f.building)) missing.push('العمارة')
     if (!filled(f.floor)) missing.push('الطابق')
   }
+  // خانات اختيارية لكن معبّأة بصيغة خاطئة (حروف بخانة أرقام، هوية ليست 9 أرقام...) — الخادم سيرفضها
+  missing.push(...invalidFormatFields(f, s))
+
   return missing
 }
 
@@ -415,7 +419,7 @@ const goToStep = async (target: number) => {
     for (let s = step.value; s < target; s++) {
       const missing = blockingMissing(s)
       if (missing.length) {
-        stepNotice.value = `أكمل الحقول المطلوبة قبل المتابعة: ${missing.join('، ')}`
+        stepNotice.value = `أكمل أو صحّح هذه الحقول قبل المتابعة: ${missing.join('، ')}`
         if (s !== step.value) step.value = s
         await nextTick()
         await formRef.value?.validate()
@@ -433,11 +437,16 @@ const nextStep = () => { if (step.value < 4) goToStep(step.value + 1) }
 const prevStep = () => { if (step.value > 1) goToStep(step.value - 1) }
 
 const handleSave = async () => {
-  for (const s of [1, 2, 3]) {
-    if (blockingMissing(s).length) {
-      await goToStep(4) // يوقف عند أول خطوة ناقصة ويعرض الرسالة
-      return
-    }
+  // goToStep يفحص من الخطوة الحالية للأمام فقط، فخطأ بخطوة سابقة كان يمنع الحفظ بصمت —
+  // نقفز مباشرة لأول خطوة فيها خانة ناقصة أو خاطئة ونعرض السبب.
+  const badStep = [1, 2, 3].find(s => blockingMissing(s).length)
+  if (badStep) {
+    stepNotice.value = `أكمل أو صحّح هذه الحقول قبل الحفظ: ${blockingMissing(badStep).join('، ')}`
+    step.value = badStep
+    await nextTick()
+    await formRef.value?.validate()
+    scrollToFirstError()
+    return
   }
   stepNotice.value = ''
   await submit()
@@ -659,6 +668,7 @@ const submit = async () => {
               >
                 <VTextField
                   v-model="form.registration_date"
+                  :rules="[contractorRules.notFuture]"
                   label="تاريخ التسجيل"
                   type="date"
                   :error-messages="validationErrors.registration_date"
@@ -702,6 +712,7 @@ const submit = async () => {
             >
               <VTextField
                 v-model="form.commercial_register"
+                v-numeric
                 label="رقم السجل التجاري *"
                 inputmode="numeric"
                 maxlength="9"
@@ -729,6 +740,9 @@ const submit = async () => {
             >
               <VTextField
                 v-model="form.capital"
+                v-numeric="'decimal'"
+                inputmode="decimal"
+                :rules="[contractorRules.capital]"
                 label="رأس مال الشركة"
                 :error-messages="validationErrors.capital"
               />
@@ -773,6 +787,8 @@ const submit = async () => {
             >
               <VTextField
                 v-model="form.owner_name"
+                maxlength="255"
+                :rules="[contractorRules.personName]"
                 label="اسم صاحب المنشأة"
                 :error-messages="validationErrors.owner_name"
               />
@@ -784,6 +800,7 @@ const submit = async () => {
               <div class="d-flex align-start gap-2">
                 <VTextField
                   v-model="newPartnerName"
+                  :rules="[contractorRules.personName]"
                   label="اسم شريك"
                   placeholder="اكتب الاسم واضغط Enter"
                   :error-messages="validationErrors.partners"
@@ -855,6 +872,8 @@ const submit = async () => {
             >
               <VTextField
                 v-model="form.authorized_person"
+                maxlength="255"
+                :rules="[contractorRules.personName]"
                 label="اسم المفوض بالتوقيع"
                 :error-messages="validationErrors.authorized_person"
               />
@@ -865,6 +884,10 @@ const submit = async () => {
             >
               <VTextField
                 v-model="form.authorized_person_id_number"
+                v-numeric
+                maxlength="9"
+                placeholder="9 أرقام"
+                :rules="[contractorRules.idNumber]"
                 label="رقم هوية المفوض"
                 inputmode="numeric"
                 :error-messages="validationErrors.authorized_person_id_number"
@@ -876,6 +899,9 @@ const submit = async () => {
             >
               <VTextField
                 v-model="form.authorized_person_phone"
+                v-numeric="'phone'"
+                maxlength="16"
+                :rules="[contractorRules.mobile]"
                 label="رقم جوال المفوض"
                 inputmode="tel"
                 prepend-inner-icon="tabler-phone"
@@ -888,6 +914,9 @@ const submit = async () => {
             >
               <VTextField
                 v-model="form.authorized_person_whatsapp"
+                v-numeric="'phone'"
+                maxlength="16"
+                :rules="[contractorRules.mobile]"
                 label="رقم الواتساب للمفوض"
                 inputmode="tel"
                 prepend-inner-icon="tabler-brand-whatsapp"
@@ -925,6 +954,7 @@ const submit = async () => {
             >
               <VTextField
                 v-model="form.phone"
+                v-numeric
                 label="رقم الجوال *"
                 prefix="+970"
                 placeholder="59XXXXXXX"
@@ -940,6 +970,10 @@ const submit = async () => {
             >
               <VTextField
                 v-model="form.fax"
+                v-numeric="'phone'"
+                inputmode="tel"
+                maxlength="16"
+                :rules="[contractorRules.fax]"
                 label="الهاتف / الفاكس"
                 :error-messages="validationErrors.fax"
               />
@@ -950,6 +984,8 @@ const submit = async () => {
             >
               <VTextField
                 v-model="form.email"
+                maxlength="255"
+                :rules="[contractorRules.email]"
                 label="البريد الإلكتروني"
                 type="email"
                 :error-messages="validationErrors.email"
@@ -1076,6 +1112,7 @@ const submit = async () => {
             >
               <VTextField
                 v-model="form.license_number"
+                v-numeric
                 label="رقم رخصة البلدية *"
                 inputmode="numeric"
                 maxlength="5"
@@ -1095,7 +1132,7 @@ const submit = async () => {
                 label="تاريخ التأسيس *"
                 type="date"
                 :error-messages="validationErrors.established_date"
-                :rules="[v => !!v || 'تاريخ التأسيس مطلوب']"
+                :rules="[v => !!v || 'تاريخ التأسيس مطلوب', contractorRules.notFuture]"
               />
             </VCol>
             <VCol

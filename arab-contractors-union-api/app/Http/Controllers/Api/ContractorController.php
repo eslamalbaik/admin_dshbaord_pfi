@@ -91,6 +91,40 @@ class ContractorController extends Controller
         return $isUpdate ? $rule->ignore($contractorId) : $rule;
     }
 
+    // خانات الأرقام: أرقام فقط (مع + اختيارية في أول رقم الجوال/الفاكس للصيغة الدولية)،
+    // والأسماء بدون أرقام. نفس الأنماط في الواجهة (utils/contractorValidation.ts).
+    private const PHONE_PATTERN     = '/^\+?[0-9]{9,15}$/';
+    private const FAX_PATTERN       = '/^\+?[0-9]{6,15}$/';
+    private const ID_NUMBER_PATTERN = '/^[0-9]{9}$/';
+    private const NO_DIGITS         = '/[0-9\x{0660}-\x{0669}\x{06F0}-\x{06F9}]/u';
+
+    /** خانات تُحوَّل أرقامها العربية (٠١٢) للاتينية وتُزال منها المسافات والشرطات قبل التحقق. */
+    private const NUMERIC_INPUTS = [
+        'commercial_register', 'license_number', 'phone', 'fax', 'capital',
+        'authorized_person_id_number', 'authorized_person_phone', 'authorized_person_whatsapp',
+    ];
+
+    private function normalizeNumericInputs(Request $request): void
+    {
+        $clean = [];
+        foreach (self::NUMERIC_INPUTS as $field) {
+            $value = $request->input($field);
+            if (! is_string($value)) {
+                continue;
+            }
+            $value = strtr($value, [
+                '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
+                '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+                '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
+                '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
+            ]);
+            // رأس المال قد يحمل فاصلة آلاف (10,000)؛ باقي الخانات مسافات/شرطات تنسيق فقط.
+            $value = preg_replace($field === 'capital' ? '/[\s,_]+/u' : '/[\s\-()]+/u', '', $value);
+            $clean[$field] = $value;
+        }
+        $request->merge($clean);
+    }
+
     private function getValidationRules($isUpdate = false, $contractorId = null)
     {
         // السقف مشتق من UploadLimits لا رقماً ثابتاً: 10240 السابقة كانت تَعِد بـ10MB
@@ -120,15 +154,15 @@ class ContractorController extends Controller
             'classification'                => 'nullable|string|max:10',
             'field_lk_type'                 => 'nullable|integer',
             'specialization_lk_type'        => 'nullable|integer',
-            'established_date'              => 'nullable|date',
+            'established_date'              => 'nullable|date|before_or_equal:today',
             'specialties'                   => 'nullable|string',
-            'owner_name'                    => 'nullable|string|max:255',
+            'owner_name'                    => ['nullable', 'string', 'max:255', 'not_regex:' . self::NO_DIGITS],
             'email'                         => [
                 'nullable', 'email',
                 $this->uniqueIgnoringSoftDeleted('email', $isUpdate, $contractorId),
             ],
             'phone'                         => [
-                'nullable', 'string', 'max:20',
+                'nullable', 'string', 'regex:' . self::PHONE_PATTERN,
                 $this->uniqueIgnoringSoftDeleted('phone', $isUpdate, $contractorId),
             ],
             'city'                          => 'nullable|string|max:100',
@@ -141,18 +175,18 @@ class ContractorController extends Controller
             'notes'                         => 'nullable|string',
 
             // Text fields
-            'partners'                      => 'nullable|string',
-            'fax'                           => 'nullable|string|max:50',
+            'partners'                      => ['nullable', 'string', 'not_regex:' . self::NO_DIGITS],
+            'fax'                           => ['nullable', 'string', 'regex:' . self::FAX_PATTERN],
             'building'                      => ($isUpdate ? 'nullable' : 'required') . '|string|max:100',
             'floor'                         => ($isUpdate ? 'nullable' : 'required') . '|string|max:50',
-            'capital'                       => 'nullable|string|max:100',
-            'registration_date'             => 'nullable|date',
+            'capital'                       => 'nullable|numeric|min:0|max:999999999999',
+            'registration_date'             => 'nullable|date|before_or_equal:today',
             'legal_form'                    => 'nullable|string|max:100',
             'company_purposes'              => 'nullable|string',
-            'authorized_person'             => 'nullable|string|max:255',
-            'authorized_person_id_number'   => 'nullable|string|max:50',
-            'authorized_person_phone'       => 'nullable|string|max:20',
-            'authorized_person_whatsapp'    => 'nullable|string|max:20',
+            'authorized_person'             => ['nullable', 'string', 'max:255', 'not_regex:' . self::NO_DIGITS],
+            'authorized_person_id_number'   => ['nullable', 'string', 'regex:' . self::ID_NUMBER_PATTERN],
+            'authorized_person_phone'       => ['nullable', 'string', 'regex:' . self::PHONE_PATTERN],
+            'authorized_person_whatsapp'    => ['nullable', 'string', 'regex:' . self::PHONE_PATTERN],
 
             // Files
             'cr_file'                       => $fileRule,
@@ -270,6 +304,15 @@ class ContractorController extends Controller
             ],
             'file'     => 'يجب أن يكون حقل :attribute ملفاً.',
             'image'    => 'يجب أن يكون حقل :attribute صورة.',
+            'numeric'  => 'حقل :attribute يقبل أرقاماً فقط.',
+            'digits'   => 'حقل :attribute يجب أن يتكون من :digits أرقام فقط.',
+            'not_regex' => 'حقل :attribute لا يقبل أرقاماً.',
+            'before_or_equal' => 'حقل :attribute لا يمكن أن يكون تاريخاً في المستقبل.',
+            'phone.regex'                       => 'رقم الجوال يقبل أرقاماً فقط (9 إلى 15 رقماً).',
+            'fax.regex'                         => 'الهاتف / الفاكس يقبل أرقاماً فقط (6 إلى 15 رقماً).',
+            'authorized_person_id_number.regex' => 'رقم هوية المفوض يجب أن يتكون من 9 أرقام فقط.',
+            'authorized_person_phone.regex'     => 'رقم جوال المفوض يقبل أرقاماً فقط (9 إلى 15 رقماً، ويمكن أن يبدأ بـ +).',
+            'authorized_person_whatsapp.regex'  => 'رقم واتساب المفوض يقبل أرقاماً فقط (9 إلى 15 رقماً، ويمكن أن يبدأ بـ +).',
             'mimes'    => 'يجب أن يكون ملف :attribute من نوع: :values.',
         ] + \App\Support\UploadLimits::documentMessages(Contractor::DOCUMENT_LABELS);
     }
@@ -324,6 +367,7 @@ class ContractorController extends Controller
     public function store(Request $request)
     {
         $this->normalizeMembershipNumber($request);
+        $this->normalizeNumericInputs($request);
         $validated = $request->validate($this->getValidationRules(),$this->getValidationMessages(), $this->getValidationAttributes());
         // مقاول قديم بننقله للنظام: آخر سنة عضوية مدفوعة إله بتحدد حالته من أول يوم
         // (2025 والحالية 2026 ← منتهية). عضو جديد جداً (بدون التأشير) بيضل "قيد المراجعة" متل قبل.
@@ -383,13 +427,14 @@ class ContractorController extends Controller
     {
         $contractor->withFileUrls = true;
 
-        return $this->success($contractor->load(['activeMembership', 'governorate:id,name'])->toArray());
+        return $this->success($contractor->load(['activeMembership', 'latestMembership', 'governorate:id,name'])->toArray());
     }
 
     // PUT/PATCH /api/contractors/{id}
     public function update(Request $request, Contractor $contractor)
     {
         $this->normalizeMembershipNumber($request);
+        $this->normalizeNumericInputs($request);
         $validated = $request->validate($this->getValidationRules(true,$contractor->id), $this->getValidationMessages(), $this->getValidationAttributes());
         $this->handleFileUploads($request, $validated, $contractor);
         $this->syncLocation($validated);
@@ -478,16 +523,17 @@ class ContractorController extends Controller
     // "عرض" (أيقونة العين) بدون المرور بفورم الملف الكامل (يتطلب حقولاً إلزامية أخرى)
     public function updateContact(Request $request, Contractor $contractor)
     {
+        $this->normalizeNumericInputs($request);
         $validated = $request->validate([
-            'authorized_person' => 'nullable|string|max:255',
-            'authorized_person_id_number' => 'nullable|string|max:50',
-            'authorized_person_phone'     => 'nullable|string|max:20',
-            'authorized_person_whatsapp'  => 'nullable|string|max:20',
+            'authorized_person' => ['nullable', 'string', 'max:255', 'not_regex:' . self::NO_DIGITS],
+            'authorized_person_id_number' => ['nullable', 'string', 'regex:' . self::ID_NUMBER_PATTERN],
+            'authorized_person_phone'     => ['nullable', 'string', 'regex:' . self::PHONE_PATTERN],
+            'authorized_person_whatsapp'  => ['nullable', 'string', 'regex:' . self::PHONE_PATTERN],
             'phone'              => [
-                'nullable', 'string', 'max:20',
+                'nullable', 'string', 'regex:' . self::PHONE_PATTERN,
                 $this->uniqueIgnoringSoftDeleted('phone', true, $contractor->id),
             ],
-        ], $this->getValidationMessages());
+        ], $this->getValidationMessages(), $this->getValidationAttributes());
 
         $contractor->update($validated);
 
