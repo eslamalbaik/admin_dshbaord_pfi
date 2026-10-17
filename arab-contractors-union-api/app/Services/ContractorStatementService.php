@@ -71,7 +71,7 @@ class ContractorStatementService
                 kind: 'penalty',
                 id: $penalty->id,
                 title: $penalty->reason ?: 'غرامة',
-                reference: null,
+                reference: $penalty->reference_number,
                 amount: (float) $penalty->amount,
                 delta: -$counted,
                 status: $penalty->status,
@@ -84,7 +84,7 @@ class ContractorStatementService
 
             if ($penalty->status !== 'rejected') {
                 $this->pushLegacySettlement($entries, $penalty->paid_at ?? $penalty->updated_at, 'penalty', $penalty->id,
-                    $penalty->reason ?: 'غرامة', null,
+                    $penalty->reason ?: 'غرامة', $penalty->reference_number,
                     (float) $penalty->paid_amount - (float) $allocations->where('penalty_id', $penalty->id)->sum('amount_jod'));
             }
         }

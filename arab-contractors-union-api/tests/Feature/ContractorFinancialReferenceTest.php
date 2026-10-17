@@ -49,6 +49,20 @@ class ContractorFinancialReferenceTest extends TestCase
             ->assertJsonPath('items.penalties.0.reference_number', $ref);
     }
 
+    public function test_penalty_reference_number_reaches_the_statement_and_notification(): void
+    {
+        $c = $this->contractor();
+        $penalty = Penalty::create(['contractor_id' => $c->id, 'reason' => 'مخالفة', 'amount' => 50, 'status' => 'unpaid']);
+        $ref = $penalty->fresh()->reference_number;
+
+        $entries = $this->getJson('/api/v1/contractor/payments/statement')->assertOk()->json('items.entries');
+        $entry = collect($entries)->firstWhere(fn ($e) => $e['kind'] === 'penalty' && $e['id'] === $penalty->id);
+        $this->assertSame($ref, $entry['reference_number']);
+
+        $data = (new \App\Notifications\PenaltyAddedNotification($penalty->fresh()))->toArray($c);
+        $this->assertSame($ref, $data['reference_number']);
+    }
+
     public function test_pending_transfer_without_a_typed_reference_falls_back(): void
     {
         $c = $this->contractor();

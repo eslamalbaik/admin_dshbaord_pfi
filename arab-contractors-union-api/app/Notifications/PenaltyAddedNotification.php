@@ -40,6 +40,7 @@ class PenaltyAddedNotification extends Notification implements ShouldQueue
         return [
             'type'       => 'penalty_added',
             'penalty_id' => $this->penalty->id,
+            'reference_number' => $this->penalty->reference_number,
             'amount'     => $amount,
             'remaining'  => $remaining,
             'title'      => 'غرامة جديدة على حسابك',
