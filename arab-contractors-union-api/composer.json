@@ -17,6 +17,10 @@
         "laravel/tinker": "^2.10.1",
         "maatwebsite/excel": "^3.1",
         "mpdf/mpdf": "^8.3",
+        "open-telemetry/exporter-otlp": "^1.4",
+        "open-telemetry/opentelemetry-auto-laravel": "^1.10",
+        "open-telemetry/sdk": "^1.15",
+        "php-http/guzzle7-adapter": "^1.1",
         "phpoffice/phpword": "^1.4",
         "predis/predis": "^3.6",
         "simplesoftwareio/simple-qrcode": "*",
@@ -95,7 +99,8 @@
         "sort-packages": true,
         "allow-plugins": {
             "pestphp/pest-plugin": true,
-            "php-http/discovery": true
+            "php-http/discovery": true,
+            "tbachert/spi": true
         }
     },
     "minimum-stability": "stable",
