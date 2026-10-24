@@ -540,6 +540,43 @@ class ContractorHomeTest extends TestCase
         $this->assertEquals('بانتظار الإقرار بالقراءة', $item['subtitle']);
     }
 
+    public function test_circular_feed_item_carries_the_full_circular_details(): void
+    {
+        $contractor = $this->createContractor();
+
+        $announcement = Announcement::create([
+            'title' => 'تست مهم', 'number' => '2026/24', 'category' => 'تصنيف اختبار',
+            'body' => 'هذا نص التعميم كاملاً', 'attachment' => 'http://localhost/storage/announcements/attachments/a.pdf',
+            'is_pinned' => true, 'is_published' => true, 'published_at' => now()->subHour(),
+        ]);
+
+        Sanctum::actingAs($contractor, ['*']);
+
+        foreach (['/api/v1/contractor/home' => 'items.latest_updates', '/api/v1/contractor/home/updates' => 'items'] as $url => $path) {
+            $item = collect($this->getJson($url)->json($path))->firstWhere('type', 'circular');
+
+            $this->assertSame($announcement->id, $item['reference_id'], $url);
+            $this->assertSame('هذا نص التعميم كاملاً', $item['details']['body'], $url);
+            $this->assertSame('2026/24', $item['details']['number'], $url);
+            $this->assertSame('تصنيف اختبار', $item['details']['category'], $url);
+            $this->assertSame('http://localhost/storage/announcements/attachments/a.pdf', $item['details']['attachment'], $url);
+            $this->assertTrue($item['details']['requires_acknowledgement'], $url);
+            $this->assertFalse($item['details']['acknowledged'], $url);
+        }
+
+        // بعد الإقرار يبقى النص موجوداً، وتنقلب حالة الإقرار فقط
+        $this->postJson("/api/v1/contractor/circulars/{$announcement->id}/acknowledge")->assertOk();
+        $item = collect($this->getJson('/api/v1/contractor/home')->json('items.latest_updates'))->firstWhere('type', 'circular');
+        $this->assertSame('هذا نص التعميم كاملاً', $item['details']['body']);
+        $this->assertFalse($item['details']['requires_acknowledgement']);
+        $this->assertTrue($item['details']['acknowledged']);
+
+        // باقي الأنواع ما بتحمل details
+        Tender::create(['title' => 'عطاء', 'status' => 'open']);
+        $tender = collect($this->getJson('/api/v1/contractor/home')->json('items.latest_updates'))->firstWhere('type', 'tender');
+        $this->assertArrayNotHasKey('details', $tender);
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     //  GET /contractor/home/updates — full paginated history
     // ─────────────────────────────────────────────────────────────────────

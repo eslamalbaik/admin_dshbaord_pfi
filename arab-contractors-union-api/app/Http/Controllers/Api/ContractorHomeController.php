@@ -226,7 +226,7 @@ class ContractorHomeController extends Controller
                 'priority'     => $item['priority'],
                 'created_at'   => $item['created_at']->toIso8601String(),
                 'url'          => $item['url'] ?? null,
-            ];
+            ] + (isset($item['details']) ? ['details' => $item['details']] : []);
         })->values();
     }
 
@@ -276,7 +276,7 @@ class ContractorHomeController extends Controller
         $acknowledgedIds = AnnouncementAcknowledgement::where('contractor_id', $contractor->id)->pluck('announcement_id');
 
         return Announcement::published()
-            ->select(['id', 'title', 'image', 'is_pinned', 'published_at'])
+            ->select(['id', 'title', 'number', 'category', 'body', 'image', 'attachment', 'is_pinned', 'published_at'])
             ->latest('published_at')
             ->limit(self::FEED_POOL_LIMIT)
             ->get()
@@ -292,6 +292,19 @@ class ContractorHomeController extends Controller
                     'is_new'       => $awaitingAck || $a->published_at->gt(now()->subHours(self::NEW_BADGE_HOURS)),
                     'priority'     => $awaitingAck ? 'high' : 'normal',
                     'created_at'   => $a->published_at,
+                    // التطبيق يعرض نافذة التعميم (Pop-up) من هذا العنصر مباشرة، فيحتاج النص كاملاً
+                    // مش العنوان وحده — نفس حقول contractor/circulars/pending و announcements/{id}
+                    'details'      => [
+                        'number'                   => $a->number,
+                        'category'                 => $a->category,
+                        'body'                     => $a->body,
+                        'image'                    => $a->image,
+                        'attachment'               => $a->attachment,
+                        'is_pinned'                => $a->is_pinned,
+                        'requires_acknowledgement' => $awaitingAck,
+                        'acknowledged'             => $acknowledgedIds->contains($a->id),
+                        'published_at'             => $a->published_at->toIso8601String(),
+                    ],
                 ];
             });
     }
