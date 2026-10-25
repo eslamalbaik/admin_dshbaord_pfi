@@ -15,6 +15,7 @@ use App\Models\Tender;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 /**
  * الشاشة الرئيسية لتطبيق المقاول (الموبايل) — نداء واحد يجمع حالة العضوية،
@@ -36,6 +37,7 @@ class ContractorHomeController extends Controller
     private const FEED_POOL_LIMIT         = 30; // عدد السجلات المجلوبة من كل مصدر قبل الدمج والترتيب
     private const HOME_UPDATES_LIMIT      = 5;
     private const UPDATES_PER_PAGE        = 20;
+    private const CIRCULAR_SUBTITLE_LIMIT = 150; // طول سطر نص التعميم بالتغذية
 
     // ─────────────────────────────────────────────────────────────────────────
     //  GET /api/v1/contractor/home
@@ -287,7 +289,9 @@ class ContractorHomeController extends Controller
                     'type'         => 'circular',
                     'reference_id' => $a->id,
                     'title'        => $a->title,
-                    'subtitle'     => $awaitingAck ? 'بانتظار الإقرار بالقراءة' : null,
+                    // نص التعميم نفسه كسطر فرعي (طلب eslam 2026-10-25) بدل "بانتظار الإقرار بالقراءة"؛
+                    // حالة الإقرار باقية بـ priority و details.requires_acknowledgement
+                    'subtitle'     => $this->circularSubtitle($a->body),
                     'has_attachment' => (bool) $a->image,
                     'is_new'       => $awaitingAck || $a->published_at->gt(now()->subHours(self::NEW_BADGE_HOURS)),
                     'priority'     => $awaitingAck ? 'high' : 'normal',
@@ -307,6 +311,14 @@ class ContractorHomeController extends Controller
                     ],
                 ];
             });
+    }
+
+    // نص عادي بلا HTML وبسطر واحد، مقصوص على CIRCULAR_SUBTITLE_LIMIT حرف؛ النص الكامل بـ details.body
+    private function circularSubtitle(?string $body): ?string
+    {
+        $text = trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags(str_replace('<', ' <', (string) $body)), ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+
+        return $text === '' ? null : Str::limit($text, self::CIRCULAR_SUBTITLE_LIMIT, '…');
     }
 
     private function eventUpdates(): Collection

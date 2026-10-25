@@ -537,7 +537,27 @@ class ContractorHomeTest extends TestCase
 
         $this->assertEquals('high', $item['priority']);
         $this->assertContains('جديد', $item['badges']);
-        $this->assertEquals('بانتظار الإقرار بالقراءة', $item['subtitle']);
+        $this->assertTrue($item['details']['requires_acknowledgement']);
+        $this->assertSame('x', $item['subtitle']);
+    }
+
+    public function test_circular_subtitle_is_the_plain_body_truncated(): void
+    {
+        $contractor = $this->createContractor();
+
+        Announcement::create([
+            'title' => 'تعميم طويل', 'body' => "<p>السطر&nbsp;الأول</p>\n\n<p>".str_repeat('كلمة ', 60).'</p>',
+            'is_published' => true, 'published_at' => now()->subHour(),
+        ]);
+
+        Sanctum::actingAs($contractor, ['*']);
+        $item = collect($this->getJson('/api/v1/contractor/home/updates')->json('items'))->firstWhere('type', 'circular');
+
+        $this->assertStringStartsWith('السطر الأول كلمة كلمة', $item['subtitle']);
+        $this->assertStringNotContainsString('<', $item['subtitle']);
+        $this->assertStringEndsWith('…', $item['subtitle']);
+        $this->assertLessThanOrEqual(151, mb_strlen($item['subtitle']));
+        $this->assertStringContainsString('<p>', $item['details']['body']);
     }
 
     public function test_circular_feed_item_carries_the_full_circular_details(): void
