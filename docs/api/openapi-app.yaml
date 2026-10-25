@@ -4127,7 +4127,10 @@ components:
             open `url` directly). Financial types and certificates were removed from this feed on 2026-10-13.
         reference_id: { type: integer }
         title: { type: string }
-        subtitle: { type: string, nullable: true }
+        subtitle:
+          type: string
+          nullable: true
+          description: 'Per type: tender → category, event → date — place, news → excerpt, circular → the circular body as plain text (HTML stripped, one line, max 150 chars + "…"; full text in details.body), legal_file → category name.'
         badges:
           type: array
           items: { type: string }

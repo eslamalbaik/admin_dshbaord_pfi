@@ -9175,7 +9175,8 @@
           },
           "subtitle": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "Per type: tender → category, event → date — place, news → excerpt, circular → the circular body as plain text (HTML stripped, one line, max 150 chars + \"…\"; full text in details.body), legal_file → category name."
           },
           "badges": {
             "type": "array",
