@@ -142,8 +142,26 @@ const currencies = [
 function openPay(c: ContractorRow) {
   paying.value = c
   payForm.value = { amount: '', currency: 'JOD', exchange_rate: '', method: 'cash', reference_number: '', notes: '' }
+  payReceiptFile.value = null
   payDialog.value = true
 }
+
+// صورة الإشعار (اختيارية) — VFileInput بدون multiple يرجّع File واحد مش مصفوفة
+const payReceiptFile = ref<File | File[] | null>(null)
+const payReceiptPreview = ref('')
+
+function firstFile(v: File | File[] | null | undefined): File | null {
+  return (Array.isArray(v) ? v[0] : v) ?? null
+}
+
+watch(payReceiptFile, files => {
+  if (payReceiptPreview.value)
+    URL.revokeObjectURL(payReceiptPreview.value)
+
+  const file = firstFile(files)
+
+  payReceiptPreview.value = file && file.type.startsWith('image/') ? URL.createObjectURL(file) : ''
+})
 
 // اقتراح سعر الصرف المعتمد عند تغيير العملة
 watch(() => payForm.value.currency, cur => {
@@ -163,16 +181,26 @@ const payJodEquivalent = computed(() => {
 })
 
 const payMutation = useMutation({
-  mutationFn: async () => (await api.post(`/api/v1/dashboard/contractors/${paying.value!.contractor_id}/dues/pay`, {
-    amount: payForm.value.amount,
-    currency: payForm.value.currency,
-    exchange_rate: payForm.value.currency !== 'JOD' && payForm.value.exchange_rate
-      ? payForm.value.exchange_rate
-      : undefined,
-    method: payForm.value.method,
-    reference_number: payForm.value.reference_number || undefined,
-    notes: payForm.value.notes || undefined,
-  })).data,
+  mutationFn: async () => {
+    const form = new FormData()
+
+    form.append('amount', String(payForm.value.amount))
+    form.append('currency', payForm.value.currency)
+    if (payForm.value.currency !== 'JOD' && payForm.value.exchange_rate)
+      form.append('exchange_rate', String(payForm.value.exchange_rate))
+    form.append('method', payForm.value.method)
+    if (payForm.value.reference_number)
+      form.append('reference_number', payForm.value.reference_number)
+    if (payForm.value.notes)
+      form.append('notes', payForm.value.notes)
+    const receipt = firstFile(payReceiptFile.value)
+    if (receipt)
+      form.append('receipt_image', receipt)
+
+    return (await api.post(`/api/v1/dashboard/contractors/${paying.value!.contractor_id}/dues/pay`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })).data
+  },
   onSuccess: (d: any) => {
     payDialog.value = false
     const appliedItems = d.items?.applied ?? []
@@ -1174,6 +1202,24 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
             </VCol>
             <VCol cols="12" md="6">
               <VTextField v-model="payForm.notes" label="ملاحظة (اختياري)" dir="rtl" />
+            </VCol>
+            <VCol cols="12">
+              <VFileInput
+                v-model="payReceiptFile"
+                label="صورة الإشعار (اختياري)"
+                accept="image/png,image/jpeg,image/webp,application/pdf"
+                prepend-icon=""
+                prepend-inner-icon="tabler-photo"
+                hint="صورة أو PDF، حتى 5 ميغابايت"
+                persistent-hint
+                show-size
+              />
+              <VImg
+                v-if="payReceiptPreview"
+                :src="payReceiptPreview"
+                max-height="200"
+                class="mt-2 rounded border"
+              />
             </VCol>
           </VRow>
 

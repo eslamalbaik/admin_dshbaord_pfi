@@ -134,8 +134,19 @@ class ContractorDueController extends Controller
     public function payForContractor(PayContractorDueRequest $request, Contractor $contractor)
     {
         $data = $request->validated();
-        
-        $result = $this->paymentService->processPayment($contractor, $data, Auth::id());
+
+        if ($request->hasFile('receipt_image')) {
+            $data['receipt_image'] = $request->file('receipt_image')->store('payment-receipts', 'public');
+        }
+
+        try {
+            $result = $this->paymentService->processPayment($contractor, $data, Auth::id());
+        } catch (\Throwable $e) {
+            if (! empty($data['receipt_image'])) {
+                Storage::disk('public')->delete($data['receipt_image']);
+            }
+            throw $e;
+        }
 
         $this->financeLog('due.contractor_payment', [
             'contractor_id' => $contractor->id,

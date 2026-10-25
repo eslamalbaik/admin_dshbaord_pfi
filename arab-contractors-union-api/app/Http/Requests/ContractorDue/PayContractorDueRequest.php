@@ -20,6 +20,15 @@ class PayContractorDueRequest extends FormRequest
             'method'           => 'nullable|in:cash,bank_transfer,cheque',
             'reference_number' => 'nullable|string|max:100',
             'notes'            => 'nullable|string|max:500',
+            'receipt_image'    => 'nullable|file|mimes:png,jpg,jpeg,webp,pdf|max:5120',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'receipt_image.mimes' => 'صورة الإشعار يجب أن تكون صورة (png, jpg, jpeg, webp) أو ملف PDF.',
+            'receipt_image.max'   => 'حجم صورة الإشعار يجب ألا يتجاوز 5 ميغابايت.',
         ];
     }
 }
