@@ -91,11 +91,32 @@ const publishModeOptions = [
 const localDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const tomorrowStr = () => localDateStr(new Date(Date.now() + 24 * 60 * 60 * 1000))
 
-// موعد الفعالية من بكرا وطالع (عند الإنشاء) — نفس قيد الباك اند
-const minEventDate = computed(() => `${tomorrowStr()}T00:00`)
+// يوم النشر: تاريخ الجدولة لو النشر مجدول، وإلا اليوم (نشر مباشر أو مسودة)
+const publishDayStr = () => {
+  const today = localDateStr(new Date())
+  if (form.value.publishMode === 'schedule' && form.value.published_at)
+    return form.value.published_at > today ? form.value.published_at : today
 
-// "ابتداءً من 08/10/2026 (تاريخ اليوم +1)" — يوضّح أقرب تاريخ مسموح بدل كلمة "بكرا"
+  return today
+}
+
+// موعد الفعالية من تاريخ يوم النشر +1 (نفس قيد الباك اند)
+const dayAfter = (ymd: string) => {
+  const [y, m, d] = ymd.split('-').map(Number)
+
+  return localDateStr(new Date(y, m - 1, d + 1))
+}
+const minEventDate = computed(() => `${dayAfter(publishDayStr())}T00:00`)
+
+// "ابتداءً من 08/10/2026 (تاريخ النشر +1)" — يوضّح أقرب تاريخ مسموح
 const minDateHint = computed(() => {
+  const [y, m, d] = minEventDate.value.slice(0, 10).split('-')
+
+  return `ابتداءً من ${d}/${m}/${y} (تاريخ النشر +1)`
+})
+
+// تاريخ النشر المجدول نفسه من اليوم +1
+const minPublishHint = computed(() => {
   const [y, m, d] = tomorrowStr().split('-')
 
   return `ابتداءً من ${d}/${m}/${y} (تاريخ اليوم +1)`
@@ -323,7 +344,7 @@ const saveEvent = async () => {
   }
   // نفس قاعدة الموعد: تاريخ مجدول جديد من اليوم +1، والتاريخ المحفوظ أصلاً بيمرّ بالتعديل
   if (mode === 'schedule' && form.value.published_at !== originalPublishedAt.value && form.value.published_at < tomorrowStr()) {
-    notify(`تاريخ النشر المجدول لازم يكون ${minDateHint.value}`, 'error')
+    notify(`تاريخ النشر المجدول لازم يكون ${minPublishHint.value}`, 'error')
     return
   }
   const mainImage = firstFile(mainImageFile.value)
@@ -649,7 +670,8 @@ const deleteEvent = async () => {
               <VCol cols="12" md="6">
                 <VSelect v-model="form.event_format" :items="eventFormatOptions" label="نوع الحضور" clearable />
               </VCol>
-              <VCol v-if="form.event_format === 'onsite' || form.event_format === 'hybrid'" cols="12" md="6">
+              <!-- v-show مش v-if: الحقل بيضل مركّب فالقيمة المكتوبة أو المحفوظة ما بتنمسح عند تغيير نوع الحضور -->
+              <VCol v-show="form.event_format === 'onsite' || form.event_format === 'hybrid'" cols="12" md="6">
                 <VTextField
                   v-model="form.event_location"
                   label="مكان الفعالية *"
@@ -657,7 +679,7 @@ const deleteEvent = async () => {
                   :rules="[v => !!v || 'مطلوب لأن نوع الحضور وجاهي أو وجاهي + أونلاين']"
                 />
               </VCol>
-              <VCol v-if="form.event_format !== 'onsite'" cols="12" md="6">
+              <VCol v-show="form.event_format !== 'onsite'" cols="12" md="6">
                 <VTextField
                   v-model="form.stream_url"
                   label="رابط البث المباشر (Zoom)"
@@ -815,7 +837,7 @@ const deleteEvent = async () => {
                   label="تاريخ النشر المجدول *"
                   type="date"
                   :min="isEditing && originalPublishedAt ? undefined : tomorrowStr()"
-                  :hint="minDateHint"
+                  :hint="minPublishHint"
                   persistent-hint
                 />
               </VCol>

@@ -522,6 +522,58 @@ class EventAdminTest extends TestCase
         ])->assertStatus(201);
     }
 
+    // موعد الفعالية من تاريخ يوم النشر +1 (مش من اليوم +1 دايماً)
+    public function test_store_scheduled_event_date_must_be_after_publish_date(): void
+    {
+        $this->actingAsAdmin();
+        $tz = config('app.local_timezone');
+        $publish = now($tz)->addDays(5);
+
+        // نشر مجدول بعد 5 أيام، موعد الفعالية بعد يومين (قبل النشر +1) → مرفوض
+        $this->postJson('/api/v1/admin/events', [
+            'title' => 'فعالية', 'body' => 'نص', 'is_published' => true,
+            'published_at' => $publish->toDateString(),
+            'event_date' => now($tz)->addDays(2)->format('Y-m-d\TH:i'),
+        ])->assertStatus(422)->assertJsonValidationErrors(['event_date']);
+
+        // نفس يوم النشر → مرفوض
+        $this->postJson('/api/v1/admin/events', [
+            'title' => 'فعالية', 'body' => 'نص', 'is_published' => true,
+            'published_at' => $publish->toDateString(),
+            'event_date' => $publish->copy()->setTime(18, 0)->format('Y-m-d\TH:i'),
+        ])->assertStatus(422)->assertJsonValidationErrors(['event_date']);
+
+        // يوم النشر +1 → مقبول
+        $this->postJson('/api/v1/admin/events', [
+            'title' => 'فعالية', 'body' => 'نص', 'is_published' => true,
+            'published_at' => $publish->toDateString(),
+            'event_date' => $publish->copy()->addDay()->startOfDay()->format('Y-m-d\TH:i'),
+        ])->assertStatus(201);
+    }
+
+    public function test_hybrid_event_keeps_location_and_stream_url_across_format_switches(): void
+    {
+        $this->actingAsAdmin();
+        $tz = config('app.local_timezone');
+
+        $id = $this->postJson('/api/v1/admin/events', [
+            'title' => 'فعالية', 'body' => 'نص', 'event_format' => 'hybrid',
+            'event_location' => 'gaza', 'stream_url' => 'https://zoom.us/j/123?pwd=abc',
+            'event_date' => now($tz)->addDay()->startOfDay()->format('Y-m-d\TH:i'),
+        ])->assertStatus(201)->json('data.id') ?? Event::latest('id')->value('id');
+
+        foreach (['online', 'onsite', 'hybrid'] as $format) {
+            $this->putJson("/api/v1/admin/events/{$id}", [
+                'event_format' => $format, 'event_location' => 'gaza', 'stream_url' => 'https://zoom.us/j/123?pwd=abc',
+            ])->assertStatus(200);
+
+            $event = Event::find($id);
+            $this->assertSame($format, $event->event_format);
+            $this->assertSame('gaza', $event->event_location);
+            $this->assertSame('https://zoom.us/j/123?pwd=abc', $event->stream_url);
+        }
+    }
+
     public function test_store_rejects_main_image_over_10mb(): void
     {
         $this->actingAsAdmin();
