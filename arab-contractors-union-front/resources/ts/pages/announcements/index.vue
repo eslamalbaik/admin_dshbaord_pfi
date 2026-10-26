@@ -90,11 +90,6 @@ const localDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1)
 const todayStr = () => localDateStr(new Date())
 const yesterdayStr = () => localDateStr(new Date(Date.now() - 24 * 60 * 60 * 1000))
 
-// تاريخ النشر المجدول بيتنسى لما المستخدم يرجع لـ"نشر مباشرة" بالإنشاء (ما إله معنى وقتها)
-watch(() => form.value.publishMode, mode => {
-  if (mode !== 'schedule' && !isEditing.value) form.value.published_at = ''
-})
-
 const minPublishDate = computed(() => (isEditing.value ? yesterdayStr() : todayStr()))
 
 // حقل تاريخ النشر يظهر فقط بالجدولة، أو بتعديل تعميم منشور (لتصحيح تاريخه)
@@ -119,6 +114,11 @@ const formDialog = ref(false)
 const formLoading = ref(false)
 const isEditing = ref(false)
 const form = ref(emptyForm())
+
+// تاريخ النشر المجدول بيتنسى لما المستخدم يرجع لـ"نشر مباشرة" بالإنشاء (ما إله معنى وقتها)
+watch(() => form.value.publishMode, mode => {
+  if (mode !== 'schedule' && !isEditing.value) form.value.published_at = ''
+})
 
 // حالة التعميم عند فتحه للتعديل — لتحديد شو لازم ينبعت للخادم عند الحفظ (مثل منطق الأخبار)
 const originalPublishMode = ref<PublishMode>('now')
@@ -572,9 +572,23 @@ const deleteAnnouncement = async () => {
 </template>
 
 <style scoped>
-/* أزرار طريقة النشر بتلف على الشاشات الصغيرة بدل ما تطلع برا الحوار */
+/* أزرار طريقة النشر: بعرض الحوار وبحصص متساوية (نفس صفحة الأخبار)،
+   وبتلف على الشاشات الصغيرة بدل ما تطلع برا الحوار */
 .publish-mode-toggle {
+  display: flex;
   flex-wrap: wrap;
   block-size: auto !important;
+  inline-size: 100%;
+}
+
+.publish-mode-toggle .v-btn {
+  flex: 1 1 auto;
+}
+
+/* بالموبايل: حشوة أصغر عشان الأزرار الثلاثة تضل بسطر واحد */
+@media (max-width: 600px) {
+  .publish-mode-toggle .v-btn {
+    padding-inline: 8px;
+  }
 }
 </style>
