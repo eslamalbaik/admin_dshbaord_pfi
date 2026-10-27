@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/plugins/axios'
+import { MotionDirective } from '@vueuse/motion'
 import {
   ArrowLeft, Award, Bookmark, Building2, CalendarDays, ChevronLeft, ChevronRight, Clock, FileSignature,
-  FileText, Globe, Handshake, Hourglass, Landmark, Play, Search, ShieldCheck, UserCheck, UserCog,
+  FileText, Globe, Handshake, Hourglass, Landmark, Loader2, MapPin, Play, Search, SearchX, ShieldCheck, UserCheck, UserCog,
 } from 'lucide-vue-next'
 
 definePage({
@@ -12,6 +13,22 @@ definePage({
 })
 
 const router = useRouter()
+
+// ─── Scroll animations (@vueuse/motion) ──────────────────────────────────────
+// v-reveal: يطلع العنصر من تحت مع fade أول ما يبين بالشاشة (مرة وحدة). :delay للتتابع بين الكروت.
+const vReveal = MotionDirective({
+  initial: { opacity: 0, y: 40 },
+  visibleOnce: { opacity: 1, y: 0, transition: { duration: 700, ease: [0.22, 1, 0.36, 1] } },
+})
+const vRevealSide = MotionDirective({
+  initial: { opacity: 0, x: -60 },
+  visibleOnce: { opacity: 1, x: 0, transition: { duration: 800, ease: [0.22, 1, 0.36, 1] } },
+})
+// الهيرو بيتحرك عند فتح الصفحة مش عند السكرول
+const vEnter = MotionDirective({
+  initial: { opacity: 0, y: 30 },
+  enter: { opacity: 1, y: 0, transition: { duration: 800, ease: [0.22, 1, 0.36, 1] } },
+})
 
 // ─── Partners strip ──────────────────────────────────────────────────────────
 const partners = [
@@ -66,11 +83,55 @@ function openTender(t: TenderCard) {
 }
 
 // ─── Directory search ────────────────────────────────────────────────────────
+interface DirectoryItem { name: string; membership_number: string; city: string | null; membership_status: string; status_label: string; fields: { name: string; grades: string[] }[] }
 const searchQuery = ref('')
-function searchDirectory() {
+const directory = ref<DirectoryItem[]>([])
+const directoryTotal = ref(0)
+const directoryPage = ref(1)
+const directoryLastPage = ref(1)
+const directoryLoading = ref(false)
+const directorySearched = ref('')
+let directoryTimer: ReturnType<typeof setTimeout> | undefined
+let directoryRequest = 0
+
+async function fetchDirectory(page = 1) {
   const q = searchQuery.value.trim()
-  router.push({ path: '/landing/members', query: q ? { search: q } : {} })
+  const id = ++directoryRequest
+  directoryLoading.value = true
+  try {
+    const r = await api.get('/api/v1/contractors-directory', { params: { search: q, page, per_page: 6 } })
+    if (id !== directoryRequest) return
+    const items = r.data.items ?? []
+    directory.value = page === 1 ? items : [...directory.value, ...items]
+    directoryTotal.value = r.data.meta?.total ?? items.length
+    directoryPage.value = r.data.meta?.current_page ?? page
+    directoryLastPage.value = r.data.meta?.last_page ?? page
+    directorySearched.value = q
+  }
+  catch {
+    if (id === directoryRequest) { directory.value = []; directoryTotal.value = 0; directorySearched.value = q }
+  }
+  finally {
+    if (id === directoryRequest) directoryLoading.value = false
+  }
 }
+function searchDirectory() {
+  clearTimeout(directoryTimer)
+  if (searchQuery.value.trim()) fetchDirectory(1)
+}
+// بحث تلقائي أثناء الكتابة (بعد توقف قصير)، ومسح النتائج لما يفضى الحقل
+watch(searchQuery, (q) => {
+  clearTimeout(directoryTimer)
+  if (!q.trim()) {
+    directoryRequest++
+    directory.value = []
+    directorySearched.value = ''
+    directoryLoading.value = false
+    return
+  }
+  if (q.trim().length >= 2) directoryTimer = setTimeout(() => fetchDirectory(1), 400)
+})
+onUnmounted(() => clearTimeout(directoryTimer))
 
 // ─── News ────────────────────────────────────────────────────────────────────
 interface NewsCard { key: string; title: string; excerpt: string; image: string; date: string; to: string }
@@ -141,15 +202,15 @@ onMounted(() => {
       <img src="/images/landing/home-hero.webp" alt="" class="hero-img">
       <div class="hero-shade" />
       <div class="container hero-inner">
-        <span class="hero-badge"><i />الجهة الرسمية لتصنيف واعتماد المقاولين، غزة</span>
-        <h1 class="hero-title">
+        <span v-enter class="hero-badge"><i />الجهة الرسمية لتصنيف واعتماد المقاولين، غزة</span>
+        <h1 v-enter :delay="120" class="hero-title">
           تمكين <span class="accent">وتطوير</span> شركات<br>
           <span class="accent">المقاولات</span> الوطنية
         </h1>
-        <p class="hero-desc">
+        <p v-enter :delay="240" class="hero-desc">
           نقدم منظومة خدمات الكترونية وتصنيفية متكاملة لجميع المقاولين المسجلين لضمان كفاءة التنفيذ والارتقاء بالقورة الانتاجية
         </p>
-        <div class="hero-actions">
+        <div v-enter :delay="360" class="hero-actions">
           <RouterLink to="/landing/members" class="hero-btn hero-btn-solid">
             استكشف دليل المقاولين <ChevronLeft :size="18" />
           </RouterLink>
@@ -162,7 +223,7 @@ onMounted(() => {
 
     <!-- ══ PARTNERS ══ -->
     <div class="container">
-      <div class="partners">
+      <div v-reveal class="partners">
         <span class="partners-label">الشركاء والجهات المعتمدة:</span>
         <span v-for="p in partners" :key="p.label" class="partner">
           <component :is="p.icon" :size="20" /> {{ p.label }}
@@ -173,7 +234,7 @@ onMounted(() => {
     <!-- ══ ABOUT ══ -->
     <section class="about dotted">
       <div class="container about-grid">
-        <div class="about-text">
+        <div v-reveal class="about-text">
           <span class="eyebrow"><i />عن الاتحاد</span>
           <h2 class="about-heading">
             تأسس الاتحاد ليشكل الكيان الرسمي الجامع لشركات المقاولات الوطنية، وتسهيل الوصول للعطاءات والمناقصات بمرونة واحترافية عالية.
@@ -195,14 +256,14 @@ onMounted(() => {
             تعرف على كل خدماتنا الالكترونية <ChevronLeft :size="18" />
           </RouterLink>
         </div>
-        <div class="about-visual">
+        <div v-reveal-side :delay="150" class="about-visual">
           <span class="about-frame" />
           <img src="/images/landing/home-about.webp" alt="فريق اتحاد المقاولين" loading="lazy">
         </div>
       </div>
 
       <div class="container">
-        <div class="stats">
+        <div v-reveal class="stats">
           <div v-for="s in stats" :key="s.label" class="stat" :class="`stat-${s.tone}`">
             <span class="stat-icon"><component :is="s.icon" :size="20" /></span>
             <div>
@@ -217,7 +278,7 @@ onMounted(() => {
     <!-- ══ TENDERS ══ -->
     <section class="section">
       <div class="container">
-        <div class="head-row">
+        <div v-reveal class="head-row">
           <div>
             <span class="eyebrow"><i />اهم العطاءات</span>
             <h2 class="heading">احدث <span class="underlined">العطاءات</span></h2>
@@ -232,7 +293,7 @@ onMounted(() => {
         </div>
 
         <div class="cards-grid">
-          <article v-for="(t, i) in visibleTenders" :key="`${t.id}-${i}`" class="tender-card">
+          <article v-for="(t, i) in visibleTenders" :key="`${t.id}-${i}`" v-reveal :delay="i * 120" class="tender-card">
             <div class="tender-img">
               <img :src="t.image" :alt="t.title" loading="lazy">
               <span v-if="t.closingSoon" class="status status-soon"><Hourglass :size="13" /> قريب الاغلاق</span>
@@ -256,7 +317,7 @@ onMounted(() => {
 
     <!-- ══ DIRECTORY ══ -->
     <div class="container">
-      <section class="directory">
+      <section v-reveal class="directory">
         <img src="/images/landing/home-directory.webp" alt="" class="directory-img" loading="lazy">
         <div class="directory-shade" />
         <div class="directory-inner">
@@ -268,6 +329,37 @@ onMounted(() => {
             <input v-model="searchQuery" type="text" placeholder="ابحث باسم الشركة أو رقم العضوية...">
             <button type="submit" class="btn-navy">بحث</button>
           </form>
+
+          <div v-if="directoryLoading && !directory.length" class="directory-state">
+            <Loader2 :size="22" class="spin" /> جاري البحث...
+          </div>
+          <div v-else-if="directorySearched && !directory.length" class="directory-state">
+            <SearchX :size="22" /> لا توجد شركة مسجلة بهذا الاسم أو رقم العضوية
+          </div>
+          <div v-else-if="directory.length" class="directory-results">
+            <p class="directory-count">{{ directoryTotal }} نتيجة لـ "{{ directorySearched }}"</p>
+            <div class="directory-grid">
+              <article v-for="c in directory" :key="c.membership_number" class="dcard">
+                <div class="dcard-head">
+                  <span class="dcard-logo"><Building2 :size="20" /></span>
+                  <div class="dcard-title">
+                    <h3>{{ c.name }}</h3>
+                    <span class="dcard-num">رقم العضوية: <b dir="ltr">{{ c.membership_number }}</b></span>
+                  </div>
+                  <span class="dstatus" :class="`dstatus-${c.membership_status}`"><i />{{ c.status_label }}</span>
+                </div>
+                <p v-if="c.city" class="dcard-city"><MapPin :size="15" /> {{ c.city }}</p>
+                <div v-if="c.fields.length" class="dcard-fields">
+                  <span v-for="f in c.fields" :key="f.name" class="dfield">
+                    {{ f.name }}<b v-if="f.grades.length"> · {{ f.grades.join('، ') }}</b>
+                  </span>
+                </div>
+              </article>
+            </div>
+            <button v-if="directoryPage < directoryLastPage" class="directory-more" :disabled="directoryLoading" @click="fetchDirectory(directoryPage + 1)">
+              <Loader2 v-if="directoryLoading" :size="16" class="spin" /> عرض نتائج أكثر
+            </button>
+          </div>
         </div>
       </section>
     </div>
@@ -275,7 +367,7 @@ onMounted(() => {
     <!-- ══ NEWS ══ -->
     <section class="section">
       <div class="container">
-        <div class="head-row">
+        <div v-reveal class="head-row">
           <div>
             <span class="eyebrow"><i />المركز الاعلامي</span>
             <h2 class="heading">أخبار ومستجدات الاتحاد</h2>
@@ -290,7 +382,7 @@ onMounted(() => {
         </div>
 
         <div class="cards-grid">
-          <article v-for="n in visibleNews" :key="n.key" class="news-card">
+          <article v-for="(n, i) in visibleNews" :key="n.key" v-reveal :delay="i * 120" class="news-card">
             <img :src="n.image" :alt="n.title" class="news-img" loading="lazy">
             <div class="news-body">
               <span v-if="n.date" class="news-date">{{ n.date }}</span>
@@ -305,7 +397,7 @@ onMounted(() => {
 
     <!-- ══ MOBILE APP ══ -->
     <div class="container app-wrap">
-      <section class="app">
+      <section v-reveal class="app">
         <span class="ball ball-white" />
         <span class="ball ball-orange" />
         <div class="app-text">
@@ -330,7 +422,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-@import url('https://fonts.cdnfonts.com/css/neo-sans-arabic');
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
 
 .lp {
@@ -344,7 +435,7 @@ onMounted(() => {
   --line: #e6e8ef;
   --green: #11903a;
 
-  font-family: 'Neo Sans Arabic', 'Tajawal', 'Cairo', sans-serif;
+  font-family: 'Tajawal', 'Cairo', sans-serif;
   color: var(--ink);
   background: #fff;
   overflow-x: hidden;
@@ -357,7 +448,7 @@ onMounted(() => {
 .lp a { text-decoration: none; }
 
 .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
-.section { padding: 48px 0 16px; }
+.section { padding: 96px 0 0; }
 .clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .accent { color: var(--yellow); }
 
@@ -427,7 +518,7 @@ onMounted(() => {
 /* ══ PARTNERS ══ */
 .partners {
   display: flex; align-items: center; justify-content: space-between; gap: 18px 28px; flex-wrap: wrap;
-  border-top: 1px solid var(--line); margin-top: 40px; padding: 12px 0 8px;
+  border-top: 1px solid var(--line); margin-top: 48px; padding: 16px 0 8px;
 }
 .partners-label { color: #8a90a0; font-weight: 700; font-size: 15px; }
 .partner { display: inline-flex; align-items: center; gap: 8px; color: #3c4a6b; font-weight: 700; font-size: 15px; }
@@ -438,7 +529,7 @@ onMounted(() => {
   background-image: radial-gradient(circle, #f4f5f8 6px, transparent 6.5px);
   background-size: 26px 26px; background-repeat: repeat;
 }
-.about { padding: 40px 0 8px; margin-top: 16px; }
+.about { padding: 72px 0 24px; margin-top: 40px; }
 .about-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 56px; align-items: start; }
 .about-heading { font-size: clamp(21px, 1.8vw, 26px); font-weight: 800; line-height: 1.6; margin-bottom: 30px; }
 .features { display: flex; flex-direction: column; gap: 22px; margin-bottom: 24px; }
@@ -512,7 +603,7 @@ onMounted(() => {
 .tender-btn { width: 100%; padding: 12px; font-size: 15px; }
 
 /* ══ DIRECTORY ══ */
-.directory { position: relative; overflow: hidden; border-radius: 30px; margin: 40px 0 16px; text-align: center; color: #fff; }
+.directory { position: relative; overflow: hidden; border-radius: 30px; margin: 96px 0 0; text-align: center; color: #fff; }
 .directory-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .directory-shade { position: absolute; inset: 0; background: linear-gradient(100deg, rgba(40, 40, 160, .86) 0%, rgba(20, 20, 130, .93) 35%, rgba(30, 30, 140, .9) 70%, rgba(130, 80, 60, .8) 100%); }
 .directory-inner { position: relative; padding: 40px 24px 40px; display: flex; flex-direction: column; align-items: center; }
@@ -526,6 +617,33 @@ onMounted(() => {
 .directory-search input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; font-size: 14px; padding: 10px 0; color: var(--ink); }
 .directory-search .btn-navy { padding: 12px 26px; font-size: 15px; }
 
+.directory-state { display: flex; align-items: center; gap: 10px; margin-top: 26px; font-weight: 700; color: rgba(255, 255, 255, .9); }
+.directory-results { width: 100%; max-width: 1000px; margin-top: 28px; }
+.directory-count { font-size: 14px !important; margin-bottom: 14px !important; color: rgba(255, 255, 255, .8) !important; }
+.directory-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; text-align: right; }
+.dcard { background: #fff; color: var(--ink); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px; animation: dcard-in .45s ease both; }
+@keyframes dcard-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.dcard-head { display: flex; align-items: flex-start; gap: 10px; }
+.dcard-logo { width: 40px; height: 40px; border-radius: 10px; background: var(--navy-soft); color: var(--navy); display: grid; place-items: center; flex-shrink: 0; }
+.dcard-title { flex: 1; min-width: 0; }
+.dcard h3 { font-size: 15px; font-weight: 800; line-height: 1.45; }
+.dcard-num { font-size: 12px; color: var(--muted); }
+.dcard-num b { color: var(--navy); }
+.dstatus { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
+.dstatus i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.dstatus-active { background: #e3f6e8; color: var(--green); }
+.dstatus-expired { background: #fff1dc; color: var(--orange); }
+.dstatus-suspended { background: #fde8ea; color: #d6142b; }
+.dcard-city { display: flex; align-items: center; gap: 6px; color: var(--muted) !important; font-size: 13px !important; margin: 0 !important; line-height: 1.4 !important; }
+.dcard-city svg { color: var(--orange); }
+.dcard-fields { display: flex; flex-wrap: wrap; gap: 6px; }
+.dfield { background: #f4f5f8; border: 1px solid #e3e5eb; border-radius: 8px; padding: 3px 9px; font-size: 12px; font-weight: 600; }
+.dfield b { color: var(--orange); font-weight: 700; }
+.directory-more { margin-top: 18px; display: inline-flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, .12); color: #fff; border: 1px solid rgba(255, 255, 255, .5); border-radius: 10px; padding: 10px 22px; font-weight: 700; cursor: pointer; }
+.directory-more:hover { background: rgba(255, 255, 255, .2); }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* ══ NEWS ══ */
 .news-card { border: 1px solid #dfe2ea; border-radius: 14px; overflow: hidden; background: #fff; display: flex; flex-direction: column; }
 .news-img { width: 100%; height: 198px; object-fit: cover; display: block; }
@@ -534,7 +652,7 @@ onMounted(() => {
 .read-more { display: inline-flex; align-items: center; gap: 10px; color: var(--navy); font-weight: 800; font-size: 15px; margin-top: auto; padding-top: 6px; }
 
 /* ══ APP ══ */
-.app-wrap { padding-top: 40px; padding-bottom: 40px; }
+.app-wrap { padding-top: 96px; padding-bottom: 96px; }
 .app {
   position: relative; overflow: hidden; border-radius: 32px; display: grid; grid-template-columns: 1fr 1fr; align-items: center;
   background: radial-gradient(circle at 42% 50%, #fff 0%, #f1f3f7 30%, #e9ecf2 100%); min-height: 430px; padding: 40px 40px 40px 0;
@@ -563,7 +681,7 @@ onMounted(() => {
   .about-btn { float: none; }
   .stats { grid-template-columns: repeat(2, 1fr); row-gap: 22px; }
   .stat:nth-child(3) { border-inline-start: none; }
-  .cards-grid { grid-template-columns: repeat(2, 1fr); }
+  .cards-grid, .directory-grid { grid-template-columns: repeat(2, 1fr); }
   .app { grid-template-columns: 1fr; padding: 40px 28px 0; text-align: center; }
   .app-text p { margin-inline: auto; }
   .app-arrow { display: none; }
@@ -578,7 +696,12 @@ onMounted(() => {
   .stats { grid-template-columns: 1fr; }
   .stat { justify-content: flex-start; }
   .stat + .stat { border-inline-start: none; border-top: 1px solid var(--line); padding-top: 18px; }
-  .cards-grid { grid-template-columns: 1fr; }
+  .cards-grid, .directory-grid { grid-template-columns: 1fr; }
+  .section { padding-top: 72px; }
+  .directory { margin-top: 72px; }
+  .dcard-head { flex-wrap: wrap; }
+  .dstatus { order: 3; margin-inline-start: 50px; }
+  .app-wrap { padding-top: 72px; padding-bottom: 72px; }
   .head-row { align-items: flex-start; }
   .directory { border-radius: 22px; }
   .directory-search .btn-navy { padding: 12px 18px; }
