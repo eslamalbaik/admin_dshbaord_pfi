@@ -111,7 +111,7 @@ const branch = ref<keyof typeof branches>('gaza')
 .pub-footer-name { font-size: 1.15rem; font-weight: 500; margin-bottom: 8px !important; }
 .pub-footer-en { font-size: 1.05rem; color: rgba(255, 255, 255, .85); direction: ltr; text-align: left; line-height: 1.5; }
 .pub-footer-bio { font-size: 1.15rem; line-height: 1.75; margin-bottom: 26px !important; }
-.pub-footer-social { display: flex; gap: 14px; justify-content: flex-end; }
+.pub-footer-social { display: flex; gap: 14px; justify-content: flex-start; }
 .pub-fsoc {
   width: 36px; height: 36px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, .25);
   display: grid; place-items: center; color: #fff; text-decoration: none; transition: background .2s;
