@@ -180,7 +180,8 @@ class ContractorController extends Controller
             'building'                      => ($isUpdate ? 'nullable' : 'required') . '|string|max:100',
             'floor'                         => ($isUpdate ? 'nullable' : 'required') . '|string|max:50',
             'capital'                       => 'nullable|numeric|min:0|max:999999999999',
-            'registration_date'             => 'nullable|date|before_or_equal:today',
+            // تاريخ التسجيل حتى أمس فقط بتوقيت غزة (التطبيق يعمل بـ UTC فيتأخر "اليوم" حتى 3 ساعات)
+            'registration_date'             => 'nullable|date|before:' . now('Asia/Gaza')->toDateString(),
             'legal_form'                    => 'nullable|string|max:100',
             'company_purposes'              => 'nullable|string',
             'authorized_person'             => ['nullable', 'string', 'max:255', 'not_regex:' . self::NO_DIGITS],
@@ -308,6 +309,7 @@ class ContractorController extends Controller
             'digits'   => 'حقل :attribute يجب أن يتكون من :digits أرقام فقط.',
             'not_regex' => 'حقل :attribute لا يقبل أرقاماً.',
             'before_or_equal' => 'حقل :attribute لا يمكن أن يكون تاريخاً في المستقبل.',
+            'registration_date.before' => 'تاريخ التسجيل يجب أن يكون قبل تاريخ اليوم (أمس أو أقدم).',
             'phone.regex'                       => 'رقم الجوال يقبل أرقاماً فقط (9 إلى 15 رقماً).',
             'fax.regex'                         => 'الهاتف / الفاكس يقبل أرقاماً فقط (6 إلى 15 رقماً).',
             'authorized_person_id_number.regex' => 'رقم هوية المفوض يجب أن يتكون من 9 أرقام فقط.',

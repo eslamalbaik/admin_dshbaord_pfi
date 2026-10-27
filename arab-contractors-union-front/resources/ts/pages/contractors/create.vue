@@ -2,7 +2,7 @@
 import api from '@/plugins/axios'
 import { UPLOAD_TIMEOUT_MS, describeRequestError } from '@/utils/requestError'
 import { contractorDocumentLabels } from '@/utils/contractorDocuments'
-import { contractorRules, invalidFormatFields, vNumeric } from '@/utils/contractorValidation'
+import { contractorRules, invalidFormatFields, vNumeric, yesterday } from '@/utils/contractorValidation'
 import type { ContractorDocumentKey } from '@/utils/contractorDocuments'
 import { useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
@@ -610,9 +610,10 @@ const submit = async () => {
               >
                 <VTextField
                   v-model="form.registration_date"
-                  :rules="[contractorRules.notFuture]"
+                  :rules="[contractorRules.beforeToday]"
                   label="تاريخ التسجيل"
                   type="date"
+                  :max="yesterday()"
                   :error-messages="validationErrors.registration_date"
                 />
               </VCol>
