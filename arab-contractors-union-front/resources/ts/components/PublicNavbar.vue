@@ -299,7 +299,7 @@ div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
 .pub-brand { display: flex; align-items: center; gap: .75rem; text-decoration: none; flex-shrink: 0; }
 .pub-brand-logo { height: 56px; width: auto; object-fit: contain; }
 .pub-brand-name {
-  display: flex; flex-direction: column; gap: .35rem; color: #0b0b0f; font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif;
+  display: flex; flex-direction: column; gap: .35rem; color: #0b0b0f; font-family: 'Tajawal', sans-serif;
   font-size: .95rem; font-weight: 700; line-height: 1.2; white-space: nowrap;
 }
 .pub-brand-name small { color: #5b6474; font-size: .82rem; font-weight: 400; direction: ltr; text-align: right; letter-spacing: .02em; }
@@ -320,7 +320,7 @@ div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
   transition: color .2s; white-space: nowrap; background: none; border: none;
   cursor: pointer;
 }
-.pub-nav-link { font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif; font-size: .92rem; color: #2b2f3a; }
+.pub-nav-link { font-family: 'Tajawal', sans-serif; font-size: .92rem; color: #2b2f3a; }
 .pub-nav-link:hover, .router-link-exact-active.pub-nav-link { color: #00006e; }
 .router-link-exact-active.pub-nav-link { font-weight: 700; }
 /* orange bar on the bottom edge of the card under the current page */
@@ -359,7 +359,7 @@ div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
   background: #00006e;
   color: #fff; border: none; border-radius: 10px;
   min-height: 44px; padding: .6rem 1.2rem .6rem 1.4rem; font-size: .92rem; font-weight: 700;
-  cursor: pointer; font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif; white-space: nowrap;
+  cursor: pointer; font-family: 'Tajawal', sans-serif; white-space: nowrap;
   flex-shrink: 0; text-decoration: none;
   transition: all .25s; box-shadow: 0 4px 14px rgba(13,27,75,.25);
 }
@@ -377,7 +377,7 @@ div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
   padding: .6rem .875rem; color: #374151; font-size: .9rem; font-weight: 600;
   text-decoration: none; border-radius: 8px; display: flex; align-items: center;
   justify-content: space-between; background: none; border: none; cursor: pointer;
-  font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif; width: 100%; text-align: right;
+  font-family: 'Tajawal', sans-serif; width: 100%; text-align: right;
 }
 .pub-mob-link:hover { background: #e8eaf6; color: #1a237e; }
 .pub-mob-sub { padding-inline-start: 1rem; display: flex; flex-direction: column; gap: .15rem; margin-bottom: .25rem; }
