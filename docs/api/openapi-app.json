@@ -9384,6 +9384,12 @@
             "nullable": true,
             "description": "Full URL (pdf/doc/docx)."
           },
+          "external_url": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true,
+            "description": "Optional external link (always starts with http/https). Show an \"open link\" button when present. Also in latest_updates[].details.external_url for circular items."
+          },
           "is_pinned": {
             "type": "boolean",
             "description": "Present in the list endpoint only."
