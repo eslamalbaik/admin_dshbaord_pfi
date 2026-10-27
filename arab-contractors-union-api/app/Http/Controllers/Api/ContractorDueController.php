@@ -23,6 +23,8 @@ use App\Services\DuesDiscountService;
 use App\Services\DuesGenerationService;
 use App\Services\LegacyDuesImporter;
 use App\Services\AuditLogService;
+use App\Jobs\GeneratePaymentReceiptJob;
+use App\Notifications\PaymentConfirmedNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -159,6 +161,10 @@ class ContractorDueController extends Controller
         ]);
 
         AuditLogService::record(Auth::user(), 'due.contractor_payment', $contractor, ['amount' => $data['amount'], 'amount_jod' => $result['amount_jod']]);
+
+        // نفس مسار صفحة المدفوعات (storeManual): فاتورة PDF للدفعة + إشعار المقاول بتأكيدها
+        GeneratePaymentReceiptJob::dispatch($result['payment_id']);
+        $contractor->notify(new PaymentConfirmedNotification(Payment::findOrFail($result['payment_id'])));
 
         return $this->success(
             $result + ['remaining_total_jod' => $this->financialService->outstandingDuesTotal($contractor)],
