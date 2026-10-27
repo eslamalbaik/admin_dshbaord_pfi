@@ -75,10 +75,17 @@ const HAS_DIGIT_RE = /[0-9٠-٩۰-۹]/
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const empty = (v: unknown) => v === null || v === undefined || String(v).trim() === ''
-const today = () => {
-  const d = new Date()
 
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+/** تاريخ اليوم (Y-m-d) بتوقيت غزة — نفس "اليوم" الذي يقارن به الخادم، مهما كانت منطقة جهاز المستخدم. */
+const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Gaza', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+
+/** أمس بتوقيت غزة: أقصى قيمة لتاريخ التسجيل (خاصية max في خانة التاريخ). */
+export const yesterday = () => {
+  const d = new Date(`${today()}T00:00:00Z`)
+
+  d.setUTCDate(d.getUTCDate() - 1)
+
+  return d.toISOString().substring(0, 10)
 }
 
 /** قواعد Vuetify للخانات الاختيارية: فارغة = مقبولة، وإلا يجب أن تطابق الصيغة. */
@@ -90,6 +97,7 @@ export const contractorRules = {
   personName: (v: string) => empty(v) || !HAS_DIGIT_RE.test(v) || 'الاسم لا يقبل أرقاماً',
   email: (v: string) => empty(v) || EMAIL_RE.test(v) || 'البريد الإلكتروني غير صحيح',
   notFuture: (v: string) => empty(v) || String(v).substring(0, 10) <= today() || 'لا يمكن أن يكون التاريخ في المستقبل',
+  beforeToday: (v: string) => empty(v) || String(v).substring(0, 10) < today() || 'تاريخ التسجيل يجب أن يكون أمس أو أقدم',
   maxLen: (max: number) => (v: string) => empty(v) || String(v).length <= max || `يجب ألا يتجاوز ${max} حرفاً`,
 }
 
@@ -98,7 +106,7 @@ export const invalidFormatFields = (f: Record<string, any>, step: number): strin
   const checks: Record<number, [string, unknown, (v: any) => true | string][]> = {
     1: [
       ['رأس المال', f.capital, contractorRules.capital],
-      ['تاريخ التسجيل', f.registration_date, contractorRules.notFuture],
+      ['تاريخ التسجيل', f.registration_date, contractorRules.beforeToday],
     ],
     2: [
       ['اسم صاحب المنشأة', f.owner_name, contractorRules.personName],
