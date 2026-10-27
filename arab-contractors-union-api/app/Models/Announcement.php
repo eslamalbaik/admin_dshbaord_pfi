@@ -11,7 +11,7 @@ class Announcement extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'title', 'number', 'category', 'body', 'image', 'attachment', 'is_published', 'is_pinned', 'published_at', 'expires_at', 'created_by',
+        'title', 'number', 'category', 'body', 'image', 'attachment', 'external_url', 'is_published', 'is_pinned', 'published_at', 'expires_at', 'created_by',
     ];
 
     protected $casts = [

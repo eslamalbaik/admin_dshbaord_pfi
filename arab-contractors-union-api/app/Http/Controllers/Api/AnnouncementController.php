@@ -40,7 +40,7 @@ class AnnouncementController extends Controller
         }
 
         $paginator = $query->latest('published_at')
-            ->select(['id', 'title', 'number', 'category', 'body', 'image', 'attachment', 'is_pinned', 'published_at'])
+            ->select(['id', 'title', 'number', 'category', 'body', 'image', 'attachment', 'external_url', 'is_pinned', 'published_at'])
             ->paginate($request->integer('per_page', 15));
 
         $categories = Announcement::published()
@@ -81,7 +81,7 @@ class AnnouncementController extends Controller
             ->where('is_pinned', true)
             ->whereDoesntHave('acknowledgements', fn ($q) => $q->where('contractor_id', $contractor->id))
             ->latest('published_at')
-            ->get(['id', 'title', 'number', 'category', 'body', 'image', 'attachment', 'published_at']);
+            ->get(['id', 'title', 'number', 'category', 'body', 'image', 'attachment', 'external_url', 'published_at']);
 
         return $this->success($announcements->toArray());
     }
@@ -106,7 +106,7 @@ class AnnouncementController extends Controller
             return $this->error('الإعلان غير متاح.', 404);
         }
 
-        return $this->success($announcement->only(['id', 'title', 'number', 'category', 'body', 'image', 'attachment', 'published_at']));
+        return $this->success($announcement->only(['id', 'title', 'number', 'category', 'body', 'image', 'attachment', 'external_url', 'published_at']));
     }
 
     // GET /api/v1/admin/announcements
@@ -171,6 +171,8 @@ class AnnouncementController extends Controller
         // المسودة ما بتنشر بالتطبيق — تاريخ الانتهاء و"عاجل وهام" ما إلهم معنى، فما منتحقق منهم ومنصفّرهم
         $isDraft = ! $request->boolean('is_published');
 
+        $this->normalizeExternalUrl($request);
+
         $validated = $request->validate([
             'title'        => 'required|string|max:255',
             'number'       => 'nullable|string|max:100',
@@ -179,6 +181,7 @@ class AnnouncementController extends Controller
             'body'         => 'required|string',
             'image'        => 'nullable',
             'attachment'   => 'nullable|file|mimes:pdf,doc,docx|max:10240',
+            'external_url' => 'nullable|url|max:2048',
             'is_published' => 'boolean',
             'is_pinned'    => 'boolean',
             // لازم اليوم أو بعده عند الإنشاء (REQ-12 #1) — التعديل يبقى بلا قيد حتى لا يُمنع
@@ -193,7 +196,7 @@ class AnnouncementController extends Controller
                 if (now()->parse($value)->lessThanOrEqualTo($publishedAt))
                     $fail('يجب أن يكون تاريخ انتهاء التعميم بعد تاريخ النشر.');
             }],
-        ]);
+        ], $this->externalUrlMessages());
 
         if ($isDraft) {
             $validated['is_pinned'] = false;
@@ -254,6 +257,8 @@ class AnnouncementController extends Controller
         // مسودة بعد الحفظ (مُرسلة صراحةً، أو التعميم أصلاً مسودة وما انبعت is_published)
         $isDraft = $request->has('is_published') ? ! $request->boolean('is_published') : ! $announcement->is_published;
 
+        $this->normalizeExternalUrl($request);
+
         $validated = $request->validate([
             'title'        => 'sometimes|string|max:255',
             'number'       => 'nullable|string|max:100',
@@ -262,6 +267,7 @@ class AnnouncementController extends Controller
             'body'         => 'sometimes|string',
             'image'        => 'nullable',
             'attachment'   => 'nullable|file|mimes:pdf,doc,docx|max:10240',
+            'external_url' => 'nullable|url|max:2048',
             'is_published' => 'boolean',
             'is_pinned'    => 'boolean',
             'publish_now'  => 'boolean',
@@ -274,7 +280,7 @@ class AnnouncementController extends Controller
                 if (now()->parse($value)->lessThanOrEqualTo($publishedAt))
                     $fail('يجب أن يكون تاريخ انتهاء التعميم بعد تاريخ النشر.');
             }],
-        ]);
+        ], $this->externalUrlMessages());
 
         // "نشر مباشرة" لتعميم كان مسودة أو مجدول لتاريخ لاحق: تاريخ النشر يصير الآن (نفس منطق News)
         $publishNow = $request->boolean('publish_now');
@@ -330,5 +336,21 @@ class AnnouncementController extends Controller
         $announcement->delete();
 
         return $this->success(message: 'تم حذف الإعلان بنجاح.');
+    }
+
+    // نفس منطق الفعاليات: رابط مكتوب بدون بروتوكول (www.example.com) بنكمّله بـ https:// قبل التحقق
+    private function normalizeExternalUrl(Request $request): void
+    {
+        $value = trim((string) $request->input('external_url', ''));
+        if ($value !== '' && ! preg_match('~^[a-z][a-z0-9+.-]*://~i', $value))
+            $request->merge(['external_url' => 'https://' . ltrim($value, '/')]);
+    }
+
+    private function externalUrlMessages(): array
+    {
+        return [
+            'external_url.url' => 'الرابط الخارجي غير صالح — انسخ الرابط كامل من المتصفح.',
+            'external_url.max' => 'الرابط الخارجي طويل جداً.',
+        ];
     }
 }

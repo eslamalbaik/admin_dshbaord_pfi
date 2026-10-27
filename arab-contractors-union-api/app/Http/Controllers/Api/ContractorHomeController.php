@@ -278,7 +278,7 @@ class ContractorHomeController extends Controller
         $acknowledgedIds = AnnouncementAcknowledgement::where('contractor_id', $contractor->id)->pluck('announcement_id');
 
         return Announcement::published()
-            ->select(['id', 'title', 'number', 'category', 'body', 'image', 'attachment', 'is_pinned', 'published_at'])
+            ->select(['id', 'title', 'number', 'category', 'body', 'image', 'attachment', 'external_url', 'is_pinned', 'published_at'])
             ->latest('published_at')
             ->limit(self::FEED_POOL_LIMIT)
             ->get()
@@ -304,6 +304,7 @@ class ContractorHomeController extends Controller
                         'body'                     => $a->body,
                         'image'                    => $a->image,
                         'attachment'               => $a->attachment,
+                        'external_url'             => $a->external_url,
                         'is_pinned'                => $a->is_pinned,
                         'requires_acknowledgement' => $awaitingAck,
                         'acknowledged'             => $acknowledgedIds->contains($a->id),

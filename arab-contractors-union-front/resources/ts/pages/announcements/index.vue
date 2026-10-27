@@ -104,6 +104,7 @@ const emptyForm = () => ({
   number: '',
   category_id: null as number | null,
   body: '',
+  external_url: '',
   publishMode: 'now' as PublishMode,
   is_pinned: false,
   published_at: '',
@@ -139,6 +140,7 @@ const openEdit = (item: any) => {
     number: item.number ?? '',
     category_id: item.category_id ?? null,
     body: item.body ?? '',
+    external_url: item.external_url ?? '',
     publishMode: !item.is_published
       ? 'draft'
       : (item.published_at && new Date(item.published_at) > new Date() ? 'schedule' : 'now'),
@@ -150,6 +152,13 @@ const openEdit = (item: any) => {
   originalPublishedAt.value = form.value.published_at
   isEditing.value = true
   formDialog.value = true
+}
+
+// رابط مكتوب بدون بروتوكول (www.example.com) بنكمّله بـ https:// — نفس سلوك فورم الفعاليات
+const withScheme = (v: string) => {
+  const t = v.trim()
+
+  return t && !/^[a-z][a-z0-9+.-]*:\/\//i.test(t) ? `https://${t.replace(/^\/+/, '')}` : t
 }
 
 // ── View details (read-only) ───────────────────────
@@ -193,6 +202,9 @@ const saveAnnouncement = async () => {
     // رقم التعميم: يُترك فارغاً بالإنشاء لتوليده تلقائياً بالباك اند؛ التعديل يسمح بتصحيحه يدوياً
     if (isEditing.value && form.value.number) fd.append('number', form.value.number)
     if (form.value.category_id) fd.append('category_id', String(form.value.category_id))
+    // الرابط الخارجي اختياري: بالتعديل بينبعت حتى لو فاضي عشان يمسح الرابط القديم
+    const externalUrl = withScheme(form.value.external_url)
+    if (externalUrl || isEditing.value) fd.append('external_url', externalUrl)
     // يُرسل دائماً (فاضي = null) حتى يقدر المستخدم يمسح تاريخ الانتهاء، والمسودة بتمسحه دائماً
     fd.append('expires_at', isDraft.value ? '' : form.value.expires_at)
 
@@ -411,6 +423,19 @@ const deleteAnnouncement = async () => {
             <VCol cols="12">
               <VTextarea v-model="form.body" label="نص التعميم" rows="6" style="font-family:Cairo,sans-serif" />
             </VCol>
+            <VCol cols="12">
+              <VTextField
+                v-model="form.external_url"
+                label="رابط خارجي (اختياري)"
+                prepend-inner-icon="tabler-external-link"
+                dir="ltr"
+                placeholder="https://..."
+                hint="يظهر بتطبيق المقاول كزر لفتح الرابط"
+                persistent-hint
+                style="font-family:Cairo,sans-serif"
+                @blur="form.external_url = withScheme(form.external_url)"
+              />
+            </VCol>
 
             <!-- قسم النشر: الطريقة أولاً، بعدين التواريخ حسب الطريقة، بعدين "عاجل وهام" -->
             <VCol cols="12">
@@ -533,6 +558,19 @@ const deleteAnnouncement = async () => {
             style="font-family:Cairo,sans-serif"
           >
             تحميل المرفق
+          </VBtn>
+          <VBtn
+            v-if="viewingItem.external_url"
+            :href="viewingItem.external_url"
+            target="_blank"
+            rel="noopener"
+            variant="tonal"
+            color="primary"
+            prepend-icon="tabler-external-link"
+            :class="{ 'ms-2': viewingItem.attachment }"
+            style="font-family:Cairo,sans-serif"
+          >
+            فتح الرابط الخارجي
           </VBtn>
         </VCardText>
         <VCardActions>
