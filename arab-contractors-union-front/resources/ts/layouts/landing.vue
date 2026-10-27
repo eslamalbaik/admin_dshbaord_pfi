@@ -19,5 +19,10 @@ import PublicFooter from '@/components/PublicFooter.vue'
   display: flex;
   flex-direction: column;
   background: #ffffff;
+  /* height of the floating PublicNavbar (padding + card); the home hero slides up under it */
+  --pub-nav-h: 114px;
+}
+@media (max-width: 1100px) {
+  .lp-layout { --pub-nav-h: 88px; }
 }
 </style>
