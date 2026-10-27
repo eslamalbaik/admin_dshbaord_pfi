@@ -155,6 +155,8 @@ class PaymentController extends Controller
         // بما أن توليد الـ PDF أصبح يتم في الخلفية (Background Job)،
         // نتحقق مما إذا كانت المهمة قد اكتملت بالفعل أم لا.
         if (! $payment->receipt_pdf_path) {
+            // دفعات صفحة الذمم القديمة انحفظت بدون فاتورة — نطلق توليدها هون بدل ما تضل 409 للأبد
+            \App\Jobs\GeneratePaymentReceiptJob::dispatch($payment->id);
             return $this->error('الإيصال قيد الإصدار حالياً، يرجى المحاولة بعد قليل.', 409);
         }
 

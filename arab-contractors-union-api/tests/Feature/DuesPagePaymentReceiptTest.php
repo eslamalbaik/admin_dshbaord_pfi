@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\GeneratePaymentReceiptJob;
 use App\Models\Contractor;
 use App\Models\ContractorDue;
 use App\Models\Payment;
 use App\Models\User;
+use App\Notifications\PaymentConfirmedNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
@@ -82,5 +84,14 @@ class DuesPagePaymentReceiptTest extends TestCase
     {
         $this->pay(['amount' => 100, 'receipt_image' => UploadedFile::fake()->create('notice.exe', 10)])
             ->assertStatus(422)->assertJsonValidationErrors('receipt_image');
+    }
+
+    /** بلاغ eslam (27/10/2026): دفعة صفحة الذمم ما كانت تطلع إلها فاتورة مثل دفعة صفحة المدفوعات */
+    public function test_dues_page_payment_generates_invoice_and_notifies_contractor(): void
+    {
+        $id = $this->pay(['amount' => 100])->assertCreated()->json('items.payment_id');
+
+        Queue::assertPushed(GeneratePaymentReceiptJob::class, fn ($job) => $job->paymentId === $id);
+        Notification::assertSentTo($this->contractor, PaymentConfirmedNotification::class);
     }
 }
