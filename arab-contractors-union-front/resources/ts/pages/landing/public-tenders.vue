@@ -1,10 +1,16 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Search, Calendar, ChevronLeft, Filter, ExternalLink, FileText } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
 const BASE = import.meta.env.VITE_API_BASE_URL ?? ''
+// صورة العطاءات الأساسية — نفس صورة كروت "أحدث العطاءات" بالرئيسية
+const TENDER_IMAGE = '/tenders.webp'
+
+const route = useRoute()
+const router = useRouter()
 
 interface TenderAttachment {
   id: number
@@ -29,6 +35,8 @@ interface Tender {
   attachments: TenderAttachment[]
   external_url: string | null
   updated_at: string
+  issuing_entity?: string | null
+  reference_number?: string | null
 }
 
 const searchQ = ref('')
@@ -42,7 +50,12 @@ const total = ref(0)
 const page = ref(1)
 const lastPage = ref(1)
 const loading = ref(false)
-const expanded = ref<number | null>(null)
+
+// تفاصيل عطاء واحد عند فتح الصفحة بـ ?id= (من كروت الرئيسية أو زر عرض التفاصيل)
+const selected = ref<Tender | null>(null)
+const selectedLoading = ref(false)
+const selectedError = ref(false)
+const detailEl = ref<HTMLElement | null>(null)
 
 const statuses = [
   { value: 'open', label: 'مفتوحة' },
@@ -113,7 +126,43 @@ watch(searchQ, () => {
 
 watch(page, fetchTenders)
 
-onMounted(fetchTenders)
+async function fetchSelected() {
+  const id = Number(route.query.id)
+  if (!id) {
+    selected.value = null
+    selectedError.value = false
+    return
+  }
+  selectedLoading.value = true
+  selectedError.value = false
+  try {
+    const r = await fetch(`${BASE}/api/v1/tenders-public/${id}`, { headers: { Accept: 'application/json' } })
+    if (!r.ok) throw new Error(String(r.status))
+    const data = await r.json()
+    selected.value = data.items ?? data.data ?? null
+    if (!selected.value) throw new Error('empty')
+  }
+  catch {
+    selected.value = null
+    selectedError.value = true
+  }
+  finally {
+    selectedLoading.value = false
+  }
+  await nextTick()
+  detailEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+watch(() => route.query.id, fetchSelected)
+
+onMounted(() => {
+  fetchTenders()
+  fetchSelected()
+})
+
+function closeDetail() {
+  router.push({ path: '/landing/public-tenders' })
+}
 
 function resetFilters() {
   searchQ.value = ''
@@ -129,11 +178,7 @@ function fmtDate(d: string | null) {
 }
 
 function openTender(t: Tender) {
-  // رابط خارجي إن وُجد (تفاصيل العطاء أو رابط التقديم)، وإلا توسيع البطاقة
-  if (t.external_url)
-    window.open(t.external_url, '_blank', 'noopener')
-  else
-    expanded.value = expanded.value === t.id ? null : t.id
+  router.push({ path: '/landing/public-tenders', query: { id: String(t.id) } })
 }
 </script>
 
@@ -150,6 +195,51 @@ function openTender(t: Tender) {
 
     <section class="pub-section">
       <div class="pub-cont">
+        <div v-if="route.query.id" ref="detailEl" class="tender-detail">
+          <div v-if="selectedLoading" class="detail-msg">جاري تحميل تفاصيل العطاء...</div>
+          <div v-else-if="selectedError" class="detail-msg">
+            لم يتم العثور على هذا العطاء.
+            <button class="filter-reset" style="margin: 1rem auto 0;" @click="closeDetail">عرض كل العطاءات</button>
+          </div>
+          <template v-else-if="selected">
+            <div class="detail-img">
+              <img :src="TENDER_IMAGE" :alt="selected.title">
+            </div>
+            <div class="detail-body">
+              <div class="tender-meta-top">
+                <span class="tender-ref">PCU-{{ selected.id }}</span>
+                <span v-if="selected.category" class="tender-sector detail-sector">{{ selected.category }}</span>
+                <span class="tender-status" :class="statusClass[selected.status]">{{ statusLabel[selected.status] ?? selected.status }}</span>
+                <span v-if="selected.closing_soon" class="tender-status status-closing">ينتهي قريباً</span>
+              </div>
+              <h2 class="detail-title">{{ selected.title }}</h2>
+              <p v-if="selected.issuing_entity" class="detail-entity">الجهة المعلنة: {{ selected.issuing_entity }}</p>
+              <div class="tender-info">
+                <span><Calendar :size="13" /> تاريخ النشر: {{ fmtDate(selected.published_at) }}</span>
+                <span><Calendar :size="13" /> آخر موعد: {{ fmtDate(selected.deadline) }}</span>
+                <span><Calendar :size="13" /> آخر تحديث: {{ fmtDate(selected.updated_at) }}</span>
+              </div>
+              <p v-if="selected.description" class="detail-desc">{{ selected.description }}</p>
+              <div class="tender-info detail-contact">
+                <span v-if="selected.submission_email">البريد للتقديم: {{ selected.submission_email }}</span>
+                <span v-if="selected.submission_phone">هاتف: {{ selected.submission_phone }}</span>
+                <a v-if="selected.submission_file_url" :href="selected.submission_file_url" target="_blank" rel="noopener"><FileText :size="13" /> ملف العطاء</a>
+              </div>
+              <div v-if="selected.attachments?.length" class="tender-attachments">
+                <a v-for="att in selected.attachments" :key="att.id" :href="att.url" target="_blank" rel="noopener" class="tender-attachment">
+                  <img v-if="att.is_image" :src="att.url" :alt="att.label ?? 'مرفق'" class="tender-attachment-img" />
+                  <FileText v-else :size="13" />
+                  <span>{{ att.label || 'مرفق' }}</span>
+                </a>
+              </div>
+              <div class="detail-actions">
+                <a v-if="selected.external_url" :href="selected.external_url" target="_blank" rel="noopener" class="detail-btn">رابط العطاء <ExternalLink :size="14" /></a>
+                <button class="filter-reset" @click="closeDetail">عرض كل العطاءات <ChevronLeft :size="14" /></button>
+              </div>
+            </div>
+          </template>
+        </div>
+
         <div class="tender-filters">
           <div class="search-wrap">
             <Search :size="16" class="search-ico" />
@@ -188,6 +278,9 @@ function openTender(t: Tender) {
             :style="`--tc:${colorFor(t.id)}`"
           >
             <div class="tender-color-bar" />
+            <div class="tender-thumb">
+              <img :src="TENDER_IMAGE" :alt="t.title" loading="lazy">
+            </div>
             <div class="tender-body">
               <div class="tender-top">
                 <div>
@@ -209,45 +302,13 @@ function openTender(t: Tender) {
                 <span><Calendar :size="13" /> آخر موعد: {{ fmtDate(t.deadline) }}</span>
                 <span><Calendar :size="13" /> آخر تحديث: {{ fmtDate(t.updated_at) }}</span>
               </div>
-              <div v-if="expanded === t.id" class="tender-details">
-                <p v-if="t.description">{{ t.description }}</p>
-                <div class="tender-info" style="margin-top: .5rem;">
-                  <span v-if="t.submission_email">البريد للتقديم: {{ t.submission_email }}</span>
-                  <span v-if="t.submission_phone">هاتف: {{ t.submission_phone }}</span>
-                  <a
-                    v-if="t.submission_file_url"
-                    :href="t.submission_file_url"
-                    target="_blank"
-                    rel="noopener"
-                  ><FileText :size="13" /> ملف العطاء</a>
-                </div>
-                <div v-if="t.attachments?.length" class="tender-attachments">
-                  <a
-                    v-for="att in t.attachments"
-                    :key="att.id"
-                    :href="att.url"
-                    target="_blank"
-                    rel="noopener"
-                    class="tender-attachment"
-                  >
-                    <img v-if="att.is_image" :src="att.url" :alt="att.label ?? 'مرفق'" class="tender-attachment-img" />
-                    <FileText v-else :size="13" />
-                    <span>{{ att.label || 'مرفق' }}</span>
-                  </a>
-                </div>
-              </div>
             </div>
             <button
               class="tender-btn"
               :style="`background:${colorFor(t.id)}`"
               @click="openTender(t)"
             >
-              <template v-if="t.external_url">
-                رابط العطاء <ExternalLink :size="14" />
-              </template>
-              <template v-else>
-                عرض التفاصيل <ChevronLeft :size="14" />
-              </template>
+              عرض التفاصيل <ChevronLeft :size="14" />
             </button>
           </div>
         </div>
@@ -326,8 +387,24 @@ function openTender(t: Tender) {
 .tender-attachment { display: flex; align-items: center; gap: .4rem; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 8px; padding: .3rem .6rem; font-size: .78rem; color: #1a237e; text-decoration: none; }
 .tender-attachment:hover { background: #e8eaf6; }
 .tender-attachment-img { width: 18px; height: 18px; object-fit: cover; border-radius: 4px; }
+.tender-thumb { width: 180px; flex-shrink: 0; align-self: stretch; min-height: 120px; }
+.tender-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tender-detail { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); background: #fff; border: 1.5px solid #e5e7eb; border-radius: 18px; overflow: hidden; margin-bottom: 2.5rem; box-shadow: 0 10px 30px rgba(13, 27, 75, .08); scroll-margin-top: calc(var(--pub-nav-h, 114px) + 1rem); }
+.detail-msg { grid-column: 1 / -1; text-align: center; padding: 3rem 1.5rem; color: #6b7280; display: flex; flex-direction: column; align-items: center; }
+.detail-img { min-height: 260px; }
+.detail-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.detail-body { padding: 1.75rem; display: flex; flex-direction: column; gap: .9rem; }
+.detail-sector { background: #e8eaf6; color: #1a237e; border-color: #c5cae9; }
+.detail-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: clamp(1.25rem, 2.4vw, 1.6rem); font-weight: 800; color: #0d1b3e; line-height: 1.5; }
+.detail-entity { font-size: .9rem; color: #374151; font-weight: 600; }
+.detail-desc { font-size: .95rem; color: #4b5563; line-height: 1.9; white-space: pre-line; }
+.detail-contact { font-size: .85rem; }
+.detail-contact a { color: #1a237e; display: inline-flex; align-items: center; gap: .3rem; font-size: .8rem; }
+.detail-actions { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: .5rem; }
+.detail-btn { display: inline-flex; align-items: center; gap: .4rem; background: #1a237e; color: #fff; border-radius: 9px; padding: .55rem 1.1rem; font-size: .85rem; font-weight: 700; text-decoration: none; }
+@media (max-width: 860px) { .tender-detail { grid-template-columns: 1fr; } .detail-img { min-height: 0; height: 220px; } .detail-body { padding: 1.25rem; } }
 .empty-state { text-align: center; padding: 4rem 2rem; color: #9ca3af; }
 .empty-state p { font-size: 1rem; margin-top: 1rem; }
 
-@media (max-width: 700px) { .tender-card { flex-wrap: wrap; } .tender-color-bar { width: 100%; height: 5px; align-self: auto; } .tender-btn { margin: 0 1rem 1rem; width: calc(100% - 2rem); justify-content: center; } .tender-top { flex-direction: column; } }
+@media (max-width: 700px) { .tender-card { flex-wrap: wrap; } .tender-color-bar { width: 100%; height: 5px; align-self: auto; } .tender-btn { margin: 0 1rem 1rem; width: calc(100% - 2rem); justify-content: center; } .tender-top { flex-direction: column; } .tender-thumb { width: 100%; height: 170px; min-height: 0; } .tender-body { padding: 0 1rem; flex-basis: 100%; } .tender-card { gap: .9rem; } }
 </style>
