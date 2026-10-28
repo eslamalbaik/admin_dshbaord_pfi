@@ -273,13 +273,12 @@ function openTender(t: Tender) {
 </template>
 
 <style scoped>
-@import url('https://fonts.cdnfonts.com/css/neo-sans-arabic');
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap');
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-.pub-page { font-family: 'Neo Sans Arabic', 'Tajawal', 'Neo Sans Arabic', 'Cairo', sans-serif; direction: rtl; color: #374151; background: #fff; }
+.pub-page { font-family: 'Tajawal', 'Cairo', sans-serif; direction: rtl; color: #374151; background: #fff; }
 .pub-cont { max-width: 1240px; margin: 0 auto; padding: 0 1.5rem; }
 .pub-section { padding: 5rem 0; }
-.page-hero { background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); padding: 4rem 0 3rem; position: relative; overflow: hidden; }
+.page-hero { background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); margin-top: calc(-1 * var(--pub-nav-h, 114px)); padding: calc(var(--pub-nav-h, 114px) + 2.5rem) 0 3rem; position: relative; overflow: hidden; }
 .page-hero-shapes { position: absolute; inset: 0; pointer-events: none; }
 .ph-s { position: absolute; border-radius: 50%; }
 .ph-s1 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(249,168,37,.12), transparent 65%); top: -100px; left: 5%; }
@@ -287,18 +286,18 @@ function openTender(t: Tender) {
 .page-hero-inner { position: relative; z-index: 2; }
 .page-breadcrumb { display: flex; align-items: center; gap: .5rem; font-size: .82rem; color: rgba(255,255,255,.6); margin-bottom: 1rem; }
 .page-breadcrumb a { color: rgba(255,255,255,.6); text-decoration: none; } .page-breadcrumb a:hover { color: #f9a825; }
-.page-hero-title { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: clamp(2rem,4vw,3rem); font-weight: 900; color: #fff; margin-bottom: .75rem; }
+.page-hero-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: clamp(2rem,4vw,3rem); font-weight: 900; color: #fff; margin-bottom: .75rem; }
 .page-hero-desc { font-size: 1rem; color: rgba(255,255,255,.75); line-height: 1.75; max-width: 600px; }
 
 .tender-filters { background: #f9fafb; border: 1.5px solid #e5e7eb; border-radius: 16px; padding: 1.5rem; margin-bottom: 2rem; display: flex; flex-direction: column; gap: 1rem; }
 .search-wrap { position: relative; }
 .search-ico { position: absolute; top: 50%; right: 1rem; transform: translateY(-50%); color: #9ca3af; }
-.search-input { width: 100%; border: 1.5px solid #e5e7eb; border-radius: 10px; padding: .75rem 2.75rem .75rem 1rem; font-size: .9rem; font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif; color: #374151; background: #fff; outline: none; transition: border-color .2s; }
+.search-input { width: 100%; border: 1.5px solid #e5e7eb; border-radius: 10px; padding: .75rem 2.75rem .75rem 1rem; font-size: .9rem; font-family: 'Tajawal', sans-serif; color: #374151; background: #fff; outline: none; transition: border-color .2s; }
 .search-input:focus { border-color: #1a237e; }
 .filter-row { display: flex; gap: .875rem; flex-wrap: wrap; }
-.filter-sel { border: 1.5px solid #e5e7eb; border-radius: 9px; padding: .55rem 1rem; font-size: .85rem; font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif; color: #374151; background: #fff; outline: none; cursor: pointer; }
+.filter-sel { border: 1.5px solid #e5e7eb; border-radius: 9px; padding: .55rem 1rem; font-size: .85rem; font-family: 'Tajawal', sans-serif; color: #374151; background: #fff; outline: none; cursor: pointer; }
 .filter-sel:focus { border-color: #1a237e; }
-.filter-reset { display: flex; align-items: center; gap: .4rem; background: #e8eaf6; color: #1a237e; border: 1.5px solid #c5cae9; border-radius: 9px; padding: .55rem 1rem; font-size: .83rem; font-weight: 600; cursor: pointer; font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif; }
+.filter-reset { display: flex; align-items: center; gap: .4rem; background: #e8eaf6; color: #1a237e; border: 1.5px solid #c5cae9; border-radius: 9px; padding: .55rem 1rem; font-size: .83rem; font-weight: 600; cursor: pointer; font-family: 'Tajawal', sans-serif; }
 .filter-reset:hover { background: #1a237e; color: #fff; }
 .results-count { font-size: .85rem; color: #9ca3af; margin-bottom: 1.25rem; }
 
@@ -309,17 +308,17 @@ function openTender(t: Tender) {
 .tender-body { flex: 1; min-width: 0; padding: 1.25rem 0; }
 .tender-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: .875rem; }
 .tender-meta-top { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .5rem; align-items: center; }
-.tender-ref { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: .75rem; font-weight: 800; color: #9ca3af; letter-spacing: .02em; }
+.tender-ref { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: .75rem; font-weight: 800; color: #9ca3af; letter-spacing: .02em; }
 .tender-sector { font-size: .75rem; font-weight: 700; border: 1px solid; border-radius: 50px; padding: .15rem .65rem; }
 .tender-status { font-size: .75rem; font-weight: 700; border-radius: 50px; padding: .15rem .65rem; }
 .status-open    { background: #e8f5e9; color: #2e7d32; }
 .status-closing { background: #fff8e1; color: #e65100; }
 .status-closed  { background: #f3f4f6; color: #9ca3af; }
-.tender-title { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: 1rem; font-weight: 800; color: #0d1b3e; line-height: 1.5; }
+.tender-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 1rem; font-weight: 800; color: #0d1b3e; line-height: 1.5; }
 .tender-info { display: flex; gap: 1.25rem; flex-wrap: wrap; }
 .tender-info span { display: flex; align-items: center; gap: .35rem; font-size: .8rem; color: #6b7280; }
 .tender-pub { background: #f3f4f6; border-radius: 50px; padding: .15rem .65rem; }
-.tender-btn { display: flex; align-items: center; gap: .4rem; border: none; border-radius: 10px; margin: 1rem 1.25rem 1rem 0; padding: .65rem 1.25rem; font-size: .83rem; font-weight: 700; color: #fff; cursor: pointer; font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif; transition: all .2s; white-space: nowrap; flex-shrink: 0; }
+.tender-btn { display: flex; align-items: center; gap: .4rem; border: none; border-radius: 10px; margin: 1rem 1.25rem 1rem 0; padding: .65rem 1.25rem; font-size: .83rem; font-weight: 700; color: #fff; cursor: pointer; font-family: 'Tajawal', sans-serif; transition: all .2s; white-space: nowrap; flex-shrink: 0; }
 .tender-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
 .tender-details { margin-top: .75rem; padding-top: .75rem; border-top: 1px dashed #e5e7eb; font-size: .85rem; color: #6b7280; line-height: 1.8; }
 .tender-details a { color: #1a237e; display: inline-flex; align-items: center; gap: .3rem; }

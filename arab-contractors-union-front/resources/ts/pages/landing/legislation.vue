@@ -89,13 +89,12 @@ const filteredDocs = computed(() => docs.filter(d => d.cat === activecat.value))
 </template>
 
 <style scoped>
-@import url('https://fonts.cdnfonts.com/css/neo-sans-arabic');
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap');
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-.pub-page { font-family: 'Neo Sans Arabic', 'Tajawal', 'Neo Sans Arabic', 'Cairo', sans-serif; direction: rtl; color: #374151; background: #fff; }
+.pub-page { font-family: 'Tajawal', 'Cairo', sans-serif; direction: rtl; color: #374151; background: #fff; }
 .pub-cont { max-width: 1240px; margin: 0 auto; padding: 0 1.5rem; }
 .pub-section { padding: 5rem 0; }
-.page-hero { background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); padding: 4rem 0 3rem; position: relative; overflow: hidden; }
+.page-hero { background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); margin-top: calc(-1 * var(--pub-nav-h, 114px)); padding: calc(var(--pub-nav-h, 114px) + 2.5rem) 0 3rem; position: relative; overflow: hidden; }
 .page-hero-shapes { position: absolute; inset: 0; pointer-events: none; }
 .ph-s { position: absolute; border-radius: 50%; }
 .ph-s1 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(249,168,37,.12), transparent 65%); top: -100px; left: 5%; }
@@ -103,13 +102,13 @@ const filteredDocs = computed(() => docs.filter(d => d.cat === activecat.value))
 .page-hero-inner { position: relative; z-index: 2; }
 .page-breadcrumb { display: flex; align-items: center; gap: .5rem; font-size: .82rem; color: rgba(255,255,255,.6); margin-bottom: 1rem; }
 .page-breadcrumb a { color: rgba(255,255,255,.6); text-decoration: none; } .page-breadcrumb a:hover { color: #f9a825; }
-.page-hero-title { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: clamp(2rem,4vw,3rem); font-weight: 900; color: #fff; margin-bottom: .75rem; }
+.page-hero-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: clamp(2rem,4vw,3rem); font-weight: 900; color: #fff; margin-bottom: .75rem; }
 .page-hero-desc { font-size: 1rem; color: rgba(255,255,255,.75); line-height: 1.75; max-width: 600px; }
 
 .leg-layout { display: grid; grid-template-columns: 240px 1fr; gap: 2.5rem; align-items: start; }
 .leg-sidebar { background: #f9fafb; border: 1.5px solid #e5e7eb; border-radius: 16px; padding: 1.5rem; position: sticky; top: 120px; }
-.sidebar-title { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: .9rem; font-weight: 800; color: #0d1b3e; margin-bottom: 1rem; padding-bottom: .65rem; border-bottom: 2px solid #e5e7eb; }
-.sidebar-btn { width: 100%; display: flex; align-items: center; gap: .65rem; padding: .65rem .875rem; border: none; border-radius: 10px; font-size: .85rem; font-weight: 600; cursor: pointer; font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif; color: #6b7280; background: transparent; transition: all .2s; text-align: right; margin-bottom: .25rem; }
+.sidebar-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: .9rem; font-weight: 800; color: #0d1b3e; margin-bottom: 1rem; padding-bottom: .65rem; border-bottom: 2px solid #e5e7eb; }
+.sidebar-btn { width: 100%; display: flex; align-items: center; gap: .65rem; padding: .65rem .875rem; border: none; border-radius: 10px; font-size: .85rem; font-weight: 600; cursor: pointer; font-family: 'Tajawal', sans-serif; color: #6b7280; background: transparent; transition: all .2s; text-align: right; margin-bottom: .25rem; }
 .sidebar-btn.active { background: #1a237e; color: #fff; }
 .sidebar-btn:hover:not(.active) { background: #e8eaf6; color: #1a237e; }
 
@@ -118,12 +117,12 @@ const filteredDocs = computed(() => docs.filter(d => d.cat === activecat.value))
 .doc-card:hover { box-shadow: 0 6px 20px rgba(0,0,0,.08); border-color: #c5cae9; transform: translateX(-4px); }
 .doc-icon { width: 58px; height: 58px; border-radius: 14px; border: 1.5px solid; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .doc-body { flex: 1; min-width: 0; }
-.doc-title { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: .93rem; font-weight: 800; color: #0d1b3e; margin-bottom: .45rem; }
+.doc-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: .93rem; font-weight: 800; color: #0d1b3e; margin-bottom: .45rem; }
 .doc-meta { display: flex; gap: .875rem; flex-wrap: wrap; }
 .doc-meta span { display: flex; align-items: center; gap: .3rem; font-size: .77rem; color: #9ca3af; font-weight: 500; }
 .doc-type { background: #e8eaf6; color: #1a237e; border-radius: 50px; padding: .1rem .55rem; font-weight: 700 !important; }
 .doc-actions { display: flex; gap: .5rem; flex-shrink: 0; }
-.doc-btn { display: flex; align-items: center; gap: .3rem; border-radius: 8px; padding: .45rem .875rem; font-size: .8rem; font-weight: 700; cursor: pointer; font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif; transition: all .2s; white-space: nowrap; }
+.doc-btn { display: flex; align-items: center; gap: .3rem; border-radius: 8px; padding: .45rem .875rem; font-size: .8rem; font-weight: 700; cursor: pointer; font-family: 'Tajawal', sans-serif; transition: all .2s; white-space: nowrap; }
 .doc-btn.download { background: transparent; border: 1.5px solid; }
 .doc-btn.download:hover { color: #fff !important; }
 .doc-btn.view { background: #f3f4f6; color: #6b7280; border: 1.5px solid #e5e7eb; }

@@ -107,20 +107,19 @@ const committees = [
 </template>
 
 <style scoped>
-@import url('https://fonts.cdnfonts.com/css/neo-sans-arabic');
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap');
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-.pub-page { font-family: 'Neo Sans Arabic', 'Tajawal', 'Neo Sans Arabic', 'Cairo', sans-serif; direction: rtl; color: #374151; background: #fff; }
+.pub-page { font-family: 'Tajawal', 'Cairo', sans-serif; direction: rtl; color: #374151; background: #fff; }
 .pub-cont { max-width: 1240px; margin: 0 auto; padding: 0 1.5rem; }
 .pub-section { padding: 5rem 0; }
 .bg-soft { background: #f5f7ff; }
 .pub-sec-label { display: inline-block; background: #e8eaf6; color: #1a237e; border: 1px solid #c5cae9; border-radius: 50px; padding: .28rem 1.1rem; font-size: .77rem; font-weight: 700; letter-spacing: .05em; }
-.pub-sec-h { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: clamp(1.6rem,3.5vw,2.3rem); font-weight: 900; color: #0d1b3e; padding-bottom: .7rem; position: relative; }
+.pub-sec-h { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: clamp(1.6rem,3.5vw,2.3rem); font-weight: 900; color: #0d1b3e; padding-bottom: .7rem; position: relative; }
 .pub-sec-h::after { content: ''; position: absolute; bottom: 0; right: 0; width: 48px; height: 4px; background: linear-gradient(90deg,#f9a825,#e65100); border-radius: 2px; }
 .pub-sec-h.center { text-align: center; }
 .pub-sec-h.center::after { right: 50%; transform: translateX(50%); }
 .pub-sec-header-c { text-align: center; margin-bottom: 3rem; }
-.page-hero { background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); padding: 4rem 0 3rem; position: relative; overflow: hidden; }
+.page-hero { background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); margin-top: calc(-1 * var(--pub-nav-h, 114px)); padding: calc(var(--pub-nav-h, 114px) + 2.5rem) 0 3rem; position: relative; overflow: hidden; }
 .page-hero-shapes { position: absolute; inset: 0; pointer-events: none; }
 .ph-s { position: absolute; border-radius: 50%; }
 .ph-s1 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(249,168,37,.12), transparent 65%); top: -100px; left: 5%; }
@@ -129,14 +128,14 @@ const committees = [
 .page-breadcrumb { display: flex; align-items: center; gap: .5rem; font-size: .82rem; color: rgba(255,255,255,.6); margin-bottom: 1rem; }
 .page-breadcrumb a { color: rgba(255,255,255,.6); text-decoration: none; }
 .page-breadcrumb a:hover { color: #f9a825; }
-.page-hero-title { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: clamp(2rem,4vw,3rem); font-weight: 900; color: #fff; margin-bottom: .75rem; }
+.page-hero-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: clamp(2rem,4vw,3rem); font-weight: 900; color: #fff; margin-bottom: .75rem; }
 .page-hero-desc { font-size: 1rem; color: rgba(255,255,255,.75); line-height: 1.75; max-width: 600px; }
 
 .committees-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1.5rem; }
 .committee-card { background: var(--cbg); border: 1.5px solid var(--cc); border-top: 5px solid var(--cc); border-radius: 16px; padding: 1.75rem; transition: transform .25s, box-shadow .25s; }
 .committee-card:hover { transform: translateY(-5px); box-shadow: 0 10px 28px rgba(0,0,0,.1); }
 .committee-header { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; margin-bottom: .875rem; }
-.committee-name { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: .95rem; font-weight: 800; color: #0d1b3e; line-height: 1.4; }
+.committee-name { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: .95rem; font-weight: 800; color: #0d1b3e; line-height: 1.4; }
 .committee-members { display: flex; align-items: center; gap: .3rem; font-size: .76rem; font-weight: 700; color: var(--cc); background: rgba(255,255,255,.7); border: 1px solid var(--cc); border-radius: 50px; padding: .2rem .65rem; white-space: nowrap; flex-shrink: 0; }
 .committee-desc { font-size: .85rem; color: #4b5563; line-height: 1.8; }
 
@@ -144,7 +143,7 @@ const committees = [
 .hq-badge { position: absolute; top: -12px; right: 1.5rem; background: #1a237e; color: #fff; font-size: .75rem; font-weight: 700; border-radius: 50px; padding: .25rem .875rem; }
 .hq-inner { display: flex; gap: 1.75rem; align-items: center; }
 .hq-icon { width: 72px; height: 72px; border-radius: 20px; background: #1a237e; color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.hq-name { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: 1.2rem; font-weight: 900; color: #0d1b3e; margin-bottom: .75rem; }
+.hq-name { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 1.2rem; font-weight: 900; color: #0d1b3e; margin-bottom: .75rem; }
 .hq-info { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: .65rem; }
 .hq-info span, .hq-info a { display: flex; align-items: center; gap: .4rem; font-size: .85rem; color: #374151; text-decoration: none; font-weight: 500; }
 .hq-info a:hover { color: #1a237e; }
@@ -155,7 +154,7 @@ const committees = [
 .branch-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,.1); transform: translateY(-4px); }
 .branch-color-bar { height: 5px; background: var(--bc); }
 .branch-body { padding: 1.25rem 1rem; }
-.branch-name { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: .9rem; font-weight: 800; color: #0d1b3e; margin-bottom: .65rem; }
+.branch-name { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: .9rem; font-weight: 800; color: #0d1b3e; margin-bottom: .65rem; }
 .branch-addr, .branch-phone, .branch-email, .branch-members { display: flex; align-items: center; gap: .35rem; font-size: .78rem; color: #6b7280; margin-bottom: .4rem; text-decoration: none; }
 .branch-phone:hover, .branch-email:hover { color: var(--bc); }
 .branch-members { font-weight: 700; color: var(--bc); margin-top: .65rem; }
