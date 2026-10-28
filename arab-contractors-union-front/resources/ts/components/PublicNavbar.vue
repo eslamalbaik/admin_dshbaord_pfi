@@ -267,9 +267,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
-@import url('https://fonts.cdnfonts.com/css/neo-sans-arabic');
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap');
-@import url('https://fonts.cdnfonts.com/css/dubai');
 
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
 

@@ -127,13 +127,12 @@ const services = [
 </template>
 
 <style scoped>
-@import url('https://fonts.cdnfonts.com/css/neo-sans-arabic');
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap');
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-.pub-page { font-family: 'Neo Sans Arabic', 'Tajawal', 'Neo Sans Arabic', 'Cairo', sans-serif; direction: rtl; color: #374151; background: #fff; }
+.pub-page { font-family: 'Tajawal', 'Cairo', sans-serif; direction: rtl; color: #374151; background: #fff; }
 .pub-cont { max-width: 1240px; margin: 0 auto; padding: 0 1.5rem; }
 .pub-section { padding: 5rem 0; }
-.page-hero { background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); padding: 4rem 0 3rem; position: relative; overflow: hidden; }
+.page-hero { background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); margin-top: calc(-1 * var(--pub-nav-h, 114px)); padding: calc(var(--pub-nav-h, 114px) + 2.5rem) 0 3rem; position: relative; overflow: hidden; }
 .page-hero-shapes { position: absolute; inset: 0; pointer-events: none; }
 .ph-s { position: absolute; border-radius: 50%; }
 .ph-s1 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(249,168,37,.12), transparent 65%); top: -100px; left: 5%; }
@@ -141,7 +140,7 @@ const services = [
 .page-hero-inner { position: relative; z-index: 2; }
 .page-breadcrumb { display: flex; align-items: center; gap: .5rem; font-size: .82rem; color: rgba(255,255,255,.6); margin-bottom: 1rem; }
 .page-breadcrumb a { color: rgba(255,255,255,.6); text-decoration: none; } .page-breadcrumb a:hover { color: #f9a825; }
-.page-hero-title { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: clamp(2rem,4vw,3rem); font-weight: 900; color: #fff; margin-bottom: .75rem; }
+.page-hero-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: clamp(2rem,4vw,3rem); font-weight: 900; color: #fff; margin-bottom: .75rem; }
 .page-hero-desc { font-size: 1rem; color: rgba(255,255,255,.75); line-height: 1.75; max-width: 600px; }
 
 .services-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; }
@@ -149,7 +148,7 @@ const services = [
 .service-detail-card:hover { box-shadow: 0 12px 36px rgba(0,0,0,.1); transform: translateY(-6px); }
 .sdc-header { padding: 1.75rem 1.5rem; border-bottom: 1.5px solid; display: flex; flex-direction: column; gap: .875rem; }
 .sdc-icon { width: 54px; height: 54px; border-radius: 14px; border: 1.5px solid; display: flex; align-items: center; justify-content: center; }
-.sdc-title { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: 1rem; font-weight: 800; }
+.sdc-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 1rem; font-weight: 800; }
 .sdc-body { padding: 1.5rem; flex: 1; display: flex; flex-direction: column; gap: .875rem; }
 .sdc-desc { font-size: .85rem; color: #4b5563; line-height: 1.8; }
 .sdc-features { list-style: none; display: flex; flex-direction: column; gap: .4rem; }
@@ -159,17 +158,17 @@ const services = [
 .sdc-meta-item { flex: 1; }
 .sdc-meta-label { display: block; font-size: .72rem; color: #9ca3af; margin-bottom: .2rem; }
 .sdc-meta-val { font-size: .82rem; font-weight: 700; color: #374151; }
-.sdc-btn { display: flex; align-items: center; justify-content: center; gap: .4rem; width: 100%; color: #fff; border: none; border-radius: 10px; padding: .75rem; font-size: .88rem; font-weight: 700; cursor: pointer; font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif; transition: all .2s; margin-top: auto; }
+.sdc-btn { display: flex; align-items: center; justify-content: center; gap: .4rem; width: 100%; color: #fff; border: none; border-radius: 10px; padding: .75rem; font-size: .88rem; font-weight: 700; cursor: pointer; font-family: 'Tajawal', sans-serif; transition: all .2s; margin-top: auto; }
 .sdc-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
 
 .cta-section { background: linear-gradient(145deg, #0d1b4b, #1a237e); padding: 4rem 0; }
 .cta-inner { text-align: center; }
-.cta-title { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: 1.75rem; font-weight: 900; color: #fff; margin-bottom: .65rem; }
+.cta-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 1.75rem; font-weight: 900; color: #fff; margin-bottom: .65rem; }
 .cta-sub { font-size: 1rem; color: rgba(255,255,255,.7); margin-bottom: 2rem; }
 .cta-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
-.cta-btn-p { display: inline-flex; align-items: center; background: linear-gradient(135deg,#f9a825,#e65100); color: #fff; border-radius: 10px; padding: .875rem 2rem; font-size: .95rem; font-weight: 800; text-decoration: none; font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif; transition: all .25s; }
+.cta-btn-p { display: inline-flex; align-items: center; background: linear-gradient(135deg,#f9a825,#e65100); color: #fff; border-radius: 10px; padding: .875rem 2rem; font-size: .95rem; font-weight: 800; text-decoration: none; font-family: 'Tajawal', sans-serif; transition: all .25s; }
 .cta-btn-p:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(249,168,37,.4); }
-.cta-btn-s { display: inline-flex; align-items: center; background: rgba(255,255,255,.15); color: #fff; border: 1.5px solid rgba(255,255,255,.4); border-radius: 10px; padding: .875rem 2rem; font-size: .95rem; font-weight: 700; text-decoration: none; font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif; transition: all .25s; }
+.cta-btn-s { display: inline-flex; align-items: center; background: rgba(255,255,255,.15); color: #fff; border: 1.5px solid rgba(255,255,255,.4); border-radius: 10px; padding: .875rem 2rem; font-size: .95rem; font-weight: 700; text-decoration: none; font-family: 'Tajawal', sans-serif; transition: all .25s; }
 .cta-btn-s:hover { background: rgba(255,255,255,.25); transform: translateY(-2px); }
 
 @media (max-width: 1100px) { .services-grid { grid-template-columns: repeat(3,1fr); } }

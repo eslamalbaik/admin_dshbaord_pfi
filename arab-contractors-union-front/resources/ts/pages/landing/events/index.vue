@@ -196,13 +196,12 @@ onMounted(fetchEvents)
 </template>
 
 <style scoped>
-@import url('https://fonts.cdnfonts.com/css/neo-sans-arabic');
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 .news-page {
-  font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif;
+  font-family: 'Tajawal', sans-serif;
   background: #f8fafc;
   min-height: 100vh;
   direction: rtl;
@@ -219,7 +218,9 @@ onMounted(fetchEvents)
 .page-header {
   background: linear-gradient(160deg, #e8eaf6 0%, #f5f7ff 100%);
   border-bottom: 2px solid #fdd835;
-  padding: 3.5rem 0;
+  /* slides up under the floating PublicNavbar, like the home hero */
+  margin-top: calc(-1 * var(--pub-nav-h, 114px));
+  padding: calc(var(--pub-nav-h, 114px) + 2.5rem) 0 3.5rem;
   text-align: center;
 }
 

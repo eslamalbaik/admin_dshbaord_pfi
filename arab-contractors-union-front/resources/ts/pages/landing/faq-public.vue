@@ -153,13 +153,12 @@ function toggle(id: number) { openId.value = openId.value === id ? null : id }
 </template>
 
 <style scoped>
-@import url('https://fonts.cdnfonts.com/css/neo-sans-arabic');
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap');
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-.pub-page { font-family: 'Neo Sans Arabic', 'Tajawal', 'Neo Sans Arabic', 'Cairo', sans-serif; direction: rtl; color: #374151; background: #fff; }
+.pub-page { font-family: 'Tajawal', 'Cairo', sans-serif; direction: rtl; color: #374151; background: #fff; }
 .pub-cont { max-width: 1240px; margin: 0 auto; padding: 0 1.5rem; }
 .pub-section { padding: 5rem 0; }
-.page-hero { background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); padding: 4rem 0 3rem; position: relative; overflow: hidden; }
+.page-hero { background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); margin-top: calc(-1 * var(--pub-nav-h, 114px)); padding: calc(var(--pub-nav-h, 114px) + 2.5rem) 0 3rem; position: relative; overflow: hidden; }
 .page-hero-shapes { position: absolute; inset: 0; pointer-events: none; }
 .ph-s { position: absolute; border-radius: 50%; }
 .ph-s1 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(249,168,37,.12), transparent 65%); top: -100px; left: 5%; }
@@ -167,7 +166,7 @@ function toggle(id: number) { openId.value = openId.value === id ? null : id }
 .page-hero-inner { position: relative; z-index: 2; }
 .page-breadcrumb { display: flex; align-items: center; gap: .5rem; font-size: .82rem; color: rgba(255,255,255,.6); margin-bottom: 1rem; }
 .page-breadcrumb a { color: rgba(255,255,255,.6); text-decoration: none; } .page-breadcrumb a:hover { color: #f9a825; }
-.page-hero-title { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: clamp(2rem,4vw,3rem); font-weight: 900; color: #fff; margin-bottom: .75rem; }
+.page-hero-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: clamp(2rem,4vw,3rem); font-weight: 900; color: #fff; margin-bottom: .75rem; }
 .page-hero-desc { font-size: 1rem; color: rgba(255,255,255,.75); line-height: 1.75; max-width: 600px; }
 
 .faq-layout { display: grid; grid-template-columns: 260px 1fr; gap: 2.5rem; align-items: start; }
@@ -175,25 +174,25 @@ function toggle(id: number) { openId.value = openId.value === id ? null : id }
 
 .search-wrap { position: relative; }
 .search-ico { position: absolute; top: 50%; right: .875rem; transform: translateY(-50%); color: #9ca3af; }
-.search-input { width: 100%; border: 1.5px solid #e5e7eb; border-radius: 10px; padding: .65rem 2.5rem .65rem 1rem; font-size: .87rem; font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif; color: #374151; background: #fff; outline: none; transition: border-color .2s; }
+.search-input { width: 100%; border: 1.5px solid #e5e7eb; border-radius: 10px; padding: .65rem 2.5rem .65rem 1rem; font-size: .87rem; font-family: 'Tajawal', sans-serif; color: #374151; background: #fff; outline: none; transition: border-color .2s; }
 .search-input:focus { border-color: #1a237e; }
 
 .faq-cats { display: flex; flex-direction: column; gap: .3rem; }
-.faq-cat-btn { padding: .6rem .875rem; border: none; border-radius: 9px; font-size: .85rem; font-weight: 600; cursor: pointer; font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif; color: #6b7280; background: transparent; transition: all .2s; text-align: right; }
+.faq-cat-btn { padding: .6rem .875rem; border: none; border-radius: 9px; font-size: .85rem; font-weight: 600; cursor: pointer; font-family: 'Tajawal', sans-serif; color: #6b7280; background: transparent; transition: all .2s; text-align: right; }
 .faq-cat-btn.active { background: #1a237e; color: #fff; }
 .faq-cat-btn:hover:not(.active) { background: #e8eaf6; color: #1a237e; }
 
 .faq-cta-box { background: linear-gradient(145deg,#0d1b4b,#1a237e); border-radius: 16px; padding: 1.5rem; text-align: center; }
-.faq-cta-box h4 { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: .9rem; font-weight: 800; color: #fff; margin-bottom: .35rem; }
+.faq-cta-box h4 { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: .9rem; font-weight: 800; color: #fff; margin-bottom: .35rem; }
 .faq-cta-box p { font-size: .8rem; color: rgba(255,255,255,.6); margin-bottom: 1rem; }
-.faq-contact-btn { display: inline-block; background: linear-gradient(135deg,#f9a825,#e65100); color: #fff; border-radius: 9px; padding: .6rem 1.25rem; font-size: .85rem; font-weight: 700; text-decoration: none; font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif; }
+.faq-contact-btn { display: inline-block; background: linear-gradient(135deg,#f9a825,#e65100); color: #fff; border-radius: 9px; padding: .6rem 1.25rem; font-size: .85rem; font-weight: 700; text-decoration: none; font-family: 'Tajawal', sans-serif; }
 
 .faq-count { font-size: .85rem; color: #9ca3af; margin-bottom: 1.25rem; }
 .faq-list { display: flex; flex-direction: column; gap: .75rem; }
 .faq-item { border: 1.5px solid #e5e7eb; border-radius: 14px; overflow: hidden; transition: box-shadow .2s; }
 .faq-item:has(.faq-question.open) { border-color: #1a237e; box-shadow: 0 4px 16px rgba(26,35,126,.1); }
 
-.faq-question { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.5rem; background: #fff; border: none; cursor: pointer; font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: .95rem; font-weight: 700; color: #0d1b3e; text-align: right; transition: background .2s; }
+.faq-question { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.5rem; background: #fff; border: none; cursor: pointer; font-family: 'Tajawal', 'Cairo', sans-serif; font-size: .95rem; font-weight: 700; color: #0d1b3e; text-align: right; transition: background .2s; }
 .faq-question.open { background: #e8eaf6; color: #1a237e; }
 .faq-question:hover:not(.open) { background: #f9fafb; }
 .faq-q-text { flex: 1; }
