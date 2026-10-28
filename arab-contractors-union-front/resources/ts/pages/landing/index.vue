@@ -82,7 +82,8 @@ const stats = computed(() => [
 
 // ─── Tenders ─────────────────────────────────────────────────────────────────
 interface TenderCard { id: number | null; title: string; desc: string; category: string; image: string; closingSoon: boolean; deadline: string }
-const TENDER_PLACEHOLDER = '/images/landing/home-tender.webp'
+// الصورة الأساسية لكل عطاء ما إله صورة (من صورة تصنيفه)
+const TENDER_PLACEHOLDER = '/tenders.webp'
 const sampleTender = (closingSoon: boolean): TenderCard => ({
   id: null,
   title: 'انشاء وتأهيل شبكة صرف صحي -حي الشيخ',
