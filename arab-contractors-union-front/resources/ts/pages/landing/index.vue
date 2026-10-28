@@ -5,7 +5,7 @@ import api from '@/plugins/axios'
 import { MotionDirective } from '@vueuse/motion'
 import {
   ArrowLeft, Award, Bookmark, Building2, CalendarDays, ChevronLeft, ChevronRight, Clock, FileSignature,
-  FileText, Globe, Handshake, Hourglass, Landmark, Loader2, MapPin, Play, Search, SearchX, ShieldCheck, UserCheck, UserCog,
+  FileText, Hourglass, Loader2, MapPin, Play, Search, SearchX, ShieldCheck, UserCheck,
 } from 'lucide-vue-next'
 
 definePage({
@@ -32,10 +32,11 @@ const vEnter = MotionDirective({
 
 // ─── Partners strip ──────────────────────────────────────────────────────────
 const partners = [
-  { icon: Landmark, label: 'وزارة الأشغال العامة' },
-  { icon: UserCog, label: 'نقابة المهندسين' },
-  { icon: Handshake, label: 'مجلس الإسكان الفلسطيني' },
-  { icon: Globe, label: 'الهيئات الدولية والمناقصات' },
+  { logo: '/images/partners/ministry-public-works.png', label: 'وزارة الأشغال العامة والإسكان' },
+  { logo: '/images/partners/engineers-association.png', label: 'نقابة المهندسين - فرع غزة' },
+  { logo: '/images/partners/palestinian-housing-council.png', label: 'المجلس الفلسطيني للإسكان' },
+  { logo: '/images/partners/gaza-chamber-commerce.png', label: 'غرفة تجارة وصناعة محافظة غزة' },
+  { logo: '/images/partners/undp.png', label: 'برنامج الأمم المتحدة الإنمائي UNDP' },
 ]
 
 // ─── About ───────────────────────────────────────────────────────────────────
@@ -225,8 +226,8 @@ onMounted(() => {
     <div class="container">
       <div v-reveal class="partners">
         <span class="partners-label">الشركاء والجهات المعتمدة:</span>
-        <span v-for="p in partners" :key="p.label" class="partner">
-          <component :is="p.icon" :size="20" /> {{ p.label }}
+        <span v-for="p in partners" :key="p.label" class="partner" :title="p.label">
+          <img :src="p.logo" :alt="p.label" loading="lazy">
         </span>
       </div>
     </div>
@@ -521,8 +522,9 @@ onMounted(() => {
   border-top: 1px solid var(--line); margin-top: 64px; padding: 16px 0 8px;
 }
 .partners-label { color: #8a90a0; font-weight: 700; font-size: 15px; }
-.partner { display: inline-flex; align-items: center; gap: 8px; color: #3c4a6b; font-weight: 700; font-size: 15px; }
-.partner svg { color: #3c4a6b; }
+.partner { display: inline-flex; align-items: center; }
+.partner img { display: block; height: 64px; width: auto; max-width: 170px; object-fit: contain; transition: transform .25s; }
+.partner:hover img { transform: scale(1.06); }
 
 /* ══ ABOUT ══ */
 .dotted {
@@ -692,6 +694,7 @@ onMounted(() => {
   .hero-btn { width: 100%; justify-content: center; }
   .hero-btn-solid { justify-content: space-between; }
   .partners { justify-content: flex-start; }
+  .partner img { height: 42px; max-width: 120px; }
   .feature { padding: 18px; gap: 14px; }
   .stats { grid-template-columns: 1fr; }
   .stat { justify-content: flex-start; }
