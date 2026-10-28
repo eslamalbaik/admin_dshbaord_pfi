@@ -82,7 +82,7 @@ const stats = computed(() => [
 
 // ─── Tenders ─────────────────────────────────────────────────────────────────
 interface TenderCard { id: number | null; title: string; desc: string; category: string; image: string; closingSoon: boolean; deadline: string }
-// الصورة الأساسية لكل عطاء ما إله صورة (من صورة تصنيفه)
+// صورة العطاءات الأساسية — بتظهر لكل عطاء بغض النظر عن صورة تصنيفه (طلب المالك)
 const TENDER_PLACEHOLDER = '/tenders.webp'
 const sampleTender = (closingSoon: boolean): TenderCard => ({
   id: null,
@@ -207,7 +207,7 @@ async function loadTenders() {
         title: t.title,
         desc: plainText(t.description, 140),
         category: t.category || 'عطاء عام',
-        image: t.category_image || TENDER_PLACEHOLDER,
+        image: TENDER_PLACEHOLDER,
         closingSoon: !!t.closing_soon,
         deadline: fmtDate(t.deadline),
       }))
