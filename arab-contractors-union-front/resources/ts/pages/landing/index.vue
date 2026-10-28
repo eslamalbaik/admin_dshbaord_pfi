@@ -39,6 +39,31 @@ const partners = [
   { logo: '/images/partners/undp.png', label: 'برنامج الأمم المتحدة الإنمائي UNDP' },
 ]
 
+// كاروسيل الشعارات: السهمين بيحرّكوا شعار واحد، وبيلفّ من الآخر للأول. بيتحرك لحاله كل 3 ثواني إلا لما الماوس فوقه.
+const partnersTrack = ref<HTMLElement | null>(null)
+let partnersTimer: ReturnType<typeof setInterval> | undefined
+
+function slidePartners(dir: 1 | -1) {
+  const el = partnersTrack.value
+  if (!el) return
+  const item = el.querySelector<HTMLElement>('.partner')
+  const step = (item?.offsetWidth ?? 200) + 24
+  const max = el.scrollWidth - el.clientWidth
+  const pos = Math.abs(el.scrollLeft) // RTL: scrollLeft بيكون سالب
+  if (dir === 1 && pos >= max - 2) el.scrollTo({ left: 0, behavior: 'smooth' })
+  else if (dir === -1 && pos <= 2) el.scrollTo({ left: -max, behavior: 'smooth' })
+  else el.scrollBy({ left: -dir * step, behavior: 'smooth' })
+}
+
+function startPartners() {
+  stopPartners()
+  partnersTimer = setInterval(() => slidePartners(1), 3000)
+}
+function stopPartners() {
+  if (partnersTimer) clearInterval(partnersTimer)
+}
+onUnmounted(stopPartners)
+
 // ─── About ───────────────────────────────────────────────────────────────────
 const aboutFeatures = [
   { icon: UserCheck, title: 'التصنيف والاعتماد الرسمي', desc: 'متابعة درجات التصنيف المهني والتسجيل المعتمد للمقاولين مع مراجعة مؤهلات الشركة وخبراتها وقدراتها لتحديد الدرجة المناسبة لها' },
@@ -193,6 +218,7 @@ async function loadTenders() {
 onMounted(() => {
   loadHome()
   loadTenders()
+  startPartners()
 })
 </script>
 
@@ -224,11 +250,17 @@ onMounted(() => {
 
     <!-- ══ PARTNERS ══ -->
     <div class="container">
-      <div v-reveal class="partners">
+      <div v-reveal class="partners" @mouseenter="stopPartners" @mouseleave="startPartners">
         <span class="partners-label">الشركاء والجهات المعتمدة:</span>
-        <span v-for="p in partners" :key="p.label" class="partner" :title="p.label">
-          <img :src="p.logo" :alt="p.label" loading="lazy">
-        </span>
+        <div class="partners-carousel">
+          <button class="arrow" aria-label="السابق" @click="slidePartners(-1)"><ChevronRight :size="18" /></button>
+          <div ref="partnersTrack" class="partners-track">
+            <span v-for="p in partners" :key="p.label" class="partner" :title="p.label">
+              <img :src="p.logo" :alt="p.label" loading="lazy">
+            </span>
+          </div>
+          <button class="arrow" aria-label="التالي" @click="slidePartners(1)"><ChevronLeft :size="18" /></button>
+        </div>
       </div>
     </div>
 
@@ -518,12 +550,20 @@ onMounted(() => {
 
 /* ══ PARTNERS ══ */
 .partners {
-  display: flex; align-items: center; justify-content: space-between; gap: 18px 28px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 18px 28px; flex-wrap: wrap;
   border-top: 1px solid var(--line); margin-top: 64px; padding: 16px 0 8px;
 }
 .partners-label { color: #8a90a0; font-weight: 700; font-size: 15px; }
-.partner { display: inline-flex; align-items: center; }
-.partner img { display: block; height: 64px; width: auto; max-width: 170px; object-fit: contain; transition: transform .25s; }
+.partners-label { flex-shrink: 0; }
+.partners-carousel { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; }
+.partners-carousel .arrow { flex-shrink: 0; }
+.partners-track {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 24px; overflow-x: auto;
+  scroll-snap-type: x mandatory; scrollbar-width: none; padding: 6px 0;
+}
+.partners-track::-webkit-scrollbar { display: none; }
+.partner { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; min-width: 220px; scroll-snap-align: start; }
+.partner img { display: block; height: 84px; width: auto; max-width: 210px; object-fit: contain; transition: transform .25s; }
 .partner:hover img { transform: scale(1.06); }
 
 /* ══ ABOUT ══ */
@@ -694,7 +734,9 @@ onMounted(() => {
   .hero-btn { width: 100%; justify-content: center; }
   .hero-btn-solid { justify-content: space-between; }
   .partners { justify-content: flex-start; }
-  .partner img { height: 42px; max-width: 120px; }
+  .partners-carousel { flex-basis: 100%; }
+  .partner { min-width: 130px; }
+  .partner img { height: 60px; max-width: 150px; }
   .feature { padding: 18px; gap: 14px; }
   .stats { grid-template-columns: 1fr; }
   .stat { justify-content: flex-start; }
