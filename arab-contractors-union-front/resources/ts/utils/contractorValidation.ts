@@ -1,4 +1,5 @@
 import type { Directive } from 'vue'
+import { isValidPhone } from '@/utils/dialCodes'
 
 /**
  * تحقق خانات نموذجَي إضافة وتعديل المقاول — نفس الأنماط في الخادم
@@ -67,7 +68,6 @@ export const vNumeric: Directive<HTMLElement, NumericMode | undefined> = {
   },
 }
 
-const PHONE_RE = /^\+?[0-9]{9,15}$/
 const FAX_RE = /^\+?[0-9]{6,15}$/
 const ID_RE = /^[0-9]{9}$/
 const DECIMAL_RE = /^[0-9]+(\.[0-9]+)?$/
@@ -91,7 +91,8 @@ export const yesterday = () => {
 /** قواعد Vuetify للخانات الاختيارية: فارغة = مقبولة، وإلا يجب أن تطابق الصيغة. */
 export const contractorRules = {
   idNumber: (v: string) => empty(v) || ID_RE.test(v) || 'رقم الهوية يجب أن يتكون من 9 أرقام بالضبط',
-  mobile: (v: string) => empty(v) || PHONE_RE.test(v) || 'أرقام فقط (9 إلى 15 رقماً، ويمكن أن يبدأ بـ +)',
+  // الجوال على مقدمات الدول المفعّلة (utils/dialCodes.ts) — نفس App\Rules\DialCodePhone بالخادم
+  mobile: (v: string) => empty(v) || isValidPhone(String(v)) || 'رقم الجوال غير صحيح لمقدمة الدولة المختارة',
   fax: (v: string) => empty(v) || FAX_RE.test(v) || 'أرقام فقط (6 إلى 15 رقماً)',
   capital: (v: string) => empty(v) || DECIMAL_RE.test(String(v)) || 'رأس المال يقبل أرقاماً فقط',
   personName: (v: string) => empty(v) || !HAS_DIGIT_RE.test(v) || 'الاسم لا يقبل أرقاماً',

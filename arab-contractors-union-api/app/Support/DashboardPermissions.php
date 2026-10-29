@@ -118,6 +118,7 @@ class DashboardPermissions
                 'settings.pages'          => ['label' => 'الصفحات الديناميكية', 'actions' => self::CRUD],
                 'settings.lookups'        => ['label' => 'المجالات والاختصاصات والدرجات', 'actions' => self::CRUD],
                 'settings.governorates'   => ['label' => 'المحافظات والمدن', 'actions' => self::CRUD],
+                'settings.country_codes'  => ['label' => 'مقدمات الدول وأعلامها', 'actions' => self::CRUD],
                 'settings.activity_log'   => ['label' => 'سجل النشاط', 'actions' => [self::VIEW]],
             ],
         ],

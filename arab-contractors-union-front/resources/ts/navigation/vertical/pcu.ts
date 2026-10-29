@@ -28,6 +28,7 @@ const SETTINGS_INNER_ROUTES = [
   'settings-grade-fees',
   'settings-contractor-lookups',
   'settings-governorates',
+  'settings-country-codes',
   'tenders-categories',
   'settings-activity-log',
 ]

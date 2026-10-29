@@ -79,6 +79,12 @@ const canOpen = (routeName: string) => canAccessRoute(authStore.user, routeName)
               :to="{ name: 'settings-governorates' }"
             />
             <VListItem
+              v-if="canOpen('settings-country-codes')"
+              prepend-icon="tabler-flag"
+              title="مقدمات الدول وأعلامها"
+              :to="{ name: 'settings-country-codes' }"
+            />
+            <VListItem
               v-if="canOpen('tenders-categories')"
               prepend-icon="tabler-category"
               title="تصنيفات العطاءات"

@@ -33,7 +33,7 @@ class ContractorRegisterController extends Controller
             'terms_accepted' => 'required|accepted',
         ]);
 
-        $contractor = Contractor::where('phone', trim($request->phone))->first();
+        $contractor = Contractor::findByRegistrationPhone((string) $request->phone);
 
         if (! $contractor) {
             return $this->error('لا يوجد حساب مرتبط برقم الجوال المُدخل.', 404, null, 'contractor_not_found');
@@ -59,7 +59,7 @@ class ContractorRegisterController extends Controller
             $result = $this->otpService->sendOtp(
                 'register',
                 $contractor->id,
-                $contractor->phone,
+                $contractor->sms_phone,
                 'رمز التحقق الخاص بك في اتحاد المقاولين الفلسطينيين: {otp}. صالح لمدة 10 دقائق.',
             );
         } catch (OtpCooldownException $e) {
@@ -70,7 +70,7 @@ class ContractorRegisterController extends Controller
             'id'                  => $contractor->id,
             'name'                => $contractor->name,
             'authorized_person'   => $contractor->authorized_person,
-            'phone'               => $contractor->phone,
+            'phone'               => $contractor->sms_phone,
             'commercial_register' => $contractor->commercial_register,
             'membership_number'   => $contractor->membership_number,
             'has_password'        => !empty($contractor->password),
@@ -96,7 +96,7 @@ class ContractorRegisterController extends Controller
             'otp'   => 'required|string|size:6',
         ]);
 
-        $contractor = Contractor::where('phone', trim($request->phone))->first();
+        $contractor = Contractor::findByRegistrationPhone((string) $request->phone);
 
         if (! $contractor) {
             return $this->error('لا يوجد حساب مرتبط برقم الجوال المُدخل.', 404, null, 'contractor_not_found');
@@ -120,7 +120,7 @@ class ContractorRegisterController extends Controller
             'authorized_person'   => $contractor->authorized_person,
             'commercial_register' => $contractor->commercial_register,
             'membership_number'   => $contractor->membership_number,
-            'phone'               => $contractor->phone,
+            'phone'               => $contractor->sms_phone,
             'phone_verified'      => true,
             'has_password'        => !empty($contractor->password),
         ], $contractor->password
@@ -137,7 +137,7 @@ class ContractorRegisterController extends Controller
             'phone' => 'required|string',
         ]);
 
-        $contractor = Contractor::where('phone', trim($request->phone))->first();
+        $contractor = Contractor::findByRegistrationPhone((string) $request->phone);
 
         if (! $contractor) {
             return $this->error('لا يوجد حساب مرتبط برقم الجوال المُدخل.', 404, null, 'contractor_not_found');
@@ -155,7 +155,7 @@ class ContractorRegisterController extends Controller
             $result = $this->otpService->sendOtp(
                 'register',
                 $contractor->id,
-                $contractor->phone,
+                $contractor->sms_phone,
                 'رمز التحقق الخاص بك في اتحاد المقاولين الفلسطينيين: {otp}. صالح لمدة 10 دقائق.',
             );
         } catch (OtpCooldownException $e) {
@@ -163,7 +163,7 @@ class ContractorRegisterController extends Controller
         }
 
         $data = [
-            'phone'        => $contractor->phone,
+            'phone'        => $contractor->sms_phone,
             'otp_required' => true,
             'expires_in'   => $result['expires_in'],
         ];
@@ -188,7 +188,7 @@ class ContractorRegisterController extends Controller
             'fcm_token'             => 'nullable|string|max:500',
         ]);
 
-        $contractor = Contractor::where('phone', trim($request->phone))->first();
+        $contractor = Contractor::findByRegistrationPhone((string) $request->phone);
 
         if (! $contractor) {
             return $this->error('لا يوجد حساب مرتبط برقم الجوال المُدخل.', 404, null, 'contractor_not_found');
@@ -242,7 +242,7 @@ class ContractorRegisterController extends Controller
                 'commercial_register' => $contractor->commercial_register,
                 'name'                => $contractor->name,
                 'authorized_person'   => $contractor->authorized_person,
-                'phone'               => $contractor->phone,
+                'phone'               => $contractor->sms_phone,
                 'classification'      => $contractor->classification,
             ],
             'تم تسجيل حسابك وتسجيل الدخول بنجاح.',
@@ -259,7 +259,7 @@ class ContractorRegisterController extends Controller
             'phone' => 'required|string',
         ]);
 
-        $contractor = Contractor::where('phone', trim($request->phone))->first();
+        $contractor = Contractor::findByRegistrationPhone((string) $request->phone);
 
         if (! $contractor) {
             return $this->error('لا يوجد حساب مرتبط برقم الجوال المُدخل.', 404, null, 'contractor_not_found');
@@ -278,7 +278,7 @@ class ContractorRegisterController extends Controller
             $result = $this->otpService->sendOtp(
                 'forgot',
                 $contractor->id,
-                $contractor->phone,
+                $contractor->sms_phone,
                 'رمز استعادة كلمة المرور في اتحاد المقاولين الفلسطينيين: {otp}. صالح لمدة 10 دقائق.',
             );
         } catch (OtpCooldownException $e) {
@@ -288,7 +288,7 @@ class ContractorRegisterController extends Controller
         $data = [
             'id'                  => $contractor->id,
             'membership_number'   => $contractor->membership_number,
-            'phone'               => $contractor->phone,
+            'phone'               => $contractor->sms_phone,
             'expires_in'          => $result['expires_in'],
         ];
 
@@ -310,7 +310,7 @@ class ContractorRegisterController extends Controller
             'password' => 'required|string|min:8|confirmed',
         ]);
 
-        $contractor = Contractor::where('phone', trim($request->phone))->first();
+        $contractor = Contractor::findByRegistrationPhone((string) $request->phone);
 
         if (! $contractor) {
             return $this->error('لا يوجد حساب مرتبط برقم الجوال المُدخل.', 404, null, 'contractor_not_found');
@@ -349,7 +349,7 @@ class ContractorRegisterController extends Controller
                 'membership_number'   => $contractor->membership_number,
                 'name'                => $contractor->name,
                 'authorized_person'   => $contractor->authorized_person,
-                'phone'               => $contractor->phone,
+                'phone'               => $contractor->sms_phone,
                 'classification'      => $contractor->classification,
             ],
             'تم استعادة وتغيير كلمة المرور بنجاح وتسجيل دخولك.',
