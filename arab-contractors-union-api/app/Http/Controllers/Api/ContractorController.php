@@ -54,7 +54,7 @@ class ContractorController extends Controller
         $query->select([
             'id', 'name', 'email', 'phone', 'membership_number', 'commercial_register',
             'status', 'is_frozen', 'password', 'phone_verified_at', 'created_at',
-            'specialties', 'classification', 'authorized_person', 'authorized_person_id_number', 'city',
+            'specialties', 'classification', 'authorized_person', 'authorized_person_id_number', 'authorized_person_phone', 'city',
         ]);
 
         $page = $query->latest()->paginate($perPage);
@@ -91,7 +91,8 @@ class ContractorController extends Controller
         return $isUpdate ? $rule->ignore($contractorId) : $rule;
     }
 
-    // خانات الأرقام: أرقام فقط (مع + اختيارية في أول رقم الجوال/الفاكس للصيغة الدولية)،
+    // خانات الأرقام: أرقام فقط (مع + اختيارية في أول رقم الجوال/الفاكس للصيغة الدولية)؛ جوال وواتساب
+    // المفوض بيتفحصوا على مقدمات الدول المفعّلة (App\Rules\DialCodePhone)،
     // والأسماء بدون أرقام. نفس الأنماط في الواجهة (utils/contractorValidation.ts).
     private const PHONE_PATTERN     = '/^\+?[0-9]{9,15}$/';
     private const FAX_PATTERN       = '/^\+?[0-9]{6,15}$/';
@@ -161,6 +162,8 @@ class ContractorController extends Controller
                 'nullable', 'email',
                 $this->uniqueIgnoringSoftDeleted('email', $isUpdate, $contractorId),
             ],
+            // جوال الحساب انشال من فورم اللوحة (يكفي جوال المفوض) — بيضل اختياري هون للتوافق،
+            // وما بنرسله من الفورم فالقيمة المحفوظة عند المقاولين القدامى ما بتنمسح.
             'phone'                         => [
                 'nullable', 'string', 'regex:' . self::PHONE_PATTERN,
                 $this->uniqueIgnoringSoftDeleted('phone', $isUpdate, $contractorId),
@@ -186,8 +189,8 @@ class ContractorController extends Controller
             'company_purposes'              => 'nullable|string',
             'authorized_person'             => ['nullable', 'string', 'max:255', 'not_regex:' . self::NO_DIGITS],
             'authorized_person_id_number'   => ['nullable', 'string', 'regex:' . self::ID_NUMBER_PATTERN],
-            'authorized_person_phone'       => ['nullable', 'string', 'regex:' . self::PHONE_PATTERN],
-            'authorized_person_whatsapp'    => ['nullable', 'string', 'regex:' . self::PHONE_PATTERN],
+            'authorized_person_phone'       => ['nullable', 'string', new \App\Rules\DialCodePhone()],
+            'authorized_person_whatsapp'    => ['nullable', 'string', new \App\Rules\DialCodePhone()],
 
             // Files
             'cr_file'                       => $fileRule,
@@ -313,8 +316,6 @@ class ContractorController extends Controller
             'phone.regex'                       => 'رقم الجوال يقبل أرقاماً فقط (9 إلى 15 رقماً).',
             'fax.regex'                         => 'الهاتف / الفاكس يقبل أرقاماً فقط (6 إلى 15 رقماً).',
             'authorized_person_id_number.regex' => 'رقم هوية المفوض يجب أن يتكون من 9 أرقام فقط.',
-            'authorized_person_phone.regex'     => 'رقم جوال المفوض يقبل أرقاماً فقط (9 إلى 15 رقماً، ويمكن أن يبدأ بـ +).',
-            'authorized_person_whatsapp.regex'  => 'رقم واتساب المفوض يقبل أرقاماً فقط (9 إلى 15 رقماً، ويمكن أن يبدأ بـ +).',
             'mimes'    => 'يجب أن يكون ملف :attribute من نوع: :values.',
         ] + \App\Support\UploadLimits::documentMessages(Contractor::DOCUMENT_LABELS);
     }
@@ -529,8 +530,8 @@ class ContractorController extends Controller
         $validated = $request->validate([
             'authorized_person' => ['nullable', 'string', 'max:255', 'not_regex:' . self::NO_DIGITS],
             'authorized_person_id_number' => ['nullable', 'string', 'regex:' . self::ID_NUMBER_PATTERN],
-            'authorized_person_phone'     => ['nullable', 'string', 'regex:' . self::PHONE_PATTERN],
-            'authorized_person_whatsapp'  => ['nullable', 'string', 'regex:' . self::PHONE_PATTERN],
+            'authorized_person_phone'     => ['nullable', 'string', new \App\Rules\DialCodePhone()],
+            'authorized_person_whatsapp'  => ['nullable', 'string', new \App\Rules\DialCodePhone()],
             'phone'              => [
                 'nullable', 'string', 'regex:' . self::PHONE_PATTERN,
                 $this->uniqueIgnoringSoftDeleted('phone', true, $contractor->id),

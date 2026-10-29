@@ -56,6 +56,7 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
   'settings-pages': 'settings.pages',
   'settings-contractor-lookups': 'settings.lookups',
   'settings-governorates': 'settings.governorates',
+  'settings-country-codes': 'settings.country_codes',
   'settings-activity-log': 'settings.activity_log',
 }
 

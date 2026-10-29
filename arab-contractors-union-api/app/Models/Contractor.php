@@ -316,6 +316,44 @@ class Contractor extends Authenticatable
         $this->attributes['authorized_person_phone'] = \App\Support\PhoneNumber::normalize($value);
     }
 
+    /**
+     * رقم الجوال اللي بنبعت عليه رموز التحقق: جوال الحساب إن وُجد، وإلا جوال المفوض بالتوقيع
+     * (خانة "رقم الجوال" انشالت من فورم اللوحة، فالمقاولين الجدد ما إلهم إلا جوال المفوض).
+     */
+    public function getSmsPhoneAttribute(): ?string
+    {
+        return $this->phone ?: $this->authorized_person_phone;
+    }
+
+    /**
+     * مقاول التسجيل/استعادة كلمة السر برقم جواله: جوال الحساب أولاً، وإلا جوال المفوض بالتوقيع
+     * لمقاول ما إله جوال حساب — بشرط يكون المفوض لشركة وحدة بس، حتى ما نبعت الرمز لشركة غلط.
+     */
+    public static function findByRegistrationPhone(string $phone): ?self
+    {
+        $phone = trim($phone);
+        if ($phone === '') {
+            return null;
+        }
+
+        $contractor = self::where('phone', $phone)->first();
+        if ($contractor) {
+            return $contractor;
+        }
+
+        $normalized = \App\Support\PhoneNumber::normalize($phone);
+        if (! $normalized) {
+            return null;
+        }
+
+        $candidates = self::where(fn ($q) => $q->whereNull('phone')->orWhere('phone', ''))
+            ->where('authorized_person_phone', $normalized)
+            ->limit(2)
+            ->get();
+
+        return $candidates->count() === 1 ? $candidates->first() : null;
+    }
+
     /** فتح حساب على التطبيق = أكمل التحقق من الهوية وضبط كلمة مرور (نفس شرط تسجيل الدخول). */
     public function getHasAppAccountAttribute(): bool
     {

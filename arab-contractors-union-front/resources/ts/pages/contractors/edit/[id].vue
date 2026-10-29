@@ -5,6 +5,8 @@ import api from '@/plugins/axios'
 import { UPLOAD_TIMEOUT_MS, describeRequestError } from '@/utils/requestError'
 import { contractorDocumentLabels } from '@/utils/contractorDocuments'
 import { contractorRules, invalidFormatFields, vNumeric, yesterday } from '@/utils/contractorValidation'
+import { displayPhone } from '@/utils/dialCodes'
+import PhoneInput from '@/components/PhoneInput.vue'
 import type { ContractorDocumentKey } from '@/utils/contractorDocuments'
 import { useRoute, useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
@@ -39,8 +41,7 @@ const form = ref({
   authorized_person_phone: '',
   authorized_person_whatsapp: '',
 
-  // Step 3: العنوان وبيانات الاتصال
-  phone: '',
+  // Step 3: العنوان وبيانات الاتصال (خانة جوال المقاول انشالت — جوال المفوض بيكفي)
   fax: '',
   email: '',
   governorate_id: null as number | null,
@@ -269,7 +270,7 @@ const fetchContractor = async () => {
       'membership_number', 'commercial_register', 'name', 'capital', 'registration_date',
       'legal_form', 'company_purposes', 'owner_name', 'authorized_person',
       'authorized_person_id_number', 'authorized_person_phone', 'authorized_person_whatsapp',
-      'phone', 'fax', 'email', 'governorate_id', 'city_id', 'district', 'building', 'floor',
+      'fax', 'email', 'governorate_id', 'city_id', 'district', 'building', 'floor',
       'address', 'established_date', 'license_number', 'classification', 'notes'
     ]
 
@@ -338,7 +339,7 @@ watch(() => form.value.governorate_id, () => {
 const STEP_FIELDS: Record<number, string[]> = {
   1: ['membership_number', 'commercial_register', 'name', 'capital', 'registration_date', 'legal_form', 'company_purposes'],
   2: ['owner_name', 'partners', 'authorized_person', 'authorized_person_id_number', 'authorized_person_phone', 'authorized_person_whatsapp'],
-  3: ['phone', 'fax', 'email', 'governorate_id', 'city_id', 'district', 'address', 'building', 'floor', 'license_number', 'established_date', 'classification', 'specialties'],
+  3: ['fax', 'email', 'governorate_id', 'city_id', 'district', 'address', 'building', 'floor', 'license_number', 'established_date', 'classification', 'specialties'],
 }
 const stepOfField = (key: string) =>
   Number(Object.keys(STEP_FIELDS).find(s => STEP_FIELDS[Number(s)].includes(key)) ?? 4)
@@ -378,7 +379,7 @@ const starredChecks = computed<Record<number, boolean[]>>(() => {
     1: [filled(f.name), membershipValid(f.membership_number), /^[0-9]{9}$/.test(f.commercial_register ?? '')],
     2: [],
     3: [
-      /^[0-9]{9}$/.test(f.phone ?? ''), !!f.governorate_id, !!f.city_id, filled(f.district), filled(f.address),
+      !!f.governorate_id, !!f.city_id, filled(f.district), filled(f.address),
       filled(f.building), filled(f.floor), /^[0-9]{5}$/.test(f.license_number ?? ''), filled(f.established_date),
       f.specialties.every(sp => !!sp.field_lk_type && !!sp.specialization_lk_type && !!sp.classification),
     ],
@@ -461,7 +462,7 @@ const reviewItems = computed(() => [
   { step: 1, label: 'السجل التجاري', value: form.value.commercial_register },
   { step: 2, label: 'المفوض بالتوقيع', value: form.value.authorized_person },
   { step: 2, label: 'عدد الشركاء', value: form.value.partners.length ? String(form.value.partners.length) : '' },
-  { step: 3, label: 'الجوال', value: form.value.phone ? `+970${form.value.phone}` : '', ltr: true },
+  { step: 2, label: 'جوال المفوض', value: displayPhone(form.value.authorized_person_phone), ltr: true },
   { step: 3, label: 'العنوان', value: [governorateName.value, cityName.value, form.value.district].filter(Boolean).join(' - ') },
   { step: 3, label: 'عدد المجالات', value: String(form.value.specialties.filter(sp => sp.field_lk_type).length) },
 ])
@@ -898,14 +899,10 @@ const submit = async () => {
               cols="12"
               md="6"
             >
-              <VTextField
+              <PhoneInput
                 v-model="form.authorized_person_phone"
-                v-numeric="'phone'"
-                maxlength="16"
-                :rules="[contractorRules.mobile]"
                 label="رقم جوال المفوض"
-                inputmode="tel"
-                prepend-inner-icon="tabler-phone"
+                icon="tabler-phone"
                 :error-messages="validationErrors.authorized_person_phone"
               />
             </VCol>
@@ -913,14 +910,10 @@ const submit = async () => {
               cols="12"
               md="6"
             >
-              <VTextField
+              <PhoneInput
                 v-model="form.authorized_person_whatsapp"
-                v-numeric="'phone'"
-                maxlength="16"
-                :rules="[contractorRules.mobile]"
                 label="رقم الواتساب للمفوض"
-                inputmode="tel"
-                prepend-inner-icon="tabler-brand-whatsapp"
+                icon="tabler-brand-whatsapp"
                 :error-messages="validationErrors.authorized_person_whatsapp"
               />
             </VCol>
@@ -945,29 +938,13 @@ const submit = async () => {
             </VAvatar>
             <div>
               <h2>بيانات الاتصال</h2>
-              <p>رقم الجوال يُستخدم للتواصل مع المقاول.</p>
+              <p>هاتف المنشأة وبريدها الإلكتروني — جوال المفوض بالتوقيع في الخطوة السابقة.</p>
             </div>
           </div>
           <VRow class="mb-6">
             <VCol
               cols="12"
-              md="4"
-            >
-              <VTextField
-                v-model="form.phone"
-                v-numeric
-                label="رقم الجوال *"
-                prefix="+970"
-                placeholder="59XXXXXXX"
-                inputmode="numeric"
-                maxlength="9"
-                :error-messages="validationErrors.phone"
-                :rules="[v => !!v || 'رقم الجوال مطلوب', v => /^[0-9]{9}$/.test(v) || 'يجب إدخال 9 أرقام (مثال: 599123456)']"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              md="4"
+              md="6"
             >
               <VTextField
                 v-model="form.fax"
@@ -981,7 +958,7 @@ const submit = async () => {
             </VCol>
             <VCol
               cols="12"
-              md="4"
+              md="6"
             >
               <VTextField
                 v-model="form.email"

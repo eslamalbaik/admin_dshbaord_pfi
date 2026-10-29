@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import api from '@/plugins/axios'
 import { type ContractorDocumentKey, contractorDocumentLabels } from '@/utils/contractorDocuments'
-import { contractorRules, vNumeric } from '@/utils/contractorValidation'
+import { contractorRules } from '@/utils/contractorValidation'
+import { displayPhone, loadDialCodes } from '@/utils/dialCodes'
+import PhoneInput from '@/components/PhoneInput.vue'
 
 definePage({ meta: { requiresAdmin: true, adminOnly: true } })
 
@@ -140,7 +142,7 @@ const exportContractors = async () => {
         '',  // حقل مستبدل — trade لم يعد مستخدماً
         c.authorized_person ?? '',
         c.authorized_person_id_number ?? '',
-        c.phone ?? '',
+        c.authorized_person_phone || c.phone || '',
         c.email ?? '',
         c.city ?? '',
         getStatusLabel(c.membership_status ?? c.status),
@@ -340,16 +342,18 @@ const openDetails = async (contractor: any) => {
   }
 }
 
-// ── تعديل سريع لاسم المفوض ورقم التواصل (من شاشة "عرض") ──
+loadDialCodes()
+
+// ── تعديل سريع لاسم المفوض وجواله (من شاشة "عرض") — جوال المفوض صار رقم التواصل المعتمد ──
 const contactEditDialog = ref(false)
 const contactEditLoading = ref(false)
 const contactEditError = ref('')
-const contactForm = ref({ authorized_person: '', phone: '' })
+const contactForm = ref({ authorized_person: '', authorized_person_phone: '' })
 
 const openContactEdit = () => {
   contactForm.value = {
     authorized_person: detailsTarget.value?.authorized_person ?? '',
-    phone: detailsTarget.value?.phone ?? '',
+    authorized_person_phone: detailsTarget.value?.authorized_person_phone ?? '',
   }
   contactEditError.value = ''
   contactEditDialog.value = true
@@ -357,7 +361,7 @@ const openContactEdit = () => {
 
 const saveContactEdit = async () => {
   const invalid = contractorRules.personName(contactForm.value.authorized_person) !== true
-    || contractorRules.mobile(contactForm.value.phone) !== true
+    || contractorRules.mobile(contactForm.value.authorized_person_phone) !== true
   if (invalid) {
     contactEditError.value = 'صحّح الخانات المعلّمة باللون الأحمر قبل الحفظ.'
 
@@ -371,7 +375,7 @@ const saveContactEdit = async () => {
     const row = contractors.value.find(c => c.id === detailsTarget.value.id)
     if (row) {
       row.authorized_person = detailsTarget.value.authorized_person
-      row.phone = detailsTarget.value.phone
+      row.authorized_person_phone = detailsTarget.value.authorized_person_phone
     }
     contactEditDialog.value = false
     notify('تم تحديث بيانات التواصل بنجاح.')
@@ -489,8 +493,8 @@ const managementRows = computed(() => {
     { label: 'أسماء الشركاء', value: t.partners || '—', icon: 'tabler-users' },
     { label: 'المفوض بالتوقيع', value: t.authorized_person || '—', icon: 'tabler-signature' },
     { label: 'رقم هوية المفوض', value: t.authorized_person_id_number || '—', icon: 'tabler-id' },
-    { label: 'رقم جوال المفوض', value: t.authorized_person_phone || '—', dir: 'ltr', icon: 'tabler-device-mobile' },
-    { label: 'رقم واتساب المفوض', value: t.authorized_person_whatsapp || '—', dir: 'ltr', icon: 'tabler-brand-whatsapp' },
+    { label: 'رقم جوال المفوض', value: displayPhone(t.authorized_person_phone) || '—', dir: 'ltr', icon: 'tabler-device-mobile' },
+    { label: 'رقم واتساب المفوض', value: displayPhone(t.authorized_person_whatsapp) || '—', dir: 'ltr', icon: 'tabler-brand-whatsapp' },
   ]
 })
 
@@ -498,7 +502,8 @@ const contactRows = computed(() => {
   const t = detailsTarget.value
   if (!t) return []
   return [
-    { label: 'الجوال', value: t.phone || '—', dir: 'ltr', icon: 'tabler-device-mobile' },
+    // خانة الجوال انشالت من الفورم — بتظهر بس للمقاولين القدامى اللي إلهم رقم محفوظ
+    ...(t.phone ? [{ label: 'الجوال', value: t.phone, dir: 'ltr', icon: 'tabler-device-mobile' }] : []),
     { label: 'الهاتف/الفاكس', value: t.fax || '—', dir: 'ltr', icon: 'tabler-phone' },
     { label: 'البريد الإلكتروني', value: t.email || '—', icon: 'tabler-mail' },
     { label: 'المحافظة', value: t.governorate?.name || '—', icon: 'tabler-map' },
@@ -618,7 +623,7 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
             </VAvatar>
             <div>
               <div class="font-weight-medium" style="font-family:Cairo,sans-serif">{{ item.name }}</div>
-              <div class="text-caption text-medium-emphasis">{{ item.email || item.phone }}</div>
+              <div class="text-caption text-medium-emphasis">{{ item.email || displayPhone(item.authorized_person_phone) || item.phone }}</div>
             </div>
           </div>
         </template>
@@ -917,10 +922,10 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
       </VCard>
     </VDialog>
 
-    <!-- Contact Edit Dialog — اسم المفوض ورقم التواصل -->
+    <!-- Contact Edit Dialog — اسم المفوض وجواله -->
     <VDialog v-model="contactEditDialog" max-width="440" persistent>
       <VCard>
-        <VCardTitle style="font-family:Cairo,sans-serif">تعديل المفوض ورقم التواصل</VCardTitle>
+        <VCardTitle style="font-family:Cairo,sans-serif">تعديل المفوض ورقم جواله</VCardTitle>
         <VCardText>
           <VAlert v-if="contactEditError" type="error" variant="tonal" class="mb-4">
             {{ contactEditError }}
@@ -932,14 +937,10 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
             class="mb-4"
             style="font-family:Cairo,sans-serif"
           />
-          <VTextField
-            v-model="contactForm.phone"
-            label="رقم الجوال"
-            dir="ltr"
-            v-numeric="'phone'"
-            inputmode="tel"
-            maxlength="16"
-            :rules="[contractorRules.mobile]"
+          <PhoneInput
+            v-model="contactForm.authorized_person_phone"
+            label="رقم جوال المفوض"
+            icon="tabler-phone"
           />
         </VCardText>
         <VCardActions>
