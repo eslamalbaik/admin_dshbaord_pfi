@@ -63,7 +63,7 @@ class CertificateSerialVerificationTest extends TestCase
 
         $this->assertCount(600, array_unique($serials));
         foreach ($serials as $s) {
-            $this->assertMatchesRegularExpression('/^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]$/', $s);
+            $this->assertMatchesRegularExpression('/^([0-9A-HJKMNP-TV-Z]{4}-){4}[0-9A-HJKMNP-TV-Z]$/', $s);
             $this->assertTrue(CertificateSerialService::hasValidChecksum($s));
         }
     }
@@ -91,14 +91,14 @@ class CertificateSerialVerificationTest extends TestCase
         $cert = $this->issued();
 
         $this->expectException(\LogicException::class);
-        $cert->serial_number = 'AAAA-BBBB-C';
+        $cert->serial_number = 'AAAA-BBBB-CCCC-DDDD-E';
         $cert->save();
     }
 
     public function test_serial_is_not_mass_assignable(): void
     {
         $cert = $this->issued();
-        $cert->fill(['serial_number' => 'AAAA-BBBB-C']);
+        $cert->fill(['serial_number' => 'AAAA-BBBB-CCCC-DDDD-E']);
 
         $this->assertSame($cert->getOriginal('serial_number'), $cert->serial_number);
     }
@@ -150,7 +150,7 @@ class CertificateSerialVerificationTest extends TestCase
     {
         $this->issued();
 
-        foreach (['AAAA-BBBB-C', 'MC-000999', 'garbage', '12345'] as $bad) {
+        foreach (['AAAA-BBBB-CCCC-DDDD-E', 'MC-000999', 'garbage', '12345'] as $bad) {
             $this->check($bad)->assertOk()
                 ->assertJsonPath('items.state', 'not_found')
                 ->assertJsonPath('items.state_label', 'شهادة غير موجودة')
@@ -245,7 +245,7 @@ class CertificateSerialVerificationTest extends TestCase
 
         $this->postJson("/api/v1/dashboard/certificate-requests/{$cert->id}/issue", [])
             ->assertOk()
-            ->assertJsonPath('items.serial_number', fn ($s) => is_string($s) && strlen($s) === 11);
+            ->assertJsonPath('items.serial_number', fn ($s) => is_string($s) && strlen($s) === 21);
 
         $serial = $cert->fresh()->serial_number;
         $this->check($serial)->assertJsonPath('items.state', 'valid');

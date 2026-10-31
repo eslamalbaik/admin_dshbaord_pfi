@@ -3,10 +3,10 @@
 namespace App\Services;
 
 /**
- * مولّد الرقم التسلسلي لشهادة العضوية (يُطبع أسفل الشهادة): XXXX-XXXX-C
+ * مولّد الرقم التسلسلي لشهادة العضوية (يُطبع أسفل الشهادة): XXXX-XXXX-XXXX-XXXX-C
  *
  * منفصل عن الرقم المرجعي الداخلي (MC-000123 أعلى الشهادة، مبني على رقم الطلب).
- * - 8 خانات عشوائية (CSPRNG) من أبجدية Crockford بدون الحروف الملتبسة = 40 بت، غير متسلسلة.
+ * - 16 خانة عشوائية (CSPRNG) من أبجدية Crockford بدون الحروف الملتبسة = 80 بت، غير متسلسلة.
  * - خانة فحص واحدة (CRC) تكشف أخطاء الكتابة؛ ليست مصدر الأمان: قاعدة البيانات هي المرجع الوحيد،
  *   والرقم غير المسجّل فيها "غير موجودة" مهما كان شكله، والاستعلام محدود بـ throttle.
  * - التفرّد مضمون بقيد unique بقاعدة البيانات؛ المحاولة بتتكرر عند الاصطدام (CertificateRequest::ensureSerialNumber).
@@ -19,7 +19,7 @@ class CertificateSerialService
     public static function generate(): string
     {
         $body = '';
-        for ($i = 0; $i < 8; $i++) {
+        for ($i = 0; $i < 16; $i++) {
             $body .= self::ALPHABET[random_int(0, 31)];
         }
 
@@ -39,7 +39,7 @@ class CertificateSerialService
         // O→0 و I,L→1 (التباس شائع بالكتابة اليدوية)
         $compact = strtr(str_replace('-', '', $raw), ['O' => '0', 'I' => '1', 'L' => '1']);
 
-        if (! preg_match('/^[' . self::ALPHABET . ']{9}$/', $compact)) {
+        if (! preg_match('/^[' . self::ALPHABET . ']{17}$/', $compact)) {
             return null;
         }
 
@@ -55,7 +55,7 @@ class CertificateSerialService
 
         $compact = str_replace('-', '', $normalized);
 
-        return strlen($compact) === 9 && self::checksum(substr($compact, 0, 8)) === $compact[8];
+        return strlen($compact) === 17 && self::checksum(substr($compact, 0, 16)) === $compact[16];
     }
 
     private static function checksum(string $body): string
@@ -65,6 +65,6 @@ class CertificateSerialService
 
     private static function format(string $compact): string
     {
-        return substr($compact, 0, 4) . '-' . substr($compact, 4, 4) . '-' . substr($compact, 8, 1);
+        return implode('-', str_split(substr($compact, 0, 16), 4)) . '-' . substr($compact, 16, 1);
     }
 }
