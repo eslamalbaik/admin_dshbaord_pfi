@@ -38,12 +38,12 @@ class ContractorLastMembershipYearTest extends TestCase
         ], $extra), ['Accept' => 'application/json']);
     }
 
-    public function test_new_member_has_no_membership_and_stays_pending(): void
+    public function test_new_member_has_no_membership_and_starts_active(): void
     {
         $this->create(['is_existing_member' => '0', 'last_membership_year' => '2020'])->assertStatus(201);
 
         $c = Contractor::first();
-        $this->assertSame('pending', $c->status);
+        $this->assertSame('active', $c->status);
         $this->assertSame(0, $c->memberships()->count());
     }
 
