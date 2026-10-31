@@ -48,9 +48,12 @@ class PaymentResource extends JsonResource
             'confirmed_at'      => $this->confirmed_at,
             'paid_at'           => $this->paid_at,
             // مين أكّد/رفض/أرجع الدفعة آخر مرة (اسمه وصورته) — للوحة التحكم فقط، ما بنكشف موظفين للمقاول
-            // والمقاول (التطبيق) كمان بيشوف مين أكّد دفعته: الاسم والصورة والصفة فقط
-            'confirmed_by_user' => self::staffSummary(
-                $this->resource->loadMissing('confirmedBy:id,name,avatar,role')->confirmedBy
+            // للوحة التحكم فقط: التطبيق/المقاول ما بيشوف مين أكّد دفعته (طلب المالك)
+            'confirmed_by_user' => $this->when(
+                $request->user() instanceof \App\Models\User,
+                fn () => self::staffSummary(
+                    $this->resource->loadMissing('confirmedBy:id,name,avatar,role')->confirmedBy
+                ),
             ),
             'created_at'        => $this->created_at,
             // آخر "تغيير حالة" يدوي مع سببه (بيظهر بتلميح على شارة الحالة بسجل المدفوعات)

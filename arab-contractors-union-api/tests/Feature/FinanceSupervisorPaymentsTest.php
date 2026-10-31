@@ -78,7 +78,7 @@ class FinanceSupervisorPaymentsTest extends TestCase
         $this->postJson("/api/v1/payments/transactions/{$payment->id}/confirm")->assertForbidden();
     }
 
-    public function test_contractor_app_sees_who_confirmed_the_payment(): void
+    public function test_contractor_app_does_not_see_who_confirmed_the_payment(): void
     {
         $fin     = $this->supervisor(['finance.payments.view', 'finance.payments.update']);
         $payment = $this->payment();
@@ -86,13 +86,11 @@ class FinanceSupervisorPaymentsTest extends TestCase
 
         Sanctum::actingAs($payment->contractor);
 
-        $res = $this->getJson('/api/v1/contractor/payments/transfer');
-        $res->assertOk();
-        $this->assertSame($fin->id, $res->json('items.0.confirmed_by_user.id'));
-        $this->assertSame('محاسب مالي', $res->json('items.0.confirmed_by_user.name'));
-        $this->assertStringContainsString('avatars/fin.png', $res->json('items.0.confirmed_by_user.avatar_url'));
+        $list = $this->getJson('/api/v1/contractor/payments/transfer')->assertOk();
+        $this->assertArrayNotHasKey('confirmed_by_user', $list->json('items.0'));
 
-        $this->getJson("/api/v1/contractor/payments/{$payment->id}")
-            ->assertOk()->assertJsonPath('items.confirmed_by_user.id', $fin->id);
+        $show = $this->getJson("/api/v1/contractor/payments/{$payment->id}")->assertOk();
+        $this->assertArrayNotHasKey('confirmed_by_user', $show->json('items'));
+        $this->assertStringNotContainsString('محاسب مالي', $this->getJson('/api/v1/contractor/payments/statement')->getContent());
     }
 }
