@@ -214,6 +214,10 @@ const bulkDeleteMutation = useMutation({
   },
 })
 
+function copySerial(serial: string) {
+  navigator.clipboard?.writeText(serial)
+}
+
 // ─── إعادة إصدار شهادة قائمة (نفس الرقم التسلسلي) ───
 const regeneratingId = ref<number | null>(null)
 const regenerateError = ref('')
@@ -529,7 +533,17 @@ const contractorStatusLabel: Record<string, string> = {
               <td class="text-caption">{{ r.id }}</td>
               <td class="font-weight-medium">{{ r.contractor ?? '—' }}</td>
               <td>{{ r.membership_number ?? '—' }}</td>
-              <td class="text-caption" dir="ltr" style="font-family: monospace;">{{ r.serial_number ?? '—' }}</td>
+              <td class="text-caption" dir="ltr" style="font-family: monospace; white-space: nowrap;">
+                {{ r.serial_number ?? '—' }}
+                <VBtn
+                  v-if="r.serial_number"
+                  icon="tabler-copy"
+                  size="x-small"
+                  variant="text"
+                  title="نسخ الرقم التسلسلي"
+                  @click="copySerial(r.serial_number)"
+                />
+              </td>
               <td>
                 <VChip size="x-small" :color="certStatusColor[r.status] ?? 'secondary'">
                   {{ r.status_label ?? r.status }}

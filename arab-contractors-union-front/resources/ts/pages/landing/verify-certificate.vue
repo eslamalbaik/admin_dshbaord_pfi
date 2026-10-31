@@ -34,6 +34,18 @@ const STATE_META: Record<VerifyState, { color: string; title: string; desc: stri
   not_found: { color: 'bad', title: 'شهادة غير موجودة', desc: 'الرقم التسلسلي غير مسجّل في النظام. تأكد من كتابته كما هو أسفل الشهادة.' },
 }
 
+const copied = ref(false)
+
+async function copySerial() {
+  if (!result.value?.serial_number) return
+  try {
+    await navigator.clipboard.writeText(result.value.serial_number)
+    copied.value = true
+    setTimeout(() => { copied.value = false }, 1500)
+  }
+  catch { /* المتصفح منع النسخ: المستخدم ينسخ يدوياً */ }
+}
+
 const meta = computed(() => (result.value ? STATE_META[result.value.state] : null))
 
 function fmtDate(d?: string | null) {
@@ -93,7 +105,7 @@ onMounted(() => {
               v-model="serial"
               dir="ltr"
               class="vc-input"
-              placeholder="XXXX-XXXX-XXXX"
+              placeholder="XXXXXXXXXXXX"
               autocomplete="off"
               autocapitalize="characters"
               spellcheck="false"
@@ -127,7 +139,7 @@ onMounted(() => {
           <dl v-if="result.found" class="vc-details">
             <div><dt>اسم الشركة / المقاول</dt><dd>{{ result.contractor_name }}</dd></div>
             <div><dt>رقم العضوية</dt><dd dir="ltr">{{ result.membership_number }}</dd></div>
-            <div><dt>الرقم التسلسلي للشهادة</dt><dd dir="ltr">{{ result.serial_number }}</dd></div>
+            <div><dt>الرقم التسلسلي للشهادة</dt><dd dir="ltr">{{ result.serial_number }}<button type="button" class="vc-copy" @click="copySerial">{{ copied ? 'تم النسخ' : 'نسخ' }}</button></dd></div>
             <div><dt>نوع الشهادة</dt><dd>{{ result.type_label }}</dd></div>
             <div><dt>تاريخ الإصدار</dt><dd>{{ fmtDate(result.issued_at) }}</dd></div>
             <div><dt>تاريخ انتهاء الصلاحية</dt><dd>{{ fmtDate(result.valid_until) }}</dd></div>
@@ -173,6 +185,7 @@ onMounted(() => {
 .vc-details > div { display: flex; justify-content: space-between; gap: 1rem; padding: .75rem 0; border-bottom: 1px solid #eceff1; }
 .vc-details dt { color: #757575; font-weight: 600; font-size: .9rem; }
 .vc-details dd { margin: 0; color: #1a1a3e; font-weight: 700; text-align: left; }
+.vc-copy { margin-inline-start: .6rem; border: 1px solid #c5cae9; background: #fff; color: #1a237e; border-radius: 6px; padding: .1rem .5rem; font-size: .8rem; cursor: pointer; font-family: inherit; }
 .vc-badge { display: inline-flex; align-items: center; gap: .3rem; color: var(--vc); }
 @media (max-width: 600px) { .vc-details > div { flex-direction: column; gap: .15rem; } .vc-details dd { text-align: right; } }
 </style>
