@@ -29,6 +29,8 @@ class MembershipCertificatePdfService
     /** ارتفاع الترويسة والتذييل بالمليمتر — مشتق من نسبة أبعاد الصورتين على عرض A4 المطبوع (180mm) */
     private const HEADER_HEIGHT_MM = 45;
     private const FOOTER_HEIGHT_MM = 28;
+    /** مساحة صف الرقم التسلسلي + QR فوق صورة التذييل */
+    private const SERIAL_ROW_MM = 11;
 
     /**
      * @param  bool  $preview  يكتب في certificates/preview بدل مسار الشهادة الرسمي.
@@ -62,12 +64,22 @@ class MembershipCertificatePdfService
             : now()->endOfYear()->startOfDay();
     }
 
+    /** رابط صفحة التحقق العامة (بالموقع العام) — هو اللي بيحمله رمز QR على الشهادة */
+    public static function verificationUrl(string $serial): string
+    {
+        return rtrim((string) config('app.frontend_url'), '/') . '/landing/verify-certificate?serial=' . urlencode($serial);
+    }
+
     public function generate(CertificateRequest $certRequest, array $overrides = [], bool $preview = false): string
     {
         $contractor = $certRequest->contractor;
         $membership = $contractor->activeMembership;
 
-        $serial   = 'MC-' . str_pad((string) $certRequest->id, 6, '0', STR_PAD_LEFT);
+        // الرقم التسلسلي الفريد (يتولّد مرة واحدة ويبقى ثابتاً عند إعادة الإصدار). المعاينة ما بتحجز رقماً.
+        $serial = $preview
+            ? ($certRequest->serial_number ?: 'MC-PREVIEW')
+            : $certRequest->ensureSerialNumber();
+        $verifyUrl = self::verificationUrl($serial);
         // صيغ التواريخ مطابقة للقالب: الترويسة d-m-Y، ومتن الشهادة d/m/Y
         $issuedAt = now()->format('d-m-Y');
 
@@ -114,16 +126,20 @@ class MembershipCertificatePdfService
 
         // الشهادة يجب أن تبقى صفحة واحدة. كتلة التوقيع (الختم + الأسماء) لا تقبل
         // التقسيم في mPDF، فإن لم يتبقَّ لها ارتفاع كافٍ قفزت لصفحة ثانية بالكامل.
-        // قياساً: 16pt يتّسع حتى 4 صفوف فقط، لذا نصغّر الجدول تدريجياً بعدها.
+        // قياساً (بعد إضافة صف الرقم التسلسلي/QR بالتذييل): 16pt يتّسع حتى 3 صفوف فقط، لذا نصغّر الجدول تدريجياً بعدها.
         [$tableFontPt, $tableCellPad] = match (true) {
-            $rowCount >= 15 => ['5pt', '0.3pt'],
-            $rowCount >= 13 => ['6pt', '0.3pt'],
-            $rowCount >= 11 => ['7pt', '0.5pt'],
-            $rowCount >= 9  => ['8pt', '0.5pt'],
-            $rowCount >= 7  => ['9pt', '1pt'],
-            $rowCount >= 5  => ['11pt', '1.5pt'],
+            $rowCount >= 18 => ['4pt', '0.1pt'],
+            $rowCount >= 15 => ['4.5pt', '0.1pt'],
+            $rowCount >= 14 => ['5pt', '0.2pt'],
+            $rowCount >= 11 => ['5.5pt', '0.2pt'],
+            $rowCount >= 9  => ['6.5pt', '0.3pt'],
+            $rowCount >= 7  => ['7.5pt', '0.4pt'],
+            $rowCount >= 6  => ['8.5pt', '0.5pt'],
+            $rowCount >= 5  => ['10pt', '1pt'],
+            $rowCount >= 4  => ['12pt', '1.5pt'],
             default         => ['16pt', '2.5pt'],
         };
+
 
         $presidentName   = \App\Models\Setting::get('union_president_name', 'المهندس/ سهيل هاشم السقا');
         $presidentTitle1 = \App\Models\Setting::get('union_president_title1', 'نقيب المقاولين الفلسطينيين');
@@ -212,7 +228,7 @@ class MembershipCertificatePdfService
 <table class="sign-block" autosize="1">
   <tr>
     <td width="50%" class="seal-cell">
-      <img src="{$sealImg}" width="195" height="151">
+      <img src="{$sealImg}" width="150" height="116">
     </td>
     <td width="50%" class="sign-text">
       {$presidentName}<br>
@@ -249,7 +265,7 @@ HTML;
             // margin_header(8) + headerH هو أدنى حد؛ أقل منه يدوس المتن صورة الترويسة.
             // +2 هامش أمان لأن صندوق أول سطر يبدأ قبل حدّ الهامش بكسر نقطة.
             'margin_top'    => $headerH + 10,
-            'margin_bottom' => $footerH + 8,
+            'margin_bottom' => $footerH + self::SERIAL_ROW_MM + 8,
             'margin_header' => 8,
             'margin_footer' => 8,
             'tempDir'       => $tempDir,
@@ -274,7 +290,21 @@ HTML;
         // الترويسة والتذييل الرسميان — مستخرَجان من قالب Word المعتمد، بعرض كامل
         // ونسبة أبعاد محفوظة (لا تمطيط)
         $mpdf->SetHTMLHeader('<img src="' . $headerImg . '" style="width:100%;">');
-        $mpdf->SetHTMLFooter('<img src="' . $footerImg . '" style="width:100%;">');
+        $qrDataUri = 'data:image/svg+xml;base64,' . base64_encode(
+            \SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(200)->margin(0)->errorCorrection('M')->generate($verifyUrl)
+        );
+
+        // أسفل الشهادة: الرقم التسلسلي ورمز QR يوجّه لصفحة التحقق، ثم صورة التذييل الرسمي
+        $mpdf->SetHTMLFooter(
+            '<table width="100%" style="margin-bottom:1mm;"><tr>'
+            . '<td style="text-align:right;font-family:calibri;font-size:9pt;color:#002060;vertical-align:middle;">'
+            . '<span style="color:#D80F18;">الرقم التسلسلي للشهادة:</span> <b dir="ltr">' . e($serial) . '</b><br>'
+            . '<span style="font-size:8pt;color:#444;">للتحقق من صحة الشهادة امسح الرمز أو زر صفحة التحقق في موقع الاتحاد وأدخل الرقم</span>'
+            . '</td>'
+            . '<td style="text-align:left;width:13mm;"><img src="' . $qrDataUri . '" width="42" height="42"></td>'
+            . '</tr></table>'
+            . '<img src="' . $footerImg . '" style="width:100%;">'
+        );
 
         $mpdf->WriteHTML($html);
 

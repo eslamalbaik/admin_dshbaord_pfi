@@ -229,6 +229,9 @@ Route::prefix('v1')->group(function () {
     // --------------------------------------------------------
     //  Certificate Verification (QR) — Public (no auth)
     // --------------------------------------------------------
+    // التحقق بالرقم التسلسلي (صفحة التحقق بالموقع العام) — محدود لمنع تعداد الأرقام
+    Route::get('certificates/check', [\App\Http\Controllers\Api\CertificateVerificationController::class, 'check'])
+        ->middleware('throttle:30,1');
     Route::get('certificates/verify/{token}', [\App\Http\Controllers\Api\CertificateRequestController::class, 'verify']);
     // ملف الشهادة للمقاول برابط موقَّع — بيسجّل فتحه (اللوحة بتعرض "فتحها المقاول")
     Route::get('certificates/{certificateRequest}/certificate.pdf', [\App\Http\Controllers\Api\CertificateRequestController::class, 'file'])
@@ -500,6 +503,8 @@ Route::prefix('v1')->group(function () {
             Route::post('dashboard/certificate-requests/{certificateRequest}/approve',    [CertificateRequestController::class, 'approve'])->middleware('perm:services.certificate_requests,update');
             Route::post('dashboard/certificate-requests/{certificateRequest}/reject',     [CertificateRequestController::class, 'reject'])->middleware('perm:services.certificate_requests,update');
             Route::post('dashboard/certificate-requests/{certificateRequest}/issue',      [CertificateRequestController::class, 'issue'])->middleware('perm:services.certificate_requests,update');
+            Route::post('dashboard/certificate-requests/{certificateRequest}/revoke',     [CertificateRequestController::class, 'revoke'])->middleware('perm:services.membership_certificates,update');
+            Route::post('dashboard/certificate-requests/{certificateRequest}/reinstate',  [CertificateRequestController::class, 'reinstate'])->middleware('perm:services.membership_certificates,update');
             Route::post('dashboard/certificate-requests/{certificateRequest}/regenerate', [CertificateRequestController::class, 'regenerate'])->middleware('perm:services.membership_certificates,update');
             Route::delete('dashboard/certificate-requests/{certificateRequest}',          [CertificateRequestController::class, 'destroy'])->middleware('perm:services.certificate_requests|services.membership_certificates');
         });

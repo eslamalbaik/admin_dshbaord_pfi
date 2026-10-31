@@ -15,6 +15,7 @@ const serviceLinks = [
   { label: 'طلب شهادة تصنيف', href: '/contractor/login' },
   { label: 'سوق الاليات والمعدات', href: '/contractor/login' },
   { label: 'بوابة العطاءات', href: '/landing/public-tenders' },
+  { label: 'التحقق من شهادة', href: '/landing/verify-certificate' },
   { label: 'الذمم المالية', href: '/contractor/login' },
 ]
 

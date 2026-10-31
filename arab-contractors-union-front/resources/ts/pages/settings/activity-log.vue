@@ -200,6 +200,8 @@ const actionLabels: Record<string, string> = {
   // شهادات العضوية
   'certificate.issued': 'إصدار شهادة',
   'certificate.deleted': 'حذف طلب شهادة',
+  'certificate.revoked': 'إلغاء شهادة عضوية',
+  'certificate.reinstated': 'التراجع عن إلغاء شهادة',
 
   // تذاكر الدعم الفني
   'support_ticket.replied': 'الرد على تذكرة دعم',

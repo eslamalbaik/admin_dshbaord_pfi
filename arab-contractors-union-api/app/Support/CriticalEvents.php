@@ -77,6 +77,16 @@ class CriticalEvents
             'category' => self::CATEGORY_CERTIFICATE,
             'fields'   => self::CERTIFICATE_FIELDS,
         ],
+        'certificate.revoked' => [
+            'label'    => 'إلغاء شهادة عضوية',
+            'category' => self::CATEGORY_CERTIFICATE,
+            'fields'   => ['status' => 'الحالة'],
+        ],
+        'certificate.reinstated' => [
+            'label'    => 'التراجع عن إلغاء شهادة عضوية',
+            'category' => self::CATEGORY_CERTIFICATE,
+            'fields'   => ['status' => 'الحالة'],
+        ],
         'certificate.issued' => [
             'label'    => 'استبدال ملف شهادة صادرة',
             'category' => self::CATEGORY_CERTIFICATE,
@@ -113,6 +123,8 @@ class CriticalEvents
         'due.discount_applied_bulk',
         'balance.adjusted',
         'certificate.regenerated',
+        'certificate.revoked',
+        'certificate.reinstated',
         'supervisor.created',
         'supervisor.updated',
         'supervisor.status_changed',

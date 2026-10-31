@@ -13,7 +13,76 @@ class CertificateRequest extends Model
         'reject_reason', 'certificate_path', 'issued_at', 'reviewed_by', 'reviewed_at',
         'pending_payment_id', 'viewed_at', 'last_viewed_at', 'views_count',
         'certificate_address', 'decision_number', 'decision_date', 'valid_until',
+        'revoked_at', 'revoked_by', 'revoke_reason',
     ];
+
+    // serial_number عمداً خارج $fillable: بيتولّد بالنظام فقط (ensureSerialNumber) ولا يُعدَّل بعد الإصدار
+    protected static function booted(): void
+    {
+        static::updating(function (self $model) {
+            if ($model->isDirty('serial_number') && filled($model->getOriginal('serial_number'))) {
+                throw new \LogicException('الرقم التسلسلي للشهادة لا يُعدَّل بعد توليده.');
+            }
+        });
+    }
+
+    /**
+     * يولّد الرقم التسلسلي مرة واحدة فقط (idempotent) ويحفظه فوراً.
+     * التحديث مشروط بـ serial_number IS NULL فما في تسابق على نفس الطلب، وقيد unique
+     * بقاعدة البيانات هو الضامن النهائي ضد تكرار الرقم بين الطلبات (نعيد المحاولة عند الاصطدام).
+     */
+    public function ensureSerialNumber(): string
+    {
+        if (filled($this->serial_number)) {
+            return $this->serial_number;
+        }
+
+        for ($attempt = 0; $attempt < 10; $attempt++) {
+            $serial = \App\Services\CertificateSerialService::generate();
+
+            try {
+                $updated = static::query()
+                    ->whereKey($this->getKey())
+                    ->whereNull('serial_number')
+                    ->update(['serial_number' => $serial]);
+            } catch (\Illuminate\Database\UniqueConstraintViolationException) {
+                continue;
+            }
+
+            $current = static::query()->whereKey($this->getKey())->value('serial_number');
+            if (filled($current)) {
+                $this->attributes['serial_number'] = $current;
+                $this->syncOriginalAttribute('serial_number');
+
+                return $current;
+            }
+        }
+
+        throw new \RuntimeException('تعذّر توليد رقم تسلسلي فريد للشهادة.');
+    }
+
+    public function isRevoked(): bool
+    {
+        return $this->revoked_at !== null;
+    }
+
+    /** حالة التحقق العامة: valid | expired | revoked (الشهادة الصادرة فقط) */
+    public function verificationState(): string
+    {
+        if ($this->isRevoked()) {
+            return 'revoked';
+        }
+
+        $until = $this->valid_until
+            ?? ($this->type === 'membership' && $this->contractor
+                ? \App\Services\MembershipCertificatePdfService::validUntil($this->contractor)
+                : null);
+
+        $today = now(config('app.local_timezone', 'Asia/Gaza'))->toDateString();
+
+        // "سارية حتى 31/12" تعني صالحة طوال يوم 31/12 نفسه
+        return $until && $until->toDateString() < $today ? 'expired' : 'valid';
+    }
 
     protected $casts = [
         'issued_at'      => 'datetime',
@@ -23,6 +92,7 @@ class CertificateRequest extends Model
         'views_count'    => 'integer',
         'decision_date'  => 'date',
         'valid_until'    => 'date',
+        'revoked_at'     => 'datetime',
     ];
 
     /**

@@ -241,6 +241,33 @@ const regenerateMutation = useMutation({
   },
 })
 
+// ─── إلغاء شهادة / التراجع عن الإلغاء (بسبب إلزامي، ويُسجَّل بسجل التدقيق) ───
+const revokeTarget = ref<any | null>(null)
+const revokeReason = ref('')
+const revokeError = ref('')
+
+function openRevokeDialog(cert: any) {
+  revokeTarget.value = cert
+  revokeReason.value = ''
+  revokeError.value = ''
+}
+
+const revokeMutation = useMutation({
+  mutationFn: async () => {
+    const t = revokeTarget.value
+    const action = t.is_revoked ? 'reinstate' : 'revoke'
+
+    return (await api.post(`/api/v1/dashboard/certificate-requests/${t.id}/${action}`, { reason: revokeReason.value })).data
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['issued-certificates'] })
+    revokeTarget.value = null
+  },
+  onError: (e: any) => {
+    revokeError.value = e?.response?.data?.message ?? 'تعذّر تنفيذ العملية.'
+  },
+})
+
 // ─── تصدير CSV ───
 const isExporting = ref(false)
 
@@ -487,6 +514,7 @@ const contractorStatusLabel: Record<string, string> = {
               <th>#</th>
               <th>المقاول</th>
               <th>رقم العضوية</th>
+              <th>الرقم التسلسلي</th>
               <th>الحالة</th>
               <th>تاريخ الطلب</th>
               <th>تاريخ الإصدار</th>
@@ -501,10 +529,13 @@ const contractorStatusLabel: Record<string, string> = {
               <td class="text-caption">{{ r.id }}</td>
               <td class="font-weight-medium">{{ r.contractor ?? '—' }}</td>
               <td>{{ r.membership_number ?? '—' }}</td>
+              <td class="text-caption" dir="ltr" style="font-family: monospace;">{{ r.serial_number ?? '—' }}</td>
               <td>
                 <VChip size="x-small" :color="certStatusColor[r.status] ?? 'secondary'">
                   {{ r.status_label ?? r.status }}
                 </VChip>
+                <VChip v-if="r.is_revoked" size="x-small" color="error" class="ms-1">ملغاة</VChip>
+                <VChip v-else-if="r.verification_state === 'expired'" size="x-small" color="warning" variant="tonal" class="ms-1">منتهية</VChip>
               </td>
               <td class="text-body-2">{{ fmtDate(r.request_date) }}</td>
               <td class="text-body-2">{{ fmtDate(r.issue_date) }}</td>
@@ -549,6 +580,18 @@ const contractorStatusLabel: Record<string, string> = {
                     />
                   </template>
                 </VTooltip>
+                <VTooltip v-if="r.serial_number" :text="r.is_revoked ? 'التراجع عن الإلغاء' : 'إلغاء الشهادة'" location="top">
+                  <template #activator="{ props }">
+                    <VBtn v-if="$can('services.membership_certificates', 'update')"
+                      v-bind="props"
+                      :icon="r.is_revoked ? 'tabler-rotate-clockwise-2' : 'tabler-ban'"
+                      size="x-small"
+                      variant="text"
+                      :color="r.is_revoked ? 'success' : 'warning'"
+                      @click="openRevokeDialog(r)"
+                    />
+                  </template>
+                </VTooltip>
                 <VTooltip text="حذف الشهادة" location="top">
                   <template #activator="{ props }">
                     <VBtn v-if="$can('services.membership_certificates', 'delete')"
@@ -571,6 +614,35 @@ const contractorStatusLabel: Record<string, string> = {
         </div>
       </VCardText>
     </VCard>
+
+    <!-- ═══ حوار إلغاء شهادة / التراجع عن الإلغاء ═══ -->
+    <VDialog :model-value="!!revokeTarget" max-width="480" @update:model-value="revokeTarget = null">
+      <VCard v-if="revokeTarget">
+        <VCardTitle class="pt-4">
+          {{ revokeTarget.is_revoked ? 'التراجع عن إلغاء الشهادة' : 'إلغاء الشهادة' }}
+        </VCardTitle>
+        <VCardText>
+          <p class="mb-3 text-body-2">
+            الشهادة <b dir="ltr">{{ revokeTarget.serial_number }}</b> — {{ revokeTarget.contractor }}.
+            {{ revokeTarget.is_revoked ? 'ستعود صفحة التحقق العامة لعرضها حسب تاريخ انتهائها.' : 'ستظهر "ملغاة" فوراً في صفحة التحقق العامة.' }}
+          </p>
+          <VTextarea v-model="revokeReason" label="السبب (إلزامي)" rows="2" auto-grow />
+          <VAlert v-if="revokeError" type="error" variant="tonal" density="compact" class="mt-2">{{ revokeError }}</VAlert>
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="text" @click="revokeTarget = null">إغلاق</VBtn>
+          <VBtn
+            :color="revokeTarget.is_revoked ? 'success' : 'warning'"
+            :loading="revokeMutation.isPending.value"
+            :disabled="!revokeReason.trim()"
+            @click="revokeMutation.mutate()"
+          >
+            تأكيد
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
 
     <!-- ═══ حوار إصدار شهادة عضوية ═══ -->
     <VDialog v-model="isIssueOpen" max-width="520">
