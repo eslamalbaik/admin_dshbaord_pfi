@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-/** REQ-09/REQ-10: أرشفة العطاءات المنتهية + حذفها بعد 12 شهراً. */
+/** REQ-09/REQ-10: أرشفة العطاءات المنتهية + حذفها بعد 70 يوماً من الأرشفة (كان 12 شهراً). */
 return new class extends Migration
 {
     public function up(): void
