@@ -175,7 +175,7 @@ class CertificateRequestController extends Controller
             'pending_payment_id' => $eligibility['pending_payment']->id ?? null,
         ]);
 
-        $admins = User::where('role', 'admin')->get();
+        $admins = User::dashboardRecipients('services.certificate_requests');
         if ($admins->isNotEmpty()) {
             Notification::send($admins, new CertificateRequestSubmittedNotification($certRequest));
         }

@@ -358,7 +358,7 @@ class ContractorAuthController extends Controller
             return;
         }
 
-        $admins = User::where('role', 'admin')->get();
+        $admins = User::dashboardRecipients('contractors.list');
         if ($admins->isNotEmpty()) {
             Notification::send($admins, new ContractorProfileUpdatedNotification($contractor, $changes));
         }

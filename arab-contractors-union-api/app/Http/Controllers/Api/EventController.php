@@ -72,7 +72,7 @@ class EventController extends Controller
         );
 
         if ($registration->wasRecentlyCreated) {
-            $admins = User::where('role', 'admin')->get();
+            $admins = User::dashboardRecipients('content.events');
             if ($admins->isNotEmpty()) {
                 Notification::send($admins, new EventJoinedNotification($event, $request->user()));
             }

@@ -7,7 +7,7 @@ import api from '@/plugins/axios'
  */
 definePage({ meta: { requiresAdmin: true, adminOnly: true } })
 
-interface CatalogLeaf { key: string; label: string; actions: string[] }
+interface CatalogLeaf { key: string; label: string; actions: string[]; hint?: string | null }
 interface CatalogSection { key: string; label: string; children: CatalogLeaf[] }
 interface Supervisor {
   id: number
@@ -165,6 +165,28 @@ const toggleSection = (section: CatalogSection, value: boolean) => {
 }
 
 const selectAll = (value: boolean) => sections.value.forEach(s => toggleSection(s, value))
+
+/**
+ * قالب «محاسب مالي»: كل الشؤون المالية (عرض + إضافة + قبول الدفعات + ...) والغرامات
+ * والإحصائيات الرئيسية. «عرض» سجل المدفوعات هو اللي بيوصّله إشعارات الدفعات الجديدة.
+ */
+const ACCOUNTANT_PRESET_SECTIONS = ['finance']
+const ACCOUNTANT_PRESET_LEAVES = ['contractors.penalties']
+const ACCOUNTANT_PRESET_VIEW_ONLY = ['dashboard.home']
+
+const applyAccountantPreset = () => {
+  const next = new Set(selected.value)
+
+  sections.value.forEach(section => {
+    section.children.forEach(leaf => {
+      if (ACCOUNTANT_PRESET_SECTIONS.includes(section.key) || ACCOUNTANT_PRESET_LEAVES.includes(leaf.key))
+        leaf.actions.forEach(a => next.add(key(leaf.key, a)))
+      else if (ACCOUNTANT_PRESET_VIEW_ONLY.includes(leaf.key) && leaf.actions.includes('view'))
+        next.add(key(leaf.key, 'view'))
+    })
+  })
+  selected.value = next
+}
 
 const generatePassword = () => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
@@ -549,7 +571,16 @@ const requiredRule = [(v: string) => !!v?.trim() || 'هذا الحقل مطلو�
                 أي صلاحية إضافة/تعديل/حذف بتعطي «عرض» القسم تلقائياً. إدارة المشرفين نفسها للأدمن فقط.
               </p>
             </div>
-            <div class="d-flex gap-2">
+            <div class="d-flex flex-wrap gap-2">
+              <VBtn
+                size="small"
+                variant="tonal"
+                color="success"
+                prepend-icon="tabler-calculator"
+                @click="applyAccountantPreset"
+              >
+                صلاحيات محاسب مالي
+              </VBtn>
               <VBtn
                 size="small"
                 variant="tonal"
@@ -635,6 +666,12 @@ const requiredRule = [(v: string) => !!v?.trim() || 'هذا الحقل مطلو�
                   >
                     <td class="ps-8">
                       {{ leaf.label }}
+                      <div
+                        v-if="leaf.hint"
+                        class="text-caption text-medium-emphasis leaf-hint"
+                      >
+                        {{ leaf.hint }}
+                      </div>
                     </td>
                     <td
                       v-for="a in actions"
@@ -807,6 +844,12 @@ const requiredRule = [(v: string) => !!v?.trim() || 'هذا الحقل مطلو�
 <style scoped>
 .table-scroll {
   overflow-x: auto;
+}
+
+.leaf-hint {
+  max-width: 320px;
+  white-space: normal;
+  line-height: 1.4;
 }
 
 .matrix-wrap {
