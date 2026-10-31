@@ -119,6 +119,24 @@ class MembershipStatusSyncWithBalanceTest extends TestCase
         $this->assertSame('expired', $this->appHomeBadge());
     }
 
+    public function test_paying_95_percent_activates_and_keeps_the_rest_owed(): void
+    {
+        $this->due(300);
+        $this->manualPayment(285);
+
+        $this->assertSame('active', $this->contractor->fresh()->status);
+        $this->assertSame('active', $this->appHomeBadge());
+        $this->getJson('/api/v1/contractor/balance')->assertJsonPath('items.amount_due_jod', 15);
+    }
+
+    public function test_paying_just_under_95_percent_stays_expired(): void
+    {
+        $this->due(300);
+        $this->manualPayment(284.99);
+
+        $this->assertSame('expired', $this->contractor->fresh()->status);
+    }
+
     public function test_reverting_the_payment_returns_to_expired(): void
     {
         $this->due(150);
