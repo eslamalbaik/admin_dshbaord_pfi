@@ -3,14 +3,16 @@
 namespace App\Services;
 
 /**
- * مولّد الرقم التسلسلي لشهادة العضوية (يُطبع أسفل الشهادة): XXXX-XXXX-XXXX (12 خانة)
+ * مولّد الرقم التسلسلي لشهادة العضوية (يُطبع أسفل الشهادة): XXXXXXXXXXXX (12 خانة، حروف وأرقام فقط بدون شرطات)
  *
  * منفصل عن الرقم المرجعي الداخلي (MC-000123 أعلى الشهادة، مبني على رقم الطلب).
  * - 11 خانة عشوائية (CSPRNG) من أبجدية Crockford بدون الحروف الملتبسة = 55 بت، غير متسلسلة.
  * - الخانة الـ12 خانة فحص (CRC) تكشف أخطاء الكتابة؛ ليست مصدر الأمان: قاعدة البيانات هي المرجع الوحيد،
  *   والرقم غير المسجّل فيها "غير موجودة" مهما كان شكله، والاستعلام محدود بـ throttle.
  * - التفرّد مضمون بقيد unique بقاعدة البيانات؛ المحاولة بتتكرر عند الاصطدام (CertificateRequest::ensureSerialNumber).
- * - صيغتان قديمتان ما زالتا قابلتين للتحقق: 17 خانة (XXXX-XXXX-XXXX-XXXX-X، تجريبية على staging)
+ * - بدون شرطات أو مسافات عن قصد: الفواصل المحايدة هي سبب تلخبط الترتيب والشرطات عند النسخ من نص عربي (RTL)،
+ *   والرقم المجرّد بيُنسخ ويُلصق سليماً. صفحة التحقق بتتجاهل أي شرطات/مسافات بالمدخل.
+ * - صيغتان قديمتان ما زالتا قابلتين للتحقق: 17 خانة (تجريبية على staging)
  *   والمرجعي القديم MC-000123 للشهادات الصادرة قبل الميزة.
  */
 class CertificateSerialService
@@ -69,6 +71,23 @@ class CertificateSerialService
             $variants[] = substr($raw, 13, 4) . substr($raw, 9, 4) . substr($raw, 5, 4) . substr($raw, 1, 4) . $raw[0];
         }
 
+        // نسخ مخربط على مستوى القطع (بين الشرطات): نجرّب كل ترتيب للقطع، كل قطعة كما هي أو معكوسة
+        $chunks = array_values(array_filter(preg_split('/[^0-9A-Za-z]+/', strtoupper((string) $input))));
+        if (count($chunks) >= 2 && count($chunks) <= 5) {
+            foreach (self::permutations($chunks) as $perm) {
+                for ($mask = 0; $mask < (1 << count($perm)); $mask++) {
+                    $c = '';
+                    foreach ($perm as $i => $chunk) {
+                        $c .= ($mask >> $i) & 1 ? strrev($chunk) : $chunk;
+                    }
+                    $c = self::clean($c);
+                    if ($c !== null) {
+                        $variants[] = $c;
+                    }
+                }
+            }
+        }
+
         $out = [];
         foreach ($variants as $c) {
             $f = self::format($c);
@@ -78,6 +97,26 @@ class CertificateSerialService
         }
 
         return array_keys($out);
+    }
+
+    /** @param string[] $items @return string[][] */
+    private static function permutations(array $items): array
+    {
+        if (count($items) <= 1) {
+            return [$items];
+        }
+
+        $result = [];
+        foreach ($items as $i => $item) {
+            $rest = $items;
+            unset($rest[$i]);
+            foreach (self::permutations(array_values($rest)) as $p) {
+                array_unshift($p, $item);
+                $result[] = $p;
+            }
+        }
+
+        return $result;
     }
 
     /** خانة الفحص سليمة؟ (الرقم القديم MC-000123 بلا فحص → true) */
@@ -112,12 +151,9 @@ class CertificateSerialService
         return self::ALPHABET[crc32($body) % 32];
     }
 
+    /** الصيغة القياسية = الخانات المجرّدة (بدون شرطات) */
     private static function format(string $compact): string
     {
-        if (strlen($compact) === self::LEN_V1) {
-            return implode('-', str_split(substr($compact, 0, 16), 4)) . '-' . substr($compact, 16, 1);
-        }
-
-        return implode('-', str_split($compact, 4));
+        return $compact;
     }
 }
