@@ -3,13 +3,14 @@
 namespace App\Services;
 
 /**
- * مولّد الرقم التسلسلي لشهادة العضوية: MC-XXXXX-XXXXX-CC
+ * مولّد الرقم التسلسلي لشهادة العضوية (يُطبع أسفل الشهادة): XXXX-XXXX-C
  *
- * - 10 خانات عشوائية (CSPRNG) من أبجدية Crockford بدون الحروف الملتبسة (I L O U) = 50 بت،
- *   فتخمين رقم صالح عشوائياً غير عملي، والأرقام غير متسلسلة فما بتنكشف أعداد الشهادات.
- * - خانتا فحص (CRC) آخر الرقم بتكشف أخطاء الإدخال، لكنها ليست مصدر الأمان: قاعدة البيانات
- *   هي المرجع الوحيد، والرقم اللي مش مسجّل فيها "غير موجودة" مهما كان شكله.
- * - التفرّد مضمون بقيد unique بقاعدة البيانات؛ المحاولة بتتكرر عند الاصطدام (انظر CertificateRequest::ensureSerialNumber).
+ * منفصل عن الرقم المرجعي الداخلي (MC-000123 أعلى الشهادة، مبني على رقم الطلب).
+ * - 8 خانات عشوائية (CSPRNG) من أبجدية Crockford بدون الحروف الملتبسة = 40 بت، غير متسلسلة.
+ * - خانة فحص واحدة (CRC) تكشف أخطاء الكتابة؛ ليست مصدر الأمان: قاعدة البيانات هي المرجع الوحيد،
+ *   والرقم غير المسجّل فيها "غير موجودة" مهما كان شكله، والاستعلام محدود بـ throttle.
+ * - التفرّد مضمون بقيد unique بقاعدة البيانات؛ المحاولة بتتكرر عند الاصطدام (CertificateRequest::ensureSerialNumber).
+ * - الشهادات القديمة المطبوع عليها MC-000123 فقط بتضل قابلة للتحقق بهالرقم (legacy).
  */
 class CertificateSerialService
 {
@@ -18,7 +19,7 @@ class CertificateSerialService
     public static function generate(): string
     {
         $body = '';
-        for ($i = 0; $i < 10; $i++) {
+        for ($i = 0; $i < 8; $i++) {
             $body .= self::ALPHABET[random_int(0, 31)];
         }
 
@@ -30,44 +31,40 @@ class CertificateSerialService
     {
         $raw = strtoupper(preg_replace('/[\s\x{200E}\x{200F}\x{202A}-\x{202E}]+/u', '', (string) $input));
 
-        // الرقم القديم المطبوع قبل هالميزة: MC-000123
+        // الرقم المرجعي القديم المطبوع قبل هالميزة: MC-000123
         if (preg_match('/^MC-?(\d{6})$/', $raw, $m)) {
             return 'MC-' . $m[1];
         }
 
-        $compact = str_replace('-', '', preg_replace('/^MC-?/', '', $raw));
         // O→0 و I,L→1 (التباس شائع بالكتابة اليدوية)
-        $compact = strtr($compact, ['O' => '0', 'I' => '1', 'L' => '1']);
+        $compact = strtr(str_replace('-', '', $raw), ['O' => '0', 'I' => '1', 'L' => '1']);
 
-        if (! preg_match('/^[' . self::ALPHABET . ']{12}$/', $compact)) {
+        if (! preg_match('/^[' . self::ALPHABET . ']{9}$/', $compact)) {
             return null;
         }
 
         return self::format($compact);
     }
 
-    /** الرقم بصيغته الجديدة وخانتا الفحص سليمتان؟ (الرقم القديم بلا فحص → true) */
+    /** خانة الفحص سليمة؟ (الرقم القديم بلا فحص → true) */
     public static function hasValidChecksum(string $normalized): bool
     {
         if (preg_match('/^MC-\d{6}$/', $normalized)) {
             return true;
         }
 
-        $compact = str_replace('-', '', substr($normalized, 3)); // بدون بادئة MC-
+        $compact = str_replace('-', '', $normalized);
 
-        return strlen($compact) === 12
-            && self::checksum(substr($compact, 0, 10)) === substr($compact, 10, 2);
+        return strlen($compact) === 9 && self::checksum(substr($compact, 0, 8)) === $compact[8];
     }
 
     private static function checksum(string $body): string
     {
-        $n = crc32($body) % 1024;
-
-        return self::ALPHABET[intdiv($n, 32)] . self::ALPHABET[$n % 32];
+        return self::ALPHABET[crc32($body) % 32];
     }
 
     private static function format(string $compact): string
     {
-        return 'MC-' . substr($compact, 0, 5) . '-' . substr($compact, 5, 5) . '-' . substr($compact, 10, 2);
+        return substr($compact, 0, 4) . '-' . substr($compact, 4, 4) . '-' . substr($compact, 8, 1);
     }
 }

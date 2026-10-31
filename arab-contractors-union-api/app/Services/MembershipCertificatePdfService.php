@@ -75,9 +75,11 @@ class MembershipCertificatePdfService
         $contractor = $certRequest->contractor;
         $membership = $contractor->activeMembership;
 
-        // الرقم التسلسلي الفريد (يتولّد مرة واحدة ويبقى ثابتاً عند إعادة الإصدار). المعاينة ما بتحجز رقماً.
+        // الرقم المرجعي الداخلي (أعلى الشهادة) مبني على رقم الطلب — منفصل عن الرقم التسلسلي
+        $reference = 'MC-' . str_pad((string) $certRequest->id, 6, '0', STR_PAD_LEFT);
+        // الرقم التسلسلي الفريد (أسفل الشهادة): يتولّد مرة واحدة ويبقى ثابتاً عند إعادة الإصدار. المعاينة ما بتحجز رقماً.
         $serial = $preview
-            ? ($certRequest->serial_number ?: 'MC-PREVIEW')
+            ? ($certRequest->serial_number ?: '----')
             : $certRequest->ensureSerialNumber();
         $verifyUrl = self::verificationUrl($serial);
         // صيغ التواريخ مطابقة للقالب: الترويسة d-m-Y، ومتن الشهادة d/m/Y
@@ -200,7 +202,7 @@ class MembershipCertificatePdfService
   .seal-cell { text-align: center; }
 </style>
 
-<div class="meta"><span class="meta-label">الرقـم:</span> <span class="meta-value" dir="ltr">{$serial}</span><br><span class="meta-label">التاريخ:</span> <span class="meta-value">{$issuedAt}</span></div>
+<div class="meta"><span class="meta-label">الرقـم:</span> <span class="meta-value" dir="ltr">{$reference}</span><br><span class="meta-label">التاريخ:</span> <span class="meta-value">{$issuedAt}</span></div>
 
 <div class="title">شهادة عضـــــــــوية</div>
 
@@ -312,8 +314,8 @@ HTML;
         $mpdf->SetProtection(['print', 'copy'], '', config('app.certificate_pdf_owner_password'));
 
         $path = $preview
-            ? "certificates/preview/{$serial}.pdf"
-            : "certificates/membership/{$serial}.pdf";
+            ? "certificates/preview/{$reference}.pdf"
+            : "certificates/membership/{$reference}.pdf";
 
         Storage::disk('public')->put($path, $mpdf->Output('', 'S'));
 
