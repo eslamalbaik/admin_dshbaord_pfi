@@ -1,5 +1,7 @@
 import { reactive, ref, watch } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
+import type { Router } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { NOTIFICATIONS_KEY } from '@/composables/useNotifications'
 import { connectEcho, disconnectEcho } from '@/plugins/echo'
@@ -189,8 +191,18 @@ export function __simulateIncoming(notification: Record<string, any>) {
   handleIncoming(notification)
 }
 
+let appRouter: Router | null = null
+
+// الصفحات العامة (meta.public: الرئيسية، بوابة المقاول، الدخول…) لا تعرض أي تنبيه
+// إداري ولا تصدر رنّة — حتى لو كان أدمن مسجّلاً بنفس المتصفح وفتح الموقع العام.
+function onPublicRoute(): boolean {
+  return !!appRouter?.currentRoute.value.meta.public
+}
+
 function handleIncoming(notification: Record<string, any>) {
   notificationPulse.value++
+  if (onPublicRoute())
+    return
   if (!notificationSoundMuted.value)
     playChime()
   pushToast(notification)
@@ -219,6 +231,8 @@ export function useRealtimeAdminNotifications() {
 
   const queryClient = useQueryClient()
   const authStore = useAuthStore()
+
+  appRouter = useRouter()
 
   watch(
     () => [authStore.isLoggedIn, authStore.user?.id, authStore.userRole, authStore.token] as const,

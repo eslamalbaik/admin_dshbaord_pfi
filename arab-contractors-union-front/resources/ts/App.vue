@@ -35,6 +35,10 @@ useRealtimeAdminNotifications()
 // شريط «يتوفر تحديث جديد» — يظهر لمستخدمي اللوحة لما يُنشر إصدار أحدث من الواجهة
 const { showUpdateBar, reloadNow, snooze } = useAppUpdateCheck()
 
+// إشعارات الأدمن ونافذة التحديث تخصّ لوحة التحكم فقط — لا تظهر على الصفحات العامة
+// (الرئيسية/landing، بوابة المقاول، تسجيل الدخول…) حتى لو كان الأدمن مسجّلاً بنفس المتصفح.
+const showDashboardOverlays = computed(() => authStore.isLoggedIn && !route.meta.public)
+
 const isOnline = useOnline()
 const justReconnected = ref(false)
 
@@ -77,7 +81,7 @@ watch(isOnline, (online, wasOnline) => {
 
       <Transition name="update-pop">
         <div
-          v-if="showUpdateBar && authStore.isLoggedIn"
+          v-if="showUpdateBar && showDashboardOverlays"
           class="update-overlay"
           @click.self="snooze"
         >
@@ -114,7 +118,7 @@ watch(isOnline, (online, wasOnline) => {
       <RouterView />
       <ScrollToTop v-if="route.meta.layout !== 'pure'" />
 
-      <AdminNotificationToasts v-if="authStore.isLoggedIn" />
+      <AdminNotificationToasts v-if="showDashboardOverlays" />
     </component>
   </VLocaleProvider>
 </template>
