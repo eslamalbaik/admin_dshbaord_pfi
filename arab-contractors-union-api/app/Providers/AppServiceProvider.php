@@ -66,6 +66,11 @@ class AppServiceProvider extends ServiceProvider
             $model::observe(\App\Observers\BalanceRoundingObserver::class);
         }
 
+        // حالة المقاول وعضوية السنة بتمشي ورا الحالة المعروضة بالأرصدة بعد كل حركة مالية
+        foreach ([\App\Models\ContractorDue::class, \App\Models\ContractorCredit::class, \App\Models\Payment::class] as $model) {
+            $model::observe(\App\Observers\MembershipBalanceObserver::class);
+        }
+
         // Register event listeners for app notifications
         \Illuminate\Support\Facades\Event::listen(
             \App\Events\AnnouncementPublished::class,

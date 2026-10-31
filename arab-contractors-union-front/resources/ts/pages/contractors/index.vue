@@ -975,6 +975,16 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
             من <VChip size="x-small" label :color="getStatusColor(statusConfirm.contractor.status)">{{ getStatusLabel(statusConfirm.contractor.status) }}</VChip>
             إلى <VChip size="x-small" label :color="getStatusColor(statusConfirm.status)">{{ getStatusLabel(statusConfirm.status) }}</VChip>
           </div>
+          <VAlert
+            v-if="statusConfirm.contractor.membership_status && statusConfirm.contractor.membership_status !== statusConfirm.contractor.status"
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mb-3 text-body-2"
+          >
+            الحالة المعروضة بالجدول ("{{ getStatusLabel(statusConfirm.contractor.membership_status) }}") محسوبة من الرصيد،
+            والحالة المحفوظة للمقاول هي "{{ getStatusLabel(statusConfirm.contractor.status) }}".
+          </VAlert>
           <div class="text-body-2 font-weight-medium mb-2">شو رح يصير بعد التغيير:</div>
           <div v-for="(impact, i) in statusConfirmImpacts" :key="i" class="d-flex align-start gap-2 mb-2">
             <VIcon

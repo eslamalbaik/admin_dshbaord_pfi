@@ -97,6 +97,70 @@ class MembershipRenewalService
         return $membership;
     }
 
+    /**
+     * حالة المقاول المحفوظة + عضوية السنة الحالية بتمشي ورا الحالة المعروضة بالأرصدة
+     * (ContractorBalanceController::statusFor). بتنستدعى بعد أي حركة مالية (MembershipBalanceObserver).
+     *
+     * قبل هيك: مقاول "منتهي" عليه ذمة للسنة الحالية مش مكتوب ببيانها "اشتراك/عضوية" (فما بتنعدّ
+     * رسوم اشتراك) سدّدها ← الأرصدة وقائمة المقاولين تعرضه "فعّالة"، بس contractors.status ضلّت
+     * expired وما انعملّه عضوية، فالتطبيق ضل يعرضه "منتهية" ونافذة تغيير الحالة تقول "من منتهي".
+     *
+     * - المعروض "فعّالة" والمحفوظ "منتهي" ← عضوية فعّالة لحد 31/12 من السنة الحالية (إذا ما في
+     *   وحدة بتغطيها) + الحالة بتصير active.
+     * - المعروض رجع مش "فعّالة" (ترجيع الدفعة، ذمة جديدة) ← العضوية اللي عملها هالتفعيل بس
+     *   بتنرفض، والحالة بترجع expired إذا ما ضلّ عنده عضوية ثانية بتغطي السنة.
+     */
+    public function syncWithBalance(int $contractorId): void
+    {
+        $contractor = \App\Models\Contractor::find($contractorId);
+        if (! $contractor) {
+            return;
+        }
+
+        $year      = now()->year;
+        $marker    = self::balanceMarker($year);
+        $displayed = app(\App\Http\Controllers\Api\ContractorBalanceController::class)->statusFor($contractorId);
+
+        $coversYear = fn () => $contractor->memberships()
+            ->where('status', 'active')
+            ->whereYear('expires_at', $year)
+            ->exists();
+
+        if ($displayed === 'active' && $contractor->status === 'expired') {
+            if (! $coversYear()) {
+                $contractor->memberships()->create([
+                    'type'        => $contractor->memberships()->exists() ? 'renewal' : 'new',
+                    'status'      => 'active',
+                    'amount'      => 0,
+                    'starts_at'   => now()->startOfDay(),
+                    'expires_at'  => \Carbon\Carbon::create($year, 12, 31)->startOfDay(),
+                    'notes'       => $marker,
+                    'reviewed_at' => now(),
+                ]);
+            }
+            $contractor->update(['status' => 'active']);
+
+            return;
+        }
+
+        if ($displayed !== 'active' && $contractor->status === 'active') {
+            $auto = $contractor->memberships()->where('status', 'active')->where('notes', $marker);
+            if (! $auto->exists()) {
+                return;
+            }
+
+            $auto->update(['status' => 'rejected']);
+            if (! $coversYear()) {
+                $contractor->update(['status' => 'expired']);
+            }
+        }
+    }
+
+    public static function balanceMarker(int $year): string
+    {
+        return "تفعيل تلقائي بعد سداد ذمم سنة {$year}";
+    }
+
     /** الذمة رجعت مش مسدّدة (ترجيع الدفعة اللي سدّتها) ← العضوية اللي فعّلتها بتنرفض */
     public function deactivateForDue(ContractorDue $due): void
     {
