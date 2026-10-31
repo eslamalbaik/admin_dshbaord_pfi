@@ -197,12 +197,21 @@ class SupportTicketController extends Controller
         return $this->paginated($paginator);
     }
 
-    /** GET /api/v1/dashboard/support-tickets/{ticket} */
+    /**
+     * GET /api/v1/dashboard/support-tickets/{ticket}
+     *
+     * نفس شكل صف القائمة (format) لأن نافذة التذكرة باللوحة مبنية عليه: اسم المقاول نص
+     * و attachment_url مباشر. formatDetails (شكل التطبيق) بيرجّع contractor ككائن، فلما
+     * تنفتح التذكرة من إشعار كان اسم المقاول يطلع JSON خام والمرفق يختفي.
+     */
     public function show(SupportTicket $ticket)
     {
-        return $this->success($this->formatDetails(
+        $data = $this->format(
             $ticket->load(['contractor:id,name,membership_number', 'repliedBy:id,name', 'messages'])
-        ));
+        );
+        $data['membership_number'] = $ticket->contractor?->membership_number;
+
+        return $this->success($data);
     }
 
     /**

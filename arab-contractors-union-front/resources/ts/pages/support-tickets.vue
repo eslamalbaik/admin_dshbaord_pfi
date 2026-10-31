@@ -60,8 +60,22 @@ const selected = ref<any>(null)
 const replyText = ref('')
 const actionError = ref('')
 
+// احتياط: لو وصلت التذكرة بالشكل المفصّل (contractor ككائن، attachment ككائن) نحوّلها
+// لنفس شكل القائمة حتى ما يطلع JSON خام بالنافذة.
+function normalizeTicket(t: any) {
+  if (!t || typeof t !== 'object')
+    return t
+  const out = { ...t }
+  if (out.contractor && typeof out.contractor === 'object')
+    out.contractor = out.contractor.name ?? null
+  if (!out.attachment_url && out.attachment && typeof out.attachment === 'object')
+    out.attachment_url = out.attachment.url ?? null
+
+  return out
+}
+
 const openTicket = (t: any) => {
-  selected.value = t
+  selected.value = normalizeTicket(t)
   replyText.value = ''
   actionError.value = ''
   isViewOpen.value = true
@@ -81,7 +95,11 @@ watch([page, statusFilter, categoryFilter, search, isViewOpen], () => {
 
 // فتح تذكرة من الرابط (‎?ticket=‎، مثلاً عند الضغط على إشعار). نجلبها مباشرة
 // حتى تفتح حتى لو لم تكن في الصفحة الحالية من الجدول.
+// رسالة واضحة لو الإشعار بيشير لتذكرة ما عادت موجودة (بدل ما ما يصير شي)
+const linkError = ref('')
+
 watch(() => route.query.ticket, async (ticket) => {
+  linkError.value = ''
   const tId = Number(ticket)
   if (!Number.isInteger(tId) || tId <= 0)
     return
@@ -93,8 +111,11 @@ watch(() => route.query.ticket, async (ticket) => {
     if (t?.id)
       openTicket(t)
   }
-  catch (err) {
+  catch (err: any) {
     console.error('Error opening ticket from link:', err)
+    linkError.value = err?.response?.status === 404
+      ? `طلب الدعم #${tId} غير موجود — على الأغلب انحذف بعد وصول الإشعار.`
+      : (err?.response?.data?.message || `تعذّر فتح طلب الدعم #${tId}.`)
   }
 }, { immediate: true })
 
@@ -103,7 +124,7 @@ const replyMutation = useMutation({
     (await api.post(`/api/v1/dashboard/support-tickets/${selected.value.id}/reply`, { reply: replyText.value })).data,
   onSuccess: (d: any) => {
     queryClient.invalidateQueries({ queryKey: ['support-tickets'] })
-    selected.value = d?.items ?? selected.value
+    selected.value = normalizeTicket(d?.items ?? selected.value)
     replyText.value = ''
   },
   onError: (e: any) => {
@@ -116,7 +137,7 @@ const statusMutation = useMutation({
     (await api.patch(`/api/v1/dashboard/support-tickets/${selected.value.id}/status`, { status })).data,
   onSuccess: (d: any) => {
     queryClient.invalidateQueries({ queryKey: ['support-tickets'] })
-    selected.value = d?.items ?? selected.value
+    selected.value = normalizeTicket(d?.items ?? selected.value)
   },
   onError: (e: any) => {
     actionError.value = e?.response?.data?.message || 'فشل تحديث الحالة.'
@@ -160,6 +181,10 @@ function waLink(phone: string | null) {
     </div>
 
     <!-- Filters -->
+    <VAlert v-if="linkError" type="warning" variant="tonal" closable class="mb-4" @click:close="linkError = ''">
+      {{ linkError }}
+    </VAlert>
+
     <VCard class="mb-6 pa-4">
       <VRow dense>
         <VCol cols="12" md="4">
