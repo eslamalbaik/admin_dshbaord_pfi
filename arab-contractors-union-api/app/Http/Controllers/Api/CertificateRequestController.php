@@ -486,6 +486,10 @@ class CertificateRequestController extends Controller
             'views_count'      => 0,
         ] + $fields);
 
+        if ($certificateRequest->type === 'membership') {
+            $certificateRequest->ensureSerialNumber();
+        }
+
         $certificateRequest->contractor?->notify(
             new CertificateRequestStatusNotification($certificateRequest)
         );
@@ -512,6 +516,7 @@ class CertificateRequestController extends Controller
             AuditLogService::record(Auth::user(), 'certificate.issued', $certificateRequest, [
                 'contractor_id' => $certificateRequest->contractor_id,
                 'generated'     => $generated,
+                'serial_number' => $certificateRequest->serial_number,
             ]);
         }
 
@@ -519,6 +524,61 @@ class CertificateRequestController extends Controller
             $this->issuedPayload($certificateRequest),
             $generated ? 'تم توليد الشهادة وإرسالها للمقاول.' : 'تم إصدار الشهادة بنجاح.',
         );
+    }
+
+    /** POST /api/v1/dashboard/certificate-requests/{certificateRequest}/revoke */
+    public function revoke(Request $request, CertificateRequest $certificateRequest)
+    {
+        $data = $request->validate(['reason' => 'required|string|max:500']);
+
+        if ($certificateRequest->status !== 'issued' || blank($certificateRequest->serial_number)) {
+            return $this->error('يمكن إلغاء الشهادات الصادرة فقط.', 422);
+        }
+        if ($certificateRequest->isRevoked()) {
+            return $this->error('الشهادة ملغاة مسبقاً.', 422);
+        }
+
+        $certificateRequest->update([
+            'revoked_at'    => now(),
+            'revoked_by'    => Auth::id(),
+            'revoke_reason' => $data['reason'],
+        ]);
+
+        AuditLogService::recordCritical(
+            Auth::user(),
+            'certificate.revoked',
+            $certificateRequest,
+            before: ['status' => 'سارية'],
+            after: ['status' => 'ملغاة'],
+            reason: $data['reason'],
+            context: $this->certificateLogContext($certificateRequest),
+        );
+
+        return $this->success($this->issuedPayload($certificateRequest), 'تم إلغاء الشهادة.');
+    }
+
+    /** POST /api/v1/dashboard/certificate-requests/{certificateRequest}/reinstate — التراجع عن الإلغاء */
+    public function reinstate(Request $request, CertificateRequest $certificateRequest)
+    {
+        $data = $request->validate(['reason' => 'required|string|max:500']);
+
+        if (! $certificateRequest->isRevoked()) {
+            return $this->error('الشهادة غير ملغاة.', 422);
+        }
+
+        $certificateRequest->update(['revoked_at' => null, 'revoked_by' => null, 'revoke_reason' => null]);
+
+        AuditLogService::recordCritical(
+            Auth::user(),
+            'certificate.reinstated',
+            $certificateRequest,
+            before: ['status' => 'ملغاة'],
+            after: ['status' => 'سارية'],
+            reason: $data['reason'],
+            context: $this->certificateLogContext($certificateRequest),
+        );
+
+        return $this->success($this->issuedPayload($certificateRequest), 'تم التراجع عن إلغاء الشهادة.');
     }
 
     /** DELETE /api/v1/dashboard/certificate-requests/{certificateRequest} */
@@ -652,7 +712,7 @@ class CertificateRequestController extends Controller
                 Auth::user(),
                 'certificate.admin_issued_membership',
                 $certRequest,
-                ['contractor_id' => $contractor->id, 'contractor_name' => $contractor->name]
+                ['contractor_id' => $contractor->id, 'contractor_name' => $contractor->name, 'serial_number' => $certRequest->serial_number]
             );
         }
 
@@ -725,6 +785,7 @@ class CertificateRequestController extends Controller
 
         return [
             'contractor_id'     => $certificateRequest->contractor_id,
+            'serial_number'     => $certificateRequest->serial_number,
             'contractor_name'   => $contractor?->name,
             'membership_number' => $contractor?->membership_number,
         ];
@@ -740,11 +801,11 @@ class CertificateRequestController extends Controller
             $certRequest = null;
         }
 
-        if (! $certRequest || $certRequest->status !== 'issued') {
+        if (! $certRequest || $certRequest->status !== 'issued' || $certRequest->isRevoked()) {
             return $this->success(['valid' => false]);
         }
 
-        $serial = 'MC-' . str_pad((string) $certRequest->id, 6, '0', STR_PAD_LEFT);
+        $serial = $certRequest->serial_number ?: 'MC-' . str_pad((string) $certRequest->id, 6, '0', STR_PAD_LEFT);
 
         return $this->success([
             'valid'                   => true,
