@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import axios from 'axios'
+import api from '@/plugins/axios'
 import { BadgeCheck, CheckCircle2, Clock, Search, ShieldCheck, XCircle } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
@@ -49,7 +49,7 @@ async function verify() {
   result.value = null
   try {
     // بدون كاش: كل تحقق يقرأ من قاعدة البيانات مباشرة
-    const r = await axios.get('/api/v1/certificates/check', { params: { serial: value, _: Date.now() } })
+    const r = await api.get('/api/v1/certificates/check', { params: { serial: value, _: Date.now() } })
     result.value = r.data.items ?? null
   }
   catch {
