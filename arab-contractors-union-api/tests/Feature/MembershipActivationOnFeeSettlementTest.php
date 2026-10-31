@@ -99,13 +99,17 @@ class MembershipActivationOnFeeSettlementTest extends TestCase
         $this->assertCount(0, $this->activeMemberships2026());
     }
 
-    public function test_settling_a_non_fee_due_does_not_activate(): void
+    public function test_settling_a_non_fee_due_does_not_activate_as_a_fee(): void
     {
         $this->feeDue(300, 'غرامة تأخير قديمة');
 
         $this->manualPayment(300);
 
-        $this->assertCount(0, $this->activeMemberships2026());
+        // ما بتنعدّ رسوم اشتراك (ما في عضوية مربوطة بالذمة)، بس ذمم السنة كلها انسدّت فالأرصدة
+        // بتعرضه "فعّالة"، والحالة المحفوظة + عضوية السنة بتتبعها (eslam 31/10)
+        $memberships = $this->activeMemberships2026();
+        $this->assertCount(1, $memberships);
+        $this->assertSame(\App\Services\MembershipRenewalService::balanceMarker(2026), $memberships->first()->notes);
     }
 
     public function test_confirmed_app_transfer_that_settles_the_fee_activates_the_year(): void
