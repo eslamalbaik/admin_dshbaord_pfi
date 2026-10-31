@@ -57,11 +57,11 @@ class CertificateSerialVerificationTest extends TestCase
     {
         $serials = [];
         $c = Contractor::create(['name' => 'س', 'membership_number' => '1_g', 'status' => 'active', 'is_frozen' => false]);
-        for ($i = 0; $i < 150; $i++) {
+        for ($i = 0; $i < 600; $i++) {
             $serials[] = $c->certificateRequests()->create(['type' => 'membership', 'status' => 'issued'])->ensureSerialNumber();
         }
 
-        $this->assertCount(150, array_unique($serials));
+        $this->assertCount(600, array_unique($serials));
         foreach ($serials as $s) {
             $this->assertMatchesRegularExpression('/^MC-[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{2}$/', $s);
             $this->assertTrue(CertificateSerialService::hasValidChecksum($s));

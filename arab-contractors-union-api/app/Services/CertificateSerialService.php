@@ -35,7 +35,7 @@ class CertificateSerialService
             return 'MC-' . $m[1];
         }
 
-        $compact = preg_replace('/^MC-?/', '', str_replace('-', '', $raw));
+        $compact = str_replace('-', '', preg_replace('/^MC-?/', '', $raw));
         // O→0 و I,L→1 (التباس شائع بالكتابة اليدوية)
         $compact = strtr($compact, ['O' => '0', 'I' => '1', 'L' => '1']);
 
@@ -53,7 +53,7 @@ class CertificateSerialService
             return true;
         }
 
-        $compact = str_replace(['MC-', '-'], '', $normalized);
+        $compact = str_replace('-', '', substr($normalized, 3)); // بدون بادئة MC-
 
         return strlen($compact) === 12
             && self::checksum(substr($compact, 0, 10)) === substr($compact, 10, 2);
