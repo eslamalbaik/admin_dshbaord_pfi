@@ -69,14 +69,30 @@ function openPreview(id: number) {
 }
 
 const detailQueryEnabled = computed(() => isViewOpen.value && !!selected.value?.id)
-const { data: detailData } = useQuery({
+const { data: detailData, isError: detailIsError, error: detailError } = useQuery({
   queryKey: computed(() => ['certificate-request', selected.value?.id]),
   queryFn: async () =>
     (await api.get(`/api/v1/dashboard/certificate-requests/${selected.value.id}`)).data,
   enabled: detailQueryEnabled,
+  // 404/403 ما بتتصلّح بإعادة المحاولة — نعرض الرسالة فوراً
+  retry: (count: number, err: any) => !(err?.response?.status >= 400 && err?.response?.status < 500) && count < 2,
 })
 
 const detail = computed(() => detailData.value?.items ?? selected.value)
+
+// لما ينفتح الطلب من إشعار، النافذة بتبدأ بالمعرّف بس ({ id }) لحد ما توصل التفاصيل.
+// قبل: لو التفاصيل ما وصلت (الطلب انحذف، أو خطأ بالخادم) كانت النافذة تطلع فاضية
+// بشرطات «—» بدون أي تفسير. هلأ بنعرض «جاري التحميل» أو رسالة واضحة.
+const detailPending = computed(() => !!detail.value && !detail.value.type)
+const detailErrorText = computed(() => {
+  const status = (detailError.value as any)?.response?.status
+  if (status === 404)
+    return 'هذا الطلب غير موجود — على الأغلب انحذف بعد وصول الإشعار.'
+  if (status === 403)
+    return 'ليس لديك صلاحية عرض هذا الطلب.'
+
+  return (detailError.value as any)?.response?.data?.message || 'تعذّر تحميل تفاصيل الطلب، حاول مرة ثانية.'
+})
 
 const openRequest = (r: any) => {
   selected.value = r
@@ -386,7 +402,27 @@ function fmtDate(d: string | null) {
 
     <!-- ─── Request Dialog ─── -->
     <VDialog v-model="isViewOpen" max-width="720" scrollable>
-      <VCard v-if="detail">
+      <VCard v-if="detailPending">
+        <VCardTitle class="pt-4">
+          <span class="text-h6">طلب #{{ detail.id }}</span>
+        </VCardTitle>
+        <VCardText>
+          <VAlert v-if="detailIsError" type="error" variant="tonal">
+            {{ detailErrorText }}
+          </VAlert>
+          <div v-else class="d-flex align-center justify-center gap-3 py-8">
+            <VProgressCircular indeterminate color="primary" size="28" />
+            <span class="text-body-2">جاري تحميل تفاصيل الطلب...</span>
+          </div>
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="text" @click="isViewOpen = false">
+            إغلاق
+          </VBtn>
+        </VCardActions>
+      </VCard>
+      <VCard v-else-if="detail">
         <VCardTitle class="d-flex align-center justify-space-between pt-4">
           <span class="text-h6">طلب #{{ detail.id }} — {{ detail.type_label ?? detail.type }}</span>
           <VChip size="small" :color="statusColor[detail.status] ?? 'secondary'">
