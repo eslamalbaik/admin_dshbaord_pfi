@@ -32,13 +32,14 @@ class CertificateVerificationController extends Controller
     {
         $request->validate(['serial' => 'required|string|max:64']);
 
-        $serial = CertificateSerialService::normalize($request->query('serial'));
+        // الرقم المنسوخ من PDF بسطر عربي ممكن ينقلب ترتيبه — بنجرّب الصيغ المحتملة (خانة الفحص بتصفّيها)
+        // والقاعدة هي الحكم: اللي مش مسجّل فيها "غير موجودة".
+        $candidates = CertificateSerialService::candidates($request->query('serial'));
 
-        // الشكل غير المعروف أو خانتا الفحص الخاطئتان = ما بيستاهل استعلام؛ والقاعدة هي المرجع للباقي
-        $cert = ($serial && CertificateSerialService::hasValidChecksum($serial))
+        $cert = $candidates
             ? CertificateRequest::query()
                 ->with('contractor:id,name,membership_number')
-                ->where('serial_number', $serial)
+                ->whereIn('serial_number', $candidates)
                 ->where('status', 'issued')
                 ->first()
             : null;

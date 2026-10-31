@@ -178,6 +178,22 @@ class CertificateSerialVerificationTest extends TestCase
         $this->check($sloppy)->assertJsonPath('items.state', 'revoked');
     }
 
+    public function test_serial_pasted_in_reversed_rtl_order_still_verifies(): void
+    {
+        $cert = $this->issued();
+        $compact = str_replace('-', '', $cert->serial_number);
+
+        // مقلوب بالكامل، أو المجموعات بترتيب معكوس مع خانة الفحص أولاً (كما بيطلع من نسخ سطر عربي)
+        $reversed = strrev($compact);
+        $rtlGroups = $compact[16] . '-' . implode('-', array_reverse(str_split(substr($compact, 0, 16), 4)));
+        // نفس الأحرف بشرطات بأماكن غلط
+        $badDashes = substr($compact, 0, 1) . '-' . substr($compact, 1, 4) . '-' . substr($compact, 5, 12);
+
+        foreach ([$reversed, $rtlGroups, $badDashes, "  {$compact}  ", strtolower($compact)] as $pasted) {
+            $this->check($pasted)->assertJsonPath('items.state', 'valid');
+        }
+    }
+
     public function test_legacy_printed_serial_still_verifies(): void
     {
         $cert = $this->issued();

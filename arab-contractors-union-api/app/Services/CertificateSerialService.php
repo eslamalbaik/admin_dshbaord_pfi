@@ -46,6 +46,42 @@ class CertificateSerialService
         return self::format($compact);
     }
 
+    /**
+     * كل الصيغ المحتملة لرقم تم نسخه من PDF أو شاشة بترتيب عربي (RTL) مقلوب: الرقم كما هو، معكوس
+     * الخانات، أو مجموعاته بترتيب معكوس. بنرجّع بس اللي خانة الفحص فيه سليمة، والقاعدة تحسم.
+     *
+     * @return string[]
+     */
+    public static function candidates(?string $input): array
+    {
+        $direct = self::normalize($input);
+        if ($direct === null) {
+            // ممكن يكون مقلوب (خانات أو أحرف): نجرّب على الخانات المجرّدة
+            $raw = strtoupper(preg_replace('/[^0-9A-Za-z]/', '', (string) $input));
+            $raw = strtr($raw, ['O' => '0', 'I' => '1', 'L' => '1']);
+            if (strlen($raw) !== 17 || ! preg_match('/^[' . self::ALPHABET . ']{17}$/', $raw)) {
+                return [];
+            }
+        } elseif (str_starts_with($direct, 'MC-')) {
+            return [$direct];
+        } else {
+            $raw = str_replace('-', '', $direct);
+        }
+
+        $groupsRev = substr($raw, 12, 4) . substr($raw, 8, 4) . substr($raw, 4, 4) . substr($raw, 0, 4) . $raw[16];
+        $cFirst    = substr($raw, 13, 4) . substr($raw, 9, 4) . substr($raw, 5, 4) . substr($raw, 1, 4) . $raw[0];
+
+        $out = [];
+        foreach ([$raw, strrev($raw), $groupsRev, $cFirst] as $c) {
+            $f = self::format($c);
+            if (self::hasValidChecksum($f)) {
+                $out[$f] = true;
+            }
+        }
+
+        return array_keys($out);
+    }
+
     /** خانة الفحص سليمة؟ (الرقم القديم بلا فحص → true) */
     public static function hasValidChecksum(string $normalized): bool
     {

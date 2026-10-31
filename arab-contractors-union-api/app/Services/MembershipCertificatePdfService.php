@@ -298,15 +298,20 @@ HTML;
 
         // أسفل الشهادة: الرقم التسلسلي ورمز QR يوجّه لصفحة التحقق، ثم صورة التذييل الرسمي
         $mpdf->SetHTMLFooter(
-            '<table width="100%" style="margin-bottom:1mm;"><tr>'
-            . '<td style="text-align:right;font-family:calibri;font-size:9pt;color:#002060;vertical-align:middle;">'
-            . '<span style="color:#D80F18;">الرقم التسلسلي للشهادة:</span> <b dir="ltr">' . e($serial) . '</b><br>'
-            . '<span style="font-size:8pt;color:#444;">للتحقق من صحة الشهادة امسح الرمز أو زر صفحة التحقق في موقع الاتحاد وأدخل الرقم</span>'
+            '<table dir="ltr" width="100%" style="margin-bottom:1mm;direction:ltr;"><tr>'
+            // الرقم بخلية LTR مستقلة بدون نص عربي حواليه، فالنسخ من الـPDF بيطلع بالترتيب الصحيح
+            . '<td style="width:13mm;text-align:left;vertical-align:middle;"><img src="' . $qrDataUri . '" width="42" height="42"></td>'
+            . '<td style="direction:ltr;text-align:left;font-family:calibri;font-size:11pt;color:#002060;vertical-align:middle;">'
+            . '<b>' . e($serial) . '</b>'
             . '</td>'
-            . '<td style="text-align:left;width:13mm;"><img src="' . $qrDataUri . '" width="42" height="42"></td>'
+            . '<td style="text-align:right;font-family:calibri;font-size:8pt;color:#444;vertical-align:middle;">'
+            . '<span style="color:#D80F18;font-size:9pt;">الرقم التسلسلي للشهادة</span><br>'
+            . 'للتحقق من صحة الشهادة امسح الرمز أو زر صفحة التحقق في موقع الاتحاد وأدخل الرقم'
+            . '</td>'
             . '</tr></table>'
             . '<img src="' . $footerImg . '" style="width:100%;">'
         );
+
 
         $mpdf->WriteHTML($html);
 
