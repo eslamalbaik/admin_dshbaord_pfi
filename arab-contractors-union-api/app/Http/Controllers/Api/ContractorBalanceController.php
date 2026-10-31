@@ -19,10 +19,8 @@ use Illuminate\Support\Facades\DB;
  * الصافي = له − عليه (سالب = الشركة مطلوب منها للاتحاد).
  * الحسبة نفسها في App\Support\ContractorBalances.
  *
- * جبر الصافي لدينار صحيح لصالح الاتحاد: رصيد الشركة يُجبر للأقل (300.5 ← 300)
- * والمطلوب منها يُجبر للأكثر (349.2- ← 350-) — يعني floor في الحالتين.
- * الجبر مخزَّن فعلياً (BalanceRoundingService يسجّل قيد "جبر كسور الرصيد")،
- * فـnet_jod وnet_exact_jod متساويان عادةً؛ أي فرق بينهما يعني قيد جبر لم يُحدَّث بعد.
+ * الصافي بكسوره (خانتان عشريتان) بدون جبر لدينار صحيح (قاعدة eslam 31/10): 114.50 بتضل 114.50،
+ * فـnet_jod وnet_exact_jod متساويان.
  *
  * يُحسب لحظياً، فأي ذمة أو غرامة أو رسوم جديدة أو دفعة تنعكس مباشرة.
  */
@@ -221,7 +219,7 @@ class ContractorBalanceController extends Controller
             'dues_jod'          => round((float) $row->dues_jod, 2),
             'penalties_jod'     => round((float) $row->penalties_jod, 2),
             'debit_jod'         => round((float) $row->dues_jod + (float) $row->penalties_jod, 2),
-            'net_jod'           => (int) $row->net_jod,
+            'net_jod'           => round((float) $row->net_jod, 2),
             'net_exact_jod'     => round((float) $row->net_exact_jod, 2),
         ];
     }

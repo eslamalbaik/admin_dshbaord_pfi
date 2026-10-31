@@ -15,7 +15,7 @@ use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 /**
- * جبر كسور رصيد المقاول لدينار صحيح لصالح الاتحاد — مضاف على قيمة ذمة أو رصيد موجود، بلا قيد منفصل.
+ * الكسور ما بتنجبر (قاعدة eslam 31/10): الذمم والأرصدة والصافي بتضل بكسورها، وما بيضل أي قيد جبر.
  */
 class BalanceRoundingTest extends TestCase
 {
@@ -65,15 +65,15 @@ class BalanceRoundingTest extends TestCase
         $this->assertEquals(-991.40, ContractorBalances::exactNet($c->id));
     }
 
-    public function test_creditor_fraction_is_taken_off_the_credit_itself(): void
+    public function test_creditor_fraction_is_kept(): void
     {
         $c = $this->contractor();
         $credit = ContractorCredit::create(['contractor_id' => $c->id, 'amount_jod' => 181.40, 'used_jod' => 0, 'description' => 'رصيد']);
 
-        $this->assertEquals(181, (float) $credit->fresh()->amount_jod);
+        $this->assertEquals(181.40, (float) $credit->fresh()->amount_jod);
         $this->assertSame(1, ContractorCredit::where('contractor_id', $c->id)->count());
         $this->assertSame(0, $this->separateEntries($c));
-        $this->assertEquals(181, ContractorBalances::exactNet($c->id));
+        $this->assertEquals(181.40, ContractorBalances::exactNet($c->id));
     }
 
     public function test_whole_dinar_balance_gets_no_rounding(): void
@@ -86,13 +86,13 @@ class BalanceRoundingTest extends TestCase
         $this->assertSame(0, $this->separateEntries($c));
     }
 
-    public function test_half_dinar_debt_is_displayed_as_one(): void
+    public function test_half_dinar_debt_is_displayed_as_is(): void
     {
         $c = $this->contractor();
         $this->due($c, 0.50);
 
         $this->assertEquals(-0.50, ContractorBalances::exactNet($c->id));
-        $this->assertEquals(-1, (int) ContractorBalances::query()->where('contractors.id', $c->id)->first()->net_jod);
+        $this->assertEquals(-0.50, (float) ContractorBalances::query()->where('contractors.id', $c->id)->first()->net_jod);
     }
 
     /** صورة eslam 12/10: 500 + 45.20 + 45.70 بدفعة 599 ← 500 + 46 + 46 والرصيد 7 */
@@ -135,36 +135,33 @@ class BalanceRoundingTest extends TestCase
         $this->assertSame(0, ContractorDue::where('contractor_id', $c->id)->where('status', '!=', 'paid')->count());
     }
 
-    public function test_overpayment_surplus_is_rounded_down_without_a_movement(): void
+    public function test_overpayment_surplus_keeps_its_fraction(): void
     {
         $c = $this->contractor();
         $this->due($c, 991.40);
 
-        $this->pay($c, 995); // فائض 3.60 ← 3
+        $this->pay($c, 995); // فائض 3.60 بيضل 3.60
 
-        $this->assertEquals(3, ContractorBalances::exactNet($c->id));
+        $this->assertEquals(3.60, ContractorBalances::exactNet($c->id));
         $this->assertSame(0, $this->separateEntries($c));
-        $this->assertSame(0, ContractorCredit::where('contractor_id', $c->id)->count());
     }
 
-    /** فرق عملة (سداد بالشيكل زاد 0.18) انشطب بالجبر: الذمة الجديدة بتضل 200 كاملة، بلا جبر 0.18 عليها */
-    public function test_absorbed_surplus_is_not_revived_by_a_new_due(): void
+    /** فرق عملة (سداد بالشيكل زاد 0.18) بيضل رصيد للشركة وبينصرف على الذمة الجديدة */
+    public function test_currency_surplus_is_kept_and_applied_to_a_new_due(): void
     {
         $c = $this->contractor();
         $this->due($c, 10);
         $this->pay($c, 10.18);
-        $this->assertEquals(0, ContractorBalances::exactNet($c->id));
+        $this->assertEquals(0.18, ContractorBalances::exactNet($c->id));
 
-        $new = $this->due($c, 200);
+        $this->due($c, 200);
         app(ContractorCreditService::class)->applyAvailableCredit($c->fresh());
 
-        $this->assertEquals(0, (float) $new->fresh()->paid_jod);
-        $this->assertEquals(200, (float) $new->fresh()->amount_jod);
+        $this->assertEquals(-199.82, ContractorBalances::exactNet($c->id));
         $this->assertSame(0, $this->separateEntries($c));
-        $this->assertEquals(-200, ContractorBalances::exactNet($c->id));
     }
 
-    public function test_a_fractional_new_due_keeps_its_fraction_after_an_absorbed_surplus(): void
+    public function test_a_fractional_new_due_keeps_its_fraction_after_a_surplus(): void
     {
         $c = $this->contractor();
         $this->due($c, 10);
@@ -173,7 +170,7 @@ class BalanceRoundingTest extends TestCase
         $this->due($c, 3.90);
         app(ContractorCreditService::class)->applyAvailableCredit($c->fresh());
 
-        $this->assertEquals(-3.90, ContractorBalances::exactNet($c->id));
+        $this->assertEquals(-3.72, ContractorBalances::exactNet($c->id));
         $this->assertSame(0, $this->separateEntries($c));
     }
 
@@ -214,19 +211,16 @@ class BalanceRoundingTest extends TestCase
         $this->assertEquals(-991, ContractorBalances::exactNet($c->id));
     }
 
-    public function test_reverting_the_host_payment_releases_the_fraction(): void
+    public function test_payment_surplus_has_no_rounding(): void
     {
         $c = $this->contractor();
         $this->due($c, 10);
-        $this->pay($c, 13.40); // فائض 3.40 ← 3
+        $this->pay($c, 13.40); // فائض 3.40 بيضل 3.40
         $payment = \App\Models\Payment::where('contractor_id', $c->id)->sole();
-        $this->assertEquals(0.40, (float) $payment->rounding_jod);
-        $this->assertNull(app(\App\Services\PaymentConfirmationService::class)->revertBlocker($payment));
 
-        $payment->update(['status' => 'rejected']); // بس الحالة — الرصيد ما عاد محسوب
-
-        $this->assertEquals(0, (float) $payment->fresh()->rounding_jod);
-        $this->assertEquals(10, (float) $payment->fresh()->used_amount_jod);
+        $this->assertEquals(0, (float) $payment->rounding_jod);
+        $this->assertEquals(10, (float) $payment->used_amount_jod);
+        $this->assertEquals(3.40, ContractorBalances::exactNet($c->id));
     }
 
     public function test_app_due_title_drops_the_discount_suffix(): void
@@ -260,7 +254,7 @@ class BalanceRoundingTest extends TestCase
         ContractorCredit::create(['contractor_id' => $c->id, 'amount_jod' => 181.40, 'used_jod' => 0, 'description' => 'رصيد']);
 
         $this->assertSame([], app(BalanceRoundingService::class)->syncAll());
-        $this->assertEquals(181, ContractorBalances::exactNet($c->id));
+        $this->assertEquals(181.40, ContractorBalances::exactNet($c->id));
     }
 
     public function test_home_last_invoice_shows_the_exact_due(): void
@@ -274,35 +268,20 @@ class BalanceRoundingTest extends TestCase
             ->assertJsonPath('items.financial.last_invoice.amount_jod', '991.40');
     }
 
-    public function test_command_dry_run_writes_nothing(): void
+    public function test_command_leaves_fractions_alone(): void
     {
         $c = $this->contractor();
-        // رصيد بكسور بدون أحداث موديل — زي ما بيصير بتعديل جماعي
         $credit = ContractorCredit::withoutEvents(fn () => ContractorCredit::create([
             'contractor_id' => $c->id, 'amount_jod' => 10.25, 'used_jod' => 0, 'description' => 'رصيد',
         ]));
 
         $this->artisan('balances:round', ['--dry-run' => true])->assertSuccessful();
-        $this->assertEquals(10.25, (float) $credit->fresh()->amount_jod);
-
         $this->artisan('balances:round')->assertSuccessful();
-        $this->assertEquals(10, (float) $credit->fresh()->amount_jod);
+
+        $this->assertEquals(10.25, (float) $credit->fresh()->amount_jod);
         $this->assertSame(0, $this->separateEntries($c));
     }
 
-    public function test_statement_shows_the_payment_fraction_inside_the_payment(): void
-    {
-        $c = $this->contractor();
-        $this->due($c, 10);
-        $this->pay($c, 13.40); // فائض 3.40 ← 3
-
-        $payment = collect(app(\App\Services\ContractorStatementService::class)->build($c->fresh())['entries'] ?? [])
-            ->firstWhere('kind', 'payment');
-
-        $this->assertNotNull($payment);
-        $this->assertContains(['kind' => 'rounding', 'amount_jod' => 0.4],
-            collect($payment['allocations'])->map(fn ($a) => ['kind' => $a['kind'], 'amount_jod' => $a['amount_jod']])->all());
-    }
 
     public function test_migration_restores_the_amounts_that_were_rounded_up(): void
     {
@@ -321,4 +300,19 @@ class BalanceRoundingTest extends TestCase
         $this->assertSame('paid', $due->fresh()->status);
     }
 
+
+    public function test_sync_restores_a_credit_that_was_rounded_down(): void
+    {
+        $c = $this->contractor();
+        // الشكل القديم المخزَّن: 181.40 انجبر لـ181 وrounding_jod = 0.40
+        $credit = ContractorCredit::withoutEvents(fn () => ContractorCredit::create([
+            'contractor_id' => $c->id, 'amount_jod' => 181, 'rounding_jod' => 0.40, 'used_jod' => 0, 'description' => 'رصيد',
+        ]));
+
+        app(BalanceRoundingService::class)->sync($c->id);
+
+        $this->assertEquals(181.40, (float) $credit->fresh()->amount_jod);
+        $this->assertEquals(0, (float) $credit->fresh()->rounding_jod);
+        $this->assertEquals(181.40, ContractorBalances::exactNet($c->id));
+    }
 }

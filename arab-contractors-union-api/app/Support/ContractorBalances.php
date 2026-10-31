@@ -40,16 +40,14 @@ class ContractorBalances
                        + (SELECT COALESCE(SUM(pe.amount), 0) FROM penalties pe
                           WHERE pe.contractor_id = contractors.id AND pe.status <> 'rejected'))";
 
-        // floor بدون FLOOR(): غير موجودة بـSQLite الاختبارات. الصافي الدقيق بخانتين عشريتين
-        // بالضبط، فطرح 0.495 ثم التقريب لعدد صحيح يساوي floor تماماً (300.00 ← 300، 300.99 ← 300، 349.01- ← 350-).
-        // بعد BalanceRoundingService الصافي المخزَّن أصلاً عدد صحيح، فهذا مجرد ضمان للعرض.
+        // الصافي بكسوره (خانتان عشريتان)، بدون جبر لدينار صحيح (قاعدة eslam 31/10): 114.50 بتضل 114.50.
         return Contractor::query()->toBase()->select([
             'contractors.id', 'contractors.name', 'contractors.membership_number', 'contractors.status',
         ])->selectRaw("ROUND({$credit}, 2) AS credit_jod")
             ->selectRaw("ROUND({$dues}, 2) AS dues_jod")
             ->selectRaw("ROUND({$penalties}, 2) AS penalties_jod")
             ->selectRaw("{$exact} AS net_exact_jod")
-            ->selectRaw("ROUND({$exact} - 0.495, 0) AS net_jod")
+            ->selectRaw("{$exact} AS net_jod")
             ->selectRaw("ROUND({$obligations}, 2) AS obligations_jod")
             ->selectRaw("ROUND({$duesObligations}, 2) AS dues_obligations_jod")
             ->selectRaw('EXISTS(SELECT 1 FROM contractor_dues cy WHERE cy.contractor_id = contractors.id

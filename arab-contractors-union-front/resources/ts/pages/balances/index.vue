@@ -128,10 +128,10 @@ async function exportCsv() {
       p++
     } while (p <= last)
 
-    const head = ['رقم العضوية', 'الشركة', 'حالة العضوية', 'له (د.أ)', 'ذمم (د.أ)', 'غرامات (د.أ)', 'عليه (د.أ)', 'الصافي الدقيق (د.أ)', 'الصافي بعد الجبر (د.أ)']
+    const head = ['رقم العضوية', 'الشركة', 'حالة العضوية', 'له (د.أ)', 'ذمم (د.أ)', 'غرامات (د.أ)', 'عليه (د.أ)', 'الصافي (د.أ)']
     const lines = rows.map(r => [
       r.membership_number, r.name, statusLabels[r.status]?.text ?? r.status,
-      r.credit_jod, r.dues_jod, r.penalties_jod, r.debit_jod, r.net_exact_jod, r.net_jod,
+      r.credit_jod, r.dues_jod, r.penalties_jod, r.debit_jod, r.net_jod,
     ].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))
 
     const blob = new Blob([`﻿${[head.join(','), ...lines].join('\n')}`], { type: 'text/csv;charset=utf-8' })
@@ -154,7 +154,7 @@ async function exportCsv() {
       <div>
         <h1 class="text-h4 font-weight-bold">أرصدة المقاولين</h1>
         <p class="text-body-2 text-medium-emphasis mb-0">
-          الصافي = ما للشركة عند الاتحاد − ما عليها (ذمم + غرامات). السالب يعني أن الشركة مطلوب منها للاتحاد. يُجبر الصافي لدينار صحيح لصالح الاتحاد: رصيد الشركة للأقل، والمطلوب منها للأكثر.
+          الصافي = ما للشركة عند الاتحاد − ما عليها (ذمم + غرامات). السالب يعني أن الشركة مطلوب منها للاتحاد. الكسور تبقى كما هي بدون جبر (مثلاً 114.50 تبقى 114.50).
         </p>
       </div>
       <VBtn
@@ -256,9 +256,6 @@ async function exportCsv() {
               <td dir="ltr">{{ money(r.penalties_jod) }}</td>
               <td dir="ltr" class="font-weight-bold" :class="netColor(r.net_jod)">
                 {{ money(r.net_jod) }}
-                <div v-if="r.net_exact_jod !== r.net_jod" class="text-caption text-medium-emphasis font-weight-regular">
-                  الدقيق: {{ money(r.net_exact_jod) }}
-                </div>
               </td>
               <td class="text-no-wrap">
                 <VBtn size="small" variant="text" prepend-icon="tabler-list-details" @click="openStatement(r)">
