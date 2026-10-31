@@ -199,7 +199,7 @@ class PaymentController extends Controller
      */
     public function myTransfers(Request $request)
     {
-        $query = $request->user()->payments()->with(['contractor:id,name', ...Payment::TITLE_RELATIONS]);
+        $query = $request->user()->payments()->with(['contractor:id,name', 'confirmedBy:id,name,avatar,role', ...Payment::TITLE_RELATIONS]);
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -225,7 +225,7 @@ class PaymentController extends Controller
             return $this->error('غير مصرَّح لك بالوصول لهذا الإشعار.', 403);
         }
 
-        return $this->success(new PaymentResource($payment->load(['contractor:id,name', ...Payment::TITLE_RELATIONS])));
+        return $this->success(new PaymentResource($payment->load(['contractor:id,name', 'confirmedBy:id,name,avatar,role', ...Payment::TITLE_RELATIONS])));
     }
 
     // ═════════════════════════════════════════════════════════════════════════

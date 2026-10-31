@@ -77,4 +77,22 @@ class FinanceSupervisorPaymentsTest extends TestCase
         Sanctum::actingAs($viewer);
         $this->postJson("/api/v1/payments/transactions/{$payment->id}/confirm")->assertForbidden();
     }
+
+    public function test_contractor_app_sees_who_confirmed_the_payment(): void
+    {
+        $fin     = $this->supervisor(['finance.payments.view', 'finance.payments.update']);
+        $payment = $this->payment();
+        $payment->update(['status' => 'paid', 'confirmed_by' => $fin->id, 'confirmed_at' => now(), 'paid_at' => now()]);
+
+        Sanctum::actingAs($payment->contractor);
+
+        $res = $this->getJson('/api/v1/contractor/payments/transfer');
+        $res->assertOk();
+        $this->assertSame($fin->id, $res->json('items.0.confirmed_by_user.id'));
+        $this->assertSame('محاسب مالي', $res->json('items.0.confirmed_by_user.name'));
+        $this->assertStringContainsString('avatars/fin.png', $res->json('items.0.confirmed_by_user.avatar_url'));
+
+        $this->getJson("/api/v1/contractor/payments/{$payment->id}")
+            ->assertOk()->assertJsonPath('items.confirmed_by_user.id', $fin->id);
+    }
 }
