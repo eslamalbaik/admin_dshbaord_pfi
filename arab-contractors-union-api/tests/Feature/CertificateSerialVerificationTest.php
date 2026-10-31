@@ -63,7 +63,7 @@ class CertificateSerialVerificationTest extends TestCase
 
         $this->assertCount(600, array_unique($serials));
         foreach ($serials as $s) {
-            $this->assertMatchesRegularExpression('/^([0-9A-HJKMNP-TV-Z]{4}-){4}[0-9A-HJKMNP-TV-Z]$/', $s);
+            $this->assertMatchesRegularExpression('/^([0-9A-HJKMNP-TV-Z]{4}-){2}[0-9A-HJKMNP-TV-Z]{4}$/', $s);
             $this->assertTrue(CertificateSerialService::hasValidChecksum($s));
         }
     }
@@ -91,14 +91,14 @@ class CertificateSerialVerificationTest extends TestCase
         $cert = $this->issued();
 
         $this->expectException(\LogicException::class);
-        $cert->serial_number = 'AAAA-BBBB-CCCC-DDDD-E';
+        $cert->serial_number = 'AAAA-BBBB-CCCC';
         $cert->save();
     }
 
     public function test_serial_is_not_mass_assignable(): void
     {
         $cert = $this->issued();
-        $cert->fill(['serial_number' => 'AAAA-BBBB-CCCC-DDDD-E']);
+        $cert->fill(['serial_number' => 'AAAA-BBBB-CCCC']);
 
         $this->assertSame($cert->getOriginal('serial_number'), $cert->serial_number);
     }
@@ -150,7 +150,7 @@ class CertificateSerialVerificationTest extends TestCase
     {
         $this->issued();
 
-        foreach (['AAAA-BBBB-CCCC-DDDD-E', 'MC-000999', 'garbage', '12345'] as $bad) {
+        foreach (['AAAA-BBBB-CCCC', 'MC-000999', 'garbage', '12345'] as $bad) {
             $this->check($bad)->assertOk()
                 ->assertJsonPath('items.state', 'not_found')
                 ->assertJsonPath('items.state_label', 'شهادة غير موجودة')
@@ -183,15 +183,31 @@ class CertificateSerialVerificationTest extends TestCase
         $cert = $this->issued();
         $compact = str_replace('-', '', $cert->serial_number);
 
-        // مقلوب بالكامل، أو المجموعات بترتيب معكوس مع خانة الفحص أولاً (كما بيطلع من نسخ سطر عربي)
-        $reversed = strrev($compact);
-        $rtlGroups = $compact[16] . '-' . implode('-', array_reverse(str_split(substr($compact, 0, 16), 4)));
-        // نفس الأحرف بشرطات بأماكن غلط
-        $badDashes = substr($compact, 0, 1) . '-' . substr($compact, 1, 4) . '-' . substr($compact, 5, 12);
+        // مقلوب بالكامل، أو المجموعات بترتيب معكوس، أو نفس الأحرف بشرطات بأماكن غلط
+        $reversed  = strrev($compact);
+        $rtlGroups = implode('-', array_reverse(str_split($compact, 4)));
+        $badDashes = substr($compact, 0, 1) . '-' . substr($compact, 1, 4) . '-' . substr($compact, 5);
 
         foreach ([$reversed, $rtlGroups, $badDashes, "  {$compact}  ", strtolower($compact)] as $pasted) {
             $this->check($pasted)->assertJsonPath('items.state', 'valid');
         }
+    }
+
+    public function test_previous_17_char_serial_still_verifies(): void
+    {
+        $cert = $this->issued();
+        $A = \App\Services\CertificateSerialService::ALPHABET;
+        do {
+            $c = '';
+            for ($i = 0; $i < 17; $i++) {
+                $c .= $A[random_int(0, 31)];
+            }
+            $v1 = implode('-', str_split(substr($c, 0, 16), 4)) . '-' . $c[16];
+        } while (! \App\Services\CertificateSerialService::hasValidChecksum($v1));
+        \DB::table('certificate_requests')->where('id', $cert->id)->update(['serial_number' => $v1]);
+
+        $this->check($v1)->assertJsonPath('items.state', 'valid');
+        $this->check(strrev(str_replace('-', '', $v1)))->assertJsonPath('items.state', 'valid');
     }
 
     public function test_legacy_printed_serial_still_verifies(): void
@@ -261,7 +277,7 @@ class CertificateSerialVerificationTest extends TestCase
 
         $this->postJson("/api/v1/dashboard/certificate-requests/{$cert->id}/issue", [])
             ->assertOk()
-            ->assertJsonPath('items.serial_number', fn ($s) => is_string($s) && strlen($s) === 21);
+            ->assertJsonPath('items.serial_number', fn ($s) => is_string($s) && strlen($s) === 14);
 
         $serial = $cert->fresh()->serial_number;
         $this->check($serial)->assertJsonPath('items.state', 'valid');
