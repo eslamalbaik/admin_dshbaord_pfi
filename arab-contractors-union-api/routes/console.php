@@ -80,14 +80,14 @@ $alertOnFailure(
     'backup:clean'
 );
 
-// أرشفة العطاءات المنتهية يومياً (REQ-09) + حذف المؤرشف منذ أكثر من 12 شهراً أسبوعياً (REQ-10)
+// أرشفة العطاءات المنتهية يومياً (REQ-09) + حذف المؤرشف منذ أكثر من 70 يوماً يومياً (REQ-10، قرار الإدارة 2026-10-31)
 $alertOnFailure(
     Schedule::command('tenders:archive')->dailyAt('01:00'),
     'tenders:archive'
 );
 
 $alertOnFailure(
-    Schedule::command('tenders:purge')->weekly(),
+    Schedule::command('tenders:purge')->dailyAt('01:15'),
     'tenders:purge'
 );
 
