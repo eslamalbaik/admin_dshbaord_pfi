@@ -47,6 +47,11 @@ class PaymentResource extends JsonResource
             'submitted_at'      => $this->submitted_at,
             'confirmed_at'      => $this->confirmed_at,
             'paid_at'           => $this->paid_at,
+            // مين أكّد/رفض/أرجع الدفعة آخر مرة (اسمه وصورته) — للوحة التحكم فقط، ما بنكشف موظفين للمقاول
+            // والمقاول (التطبيق) كمان بيشوف مين أكّد دفعته: الاسم والصورة والصفة فقط
+            'confirmed_by_user' => self::staffSummary(
+                $this->resource->loadMissing('confirmedBy:id,name,avatar,role')->confirmedBy
+            ),
             'created_at'        => $this->created_at,
             // آخر "تغيير حالة" يدوي مع سببه (بيظهر بتلميح على شارة الحالة بسجل المدفوعات)
             'last_status_change' => $this->whenLoaded('latestStatusChange', fn () => $this->latestStatusChange ? [
@@ -54,6 +59,9 @@ class PaymentResource extends JsonResource
                 'to_status'   => $this->latestStatusChange->to_status,
                 'reason'      => $this->latestStatusChange->reason,
                 'changed_by'  => $this->latestStatusChange->changer?->name,
+                'changed_by_user' => $request->user() instanceof \App\Models\User
+                    ? self::staffSummary($this->latestStatusChange->changer)
+                    : null,
                 'changed_at'  => $this->latestStatusChange->created_at,
             ] : null),
             // ليش ما بينفع ترجيع دفعة مؤكَّدة (null = مسموح)، عشان القائمة تعطّل الخيار وتشرح
@@ -61,6 +69,26 @@ class PaymentResource extends JsonResource
                 $request->user() instanceof \App\Models\User,
                 fn () => app(\App\Services\PaymentConfirmationService::class)->revertBlocker($this->resource),
             ),
+        ];
+    }
+
+    /** اسم موظف لوحة التحكم وصورته ودوره (للعرض بجانب إجراءات الدفعة) */
+    public static function staffSummary(?\App\Models\User $user): ?array
+    {
+        if (! $user) {
+            return null;
+        }
+
+        return [
+            'id'         => $user->id,
+            'name'       => $user->name,
+            'avatar'     => $user->avatar,
+            // رابط جاهز للتطبيق (الروابط الكاملة مثل Google بتمرّ كما هي)
+            'avatar_url' => $user->avatar
+                ? (preg_match('#^https?://#', $user->avatar) ? $user->avatar : \Illuminate\Support\Facades\Storage::disk('public')->url($user->avatar))
+                : null,
+            'role'       => $user->role,
+            'role_label' => \App\Http\Controllers\Api\AccountProfileController::ROLE_LABELS[$user->role] ?? $user->role,
         ];
     }
 }

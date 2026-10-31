@@ -35,6 +35,8 @@ interface Payment {
     changed_at: string
   } | null
   status_change_blocker?: string | null
+  // مين أكّد/رفض الدفعة آخر مرة (اسمه وصورته)
+  confirmed_by_user?: { id: number; name: string | null; avatar: string | null; role: string | null; role_label: string | null } | null
   submitted_at: string | null
   confirmed_at: string | null
   created_at: string
@@ -582,6 +584,7 @@ function isPdf(url: string | null) {
                 <div class="text-caption text-medium-emphasis mt-1">
                   {{ typeLabel[p.type] ?? p.type }} · {{ fmtDate(p.submitted_at ?? p.created_at) }}
                 </div>
+                <PaymentActor v-if="p.confirmed_by_user" :user="p.confirmed_by_user" :status="p.status" class="mt-1" />
               </div>
               <div class="d-flex align-center">
                 <VBtn v-if="p.receipt_image_url" icon size="small" variant="tonal" color="primary" aria-label="عرض الإيصال" @click="openReceipt(p)">
@@ -604,12 +607,16 @@ function isPdf(url: string | null) {
                     <VListItem
                       prepend-icon="tabler-clock"
                       title="آخر إجراء"
-                      :subtitle="p.status !== 'pending' ? fmtDateTime(p.confirmed_at) : 'لا يوجد بعد'"
+                      :subtitle="p.confirmed_by_user || p.status !== 'pending' ? fmtDateTime(p.confirmed_at) : 'لا يوجد بعد'"
                     />
+                    <VListItem v-if="p.confirmed_by_user">
+                      <PaymentActor :user="p.confirmed_by_user" :status="p.status" :size="28" show-role />
+                    </VListItem>
                     <VDivider class="my-1" />
                     <VListItem v-if="p.receipt_image_url" prepend-icon="tabler-photo" title="عرض الإيصال" @click="openReceipt(p)" />
                     <VListItem v-if="p.contractor_id" prepend-icon="tabler-wallet" title="كشف حساب المقاول" :to="balanceLink(p)" />
                     <VListItem v-if="$can('finance.payments', 'update')" prepend-icon="tabler-transfer" title="تغيير الحالة" @click="openStatusChange(p)" />
+                    <VListItem v-else prepend-icon="tabler-lock" title="تغيير الحالة" subtitle="يحتاج صلاحية قبول الدفعات" disabled />
                   </VList>
                 </VMenu>
               </div>
@@ -706,6 +713,7 @@ function isPdf(url: string | null) {
                   سبب الرفض: {{ p.rejection_reason }}
                 </VTooltip>
               </VChip>
+              <PaymentActor v-if="p.confirmed_by_user" :user="p.confirmed_by_user" :status="p.status" class="mt-1" />
             </td>
             <td class="text-no-wrap">
               <div class="d-flex align-center justify-space-between gap-1">
@@ -727,12 +735,16 @@ function isPdf(url: string | null) {
                     <VListItem
                       prepend-icon="tabler-clock"
                       title="آخر إجراء"
-                      :subtitle="p.status !== 'pending' ? fmtDateTime(p.confirmed_at) : 'لا يوجد بعد'"
+                      :subtitle="p.confirmed_by_user || p.status !== 'pending' ? fmtDateTime(p.confirmed_at) : 'لا يوجد بعد'"
                     />
+                    <VListItem v-if="p.confirmed_by_user">
+                      <PaymentActor :user="p.confirmed_by_user" :status="p.status" :size="28" show-role />
+                    </VListItem>
                     <VDivider class="my-1" />
                     <VListItem v-if="p.receipt_image_url" prepend-icon="tabler-photo" title="عرض الإيصال" @click="openReceipt(p)" />
                     <VListItem v-if="p.contractor_id" prepend-icon="tabler-wallet" title="كشف حساب المقاول" :to="balanceLink(p)" />
                     <VListItem v-if="$can('finance.payments', 'update')" prepend-icon="tabler-transfer" title="تغيير الحالة" @click="openStatusChange(p)" />
+                    <VListItem v-else prepend-icon="tabler-lock" title="تغيير الحالة" subtitle="يحتاج صلاحية قبول الدفعات" disabled />
                   </VList>
                 </VMenu>
               </div>

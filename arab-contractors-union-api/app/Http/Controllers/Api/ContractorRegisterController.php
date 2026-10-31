@@ -223,7 +223,7 @@ class ContractorRegisterController extends Controller
             ...($contractor->status === 'pending' ? ['status' => 'active'] : []),
         ]);
 
-        $admins = User::where('role', 'admin')->get();
+        $admins = User::dashboardRecipients(['contractors.list', 'contractors.memberships']);
         if ($admins->isNotEmpty()) {
             Notification::send($admins, new ContractorActivatedNotification($contractor));
         }

@@ -30,7 +30,7 @@ class ContractorStatementService
     {
         $dues      = $contractor->dues()->get();
         $penalties = $contractor->penalties()->get();
-        $payments  = $contractor->payments()->with([...Payment::TITLE_RELATIONS])->get();
+        $payments  = $contractor->payments()->with(['confirmedBy:id,name,avatar,role', ...Payment::TITLE_RELATIONS])->get();
         $credits   = ContractorCredit::where('contractor_id', $contractor->id)->get();
 
         $allocations = PaymentAllocation::query()
@@ -219,6 +219,8 @@ class ContractorStatementService
                 'received_at'           => ($payment->submitted_at ?? $payment->created_at)?->toIso8601String(),
                 'received_time'         => ($payment->submitted_at ?? $payment->created_at)?->copy()->setTimezone(self::DISPLAY_TIMEZONE)->format('H:i'),
                 'confirmed_at'          => $payment->confirmed_at?->toIso8601String(),
+                // مين أكّد الدفعة (اسم وصورة وصفة) — الصورة مسار نسبي من storage مثل avatar الأدمن
+                'confirmed_by_user'     => \App\Http\Resources\PaymentResource::staffSummary($payment->confirmedBy),
                 'used_jod'              => round((float) $payment->used_amount_jod, 2),
                 'unused_jod'            => $payment->status === 'paid' && in_array($payment->type, Payment::CREDIT_TYPES, true)
                     ? round($amountJod - (float) $payment->used_amount_jod, 2) : 0.0,
