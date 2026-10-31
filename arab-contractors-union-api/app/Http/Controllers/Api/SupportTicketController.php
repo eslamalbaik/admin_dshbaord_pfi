@@ -125,7 +125,7 @@ class SupportTicketController extends Controller
         ]);
 
         // إشعار الإدارة بوجود طلب دعم جديد
-        $admins = User::where('role', 'admin')->get();
+        $admins = User::dashboardRecipients('services.support_tickets');
         if ($admins->isNotEmpty()) {
             Notification::send($admins, new SupportTicketCreatedNotification($ticket));
         }
@@ -269,7 +269,7 @@ class SupportTicketController extends Controller
             $ticket->update(['status' => 'open']);
         }
 
-        $admins = User::where('role', 'admin')->get();
+        $admins = User::dashboardRecipients('services.support_tickets');
         if ($admins->isNotEmpty()) {
             try {
                 Notification::send($admins, new SupportTicketContractorRepliedNotification($ticket));

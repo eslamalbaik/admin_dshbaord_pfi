@@ -3,7 +3,7 @@
   "info": {
     "title": "PCU Contractor Mobile App API",
     "version": "1.0.0",
-    "description": "API reference for the **Palestinian Contractors Union (PCU) contractor mobile app** only.\nDashboard/admin endpoints (`/dashboard/*`, `/admin/*`, `/auth/*` for staff users, reports, etc.)\nare intentionally excluded.\n\nGenerated from the Laravel backend source (`arab-contractors-union-api`, branch\n`feature/arab-contractors-union`, commit `1ef1227`) by reading `routes/api.php`, the controllers,\nform requests and resources. The mobile app source was not available, so this documents what the\nserver exposes, not necessarily every call the app makes today.\n\n## Response envelope\nAlmost every endpoint wraps its payload in a unified envelope:\n\n```json\n{ \"status\": true, \"message\": \"…\", \"status_code\": 200, \"items\": { … } }\n```\n\n* `items` holds the payload (object or array). It is omitted when there is no payload.\n* Paginated lists add a `meta` object (`current_page`, `last_page`, `per_page`, `total`).\n* Errors: `{ \"status\": false, \"message\": \"…\", \"status_code\": 4xx, \"error\": \"machine_key?\", \"errors\": { … }? }`.\n  `error` is a stable machine-readable key (e.g. `invalid_credentials`, `otp_cooldown`) when the\n  controller sets one. Validation errors (422) put the first message in `message` and all\n  field errors in `errors`.\n* **Exceptions to the envelope** are flagged on each operation (e.g. `GET /terms` returns a bare array,\n  PDF endpoints return binary).\n\n## Language\nUser-facing `message` strings are Arabic. The `X-Locale` header (`ar` | `en`) or `Accept-Language`\ncontrols framework validation messages; default is `ar`. Controller-written messages are always Arabic.\n\n## Authentication\nContractor endpoints use **Laravel Sanctum bearer tokens**: `Authorization: Bearer <token>`.\nA token is returned by `login`, `set-password`, `forgot-password/reset` and `change-password`.\nOnly one active session per contractor: logging in deletes all previous tokens.\n\nToken lifetime: tokens are created with a 60-day `expires_at`, **but** `config/sanctum.php`\nsets a global `expiration` of `SANCTUM_TOKEN_EXPIRATION` minutes (default 10080 = 7 days), and\nSanctum enforces whichever is shorter. ⚠️ Unless the server env overrides it, tokens effectively\nexpire after 7 days — verify `SANCTUM_TOKEN_EXPIRATION` on the server.\n\nEvery protected request also passes the `contractor.active` middleware: if the account was frozen\nfrom the dashboard, all tokens are revoked and the response is `403` with\n`{\"error\":\"account_frozen\",\"force_logout\":true}` — the app must clear its session.\n\n## Rate limits\n* Auth endpoints (`/contractor/auth/login`, registration, OTP, forgot password): **5 requests / minute / IP** (`429`).\n* OTP sending has its own **35-second cooldown** per contractor+purpose (`429`, `error: otp_cooldown`, `errors.expires_in` seconds left).\n\n## Membership numbers\nFormat is `<number>_g` (e.g. `184_g`). Login also accepts the bare number (`184`), which is normalized to `184_g`.\n\n## Money\nDues, balances and credits are in **JOD**. Transfers may be submitted in `JOD`, `ILS` or `USD`;\nthe accountant converts to JOD on confirmation.\n",
+    "description": "API reference for the **Palestinian Contractors Union (PCU) contractor mobile app** only.\nDashboard/admin endpoints (`/dashboard/*`, `/admin/*`, `/auth/*` for staff users, reports, etc.)\nare intentionally excluded.\n\nGenerated from the Laravel backend source (`arab-contractors-union-api`, branch\n`feature/arab-contractors-union`, commit `1ef1227`) by reading `routes/api.php`, the controllers,\nform requests and resources. The mobile app source was not available, so this documents what the\nserver exposes, not necessarily every call the app makes today.\n\n## Response envelope\nAlmost every endpoint wraps its payload in a unified envelope:\n\n```json\n{ \"status\": true, \"message\": \"…\", \"status_code\": 200, \"items\": { … } }\n```\n\n* `items` holds the payload (object or array). It is omitted when there is no payload.\n* Paginated lists add a `meta` object (`current_page`, `last_page`, `per_page`, `total`).\n* Errors: `{ \"status\": false, \"message\": \"…\", \"status_code\": 4xx, \"error\": \"machine_key?\", \"errors\": { … }? }`.\n  `error` is a stable machine-readable key (e.g. `invalid_credentials`, `otp_cooldown`) when the\n  controller sets one. Validation errors (422) put the first message in `message` and all\n  field errors in `errors`.\n* **Exceptions to the envelope** are flagged on each operation (e.g. `GET /terms` returns a bare array,\n  PDF endpoints return binary).\n\n## Language\nUser-facing `message` strings are Arabic. The `X-Locale` header (`ar` | `en`) or `Accept-Language`\ncontrols framework validation messages; default is `ar`. Controller-written messages are always Arabic.\n\n## Authentication\nContractor endpoints use **Laravel Sanctum bearer tokens**: `Authorization: Bearer <token>`.\nA token is returned by `login`, `set-password`, `forgot-password/reset` and `change-password`.\nOnly one active session per contractor: logging in deletes all previous tokens.\n\nToken lifetime: tokens are created with a 60-day `expires_at`, **but** `config/sanctum.php`\nsets a global `expiration` of `SANCTUM_TOKEN_EXPIRATION` minutes (default 10080 = 7 days), and\nSanctum enforces whichever is shorter. ⚠️ Unless the server env overrides it, tokens effectively\nexpire after 7 days — verify `SANCTUM_TOKEN_EXPIRATION` on the server.\n\nEvery protected request also passes the `contractor.active` middleware: if the account was frozen\nfrom the dashboard, all tokens are revoked and the response is `403` with\n`{\"error\":\"account_frozen\",\"force_logout\":true}` — the app must clear its session.\n\n## Rate limits\n* Auth endpoints (`/contractor/auth/login`, registration, OTP, forgot password): **5 requests / minute / IP** (`429`).\n* OTP sending has its own **35-second cooldown** per contractor+purpose (`429`, `error: otp_cooldown`, `errors.expires_in` seconds left).\n\n## Membership numbers\nFormat is `<number>_g` (e.g. `184_g`). Login also accepts the bare number (`184`), which is normalized to `184_g`.\n\n## Login identifier\nThe official login number is the **authorized signatory's mobile** (`authorized_person_phone`, رقم جوال المفوض),\nin any common format (`0599123456`, `599123456`, `+970599123456`, `00970 599 123 456`); the membership number still works.\nSend it as `identifier` (preferred) or in the old `membership_number` field.\n\n## Money\nDues, balances and credits are in **JOD**. Transfers may be submitted in `JOD`, `ILS` or `USD`;\nthe accountant converts to JOD on confirmation.\n",
     "contact": {
       "name": "PCU"
     }
@@ -91,8 +91,8 @@
         "tags": [
           "Auth"
         ],
-        "summary": "Log in with membership number and password",
-        "description": "Checks membership first, then password, then eligibility (frozen account / phone not verified).\nDeletes all previous tokens (single active session). Updates `fcm_token` if sent.\nRate limited to 5/min/IP.\n",
+        "summary": "Log in with the authorized signatory's mobile (or membership number) and password",
+        "description": "`identifier` is the authorized signatory's mobile (رقم جوال المفوض, the official login number) or the\nmembership number. A membership number is matched first; otherwise a mobile-looking value is normalized\nto `05XXXXXXXX` and matched against `authorized_person_phone`. When one signatory is registered for several\ncompanies, the password picks the company; if the password matches more than one, `409 authorized_phone_ambiguous`\nasks the user to log in with the membership number.\nThen checks password and eligibility (frozen account / phone not verified).\nDeletes all previous tokens (single active session). Updates `fcm_token` if sent.\nRate limited to 5/min/IP.\n",
         "operationId": "contractorLogin",
         "security": [],
         "requestBody": {
@@ -102,13 +102,20 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "membership_number",
                   "password"
                 ],
+                "description": "Send `identifier` or `membership_number` (at least one).",
                 "properties": {
+                  "identifier": {
+                    "type": "string",
+                    "maxLength": 50,
+                    "description": "Authorized signatory's mobile (any format) or membership number (with or without `_g`).",
+                    "example": "0599123456"
+                  },
                   "membership_number": {
                     "type": "string",
-                    "description": "With or without the `_g` suffix.",
+                    "maxLength": 50,
+                    "description": "Old name of `identifier`, kept for current app versions. Accepts the same values.",
                     "example": "184_g"
                   },
                   "password": {
@@ -189,7 +196,17 @@
             }
           },
           "404": {
-            "description": "No contractor with this membership number (`error: no_membership`).",
+            "description": "No contractor with this membership number (`error: no_membership`), or no company has this authorized signatory mobile (`error: authorized_phone_not_found`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The mobile belongs to the signatory of several companies and the password matches more than one (`error: authorized_phone_ambiguous`); log in with the membership number.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1023,7 +1040,7 @@
           "Profile"
         ],
         "summary": "Full profile update with file uploads",
-        "description": "`multipart/form-data`. All fields optional; send only what changes.\n\n**Locked fields** (ignored if sent, admin-only): `name`, `membership_number`,\n`commercial_register`, `owner_name`, `authorized_person*`, `partners`, `specialties`,\n`classification`. Attempts to change `classification`/`specialties` are logged server-side.\n\n**Changing the phone** requires `profile/phone/request-otp` + `profile/phone/verify-otp`\nfirst (within 15 minutes), otherwise `422 phone_verification_required`.\n\nAn empty `established_date` is ignored (does not clear the stored date).\nEach uploaded file replaces the previous one. Admins are notified of changed text fields.\n",
+        "description": "`multipart/form-data`. All fields optional; send only what changes.\n\n**Locked fields** (ignored if sent, admin-only): `name`, `membership_number`,\n`commercial_register`, `owner_name`, `authorized_person*`, `partners`, `specialties`,\n`classification`. Attempts to change `classification`/`specialties` are logged server-side.\n\n**Changing the phone** is direct: send the new `phone` here, no OTP needed (since 2026-10-13).\nIt must be unique across contractors (`422` otherwise). An empty `phone` is ignored (does not clear the number).\n\nAn empty `established_date` is ignored (does not clear the stored date).\nEach uploaded file replaces the previous one. Admins are notified of changed text fields.\n",
         "operationId": "updateFullProfile",
         "requestBody": {
           "required": true,
@@ -1190,7 +1207,7 @@
             "$ref": "#/components/responses/ForceLogout"
           },
           "422": {
-            "description": "`phone_verification_required`, city not in governorate, or validation error.",
+            "description": "Phone already used by another contractor, city not in governorate, or validation error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1279,7 +1296,9 @@
           "429": {
             "$ref": "#/components/responses/OtpCooldown"
           }
-        }
+        },
+        "deprecated": true,
+        "description": "Deprecated since 2026-10-13: no longer required, kept only for older app versions."
       }
     },
     "/contractor/auth/profile/phone/verify-otp": {
@@ -1288,7 +1307,7 @@
           "Profile"
         ],
         "summary": "Change phone step 2: verify OTP",
-        "description": "On success, the new phone may be saved via `POST /contractor/auth/profile/update` within 15 minutes.",
+        "description": "Deprecated since 2026-10-13: `POST /contractor/auth/profile/update` no longer requires this step. Kept only for older app versions.",
         "operationId": "verifyPhoneChangeOtp",
         "requestBody": {
           "required": true,
@@ -1354,7 +1373,8 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/contractor/auth/logo": {
@@ -1968,7 +1988,9 @@
                                 "expires_at": {
                                   "type": "string",
                                   "format": "date",
-                                  "nullable": true
+                                  "nullable": true,
+                                  "example": "2025-12-31",
+                                  "description": "Expiry of the active membership, or of the LAST expired membership when none is active (e.g. 2025-12-31). null only when the contractor never had a membership."
                                 },
                                 "expiring_soon": {
                                   "type": "boolean"
@@ -2090,7 +2112,7 @@
           "Home"
         ],
         "summary": "Full updates feed (\"View all\")",
-        "description": "Merged feed of open tenders, news, pinned circulars, the contractor's dues, memberships and\ncertificate requests. 20 per page. Each source is capped at 30 records before merging.\n",
+        "description": "Merged feed of public union content only: open tenders, published events, news, published\ncirculars and active legal-library files. Financial items (dues, penalties, payments, balances)\nand membership/classification certificates are NOT included (they reach the contractor as\nnotifications and on their own screens). 20 per page. Each source is capped at 30 records before merging.\n",
         "operationId": "getHomeUpdates",
         "parameters": [
           {
@@ -2661,6 +2683,13 @@
                               "type": "string",
                               "example": "منتهية",
                               "description": "Arabic label as shown on the dashboard (فعّالة / منتهية / قيد المراجعة / موقوفة)."
+                            },
+                            "membership_expires_at": {
+                              "type": "string",
+                              "format": "date",
+                              "nullable": true,
+                              "example": "2025-12-31",
+                              "description": "Expiry of the active membership, or of the LAST expired membership when none is active (e.g. 2025-12-31). null only when the contractor never had a membership."
                             },
                             "currency": {
                               "type": "string",
@@ -7994,6 +8023,7 @@
           "membership": {
             "type": "object",
             "nullable": true,
+            "description": "Active membership, or the last expired one (status expired, is_expired true) when none is active. null only when the contractor never had a membership.",
             "properties": {
               "id": {
                 "type": "integer"
@@ -8426,7 +8456,9 @@
           "expires_at": {
             "type": "string",
             "format": "date",
-            "nullable": true
+            "nullable": true,
+            "example": "2025-12-31",
+            "description": "Expiry of the active membership, or of the LAST expired membership when none is active (e.g. 2025-12-31). null only when the contractor never had a membership."
           },
           "amount": {
             "type": "string",
@@ -8823,6 +8855,12 @@
             "format": "date-time",
             "nullable": true
           },
+          "expiry_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Membership certificate expiry (\"valid until\" printed on it), Y-m-d. Set by the dashboard at approve/issue (default: last membership expiry, 31/12 of its year; editable). Set only for type=membership and status=issued; null otherwise."
+          },
           "reviewed_by": {
             "type": "string",
             "nullable": true
@@ -9122,12 +9160,12 @@
             "type": "string",
             "enum": [
               "tender",
+              "event",
               "news",
               "circular",
-              "finance",
-              "member"
+              "legal_file"
             ],
-            "description": "Where `reference_id` points: `tender` → tender id, `news` → news id, `circular` → announcement id,\n`finance` → due id, `member` → membership id **or** certificate request id (both use type `member`).\n"
+            "description": "Where `reference_id` points: `tender` → tender id, `event` → event id (`/contractor/events/{id}`),\n`news` → news id, `circular` → announcement id, `legal_file` → legal file id (no details endpoint:\nopen `url` directly). Financial types and certificates were removed from this feed on 2026-10-13.\n"
           },
           "reference_id": {
             "type": "integer"
@@ -9137,25 +9175,32 @@
           },
           "subtitle": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "Per type: tender → category, event → date — place, news → excerpt, circular → the circular body as plain text (HTML stripped, one line, max 150 chars + \"…\"; full text in details.body), legal_file → category name."
           },
           "badges": {
             "type": "array",
             "items": {
               "type": "string"
             },
-            "description": "Arabic badges, any of \"ملحق\" (attachment), \"جديد\" (new), \"مرفوض\" (rejected)."
+            "description": "Arabic badges, any of \"ملحق\" (attachment), \"جديد\" (new)."
           },
           "priority": {
             "type": "string",
             "enum": [
               "normal",
               "high"
-            ]
+            ],
+            "description": "`high` only for an urgent circular the contractor has not acknowledged yet."
           },
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "url": {
+            "type": "string",
+            "nullable": true,
+            "description": "Direct file URL for `legal_file` items; null for every other type."
           }
         }
       },
@@ -9338,6 +9383,12 @@
             "format": "uri",
             "nullable": true,
             "description": "Full URL (pdf/doc/docx)."
+          },
+          "external_url": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true,
+            "description": "Optional external link (always starts with http/https). Show an \"open link\" button when present. Also in latest_updates[].details.external_url for circular items."
           },
           "is_pinned": {
             "type": "boolean",

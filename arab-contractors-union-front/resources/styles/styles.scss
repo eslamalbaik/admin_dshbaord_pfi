@@ -66,6 +66,9 @@ body,
 // وإذا المجموعة أعرض من مكانها، Vuetify أصلاً عاملها overflow-x: auto فبتعمل
 // scroll جوّاها هي بس.
 // (.layout-wrapper بس لرفع الـ specificity فوق قاعدة Vuexy اللي فيها density.)
-.layout-wrapper .v-btn-group.v-btn-toggle .v-btn:not(.v-btn--icon) {
+// الحوارات (VDialog) بتنرسم برا .layout-wrapper جوّا .v-overlay-container، فلازم
+// نغطيها كمان — هاد سبب تداخل أيقونة ونص أزرار "طريقة النشر" بحوار التعاميم.
+.layout-wrapper .v-btn-group.v-btn-toggle .v-btn:not(.v-btn--icon),
+.v-overlay-container .v-btn-group.v-btn-toggle .v-btn:not(.v-btn--icon) {
   inline-size: auto !important;
 }

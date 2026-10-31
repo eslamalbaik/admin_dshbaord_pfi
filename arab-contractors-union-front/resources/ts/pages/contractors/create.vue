@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import api from '@/plugins/axios'
+import { UPLOAD_TIMEOUT_MS, describeRequestError } from '@/utils/requestError'
 import { contractorDocumentLabels } from '@/utils/contractorDocuments'
+import { contractorRules, invalidFormatFields, vNumeric, yesterday } from '@/utils/contractorValidation'
+import { displayPhone } from '@/utils/dialCodes'
+import PhoneInput from '@/components/PhoneInput.vue'
 import type { ContractorDocumentKey } from '@/utils/contractorDocuments'
 import { useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
@@ -11,6 +15,7 @@ const router = useRouter()
 const { smAndDown } = useDisplay()
 const step = ref(1)
 const loading = ref(false)
+const uploadProgress = ref(0)
 const errorMsg = ref('')
 
 const isNewMembership = ref(true)
@@ -52,6 +57,9 @@ const form = ref({
   name: '',
   capital: '',
   registration_date: '',
+  // عضو قديم بننقله للنظام: آخر سنة دفع فيها بتحدد حالته (أقدم من السنة الحالية = منتهية)
+  is_existing_member: false,
+  last_membership_year: '' as string | number,
   legal_form: '',
   company_purposes: '',
 
@@ -63,8 +71,7 @@ const form = ref({
   authorized_person_phone: '',
   authorized_person_whatsapp: '',
 
-  // Step 3: العنوان وبيانات الاتصال
-  phone: '',
+  // Step 3: العنوان وبيانات الاتصال (خانة جوال المقاول انشالت — جوال المفوض بيكفي)
   fax: '',
   email: '',
   governorate_id: null as number | null,
@@ -105,7 +112,7 @@ const newPartnerName = ref('')
 
 const addPartner = () => {
   const name = newPartnerName.value.trim()
-  if (name) {
+  if (name && contractorRules.personName(name) === true) {
     if (!form.value.partners) {
       form.value.partners = []
     }
@@ -250,9 +257,9 @@ const uploadedDocsCount = computed(() => documentKeys.filter(k => hasFile(k)).le
 // أي خطوة يتبع لها كل حقل — لإرجاع المستخدم للخطوة الصحيحة عند خطأ من الخادم
 // ولتعليم الخطوة بعلامة خطأ في الشريط.
 const STEP_FIELDS: Record<number, string[]> = {
-  1: ['membership_number', 'commercial_register', 'name', 'capital', 'registration_date', 'legal_form', 'company_purposes'],
+  1: ['membership_number', 'commercial_register', 'name', 'capital', 'registration_date', 'is_existing_member', 'last_membership_year', 'legal_form', 'company_purposes'],
   2: ['owner_name', 'partners', 'authorized_person', 'authorized_person_id_number', 'authorized_person_phone', 'authorized_person_whatsapp'],
-  3: ['phone', 'fax', 'email', 'governorate_id', 'city_id', 'district', 'address', 'building', 'floor', 'license_number', 'established_date', 'classification', 'specialties'],
+  3: ['fax', 'email', 'governorate_id', 'city_id', 'district', 'address', 'building', 'floor', 'license_number', 'established_date', 'classification', 'specialties'],
 }
 const stepOfField = (key: string) =>
   Number(Object.keys(STEP_FIELDS).find(s => STEP_FIELDS[Number(s)].includes(key)) ?? 4)
@@ -262,6 +269,9 @@ const stepHasServerError = (s: number) =>
 
 const filled = (v: any) => v !== null && v !== undefined && String(v).trim() !== ''
 const membershipValid = (v: string) => /^[0-9]+(_g)?$/.test(v ?? '') && Number.parseInt(v) >= 1
+const currentYear = new Date().getFullYear()
+const lastMembershipYearValid = (v: string | number) =>
+  /^[0-9]{4}$/.test(String(v ?? '').trim()) && Number(v) >= 1990 && Number(v) <= currentYear
 
 // الحقول التي يرفض الخادم الحفظ بدونها — لا ننتقل للخطوة التالية قبل تعبئتها لأن الحفظ
 // سيفشل حتماً. باقي الحقول المعلّمة بـ* تُظهر رسالتها تحت الحقل دون أن تمنع الانتقال،
@@ -273,6 +283,7 @@ const blockingMissing = (s: number): string[] => {
     if (!filled(f.name)) missing.push('اسم طالب الانتساب')
     if (!membershipValid(f.membership_number)) missing.push('رقم العضوية')
     if (!/^[0-9]{9}$/.test(f.commercial_register ?? '')) missing.push('رقم السجل التجاري')
+    if (f.is_existing_member && !lastMembershipYearValid(f.last_membership_year)) missing.push('آخر سنة عضوية')
   }
   if (s === 3) {
     if (!f.governorate_id) missing.push('المحافظة')
@@ -281,6 +292,9 @@ const blockingMissing = (s: number): string[] => {
     if (!filled(f.building)) missing.push('العمارة')
     if (!filled(f.floor)) missing.push('الطابق')
   }
+  // خانات اختيارية لكن معبّأة بصيغة خاطئة (حروف بخانة أرقام، هوية ليست 9 أرقام...) — الخادم سيرفضها
+  missing.push(...invalidFormatFields(f, s))
+
   return missing
 }
 
@@ -291,7 +305,7 @@ const starredChecks = computed<Record<number, boolean[]>>(() => {
     1: [filled(f.name), membershipValid(f.membership_number), /^[0-9]{9}$/.test(f.commercial_register ?? '')],
     2: [],
     3: [
-      /^[0-9]{9}$/.test(f.phone ?? ''), !!f.governorate_id, !!f.city_id, filled(f.district), filled(f.address),
+      !!f.governorate_id, !!f.city_id, filled(f.district), filled(f.address),
       filled(f.building), filled(f.floor), /^[0-9]{5}$/.test(f.license_number ?? ''), filled(f.established_date),
       f.specialties.every(sp => !!sp.field_lk_type && !!sp.specialization_lk_type && !!sp.classification),
     ],
@@ -331,7 +345,7 @@ const goToStep = async (target: number) => {
     for (let s = step.value; s < target; s++) {
       const missing = blockingMissing(s)
       if (missing.length) {
-        stepNotice.value = `أكمل الحقول المطلوبة قبل المتابعة: ${missing.join('، ')}`
+        stepNotice.value = `أكمل أو صحّح هذه الحقول قبل المتابعة: ${missing.join('، ')}`
         if (s !== step.value) step.value = s
         await nextTick()
         await formRef.value?.validate()
@@ -350,11 +364,16 @@ const nextStep = () => { if (step.value < 4) goToStep(step.value + 1) }
 const prevStep = () => { if (step.value > 1) goToStep(step.value - 1) }
 
 const handleSave = async () => {
-  for (const s of [1, 2, 3]) {
-    if (blockingMissing(s).length) {
-      await goToStep(4) // يوقف عند أول خطوة ناقصة ويعرض الرسالة
-      return
-    }
+  // goToStep يفحص من الخطوة الحالية للأمام فقط، فخطأ بخطوة سابقة كان يمنع الحفظ بصمت —
+  // نقفز مباشرة لأول خطوة فيها خانة ناقصة أو خاطئة ونعرض السبب.
+  const badStep = [1, 2, 3].find(s => blockingMissing(s).length)
+  if (badStep) {
+    stepNotice.value = `أكمل أو صحّح هذه الحقول قبل الحفظ: ${blockingMissing(badStep).join('، ')}`
+    step.value = badStep
+    await nextTick()
+    await formRef.value?.validate()
+    scrollToFirstError()
+    return
   }
   stepNotice.value = ''
   await submit()
@@ -367,9 +386,16 @@ const reviewItems = computed(() => [
   { step: 1, label: 'اسم المنشأة', value: form.value.name },
   { step: 1, label: 'رقم العضوية', value: form.value.membership_number },
   { step: 1, label: 'السجل التجاري', value: form.value.commercial_register },
+  {
+    step: 1,
+    label: 'العضوية',
+    value: form.value.is_existing_member
+      ? `عضو قديم — آخر عضوية ${form.value.last_membership_year} (${Number(form.value.last_membership_year) >= currentYear ? 'فعّالة' : 'منتهية'})`
+      : 'عضو جديد',
+  },
   { step: 2, label: 'المفوض بالتوقيع', value: form.value.authorized_person },
   { step: 2, label: 'عدد الشركاء', value: form.value.partners.length ? String(form.value.partners.length) : '' },
-  { step: 3, label: 'الجوال', value: form.value.phone ? `+970${form.value.phone}` : '', ltr: true },
+  { step: 2, label: 'جوال المفوض', value: displayPhone(form.value.authorized_person_phone), ltr: true },
   { step: 3, label: 'العنوان', value: [governorateName.value, cityName.value, form.value.district].filter(Boolean).join(' - ') },
   { step: 3, label: 'عدد المجالات', value: String(form.value.specialties.filter(sp => sp.field_lk_type).length) },
 ])
@@ -388,11 +414,18 @@ const submit = async () => {
   }
 
   loading.value = true
+  uploadProgress.value = 0
   errorMsg.value = ''
   validationErrors.value = {}
   try {
     const fd = new FormData()
     Object.entries(form.value).forEach(([k, v]) => {
+      if (k === 'is_existing_member') {
+        fd.append(k, v ? '1' : '0')
+        return
+      }
+      if (k === 'last_membership_year' && !form.value.is_existing_member)
+        return
       // VFileInput يُعيد [] (وليس null) عند تفريغ حقل الملف — بدون هذا الفحص كان
       // يُرسَل مصفوفة فارغة كقيمة للحقل فيرفضها الخادم بخطأ "يجب أن يكون ملفاً" (REQ-01 #4)
       if (Array.isArray(v) && v.length === 0 && k !== 'partners' && k !== 'specialties')
@@ -409,7 +442,13 @@ const submit = async () => {
         }
       }
     })
-    await api.post('/api/v1/contractors', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+    await api.post('/api/v1/contractors', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: UPLOAD_TIMEOUT_MS,
+      onUploadProgress: e => {
+        uploadProgress.value = e.total ? Math.round((e.loaded / e.total) * 100) : 0
+      },
+    })
     router.push({ name: 'contractors' })
   }
   catch (err: any) {
@@ -424,7 +463,7 @@ const submit = async () => {
       return
     }
 
-    errorMsg.value = err?.response?.data?.message || 'فشل تسجيل المقاول. يرجى التحقق من المدخلات.'
+    errorMsg.value = describeRequestError(err, 'فشل تسجيل المقاول. يرجى التحقق من المدخلات.')
 
     const errors = err?.response?.data?.errors
     if (errors) {
@@ -572,9 +611,56 @@ const submit = async () => {
               >
                 <VTextField
                   v-model="form.registration_date"
+                  :rules="[contractorRules.beforeToday]"
                   label="تاريخ التسجيل"
                   type="date"
+                  :max="yesterday()"
                   :error-messages="validationErrors.registration_date"
+                />
+              </VCol>
+              <VCol
+                cols="12"
+                md="5"
+                class="d-flex align-center"
+              >
+                <VCheckbox
+                  v-model="form.is_existing_member"
+                  color="primary"
+                  hide-details
+                >
+                  <template #label>
+                    <div>
+                      <div class="font-weight-medium text-high-emphasis">
+                        عضو قديم إله عضوية سابقة
+                      </div>
+                      <div class="text-caption text-medium-emphasis">
+                        اتركه فاضي للعضو الجديد جداً
+                      </div>
+                    </div>
+                  </template>
+                </VCheckbox>
+              </VCol>
+              <VCol
+                v-if="form.is_existing_member"
+                cols="12"
+                sm="6"
+                md="4"
+              >
+                <VTextField
+                  v-model="form.last_membership_year"
+                  label="آخر سنة عضوية مدفوعة *"
+                  type="number"
+                  :min="1990"
+                  :max="currentYear"
+                  :placeholder="String(currentYear - 1)"
+                  :hint="lastMembershipYearValid(form.last_membership_year)
+                    ? (Number(form.last_membership_year) >= currentYear ? 'رح تنحفظ عضويته فعّالة لـ 31/12' : 'رح تنحفظ عضويته منتهية')
+                    : 'السنة اللي آخر مرة دفع فيها رسوم العضوية'"
+                  persistent-hint
+                  :error-messages="validationErrors.last_membership_year"
+                  :rules="[
+                    v => lastMembershipYearValid(v) || `أدخل سنة بين 1990 و ${currentYear}`,
+                  ]"
                 />
               </VCol>
             </VRow>
@@ -615,6 +701,7 @@ const submit = async () => {
             >
               <VTextField
                 v-model="form.commercial_register"
+                v-numeric
                 label="رقم السجل التجاري *"
                 inputmode="numeric"
                 maxlength="9"
@@ -642,6 +729,9 @@ const submit = async () => {
             >
               <VTextField
                 v-model="form.capital"
+                v-numeric="'decimal'"
+                inputmode="decimal"
+                :rules="[contractorRules.capital]"
                 label="رأس مال الشركة"
                 :error-messages="validationErrors.capital"
               />
@@ -686,6 +776,8 @@ const submit = async () => {
             >
               <VTextField
                 v-model="form.owner_name"
+                maxlength="255"
+                :rules="[contractorRules.personName]"
                 label="اسم صاحب المنشأة"
                 :error-messages="validationErrors.owner_name"
               />
@@ -697,6 +789,7 @@ const submit = async () => {
               <div class="d-flex align-start gap-2">
                 <VTextField
                   v-model="newPartnerName"
+                  :rules="[contractorRules.personName]"
                   label="اسم شريك"
                   placeholder="اكتب الاسم واضغط Enter"
                   :error-messages="validationErrors.partners"
@@ -768,6 +861,8 @@ const submit = async () => {
             >
               <VTextField
                 v-model="form.authorized_person"
+                maxlength="255"
+                :rules="[contractorRules.personName]"
                 label="اسم المفوض بالتوقيع"
                 :error-messages="validationErrors.authorized_person"
               />
@@ -778,6 +873,10 @@ const submit = async () => {
             >
               <VTextField
                 v-model="form.authorized_person_id_number"
+                v-numeric
+                maxlength="9"
+                placeholder="9 أرقام"
+                :rules="[contractorRules.idNumber]"
                 label="رقم هوية المفوض"
                 inputmode="numeric"
                 :error-messages="validationErrors.authorized_person_id_number"
@@ -787,11 +886,10 @@ const submit = async () => {
               cols="12"
               md="6"
             >
-              <VTextField
+              <PhoneInput
                 v-model="form.authorized_person_phone"
                 label="رقم جوال المفوض"
-                inputmode="tel"
-                prepend-inner-icon="tabler-phone"
+                icon="tabler-phone"
                 :error-messages="validationErrors.authorized_person_phone"
               />
             </VCol>
@@ -799,11 +897,10 @@ const submit = async () => {
               cols="12"
               md="6"
             >
-              <VTextField
+              <PhoneInput
                 v-model="form.authorized_person_whatsapp"
                 label="رقم الواتساب للمفوض"
-                inputmode="tel"
-                prepend-inner-icon="tabler-brand-whatsapp"
+                icon="tabler-brand-whatsapp"
                 :error-messages="validationErrors.authorized_person_whatsapp"
               />
             </VCol>
@@ -828,41 +925,32 @@ const submit = async () => {
             </VAvatar>
             <div>
               <h2>بيانات الاتصال</h2>
-              <p>رقم الجوال يُستخدم للتواصل مع المقاول.</p>
+              <p>هاتف المنشأة وبريدها الإلكتروني — جوال المفوض بالتوقيع في الخطوة السابقة.</p>
             </div>
           </div>
           <VRow class="mb-6">
             <VCol
               cols="12"
-              md="4"
-            >
-              <VTextField
-                v-model="form.phone"
-                label="رقم الجوال *"
-                prefix="+970"
-                placeholder="59XXXXXXX"
-                inputmode="numeric"
-                maxlength="9"
-                :error-messages="validationErrors.phone"
-                :rules="[v => !!v || 'رقم الجوال مطلوب', v => /^[0-9]{9}$/.test(v) || 'يجب إدخال 9 أرقام (مثال: 599123456)']"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              md="4"
+              md="6"
             >
               <VTextField
                 v-model="form.fax"
+                v-numeric="'phone'"
+                inputmode="tel"
+                maxlength="16"
+                :rules="[contractorRules.fax]"
                 label="الهاتف / الفاكس"
                 :error-messages="validationErrors.fax"
               />
             </VCol>
             <VCol
               cols="12"
-              md="4"
+              md="6"
             >
               <VTextField
                 v-model="form.email"
+                maxlength="255"
+                :rules="[contractorRules.email]"
                 label="البريد الإلكتروني"
                 type="email"
                 :error-messages="validationErrors.email"
@@ -989,6 +1077,7 @@ const submit = async () => {
             >
               <VTextField
                 v-model="form.license_number"
+                v-numeric
                 label="رقم رخصة البلدية *"
                 inputmode="numeric"
                 maxlength="5"
@@ -1008,7 +1097,7 @@ const submit = async () => {
                 label="تاريخ التأسيس *"
                 type="date"
                 :error-messages="validationErrors.established_date"
-                :rules="[v => !!v || 'تاريخ التأسيس مطلوب']"
+                :rules="[v => !!v || 'تاريخ التأسيس مطلوب', contractorRules.notFuture]"
               />
             </VCol>
             <VCol
@@ -1311,16 +1400,30 @@ const submit = async () => {
             السابق
           </VBtn>
           <div class="flex-grow-1 wizard-progress">
-            <div class="d-flex justify-space-between text-caption mb-1">
-              <span class="font-weight-medium">الخطوة {{ step }} من {{ steps.length }}</span>
-              <span class="text-medium-emphasis">اكتمال الطلب {{ overallProgress }}%</span>
-            </div>
-            <VProgressLinear
-              :model-value="overallProgress"
-              color="primary"
-              rounded
-              height="6"
-            />
+            <template v-if="loading">
+              <div class="d-flex justify-space-between text-caption mb-1">
+                <span class="font-weight-medium">جاري رفع المرفقات وحفظ المقاول…</span>
+                <span class="text-medium-emphasis">{{ uploadProgress }}%</span>
+              </div>
+              <VProgressLinear
+                :model-value="uploadProgress"
+                color="success"
+                rounded
+                height="6"
+              />
+            </template>
+            <template v-else>
+              <div class="d-flex justify-space-between text-caption mb-1">
+                <span class="font-weight-medium">الخطوة {{ step }} من {{ steps.length }}</span>
+                <span class="text-medium-emphasis">اكتمال الطلب {{ overallProgress }}%</span>
+              </div>
+              <VProgressLinear
+                :model-value="overallProgress"
+                color="primary"
+                rounded
+                height="6"
+              />
+            </template>
           </div>
           <VBtn
             v-if="step < steps.length"

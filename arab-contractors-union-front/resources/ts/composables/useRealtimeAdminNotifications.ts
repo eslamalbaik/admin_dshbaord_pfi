@@ -196,7 +196,9 @@ function handleIncoming(notification: Record<string, any>) {
   pushToast(notification)
 }
 
-const REALTIME_ROLES = ['admin', 'accountant']
+// المشرف (مثلاً حساب «محاسب مالي» من شاشة المشرفين) بيستقبل كمان — الباك إند بيبعتله بس
+// الإشعارات اللي عنده صلاحية عرض قسمها (User::dashboardRecipients)
+const REALTIME_ROLES = ['admin', 'accountant', 'supervisor']
 
 // Module-level (not per-call) so the watcher and its Echo subscription are ever
 // registered once per browser tab, even if the composable gets invoked more than
@@ -206,7 +208,7 @@ let watcherRegistered = false
 let subscribedUserId: number | null = null
 
 /**
- * Subscribes the current admin/accountant to their private Reverb channel and keeps
+ * Subscribes the current admin/accountant/supervisor to their private Reverb channel and keeps
  * the bell badge, a toast, and a chime in sync with newly broadcast notifications.
  * Call once from App.vue — it reacts to login/logout on its own.
  */

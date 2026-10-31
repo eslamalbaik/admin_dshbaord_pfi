@@ -69,7 +69,7 @@ class FetchPmaExchangeRates extends Command
         Log::channel('finance')->critical('pma_rates.fetch_failed', ['error' => $lastError]);
         $this->error("فشل جلب أسعار الصرف من كل المصادر: {$lastError} — الاعتماد على آخر سعر محفوظ.");
 
-        $admins = User::where('role', 'admin')->get();
+        $admins = User::dashboardRecipients('finance.exchange_rates', ['accountant']);
         if ($admins->isNotEmpty()) {
             Notification::send($admins, new \App\Notifications\PmaRatesFetchFailedNotification($lastError));
         }

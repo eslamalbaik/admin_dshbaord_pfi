@@ -189,6 +189,8 @@ class CertificateRequestPendingPaymentTest extends TestCase
     {
         $certRequest = $this->fileRequest();
         $certRequest->pendingPayment->update(['status' => 'paid']);
+        // اعتماد الدفعة الحقيقي بيسدّد الذمّة؛ بدونه بيوقف فحص الـ95% الموافقة
+        $certRequest->contractor->dues()->update(['paid_jod' => 500, 'status' => 'paid']);
 
         $this->actingAsAdmin();
 

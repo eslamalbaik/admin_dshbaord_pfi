@@ -19,10 +19,8 @@ use Illuminate\Support\Facades\DB;
  * الصافي = له − عليه (سالب = الشركة مطلوب منها للاتحاد).
  * الحسبة نفسها في App\Support\ContractorBalances.
  *
- * جبر الصافي لدينار صحيح لصالح الاتحاد: رصيد الشركة يُجبر للأقل (300.5 ← 300)
- * والمطلوب منها يُجبر للأكثر (349.2- ← 350-) — يعني floor في الحالتين.
- * الجبر مخزَّن فعلياً (BalanceRoundingService يسجّل قيد "جبر كسور الرصيد")،
- * فـnet_jod وnet_exact_jod متساويان عادةً؛ أي فرق بينهما يعني قيد جبر لم يُحدَّث بعد.
+ * الصافي بكسوره (خانتان عشريتان) بدون جبر لدينار صحيح (قاعدة eslam 31/10): 114.50 بتضل 114.50،
+ * فـnet_jod وnet_exact_jod متساويان.
  *
  * يُحسب لحظياً، فأي ذمة أو غرامة أو رسوم جديدة أو دفعة تنعكس مباشرة.
  */
@@ -104,6 +102,10 @@ class ContractorBalanceController extends Controller
         $balance['subscription_status'] = $this->membershipStatus($row);
         $balance['subscription_status_label'] = self::STATUS_LABELS[$balance['subscription_status']]
             ?? $balance['subscription_status'];
+
+        // تاريخ انتهاء آخر عضوية (نشطة أو منتهية) — مثلاً 2025-12-31 لعضوية منتهية، null لو ما في عضوية أبداً
+        $balance['membership_expires_at'] = \App\Models\Contractor::find($contractorId)
+            ?->display_membership?->expires_at?->toDateString();
 
         // له / عليه / متوازن — لتلوين البطاقة بالتطبيق بدون ما يقارن الرقم بصفر بنفسه
         $balance['position'] = match (true) {
@@ -217,15 +219,16 @@ class ContractorBalanceController extends Controller
             'dues_jod'          => round((float) $row->dues_jod, 2),
             'penalties_jod'     => round((float) $row->penalties_jod, 2),
             'debit_jod'         => round((float) $row->dues_jod + (float) $row->penalties_jod, 2),
-            'net_jod'           => (int) $row->net_jod,
+            'net_jod'           => round((float) $row->net_jod, 2),
             'net_exact_jod'     => round((float) $row->net_exact_jod, 2),
         ];
     }
 
     /**
      * حالة العضوية الفعلية لحساب "فعّال" إدارياً، حسب الرصيد بس (قرار الإدارة 2026-10-05):
-     * - عليه غرامة مفتوحة (ولو جزء بسيط منها) ← "منتهية" (قرار 2026-10-11).
-     * - عليه رصيد صافي سالب أكبر من 5% من مجموع ذممه ← "منتهية".
+     * - الغرامات (تأخير مشروع، انضباطية...) ما إلها علاقة بالعضوية ولا بحالتها (قرار 2026-10-14،
+     *   بيلغي قرار 2026-10-11): بتضل بالرصيد والمطالبات، بس الحالة بتنحسب من الذمم لحالها.
+     * - عليه من الذمم (بعد خصم رصيده الدائن) أكتر من 5% من مجموع ذممه ← "منتهية".
      * - رصيده صفر أو له، أو اللي عليه ≤ 5% من ذممه (يعني سدّد 95% فأكثر، قرار 2026-10-10) ← "فعّالة"،
      *   حتى لو تاريخ آخر عضوية مسجّلة فات، لأن الرسوم السنوية بتنزل كذمم.
      * باقي الحالات الإدارية (معلّق، موقوف، منتهي) بتنعرض كما هي.
@@ -243,11 +246,8 @@ class ContractorBalanceController extends Controller
             return $row->status;
         }
 
-        if ((float) ($row->penalties_jod ?? 0) > 0) {
-            return 'expired';
-        }
-
-        $owed = round(-(float) $row->net_jod, 2);
+        // الصافي بدون الغرامات = له − الذمم
+        $owed = round(-((float) $row->net_exact_jod + (float) ($row->penalties_jod ?? 0)), 2);
         if ($owed <= 0) {
             return 'active';
         }

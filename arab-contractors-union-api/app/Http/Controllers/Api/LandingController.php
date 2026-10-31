@@ -8,7 +8,11 @@ use App\Models\Contractor;
 use App\Models\News;
 use App\Models\Setting;
 use App\Models\Tender;
+use App\Rules\MembershipNumber;
+use App\Support\ContractorLookups;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class LandingController extends Controller
@@ -81,5 +85,61 @@ class LandingController extends Controller
         });
 
         return $this->success($items);
+    }
+
+    /**
+     * GET /api/v1/contractors-directory?search=&per_page=
+     * دليل شركات المقاولات المعتمدة بالصفحة الرئيسية — بحث بالاسم أو رقم العضوية.
+     * بيانات عامة فقط (اسم، رقم عضوية، مدينة، مجالات ودرجات، حالة العضوية) — بدون
+     * أي جوال أو بريد أو هوية أو ملفات. المقاولين "قيد المراجعة" ما بيظهروا.
+     */
+    public function directory(Request $request)
+    {
+        $search  = trim((string) $request->query('search', ''));
+        $perPage = min(max((int) $request->query('per_page', 6), 1), 24);
+
+        $query = Contractor::query()
+            ->whereIn('status', ['active', 'expired', 'suspended'])
+            ->select(['id', 'name', 'membership_number', 'city', 'status', 'specialties']);
+
+        if ($search !== '') {
+            $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $search) . '%';
+            $query->where(function ($q) use ($search, $like) {
+                $q->where('name', 'like', $like)
+                  // "184" أو "184_g" — نفس قاعدة تسجيل الدخول
+                  ->orWhere('membership_number', MembershipNumber::normalize($search))
+                  ->orWhere('membership_number', $search);
+            });
+        }
+
+        $page = $query->orderByRaw("status = 'active' desc")->orderBy('name')->paginate($perPage);
+
+        // نفس "حالة العضوية" المعروضة بصفحة الأرصدة وقائمة المقاولين
+        $balances = app(ContractorBalanceController::class);
+        $rows = DB::query()->fromSub($balances->balancesQuery(), 'b')
+            ->whereIn('id', $page->getCollection()->pluck('id'))->get()->keyBy('id');
+
+        $labels = ['active' => 'عضوية سارية', 'expired' => 'عضوية منتهية', 'suspended' => 'موقوفة'];
+
+        $page->setCollection($page->getCollection()->map(function (Contractor $c) use ($rows, $balances, $labels) {
+            $status = $c->status === 'suspended' || ! isset($rows[$c->id])
+                ? $c->status
+                : $balances->membershipStatus($rows[$c->id]);
+
+            return [
+                'name'              => $c->name,
+                'membership_number' => $c->membership_number,
+                'city'              => $c->city,
+                'membership_status' => $status,
+                'status_label'      => $labels[$status] ?? $status,
+                'fields'            => collect(ContractorLookups::buildFieldsTree($c->specialties))
+                    ->map(fn ($f) => [
+                        'name'   => $f['field_name'],
+                        'grades' => collect($f['specializations'])->pluck('grade_label')->filter()->unique()->values(),
+                    ])->values(),
+            ];
+        }));
+
+        return $this->paginated($page);
     }
 }

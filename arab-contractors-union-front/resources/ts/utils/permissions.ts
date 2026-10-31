@@ -56,6 +56,7 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
   'settings-pages': 'settings.pages',
   'settings-contractor-lookups': 'settings.lookups',
   'settings-governorates': 'settings.governorates',
+  'settings-country-codes': 'settings.country_codes',
   'settings-activity-log': 'settings.activity_log',
 }
 
@@ -66,7 +67,7 @@ const ROUTE_ACTIONS: Record<string, PermissionAction> = {
 }
 
 /** صفحات شخصية مفتوحة لأي مشرف (ملفي، الإشعارات) */
-const PERSONAL_ROUTES = ['settings', 'notifications', 'not-authorized']
+const PERSONAL_ROUTES = ['settings', 'profile', 'notifications', 'not-authorized']
 
 /** صفحات للأدمن فقط بغض النظر عن أي صلاحية */
 export const ADMIN_ONLY_ROUTES = ['supervisors']

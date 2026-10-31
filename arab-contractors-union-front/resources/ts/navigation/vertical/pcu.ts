@@ -28,6 +28,7 @@ const SETTINGS_INNER_ROUTES = [
   'settings-grade-fees',
   'settings-contractor-lookups',
   'settings-governorates',
+  'settings-country-codes',
   'tenders-categories',
   'settings-activity-log',
 ]
@@ -79,9 +80,9 @@ export function buildPcuNav(user: NavUser): VerticalNavItems {
     to: 'dashboards',
   })
 
-  // 2. إدارة الأعضاء (للأدمن فقط)
+  // 2. إدارة الأعضاء وخدماتهم (للأدمن فقط)
   if (!isAccountant) {
-    menuItems.push({ heading: 'إدارة الأعضاء' })
+    menuItems.push({ heading: 'إدارة الأعضاء', subtitle: 'المقاولون وطلبات الانتساب والشهادات' })
     menuItems.push({
       title: 'المقاولون',
       icon: { icon: 'tabler-building-factory-2' },
@@ -91,10 +92,23 @@ export function buildPcuNav(user: NavUser): VerticalNavItems {
         { title: 'طلبات الانتساب', to: 'contractors-memberships' },
       ],
     })
+    menuItems.push({
+      title: 'الشهادات',
+      icon: { icon: 'tabler-certificate' },
+      children: [
+        { title: 'طلبات الشهادات', to: 'certificate-requests' },
+        { title: 'شهادة العضوية', to: 'membership-certificates' },
+      ],
+    })
+    menuItems.push({
+      title: 'الدعم الفني والشكاوى',
+      icon: { icon: 'tabler-headset' },
+      to: 'support-tickets',
+    })
   }
 
-  // 3. الشؤون المالية (مشتركة)
-  menuItems.push({ heading: 'الشؤون المالية' })
+  // 3. الشؤون المالية (مشتركة، مباشرة بعد المقاولين)
+  menuItems.push({ heading: 'الشؤون المالية', subtitle: 'المدفوعات والذمم وأرصدة المقاولين' })
   menuItems.push({
     title: 'المدفوعات',
     icon: { icon: 'tabler-credit-card' },
@@ -107,60 +121,9 @@ export function buildPcuNav(user: NavUser): VerticalNavItems {
     ],
   })
 
-  // 4. العطاءات وسوق الآليات والوثائق (للأدمن فقط)
+  // 4. الإعلام والتواصل (الأخبار والفعاليات والتعميمات للأدمن، الإشعارات مشتركة)
+  menuItems.push({ heading: 'الإعلام والتواصل', subtitle: 'المحتوى والتواصل مع أعضاء الاتحاد' })
   if (!isAccountant) {
-    menuItems.push({ heading: 'العطاءات' })
-    menuItems.push({
-      title: 'العطاءات',
-      icon: { icon: 'tabler-files' },
-      children: [
-        { title: 'قائمة العطاءات', to: 'tenders' },
-        { title: 'تصنيفات العطاءات', to: 'tenders-categories' },
-      ],
-    })
-
-    menuItems.push({
-      title: 'المكتبة القانونية',
-      icon: { icon: 'tabler-library' },
-      to: 'legal-library',
-    })
-
-    menuItems.push({ heading: 'سوق الآليات' })
-    menuItems.push({
-      title: 'سوق الآليات',
-      icon: { icon: 'tabler-tractor' },
-      children: [
-        { title: 'جميع الآليات', to: 'marketplace' },
-        { title: 'إضافة آلية', to: 'marketplace-create' },
-        { title: 'أنواع المعدات', to: 'marketplace-types' },
-        { title: 'باقات الاشتراك', to: 'marketplace-packages' },
-      ],
-    })
-
-    menuItems.push({ heading: 'الوثائق' })
-    menuItems.push({
-      title: 'إدارة الوثائق',
-      icon: { icon: 'tabler-folder' },
-      to: 'documents',
-    })
-  }
-
-  // 4.5 خدمات الأعضاء (للأدمن فقط)
-  if (!isAccountant) {
-    menuItems.push({ heading: 'خدمات الأعضاء' })
-    menuItems.push({
-      title: 'الدعم الفني والشكاوى',
-      icon: { icon: 'tabler-headset' },
-      to: 'support-tickets',
-    })
-    menuItems.push({
-      title: 'الشهادات',
-      icon: { icon: 'tabler-certificate' },
-      children: [
-        { title: 'طلبات الشهادات', to: 'certificate-requests' },
-        { title: 'شهادة العضوية', to: 'membership-certificates' },
-      ],
-    })
     menuItems.push({
       title: 'الأخبار',
       icon: { icon: 'tabler-news' },
@@ -180,23 +143,59 @@ export function buildPcuNav(user: NavUser): VerticalNavItems {
       ],
     })
   }
-
-  // 5. التقارير والإشعارات (مشتركة)
-  menuItems.push({ heading: 'التقارير' })
-  menuItems.push({
-    title: 'التقارير',
-    icon: { icon: 'tabler-chart-bar' },
-    to: 'analytics',
-  })
   menuItems.push({
     title: 'الإشعارات',
     icon: { icon: 'tabler-bell' },
     to: 'notifications',
   })
 
-  // 6. الإعدادات (للأدمن فقط)
+  // 5. العطاءات والوثائق (للأدمن فقط)
   if (!isAccountant) {
-    menuItems.push({ heading: 'الإعدادات' })
+    menuItems.push({ heading: 'العطاءات والوثائق', subtitle: 'العطاءات والمكتبة القانونية والوثائق' })
+    menuItems.push({
+      title: 'العطاءات',
+      icon: { icon: 'tabler-files' },
+      children: [
+        { title: 'قائمة العطاءات', to: 'tenders' },
+        { title: 'تصنيفات العطاءات', to: 'tenders-categories' },
+      ],
+    })
+    menuItems.push({
+      title: 'المكتبة القانونية',
+      icon: { icon: 'tabler-library' },
+      to: 'legal-library',
+    })
+    menuItems.push({
+      title: 'إدارة الوثائق',
+      icon: { icon: 'tabler-folder' },
+      to: 'documents',
+    })
+
+    // 6. سوق الآليات
+    menuItems.push({ heading: 'سوق الآليات', subtitle: 'الآليات والمعدات وباقات الاشتراك' })
+    menuItems.push({
+      title: 'سوق الآليات',
+      icon: { icon: 'tabler-tractor' },
+      children: [
+        { title: 'جميع الآليات', to: 'marketplace' },
+        { title: 'إضافة آلية', to: 'marketplace-create' },
+        { title: 'أنواع المعدات', to: 'marketplace-types' },
+        { title: 'باقات الاشتراك', to: 'marketplace-packages' },
+      ],
+    })
+  }
+
+  // 7. التقارير (مشتركة)
+  menuItems.push({ heading: 'التقارير', subtitle: 'إحصائيات ومؤشرات الاتحاد' })
+  menuItems.push({
+    title: 'التقارير',
+    icon: { icon: 'tabler-chart-bar' },
+    to: 'analytics',
+  })
+
+  // 8. الإدارة والإعدادات (للأدمن فقط)
+  if (!isAccountant) {
+    menuItems.push({ heading: 'الإدارة والإعدادات', subtitle: 'إعدادات المنصة والمشرفون' })
     menuItems.push({
       title: 'الإعدادات',
       icon: { icon: 'tabler-settings' },

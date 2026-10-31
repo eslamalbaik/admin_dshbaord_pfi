@@ -273,3 +273,9 @@
   border-color: rgba(var(--v-theme-primary), 0.35);
   background: rgba(var(--v-theme-primary), 0.03);
 }
+
+/* حقول التاريخ: المتصفح يقلب ترتيب يوم/شهر/سنة بالـ RTL فيصير غير مقروء — نعرضها LTR */
+:deep(input[type="date"]) {
+  direction: ltr;
+  text-align: end;
+}

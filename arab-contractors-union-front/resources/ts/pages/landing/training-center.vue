@@ -86,18 +86,17 @@ const levelBg: Record<string,string> = { مبتدئ:'#e8f5e9', متوسط:'#fff8
 </template>
 
 <style scoped>
-@import url('https://fonts.cdnfonts.com/css/neo-sans-arabic');
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap');
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-.pub-page { font-family: 'Neo Sans Arabic', 'Tajawal', 'Neo Sans Arabic', 'Cairo', sans-serif; direction: rtl; color: #374151; background: #fff; }
+.pub-page { font-family: 'Tajawal', 'Cairo', sans-serif; direction: rtl; color: #374151; background: #fff; }
 .pub-cont { max-width: 1240px; margin: 0 auto; padding: 0 1.5rem; }
 .pub-section { padding: 5rem 0; }
 .pub-sec-label { display: inline-block; background: #e8eaf6; color: #1a237e; border: 1px solid #c5cae9; border-radius: 50px; padding: .28rem 1.1rem; font-size: .77rem; font-weight: 700; letter-spacing: .05em; margin-bottom: .65rem; }
-.pub-sec-h { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: clamp(1.6rem,3.5vw,2.3rem); font-weight: 900; color: #0d1b3e; padding-bottom: .7rem; position: relative; }
+.pub-sec-h { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: clamp(1.6rem,3.5vw,2.3rem); font-weight: 900; color: #0d1b3e; padding-bottom: .7rem; position: relative; }
 .pub-sec-h::after { content: ''; position: absolute; bottom: 0; right: 0; width: 48px; height: 4px; background: linear-gradient(90deg,#f9a825,#e65100); border-radius: 2px; }
 .sec-header-split { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 2.5rem; flex-wrap: wrap; gap: 1rem; }
 
-.page-hero { background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); padding: 4rem 0 3rem; position: relative; overflow: hidden; }
+.page-hero { background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); margin-top: calc(-1 * var(--pub-nav-h, 114px)); padding: calc(var(--pub-nav-h, 114px) + 2.5rem) 0 3rem; position: relative; overflow: hidden; }
 .page-hero-shapes { position: absolute; inset: 0; pointer-events: none; }
 .ph-s { position: absolute; border-radius: 50%; }
 .ph-s1 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(249,168,37,.12), transparent 65%); top: -100px; left: 5%; }
@@ -105,11 +104,11 @@ const levelBg: Record<string,string> = { مبتدئ:'#e8f5e9', متوسط:'#fff8
 .page-hero-inner { position: relative; z-index: 2; }
 .page-breadcrumb { display: flex; align-items: center; gap: .5rem; font-size: .82rem; color: rgba(255,255,255,.6); margin-bottom: 1rem; }
 .page-breadcrumb a { color: rgba(255,255,255,.6); text-decoration: none; } .page-breadcrumb a:hover { color: #f9a825; }
-.page-hero-title { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: clamp(2rem,4vw,3rem); font-weight: 900; color: #fff; margin-bottom: .75rem; }
+.page-hero-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: clamp(2rem,4vw,3rem); font-weight: 900; color: #fff; margin-bottom: .75rem; }
 .page-hero-desc { font-size: 1rem; color: rgba(255,255,255,.75); line-height: 1.75; max-width: 600px; margin-bottom: 2rem; }
 .hero-stats { display: flex; gap: 2.5rem; flex-wrap: wrap; }
 .hs-item { display: flex; flex-direction: column; }
-.hs-num { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: 2rem; font-weight: 900; color: #f9a825; line-height: 1; }
+.hs-num { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 2rem; font-weight: 900; color: #f9a825; line-height: 1; }
 .hs-lbl { font-size: .8rem; color: rgba(255,255,255,.65); margin-top: .25rem; }
 
 .courses-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 1.5rem; }
@@ -120,18 +119,18 @@ const levelBg: Record<string,string> = { مبتدئ:'#e8f5e9', متوسط:'#fff8
 .course-certified { background: #2e7d32; color: #fff; font-size: .7rem; font-weight: 700; border-radius: 50px; padding: .2rem .7rem; }
 .course-body { padding: 1.25rem; flex: 1; display: flex; flex-direction: column; gap: .65rem; }
 .course-level { display: inline-block; font-size: .72rem; font-weight: 700; border-radius: 50px; padding: .2rem .7rem; width: fit-content; }
-.course-title { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: .9rem; font-weight: 800; color: #0d1b3e; line-height: 1.5; }
+.course-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: .9rem; font-weight: 800; color: #0d1b3e; line-height: 1.5; }
 .course-desc { font-size: .82rem; color: #4b5563; line-height: 1.75; flex: 1; }
 .course-meta { display: flex; flex-direction: column; gap: .35rem; }
 .course-meta span { display: flex; align-items: center; gap: .4rem; font-size: .78rem; color: #6b7280; }
-.course-register { display: flex; align-items: center; justify-content: center; gap: .4rem; width: 100%; color: #fff; border: none; border-radius: 10px; padding: .7rem; font-size: .88rem; font-weight: 700; cursor: pointer; font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif; transition: all .2s; margin-top: auto; }
+.course-register { display: flex; align-items: center; justify-content: center; gap: .4rem; width: 100%; color: #fff; border: none; border-radius: 10px; padding: .7rem; font-size: .88rem; font-weight: 700; cursor: pointer; font-family: 'Tajawal', sans-serif; transition: all .2s; margin-top: auto; }
 .course-register:hover { filter: brightness(1.08); transform: translateY(-1px); }
 
 .cta-section { background: linear-gradient(145deg, #0d1b4b, #1a237e); padding: 5rem 0; }
 .cta-inner { text-align: center; }
-.cta-title { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: 1.75rem; font-weight: 900; color: #fff; margin-bottom: .65rem; }
+.cta-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 1.75rem; font-weight: 900; color: #fff; margin-bottom: .65rem; }
 .cta-sub { font-size: 1rem; color: rgba(255,255,255,.7); margin-bottom: 2rem; }
-.cta-btn { display: inline-flex; align-items: center; background: linear-gradient(135deg,#f9a825,#e65100); color: #fff; border-radius: 10px; padding: .875rem 2.25rem; font-size: .95rem; font-weight: 800; text-decoration: none; font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif; transition: all .25s; }
+.cta-btn { display: inline-flex; align-items: center; background: linear-gradient(135deg,#f9a825,#e65100); color: #fff; border-radius: 10px; padding: .875rem 2.25rem; font-size: .95rem; font-weight: 800; text-decoration: none; font-family: 'Tajawal', sans-serif; transition: all .25s; }
 .cta-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(249,168,37,.4); }
 
 @media (max-width: 1100px) { .courses-grid { grid-template-columns: repeat(3,1fr); } }

@@ -91,10 +91,10 @@ class ContractorBalanceTest extends TestCase
     }
 
     /**
-     * جبر الصافي لصالح الاتحاد: رصيد الشركة للأقل، والمطلوب منها للأكثر.
+     * الصافي بكسوره بدون جبر لدينار صحيح (قاعدة eslam 31/10).
      */
     #[DataProvider('roundingCases')]
-    public function test_net_is_rounded_in_the_unions_favour(float $credit, float $due, int $net, float $exact): void
+    public function test_net_keeps_its_fraction(float $credit, float $due, float $net, float $exact): void
     {
         $c = $this->contractor('944_g');
         if ($credit > 0) {
@@ -111,29 +111,30 @@ class ContractorBalanceTest extends TestCase
 
         $items = $this->getJson('/api/v1/contractor/balance')
             ->assertOk()
-            ->assertJsonPath('items.net_jod', $net)
             ->json('items');
+
+        $this->assertEquals($net, $items['net_jod']);
 
         // JSON بيرجع 300 مش 300.0 لما ما في كسور، فالمقارنة بالقيمة مش بالنوع
         $this->assertEquals($exact, $items['net_exact_jod']);
     }
 
-    /** الجبر مخزَّن بقيد "جبر كسور الرصيد"، فالصافي الدقيق نفسه صار عدداً صحيحاً */
+    /** الكسور بتضل: بلا جبر لفوق ولا لتحت */
     public static function roundingCases(): array
     {
         return [
-            'credit 300.20 → 300'   => [300.20, 0, 300, 300],
-            'credit 300.50 → 300'   => [300.50, 0, 300, 300],
-            'credit 300.99 → 300'   => [300.99, 0, 300, 300],
-            'credit 0.50 → settled' => [0.50, 0, 0, 0],
-            'owes 349.20 → 350'     => [0, 349.20, -350, -350],
-            'owes 349.01 → 350'     => [0, 349.01, -350, -350],
+            'credit 300.20 stays'   => [300.20, 0, 300.20, 300.20],
+            'credit 300.50 stays'   => [300.50, 0, 300.50, 300.50],
+            'credit 300.99 stays'   => [300.99, 0, 300.99, 300.99],
+            'credit 0.50 stays'     => [0.50, 0, 0.50, 0.50],
+            'owes 349.20 stays'     => [0, 349.20, -349.20, -349.20],
+            'owes 114.50 stays'     => [0, 114.50, -114.50, -114.50],
             'owes 349.00 stays'     => [0, 349.00, -349, -349],
             'credit 300.00 stays'   => [300.00, 0, 300, 300],
         ];
     }
 
-    public function test_balances_filter_uses_the_rounded_net(): void
+    public function test_balances_filter_uses_the_exact_net(): void
     {
         $c = $this->contractor('945_g');
         ContractorCredit::create(['contractor_id' => $c->id, 'amount_jod' => 0.6, 'used_jod' => 0, 'description' => 'كسور']);
@@ -141,9 +142,9 @@ class ContractorBalanceTest extends TestCase
         Sanctum::actingAs(User::factory()->create(['role' => 'admin']), ['*']);
 
         $this->getJson('/api/v1/dashboard/balances?search=945_g&filter=zero')
-            ->assertOk()->assertJsonCount(1, 'items');
-        $this->getJson('/api/v1/dashboard/balances?search=945_g&filter=credit')
             ->assertOk()->assertJsonCount(0, 'items');
+        $this->getJson('/api/v1/dashboard/balances?search=945_g&filter=credit')
+            ->assertOk()->assertJsonCount(1, 'items');
     }
 
     public function test_contractor_with_nothing_on_record_is_settled(): void

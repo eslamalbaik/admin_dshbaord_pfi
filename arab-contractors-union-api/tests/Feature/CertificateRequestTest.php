@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\CertificateRequest;
 use App\Models\Contractor;
+use App\Models\ContractorDue;
 use App\Models\Membership;
+use App\Models\Penalty;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -210,6 +212,22 @@ class CertificateRequestTest extends TestCase
             ->assertJsonPath('items.type', 'membership');
     }
 
+    /**
+     * بلاغ 2026-10-31: لوحة التحكم قالت "اكتمال الملف 100%" والتطبيق رفض طلب الشهادة لأن
+     * شرط الـ API كان فيه حقول ما بتنحسب باللوحة. الشعار وهاي الحقول الستة مش مطلوبة.
+     */
+    public function test_profile_complete_without_logo_and_dashboard_unstarred_fields(): void
+    {
+        $profile = collect($this->completeProfile())
+            ->except(['owner_name', 'authorized_person', 'capital', 'legal_form', 'registration_date', 'company_purposes', 'phone'])
+            ->all();
+        $contractor = $this->createContractor($profile);
+
+        $this->assertNull($contractor->logo);
+        $this->assertSame([], $contractor->missing_profile_fields);
+        $this->assertTrue($contractor->profile_data_complete);
+    }
+
     /** بيانات ملف تعريفي كامل بدون إنشاء أي سجل عضوية */
     private function completeProfile(): array
     {
@@ -408,6 +426,46 @@ class CertificateRequestTest extends TestCase
         );
     }
 
+    public function test_issued_membership_certificate_returns_expiry_date_to_the_app(): void
+    {
+        $contractor = $this->createCompliantContractor();
+        $contractor->memberships()->update(['expires_at' => '2026-12-31']);
+        $certRequest = $contractor->certificateRequests()->create(['type' => 'membership', 'status' => 'approved']);
+        $pending     = $contractor->certificateRequests()->create(['type' => 'good_standing', 'status' => 'pending']);
+        $this->actingAsAdmin();
+
+        $this->postJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}/issue")
+            ->assertOk()
+            ->assertJsonPath('items.expiry_date', '2026-12-31');
+
+        $this->assertSame('2026-12-31', $certRequest->fresh()->valid_until->toDateString());
+
+        // العضوية تجدّدت بعد الإصدار: التطبيق بيضل يعرض التاريخ المطبوع على الشهادة
+        $contractor->memberships()->update(['expires_at' => '2027-12-31']);
+
+        Sanctum::actingAs($contractor->fresh(), ['*']);
+        $requests = collect($this->getJson('/api/v1/contractor/certificate-requests')
+            ->assertOk()
+            ->json('items.requests'))->keyBy('id');
+
+        $this->assertSame('2026-12-31', $requests[$certRequest->id]['expiry_date']);
+        $this->assertNull($requests[$pending->id]['expiry_date']);
+    }
+
+    public function test_issue_accepts_manual_expiry_date_and_prints_it(): void
+    {
+        $contractor = $this->createCompliantContractor();
+        $contractor->memberships()->update(['expires_at' => '2026-12-31']);
+        $certRequest = $contractor->certificateRequests()->create(['type' => 'membership', 'status' => 'approved']);
+        $this->actingAsAdmin();
+
+        $this->postJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}/issue", ['valid_until' => '2027-06-30'])
+            ->assertOk()
+            ->assertJsonPath('items.expiry_date', '2027-06-30');
+
+        $this->assertSame('2027-06-30', $certRequest->fresh()->valid_until->toDateString());
+    }
+
     public function test_issue_other_types_without_file_is_refused(): void
     {
         $contractor = $this->createCompliantContractor();
@@ -474,5 +532,133 @@ class CertificateRequestTest extends TestCase
             \Mockery::type(CertificateRequest::class),
             ['address' => 'خانيونس', 'decision_number' => '07/2023', 'decision_date' => '2023-05-14'],
         );
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    //  شرط الـ95% — ذمّة انضافت بعد التقديم (2026-10-14)
+    // ─────────────────────────────────────────────────────────────────────
+
+    private function addCurrentYearDue(Contractor $contractor, float $amount = 600): void
+    {
+        ContractorDue::create([
+            'contractor_id' => $contractor->id,
+            'year'          => now()->year,
+            'description'   => 'ذمة مالية',
+            'amount_jod'    => $amount,
+            'paid_jod'      => 0,
+            'status'        => 'unpaid',
+            'source'        => 'manual',
+        ]);
+    }
+
+    public function test_index_reports_the_95_percent_block_before_submitting(): void
+    {
+        $contractor = $this->createCompliantContractor();
+        Sanctum::actingAs($contractor, ['*']);
+
+        $this->getJson('/api/v1/contractor/certificate-requests')
+            ->assertOk()
+            ->assertJsonPath('items.can_request', true)
+            ->assertJsonPath('items.cannot_request_reason', null);
+
+        $this->addCurrentYearDue($contractor);
+
+        $response = $this->getJson('/api/v1/contractor/certificate-requests')
+            ->assertOk()
+            ->assertJsonPath('items.can_request', false)
+            ->assertJsonPath('items.cannot_request_code', 'dues_below_threshold')
+            ->assertJsonPath('items.requirement_issues.0.type', 'dues_below_threshold');
+
+        $this->assertEquals(570, $response->json('items.remaining_to_95_jod'));
+        $this->assertEquals(570, $response->json('items.requirement_issues.0.amount'));
+
+        // نفس الرسالة اللي بترجع لو ضغط تقديم
+        $store = $this->postJson('/api/v1/contractor/certificate-requests', ['type' => 'membership'])->assertStatus(403);
+        $this->assertSame($store->json('message'), $response->json('items.cannot_request_reason'));
+    }
+
+    public function test_approve_is_refused_when_a_due_was_added_after_the_request(): void
+    {
+        $contractor = $this->createCompliantContractor();
+        $certRequest = $contractor->certificateRequests()->create(['type' => 'membership', 'status' => 'pending']);
+        $this->addCurrentYearDue($contractor);
+        $this->actingAsAdmin();
+
+        $this->postJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}/approve")
+            ->assertStatus(422)
+            ->assertJsonPath('error', 'dues_below_threshold');
+
+        $this->assertSame('pending', $certRequest->fresh()->status);
+
+        $this->getJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}")
+            ->assertJsonPath('items.requirement_issues.0.type', 'dues_below_threshold');
+    }
+
+    public function test_issue_is_refused_when_a_due_was_added_after_the_request(): void
+    {
+        $contractor = $this->createCompliantContractor();
+        $certRequest = $contractor->certificateRequests()->create(['type' => 'membership', 'status' => 'pending']);
+        $this->addCurrentYearDue($contractor);
+        $this->actingAsAdmin();
+
+        $this->postJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}/issue")
+            ->assertStatus(422)
+            ->assertJsonPath('error', 'dues_below_threshold');
+
+        $certRequest->refresh();
+        $this->assertSame('pending', $certRequest->status);
+        $this->assertNull($certRequest->certificate_path);
+
+        // بعد ما يسدّد 95% بيمشي الإصدار
+        $contractor->dues()->update(['paid_jod' => 570, 'status' => 'partially_paid']);
+
+        $this->postJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}/issue")
+            ->assertOk()
+            ->assertJsonPath('items.status', 'issued');
+    }
+
+    /** الغرامات ما بتمنع شهادة العضوية (قرار 2026-10-14)، بس بتضل ظاهرة بالمتطلبات */
+    public function test_open_penalty_does_not_block_the_membership_certificate(): void
+    {
+        $contractor = $this->createCompliantContractor();
+        Penalty::create(['contractor_id' => $contractor->id, 'reason' => 'غرامة تأخير تسليم مشروع',
+            'amount' => 600, 'paid_amount' => 0, 'status' => 'unpaid']);
+        Sanctum::actingAs($contractor, ['*']);
+
+        $this->getJson('/api/v1/contractor/certificate-requests')
+            ->assertOk()
+            ->assertJsonPath('items.can_request', true)
+            ->assertJsonPath('items.requirement_issues.0.type', 'late_fees');
+
+        $id = $this->postJson('/api/v1/contractor/certificate-requests', ['type' => 'membership'])
+            ->assertCreated()->json('items.id');
+
+        $this->actingAsAdmin();
+        $this->postJson("/api/v1/dashboard/certificate-requests/{$id}/issue")
+            ->assertOk()
+            ->assertJsonPath('items.status', 'issued');
+    }
+
+    /** الشهادة الصادرة بتضل ظاهرة بعد ذمّة جديدة أو طلب تاني، والطلب التاني مسموح */
+    public function test_issued_certificate_stays_visible_after_new_dues_and_a_second_request(): void
+    {
+        $contractor = $this->createCompliantContractor();
+        Sanctum::actingAs($contractor, ['*']);
+        $id = $this->postJson('/api/v1/contractor/certificate-requests', ['type' => 'membership'])->assertCreated()->json('items.id');
+
+        $this->actingAsAdmin();
+        $this->postJson("/api/v1/dashboard/certificate-requests/{$id}/issue")->assertOk();
+
+        Sanctum::actingAs($contractor, ['*']);
+        $second = $this->postJson('/api/v1/contractor/certificate-requests', ['type' => 'membership'])->assertCreated()->json('items.id');
+        $this->addCurrentYearDue($contractor);
+
+        $status = $this->getJson('/api/v1/contractor/certificates/status')->assertOk();
+        $this->assertSame($second, $status->json('items.membership.latest_request.id'));
+        $this->assertSame($id, $status->json('items.membership.latest_issued.id'));
+        $this->assertNotNull($status->json('items.membership.latest_issued.certificate_url'));
+
+        $this->assertNotNull(collect($this->getJson('/api/v1/contractor/certificate-requests')->json('items.requests'))
+            ->firstWhere('id', $id)['certificate_url']);
     }
 }

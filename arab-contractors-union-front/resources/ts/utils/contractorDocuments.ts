@@ -4,7 +4,7 @@
 // الحقل الذي رُفع منه. نسخة الخادم: Contractor::DOCUMENT_LABELS — أي تعديل يُعدَّل بالمكانين.
 export const contractorDocumentLabels = {
   cr_file: 'السجل التجاري',
-  id_file: 'صورة الهوية',
+  id_file: 'صورة الهوية الشخصية للمفوض',
   company_register: 'مستخرج عن سجل الشركة',
   municipal_license: 'رخصة المهن (الحرف) سارية المفعول',
   bank_dealing_letter: 'شهادة تعامل للشركة مع بنك',
@@ -17,6 +17,7 @@ export const contractorDocumentLabels = {
   full_time_engineer_certificate: 'شهادة مهندس متفرغ',
   accountant_certificate_or_contract: 'شهادة تفرغ محاسب من نقابة المحاسبين / أو عقد مع مكتب محاسبين معتمد',
   secretary_contract: 'عقد سكرتير',
+  authorized_signature: 'كتاب اعتماد التوقيع',
 } as const
 
 export type ContractorDocumentKey = keyof typeof contractorDocumentLabels

@@ -53,6 +53,11 @@ info:
     ## Membership numbers
     Format is `<number>_g` (e.g. `184_g`). Login also accepts the bare number (`184`), which is normalized to `184_g`.
 
+    ## Login identifier
+    The official login number is the **authorized signatory's mobile** (`authorized_person_phone`, رقم جوال المفوض),
+    in any common format (`0599123456`, `599123456`, `+970599123456`, `00970 599 123 456`); the membership number still works.
+    Send it as `identifier` (preferred) or in the old `membership_number` field.
+
     ## Money
     Dues, balances and credits are in **JOD**. Transfers may be submitted in `JOD`, `ILS` or `USD`;
     the accountant converts to JOD on confirmation.
@@ -106,9 +111,14 @@ paths:
   /contractor/auth/login:
     post:
       tags: [Auth]
-      summary: Log in with membership number and password
+      summary: Log in with the authorized signatory's mobile (or membership number) and password
       description: |
-        Checks membership first, then password, then eligibility (frozen account / phone not verified).
+        `identifier` is the authorized signatory's mobile (رقم جوال المفوض, the official login number) or the
+        membership number. A membership number is matched first; otherwise a mobile-looking value is normalized
+        to `05XXXXXXXX` and matched against `authorized_person_phone`. When one signatory is registered for several
+        companies, the password picks the company; if the password matches more than one, `409 authorized_phone_ambiguous`
+        asks the user to log in with the membership number.
+        Then checks password and eligibility (frozen account / phone not verified).
         Deletes all previous tokens (single active session). Updates `fcm_token` if sent.
         Rate limited to 5/min/IP.
       operationId: contractorLogin
@@ -119,11 +129,18 @@ paths:
           application/json:
             schema:
               type: object
-              required: [membership_number, password]
+              required: [password]
+              description: Send `identifier` or `membership_number` (at least one).
               properties:
+                identifier:
+                  type: string
+                  maxLength: 50
+                  description: Authorized signatory's mobile (any format) or membership number (with or without `_g`).
+                  example: "0599123456"
                 membership_number:
                   type: string
-                  description: With or without the `_g` suffix.
+                  maxLength: 50
+                  description: Old name of `identifier`, kept for current app versions. Accepts the same values.
                   example: "184_g"
                 password:
                   type: string
@@ -161,7 +178,10 @@ paths:
           description: "`error: account_frozen` or `phone_not_verified` (registration not completed)."
           content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
         "404":
-          description: "No contractor with this membership number (`error: no_membership`)."
+          description: "No contractor with this membership number (`error: no_membership`), or no company has this authorized signatory mobile (`error: authorized_phone_not_found`)."
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+        "409":
+          description: "The mobile belongs to the signatory of several companies and the password matches more than one (`error: authorized_phone_ambiguous`); log in with the membership number."
           content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
         "422": { $ref: "#/components/responses/ValidationError" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
@@ -532,8 +552,8 @@ paths:
         `commercial_register`, `owner_name`, `authorized_person*`, `partners`, `specialties`,
         `classification`. Attempts to change `classification`/`specialties` are logged server-side.
 
-        **Changing the phone** requires `profile/phone/request-otp` + `profile/phone/verify-otp`
-        first (within 15 minutes), otherwise `422 phone_verification_required`.
+        **Changing the phone** is direct: send the new `phone` here, no OTP needed (since 2026-10-13).
+        It must be unique across contractors (`422` otherwise). An empty `phone` is ignored (does not clear the number).
 
         An empty `established_date` is ignored (does not clear the stored date).
         Each uploaded file replaces the previous one. Admins are notified of changed text fields.
@@ -590,7 +610,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/ForceLogout" }
         "422":
-          description: "`phone_verification_required`, city not in governorate, or validation error."
+          description: "Phone already used by another contractor, city not in governorate, or validation error."
           content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
 
   /contractor/auth/profile/phone/request-otp:
@@ -598,6 +618,7 @@ paths:
       tags: [Profile]
       summary: "Change phone step 1: send OTP to the new number"
       operationId: requestPhoneChangeOtp
+      deprecated: true
       requestBody:
         required: true
         content:
@@ -633,8 +654,9 @@ paths:
     post:
       tags: [Profile]
       summary: "Change phone step 2: verify OTP"
-      description: On success, the new phone may be saved via `POST /contractor/auth/profile/update` within 15 minutes.
+      description: "Deprecated since 2026-10-13: `POST /contractor/auth/profile/update` no longer requires this step. Kept only for older app versions."
       operationId: verifyPhoneChangeOtp
+      deprecated: true
       requestBody:
         required: true
         content:
@@ -977,7 +999,7 @@ paths:
                             properties:
                               status: { $ref: "#/components/schemas/ContractorStatus" }
                               badge: { $ref: "#/components/schemas/MembershipBadge" }
-                              expires_at: { type: string, format: date, nullable: true }
+                              expires_at: { type: string, format: date, nullable: true, example: "2025-12-31", description: "Expiry of the active membership, or of the LAST expired membership when none is active (e.g. 2025-12-31). null only when the contractor never had a membership." }
                               expiring_soon: { type: boolean }
                               days_remaining: { type: integer, nullable: true }
                           financial:
@@ -1026,8 +1048,10 @@ paths:
       tags: [Home]
       summary: Full updates feed ("View all")
       description: |
-        Merged feed of open tenders, news, pinned circulars, the contractor's dues, memberships and
-        certificate requests. 20 per page. Each source is capped at 30 records before merging.
+        Merged feed of public union content only: open tenders, published events, news, published
+        circulars and active legal-library files. Financial items (dues, penalties, payments, balances)
+        and membership/classification certificates are NOT included (they reach the contractor as
+        notifications and on their own screens). 20 per page. Each source is capped at 30 records before merging.
       operationId: getHomeUpdates
       parameters:
         - $ref: "#/components/parameters/Page"
@@ -1306,6 +1330,12 @@ paths:
                             type: string
                             example: منتهية
                             description: Arabic label as shown on the dashboard (فعّالة / منتهية / قيد المراجعة / موقوفة).
+                          membership_expires_at:
+                            type: string
+                            format: date
+                            nullable: true
+                            example: "2025-12-31"
+                            description: Expiry of the active membership, or of the LAST expired membership when none is active (e.g. 2025-12-31). null only when the contractor never had a membership.
                           currency: { type: string, example: JOD }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/ForceLogout" }
@@ -3694,6 +3724,7 @@ components:
         membership:
           type: object
           nullable: true
+          description: Active membership, or the last expired one (status expired, is_expired true) when none is active. null only when the contractor never had a membership.
           properties:
             id: { type: integer }
             type: { type: string, example: renewal }
@@ -3849,7 +3880,7 @@ components:
         membership_status: { type: string, nullable: true }
         badge: { $ref: "#/components/schemas/MembershipBadge" }
         starts_at: { type: string, format: date, nullable: true }
-        expires_at: { type: string, format: date, nullable: true }
+        expires_at: { type: string, format: date, nullable: true, example: "2025-12-31", description: "Expiry of the active membership, or of the LAST expired membership when none is active (e.g. 2025-12-31). null only when the contractor never had a membership." }
         amount: { type: string, nullable: true }
         expiring_soon: { type: boolean }
         days_remaining: { type: integer, nullable: true }
@@ -3976,6 +4007,7 @@ components:
         certificate_url: { type: string, format: uri, nullable: true, description: Set once issued. }
         request_date: { type: string, format: date-time }
         issue_date: { type: string, format: date-time, nullable: true }
+        expiry_date: { type: string, format: date, nullable: true, description: 'Membership certificate expiry ("valid until" printed on it), Y-m-d. Set by the dashboard at approve/issue (default: last membership expiry, 31/12 of its year; editable). Set only for type=membership and status=issued; null otherwise.' }
         reviewed_by: { type: string, nullable: true }
 
     # ---------- Support ----------
@@ -4088,19 +4120,30 @@ components:
       properties:
         type:
           type: string
-          enum: [tender, news, circular, finance, member]
+          enum: [tender, event, news, circular, legal_file]
           description: |
-            Where `reference_id` points: `tender` → tender id, `news` → news id, `circular` → announcement id,
-            `finance` → due id, `member` → membership id **or** certificate request id (both use type `member`).
+            Where `reference_id` points: `tender` → tender id, `event` → event id (`/contractor/events/{id}`),
+            `news` → news id, `circular` → announcement id, `legal_file` → legal file id (no details endpoint:
+            open `url` directly). Financial types and certificates were removed from this feed on 2026-10-13.
         reference_id: { type: integer }
         title: { type: string }
-        subtitle: { type: string, nullable: true }
+        subtitle:
+          type: string
+          nullable: true
+          description: 'Per type: tender → category, event → date — place, news → excerpt, circular → the circular body as plain text (HTML stripped, one line, max 150 chars + "…"; full text in details.body), legal_file → category name.'
         badges:
           type: array
           items: { type: string }
-          description: Arabic badges, any of "ملحق" (attachment), "جديد" (new), "مرفوض" (rejected).
-        priority: { type: string, enum: [normal, high] }
+          description: Arabic badges, any of "ملحق" (attachment), "جديد" (new).
+        priority:
+          type: string
+          enum: [normal, high]
+          description: "`high` only for an urgent circular the contractor has not acknowledged yet."
         created_at: { type: string, format: date-time }
+        url:
+          type: string
+          nullable: true
+          description: Direct file URL for `legal_file` items; null for every other type.
 
     # ---------- Tenders ----------
     Tender:
@@ -4157,6 +4200,7 @@ components:
         body: { type: string, description: HTML. }
         image: { type: string, format: uri, nullable: true, description: Full URL. }
         attachment: { type: string, format: uri, nullable: true, description: Full URL (pdf/doc/docx). }
+        external_url: { type: string, format: uri, nullable: true, description: Optional external link (always starts with http/https). Show an "open link" button when present. Also in latest_updates[].details.external_url for circular items. }
         is_pinned: { type: boolean, description: Present in the list endpoint only. }
         published_at: { type: string, format: date-time }
         effective_status:

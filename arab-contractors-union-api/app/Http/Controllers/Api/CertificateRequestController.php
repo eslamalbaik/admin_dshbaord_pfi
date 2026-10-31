@@ -44,7 +44,12 @@ class CertificateRequestController extends Controller
     {
         $contractor = $request->user();
         $issues     = $this->eligibilityService->getIssues($contractor);
-        $blockingIssues = $this->eligibilityService->getBlockingIssues($contractor, 'membership');
+        // نفس فحص التقديم بالضبط (POST)، عشان التطبيق يعرف قبل ما يضغط المقاول "تقديم"
+        $eligibility = $this->eligibilityService->checkEligibility($contractor, 'membership');
+
+        if (($eligibility['code'] ?? null) === 'dues_below_threshold') {
+            array_unshift($issues, $this->thresholdRequirementIssue($eligibility));
+        }
 
         return $this->success([
             'contractor' => [
@@ -53,7 +58,10 @@ class CertificateRequestController extends Controller
                 'status'            => $contractor->status,
                 'is_frozen'         => (bool) $contractor->is_frozen,
             ],
-            'can_request'             => count($blockingIssues) === 0 && $contractor->profile_data_complete,
+            'can_request'             => $eligibility['eligible'],
+            'cannot_request_reason'   => $eligibility['eligible'] ? null : $eligibility['reason'],
+            'cannot_request_code'     => $eligibility['eligible'] ? null : $eligibility['code'],
+            'remaining_to_95_jod'     => $this->financialService->remainingToReach95PercentJod($contractor),
             'requirement_issues'      => $issues,
             'profile_data_complete'   => $contractor->profile_data_complete,
             'missing_profile_fields'  => $contractor->missing_profile_fields,
@@ -72,9 +80,24 @@ class CertificateRequestController extends Controller
         $issues     = $this->eligibilityService->getIssues($contractor);
         $percent    = $this->financialService->currentYearDuesPaidPercentage($contractor);
 
+        if ($threshold = $this->eligibilityService->membershipThresholdIssue($contractor)) {
+            array_unshift($issues, $this->thresholdRequirementIssue($threshold));
+        }
+
         $latestMembershipCert = $contractor->certificateRequests()
             ->where('type', 'membership')
             ->latest()
+            ->latest('id')
+            ->first();
+
+        // آخر شهادة عضوية صادرة فعلاً — بتضل ظاهرة للمقاول حتى لو قدّم طلب جديد بعدها أو
+        // انضافت عليه ذمم (latest_request بيصير الطلب الجديد، فكانت الصادرة تختفي من البطاقة)
+        $latestIssuedMembershipCert = $contractor->certificateRequests()
+            ->where('type', 'membership')
+            ->where('status', 'issued')
+            ->whereNotNull('certificate_path')
+            ->latest('issued_at')
+            ->latest('id')
             ->first();
 
         $latestClassificationCert = $contractor->certificateRequests()
@@ -105,6 +128,7 @@ class CertificateRequestController extends Controller
                     : ($displayedActive ? now()->endOfYear()->toDateString() : $activeMembership?->expires_at?->toDateString()),
                 'is_expired'        => ! ($rowValid || $displayedActive),
                 'latest_request'    => $latestMembershipCert ? new CertificateRequestResource($latestMembershipCert) : null,
+                'latest_issued'     => $latestIssuedMembershipCert ? new CertificateRequestResource($latestIssuedMembershipCert) : null,
             ],
             'classification' => [
                 'has_certificate' => (bool) $latestClassificationCert?->certificate_path,
@@ -151,7 +175,7 @@ class CertificateRequestController extends Controller
             'pending_payment_id' => $eligibility['pending_payment']->id ?? null,
         ]);
 
-        $admins = User::where('role', 'admin')->get();
+        $admins = User::dashboardRecipients('services.certificate_requests');
         if ($admins->isNotEmpty()) {
             Notification::send($admins, new CertificateRequestSubmittedNotification($certRequest));
         }
@@ -204,6 +228,11 @@ class CertificateRequestController extends Controller
         $data['requirement_issues'] = $certificateRequest->contractor
             ? $this->eligibilityService->getIssues($certificateRequest->contractor)
             : [];
+
+        if ($certificateRequest->type === 'membership' && $certificateRequest->contractor
+            && $threshold = $this->eligibilityService->membershipThresholdIssue($certificateRequest->contractor)) {
+            array_unshift($data['requirement_issues'], $this->thresholdRequirementIssue($threshold));
+        }
         $data['delivery'] = $this->deliveryStatus($certificateRequest);
 
         return $this->success($data);
@@ -302,10 +331,50 @@ class CertificateRequestController extends Controller
         );
     }
 
+    /**
+     * شرط الـ95% بيرجع ينفحص عند الموافقة والإصدار، مش بس عند التقديم: ذمّة بتنضاف بعد
+     * ما قدّم المقاول طلبه كانت بتعدّي، وينطبع له شهادة وهو عليه المبلغ (2026-10-14).
+     * الطلب بيضل على حاله (معلّق/موافق) لحد ما يسدّد.
+     */
+    private function blockedByMembershipThreshold(CertificateRequest $certificateRequest): ?\Illuminate\Http\JsonResponse
+    {
+        if ($certificateRequest->type !== 'membership' || ! $certificateRequest->contractor) {
+            return null;
+        }
+
+        $threshold = $this->eligibilityService->membershipThresholdIssue($certificateRequest->contractor);
+
+        if (! $threshold) {
+            return null;
+        }
+
+        return $this->error(
+            "لا يمكن إصدار شهادة العضوية: يتبقى على المقاول سداد {$threshold['context']['remaining_to_95_jod']} دينار للوصول إلى حد الـ 95%. يبقى الطلب معلّقاً حتى السداد.",
+            422,
+            $threshold['context'],
+            'dues_below_threshold',
+        );
+    }
+
+    /** عائق الـ95% بنفس شكل عناصر requirement_issues */
+    private function thresholdRequirementIssue(array $threshold): array
+    {
+        return [
+            'type'        => 'dues_below_threshold',
+            'description' => $threshold['reason'],
+            'amount'      => $threshold['context']['remaining_to_95_jod'],
+            'due_date'    => null,
+        ];
+    }
+
     /** POST /api/v1/dashboard/certificate-requests/{certificateRequest}/approve */
     public function approve(Request $request, CertificateRequest $certificateRequest)
     {
         if ($blocked = $this->blockedByUnconfirmedPayment($certificateRequest)) {
+            return $blocked;
+        }
+
+        if ($blocked = $this->blockedByMembershipThreshold($certificateRequest)) {
             return $blocked;
         }
 
@@ -315,6 +384,7 @@ class CertificateRequestController extends Controller
             'address'         => 'nullable|string|max:255',
             'decision_number' => 'nullable|string|max:100',
             'decision_date'   => 'nullable|date',
+            'valid_until'     => 'nullable|date',
         ]);
 
         $certificateRequest->update([
@@ -363,6 +433,10 @@ class CertificateRequestController extends Controller
             return $blocked;
         }
 
+        if ($blocked = $this->blockedByMembershipThreshold($certificateRequest)) {
+            return $blocked;
+        }
+
         if (! $request->hasFile('certificate') && $certificateRequest->type !== 'membership') {
             return $this->error(
                 'الإصدار التلقائي متاح لشهادة العضوية فقط — ارفع ملف PDF للشهادة.',
@@ -375,6 +449,11 @@ class CertificateRequestController extends Controller
         $oldIssuedAt = $certificateRequest->issued_at;
         $generated   = ! $request->hasFile('certificate');
 
+        // تاريخ الانتهاء المُدخل بيتطبع بالتوليد ويرجع بالـAPI، حتى لو الملف مرفوع يدوياً
+        if ($certificateRequest->type === 'membership' && $request->filled('valid_until')) {
+            $certificateRequest->valid_until = $request->validated()['valid_until'];
+        }
+
         // بيانات نافذة الإصدار بتغلب على المحفوظة من الموافقة، والفارغ بيرجع لملف المقاول
         $fields = [];
         if ($generated) {
@@ -385,6 +464,11 @@ class CertificateRequestController extends Controller
         $path = $generated
             ? $this->pdfService->generate($certificateRequest, $certificateRequest->certificateOverrides())
             : $request->file('certificate')->store('certificates/membership', 'public');
+
+        // ملف مرفوع يدوياً بدون تاريخ: بياخد آخر عضوية للمقاول (نفس الافتراضي للتوليد)
+        if (! $generated && $certificateRequest->type === 'membership' && blank($certificateRequest->valid_until)) {
+            $certificateRequest->valid_until = MembershipCertificatePdfService::validUntil($certificateRequest->contractor)->toDateString();
+        }
 
         if ($oldPath && $oldPath !== $path) {
             Storage::disk('public')->delete($oldPath);
@@ -589,6 +673,7 @@ class CertificateRequestController extends Controller
             'certificate_address' => $data['address'] ?? null,
             'decision_number'     => $data['decision_number'] ?? null,
             'decision_date'       => $data['decision_date'] ?? null,
+            'valid_until'         => $data['valid_until'] ?? null,
         ], fn ($v) => filled($v));
     }
 
@@ -668,7 +753,8 @@ class CertificateRequestController extends Controller
             'type_label'              => $certRequest->type_label,
             'serial'                  => $serial,
             'issued_at'               => $certRequest->issued_at,
-            'membership_valid_until'  => $certRequest->contractor?->activeMembership?->expires_at?->toDateString(),
+            'membership_valid_until'  => $certRequest->valid_until?->toDateString()
+                ?? $certRequest->contractor?->activeMembership?->expires_at?->toDateString(),
         ]);
     }
 }

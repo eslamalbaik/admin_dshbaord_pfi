@@ -238,6 +238,9 @@ Route::prefix('v1')->group(function () {
     //  Landing Home — Public (كل بيانات الصفحة الرئيسية في نداء واحد)
     // --------------------------------------------------------
     Route::get('landing/home', [\App\Http\Controllers\Api\LandingController::class, 'home']);
+    // دليل شركات المقاولات المعتمدة (بحث عام بالاسم أو رقم العضوية)
+    Route::get('contractors-directory', [\App\Http\Controllers\Api\LandingController::class, 'directory'])
+        ->middleware('throttle:60,1');
 
     // --------------------------------------------------------
     //  Maintenance Mode — Public
@@ -264,6 +267,7 @@ Route::prefix('v1')->group(function () {
     //  Governorates & Cities (المحافظات والمدن) — Public
     // --------------------------------------------------------
     Route::get('app/governorates', [SettingController::class, 'governorates']);
+    Route::get('app/country-codes', [\App\Http\Controllers\Api\CountryDialCodeController::class, 'publicIndex']);
 
     // --------------------------------------------------------
     //  Specialties Catalog (المجالات/الاختصاصات/الدرجات) — Public
@@ -315,6 +319,13 @@ Route::prefix('v1')->group(function () {
                     'permissions' => $user instanceof \App\Models\User ? $user->dashboardPermissions() : null,
                 ]);
             });
+        });
+
+        // الملف الشخصي لمستخدم لوحة التحكم (أدمن/محاسب/مشرف) — حسابه هو بس
+        Route::prefix('account')->group(function () {
+            Route::get('profile',   [\App\Http\Controllers\Api\AccountProfileController::class, 'show']);
+            Route::post('profile',  [\App\Http\Controllers\Api\AccountProfileController::class, 'update']);
+            Route::post('password', [\App\Http\Controllers\Api\AccountProfileController::class, 'updatePassword']);
         });
 
         // --------------------------------------------------------
@@ -583,6 +594,16 @@ Route::prefix('v1')->group(function () {
             Route::post('dashboard/cities',         [\App\Http\Controllers\Api\GovernorateController::class, 'citiesStore'])->middleware('perm:settings.governorates');
             Route::patch('dashboard/cities/{city}',  [\App\Http\Controllers\Api\GovernorateController::class, 'citiesUpdate'])->middleware('perm:settings.governorates');
             Route::delete('dashboard/cities/{city}', [\App\Http\Controllers\Api\GovernorateController::class, 'citiesDestroy'])->middleware('perm:settings.governorates');
+        });
+
+        // --------------------------------------------------------
+        //  Country dial codes — مقدمات الدول وأعلامها لخانات الجوال (GET /api/v1/app/country-codes العام)
+        // --------------------------------------------------------
+        Route::middleware('role:admin')->group(function () {
+            Route::get('dashboard/country-codes',                        [\App\Http\Controllers\Api\CountryDialCodeController::class, 'index'])->middleware('perm:settings.country_codes');
+            Route::post('dashboard/country-codes',                       [\App\Http\Controllers\Api\CountryDialCodeController::class, 'store'])->middleware('perm:settings.country_codes');
+            Route::match(['patch', 'post'], 'dashboard/country-codes/{countryDialCode}', [\App\Http\Controllers\Api\CountryDialCodeController::class, 'update'])->middleware('perm:settings.country_codes,update');
+            Route::delete('dashboard/country-codes/{countryDialCode}',   [\App\Http\Controllers\Api\CountryDialCodeController::class, 'destroy'])->middleware('perm:settings.country_codes');
         });
 
         // --------------------------------------------------------

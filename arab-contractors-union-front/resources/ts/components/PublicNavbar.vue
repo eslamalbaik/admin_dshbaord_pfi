@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Menu, X, HardHat, Smartphone, ChevronDown, LayoutDashboard, User, LogOut, Bell } from 'lucide-vue-next'
+import { Menu, X, ChevronDown, ChevronLeft, LayoutDashboard, User, LogOut, Bell } from 'lucide-vue-next'
 import api from '@/plugins/axios'
 import axios from 'axios'
 
@@ -156,35 +156,12 @@ onMounted(() => {
 
 <template>
   <div class="pub-header">
-    <!-- Top Bar -->
-    <div class="pub-top-bar">
-      <div class="pub-container pub-tb-inner">
-        <div class="pub-tb-contacts">
-          <a href="tel:+970592373805" class="pub-tb-link" dir="ltr">
-            (970) 0592373805 <Smartphone :size="15" />
-          </a>
-          <a href="mailto:info@pcu.ps" class="pub-tb-link">info@pcu.ps</a>
-        </div>
-        <div class="pub-tb-social">
-          <a href="#" class="pub-tb-soc" aria-label="Facebook">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M14 8V6.5c0-.8.2-1.3 1.4-1.3H17V2.2C16.7 2.1 15.7 2 14.6 2 12.2 2 10.6 3.5 10.6 6.1V8H8v3.3h2.6V22H14V11.3h2.7L17.1 8z" /></svg>
-          </a>
-          <a href="#" class="pub-tb-soc" aria-label="Instagram">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r=".8" fill="currentColor" /></svg>
-          </a>
-          <a href="#" class="pub-tb-soc" aria-label="X">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.8 3h3.1l-6.8 7.7L22 21h-6.2l-4.9-6.3L5.3 21H2.2l7.2-8.3L2 3h6.3l4.4 5.8zm-1.1 16.2h1.7L7.4 4.7H5.6z" /></svg>
-          </a>
-        </div>
-      </div>
-    </div>
-
     <!-- Navbar -->
     <nav class="pub-navbar" :class="{ scrolled }">
-      <div class="pub-container pub-nb-inner">
+      <div class="pub-container"><div class="pub-nb-card"><div class="pub-nb-inner">
         <RouterLink to="/landing" class="pub-brand">
           <img src="/logo.png" alt="اتحاد المقاولين الفلسطينيين" class="pub-brand-logo" />
-          <span class="pub-brand-name">اتحاد المقاولين<br>الفلسطينيين</span>
+          <span class="pub-brand-name">اتحاد المقاولين الفلسطينيين<small>Palestinian Contractor Union</small></span>
         </RouterLink>
 
         <div class="pub-nav-links">
@@ -207,7 +184,7 @@ onMounted(() => {
 
         <div class="pub-nb-actions">
           <button v-if="!localProfile" class="pub-btn-register" @click="handleRegisterClick">
-            <HardHat :size="15" /> تسجيل الدخول
+            تسجيل الدخول <ChevronLeft :size="16" />
           </button>
           <span v-if="localProfile?.status === 'active'" class="pub-member-pill"><i />عضوية سارية</span>
           <div v-if="localProfile" class="pub-nb-notif" @click.stop="toggleNotifDropdown">
@@ -265,7 +242,7 @@ onMounted(() => {
         </template>
         <div class="pub-mob-actions">
           <button v-if="!localProfile" class="pub-btn-register pub-mob-cta" @click="handleRegisterClick(); mobileOpen = false">
-            <HardHat :size="15" /> تسجيل العضوية
+            تسجيل الدخول <ChevronLeft :size="16" />
           </button>
           <div v-else class="pub-mob-user-wrap">
             <div class="pub-mob-user">
@@ -284,14 +261,13 @@ onMounted(() => {
           </div>
         </div>
       </div>
+      </div></div>
     </nav>
   </div>
 </template>
 
 <style scoped>
-@import url('https://fonts.cdnfonts.com/css/neo-sans-arabic');
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap');
-@import url('https://fonts.cdnfonts.com/css/dubai');
 
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
 
@@ -300,33 +276,40 @@ div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
 /* display: contents so the sticky navbar sticks against the whole page, not this wrapper */
 .pub-header { display: contents; }
 
-.pub-top-bar { background: linear-gradient(90deg, #000080, #0000c8); padding: .35rem 0; }
 .pub-container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
-.pub-tb-inner { display: flex; align-items: center; justify-content: space-between; }
-.pub-tb-contacts { display: flex; gap: 1.75rem; }
-.pub-tb-link { color: #fff; font-size: .9rem; text-decoration: none; font-weight: 700; display: flex; align-items: center; gap: .4rem; }
-.pub-tb-link:hover { color: #ffbe1a; }
-.pub-tb-social { display: flex; gap: .6rem; }
-.pub-tb-soc { width: 22px; height: 22px; border-radius: 5px; background: rgba(255,255,255,.12); color: #fff; display: flex; align-items: center; justify-content: center; text-decoration: none; border: 1px solid rgba(255,255,255,.35); transition: all .2s; }
-.pub-tb-soc:hover { background: #d67a00; border-color: #d67a00; }
 
+/* Floating white card: the wrapper is transparent so the home hero shows around it.
+   Its height (padding + card) is --pub-nav-h in layouts/landing.vue — keep them in sync. */
 .pub-navbar {
   position: sticky; top: 0; z-index: 200;
-  background: #fff; padding: .45rem 0;
+  padding: 24px 0 14px; pointer-events: none;
+}
+.pub-nb-card {
+  pointer-events: auto; position: relative;
+  background: rgba(255, 255, 255, .94); backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, .7); border-radius: 18px;
+  box-shadow: 0 6px 24px rgba(0, 0, 80, .08);
   transition: box-shadow .3s;
 }
-.pub-navbar.scrolled { box-shadow: 0 4px 24px rgba(0,0,80,.1); }
-.pub-nb-inner { display: flex; align-items: center; gap: 1rem; }
+.pub-navbar.scrolled .pub-nb-card { box-shadow: 0 10px 30px rgba(0, 0, 80, .16); }
+.pub-nb-inner { display: flex; align-items: center; gap: 1rem; min-height: 74px; padding: 0 2.5rem 0 2.5rem; }
 
 .pub-brand { display: flex; align-items: center; gap: .75rem; text-decoration: none; flex-shrink: 0; }
-.pub-brand-logo { height: 70px; width: auto; object-fit: contain; }
-/* Union name beside the logo only on wide screens (1920+); 1440 and below show the logo alone */
-.pub-brand-name { display: none; color: #000080; font-size: 1.05rem; font-weight: 800; line-height: 1.35; white-space: nowrap; }
-@media (min-width: 1920px) {
-  .pub-brand-name { display: block; }
+.pub-brand-logo { height: 56px; width: auto; object-fit: contain; }
+.pub-brand-name {
+  display: flex; flex-direction: column; gap: .35rem; color: #0b0b0f; font-family: 'Tajawal', sans-serif;
+  font-size: .95rem; font-weight: 700; line-height: 1.2; white-space: nowrap;
+}
+.pub-brand-name small { color: #5b6474; font-size: .82rem; font-weight: 400; direction: ltr; text-align: right; letter-spacing: .02em; }
+@media (min-width: 1101px) and (max-width: 1199px) {
+  .pub-brand-name { display: none; }
+}
+@media (max-width: 420px) {
+  .pub-brand-name small { display: none; }
 }
 
-.pub-nav-links { display: flex; gap: 1.6rem; margin-inline-start: 2.4rem; margin-inline-end: auto; }
+.pub-nav-links { display: flex; align-self: stretch; gap: 1.9rem; margin-inline-start: 3.2rem; margin-inline-end: auto; }
+.pub-nav-item { display: flex; align-items: center; }
 .pub-nav-item { position: relative; }
 .pub-nav-link {
   display: flex; align-items: center; gap: .35rem;
@@ -335,8 +318,13 @@ div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
   transition: color .2s; white-space: nowrap; background: none; border: none;
   cursor: pointer;
 }
-.pub-nav-link:hover, .router-link-exact-active.pub-nav-link { color: #000090; }
+.pub-nav-link { font-family: 'Tajawal', sans-serif; font-size: .92rem; color: #2b2f3a; }
+.pub-nav-link:hover, .router-link-exact-active.pub-nav-link { color: #00006e; }
 .router-link-exact-active.pub-nav-link { font-weight: 700; }
+/* orange bar on the bottom edge of the card under the current page */
+.router-link-exact-active.pub-nav-link::after {
+  content: ''; position: absolute; bottom: 0; inset-inline: 0; height: 4px; border-radius: 4px 4px 0 0; background: #d67a00;
+}
 .pub-member-pill {
   display: inline-flex; align-items: center; gap: .5rem; background: #e3f6e8; color: #11903a;
   border-radius: 14px; padding: .6rem 1.1rem; font-size: .95rem; font-weight: 600; white-space: nowrap;
@@ -365,11 +353,11 @@ div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
 .router-link-exact-active.pub-dd-link { background: #f2f3fc; color: #000090; font-weight: 700; border-inline-start-color: #d67a00; }
 
 .pub-btn-register {
-  display: flex; align-items: center; gap: .4rem;
-  background: linear-gradient(90deg, #000080, #0000e0);
+  display: flex; align-items: center; justify-content: space-between; gap: 1.6rem;
+  background: #00006e;
   color: #fff; border: none; border-radius: 10px;
-  min-height: 50px; padding: .75rem 1.6rem; font-size: .95rem; font-weight: 700;
-  cursor: pointer; font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif; white-space: nowrap;
+  min-height: 44px; padding: .6rem 1.2rem .6rem 1.4rem; font-size: .92rem; font-weight: 700;
+  cursor: pointer; font-family: 'Tajawal', sans-serif; white-space: nowrap;
   flex-shrink: 0; text-decoration: none;
   transition: all .25s; box-shadow: 0 4px 14px rgba(13,27,75,.25);
 }
@@ -379,15 +367,15 @@ div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
 
 .pub-mobile-menu {
   padding: .75rem 1.5rem 1.25rem; border-top: 1px solid #e5e7eb;
-  display: flex; flex-direction: column; gap: .2rem; background: #fff;
+  display: flex; flex-direction: column; gap: .2rem; background: transparent;
   /* the navbar is sticky now, so a long open menu scrolls inside itself */
-  max-height: calc(100vh - 86px); overflow-y: auto;
+  max-height: calc(100vh - 110px); overflow-y: auto;
 }
 .pub-mob-link {
   padding: .6rem .875rem; color: #374151; font-size: .9rem; font-weight: 600;
   text-decoration: none; border-radius: 8px; display: flex; align-items: center;
   justify-content: space-between; background: none; border: none; cursor: pointer;
-  font-family: 'Neo Sans Arabic', 'Tajawal', sans-serif; width: 100%; text-align: right;
+  font-family: 'Tajawal', sans-serif; width: 100%; text-align: right;
 }
 .pub-mob-link:hover { background: #e8eaf6; color: #1a237e; }
 .pub-mob-sub { padding-inline-start: 1rem; display: flex; flex-direction: column; gap: .15rem; margin-bottom: .25rem; }
@@ -434,6 +422,9 @@ div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
 .pub-mob-user .pub-nb-name { max-width: none; flex: 1; font-size: .88rem; }
 
 @media (max-width: 1100px) {
+  .pub-navbar { padding: 12px 0 10px; }
+  .pub-nb-inner { min-height: 64px; padding: 0 1rem; }
+  .pub-brand-logo { height: 46px; }
   .pub-nav-links { display: none; }
   .pub-hamburger { display: flex; }
   .pub-nb-actions { display: none; }

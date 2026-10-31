@@ -72,7 +72,7 @@ class EventController extends Controller
         );
 
         if ($registration->wasRecentlyCreated) {
-            $admins = User::where('role', 'admin')->get();
+            $admins = User::dashboardRecipients('content.events');
             if ($admins->isNotEmpty()) {
                 Notification::send($admins, new EventJoinedNotification($event, $request->user()));
             }
@@ -242,19 +242,49 @@ class EventController extends Controller
         return $this->paginated($query->paginate(15));
     }
 
-    // أقرب تاريخ مسموح لموعد الفعالية ولتاريخ النشر المجدول: اليوم +1 بالتوقيت المحلي (Y-m-d)
+    // أقرب تاريخ مسموح لتاريخ النشر المجدول: اليوم +1 بالتوقيت المحلي (Y-m-d)
     private function minEventDate(): string
     {
         return now(config('app.local_timezone'))->addDay()->toDateString();
     }
 
     /**
-     * تاريخ جديد لازم يكون اليوم +1 أو بعده. بالتعديل، القيمة المحفوظة أصلاً تمرّ حتى لو أقدم
+     * تاريخ يوم النشر (Y-m-d): تاريخ الجدولة لو الفعالية مجدولة لقدّام، وإلا اليوم (نشر مباشر،
+     * مسودة، أو فعالية منشورة أصلاً). ما بيرجع تاريخ قبل اليوم أبداً.
+     */
+    private function publishDay(Request $request, ?Event $event): string
+    {
+        $today = now(config('app.local_timezone'))->toDateString();
+
+        if ($request->has('is_published') && ! $request->boolean('is_published'))
+            return $today;
+        if ($request->boolean('publish_now'))
+            return $today;
+
+        $scheduled = $request->filled('published_at')
+            ? $request->input('published_at')
+            : ($event?->is_published && $event->published_at?->isFuture() ? $event->published_at : null);
+        if (! $scheduled)
+            return $today;
+
+        try {
+            $day = $scheduled instanceof \Carbon\CarbonInterface
+                ? $scheduled->copy()->timezone(config('app.local_timezone'))->toDateString()
+                : Carbon::parse($scheduled, config('app.local_timezone'))->toDateString();
+        } catch (\Throwable) {
+            return $today; // قاعدة published_at بتطلع رسالة الصيغة
+        }
+
+        return max($day, $today);
+    }
+
+    /**
+     * التاريخ الجديد لازم يكون >= $min(). بالتعديل، القيمة المحفوظة أصلاً تمرّ حتى لو أقدم
      * (نفس نمط الأخبار)، حتى ما ينمنع حفظ تعديل على فعالية قديمة بدون ما يتغيّر تاريخها.
      */
-    private function fromTomorrowRule(?Event $event, string $field, string $label): \Closure
+    private function minDateRule(?Event $event, string $field, string $label, \Closure $min, string $basis): \Closure
     {
-        return function ($attribute, $value, $fail) use ($event, $field, $label) {
+        return function ($attribute, $value, $fail) use ($event, $field, $label, $min, $basis) {
             try {
                 $date = Carbon::parse($value)->toDateString();
             } catch (\Throwable) {
@@ -262,25 +292,28 @@ class EventController extends Controller
             }
             if ($event?->{$field} && $date === $event->{$field}->toDateString())
                 return;
-            $min = $this->minEventDate();
-            if ($date < $min)
-                $fail("{$label} لازم يكون ابتداءً من " . Carbon::parse($min)->format('d/m/Y') . ' (تاريخ اليوم +1).');
+            $minDate = $min();
+            if ($date < $minDate)
+                $fail("{$label} لازم يكون ابتداءً من " . Carbon::parse($minDate)->format('d/m/Y') . " ({$basis} +1).");
         };
     }
 
     // القواعد المشتركة بين store/update لحقول الفعالية (باستثناء title/body اللي تختلف required/sometimes)
     // $event: الفعالية الحالية بالتعديل (null بالإنشاء) — لقيود التاريخ أعلاه
-    private function eventRules(?Event $event = null): array
+    private function eventRules(Request $request, ?Event $event = null): array
     {
+        $eventDateMin = fn () => Carbon::parse($this->publishDay($request, $event))->addDay()->toDateString();
+
         return [
             'image'          => 'nullable|image|mimes:jpg,jpeg,png,webp|max:10240',
             // الروابط بلا حد عملي للطول (روابط Zoom مع pwd بتطوّل) — الأعمدة text، والحد بس سقف العمود
             'video_url'      => 'nullable|url|max:65535',
             'external_url'   => 'nullable|url|max:65535',
             'is_published'   => 'boolean',
-            // تاريخ النشر المجدول وموعد الفعالية: من اليوم +1 (النشر المباشر ما بيبعت تاريخ أصلاً)
-            'published_at'   => ['nullable', 'date', $this->fromTomorrowRule($event, 'published_at', 'تاريخ النشر المجدول')],
-            'event_date'     => ['nullable', 'date', $this->fromTomorrowRule($event, 'event_date', 'موعد الفعالية')],
+            // تاريخ النشر المجدول: من اليوم +1 (النشر المباشر ما بيبعت تاريخ أصلاً)
+            'published_at'   => ['nullable', 'date', $this->minDateRule($event, 'published_at', 'تاريخ النشر المجدول', fn () => $this->minEventDate(), 'تاريخ اليوم')],
+            // موعد الفعالية: من تاريخ يوم النشر +1 (مجدولة 20/10 → من 21/10، نشر مباشر اليوم → من بكرا)
+            'event_date'     => ['nullable', 'date', $this->minDateRule($event, 'event_date', 'موعد الفعالية', $eventDateMin, 'تاريخ النشر')],
             // مكان الفعالية إلزامي لو نوع الحضور "وجاهي" أو "وجاهي + أونلاين" (بند 9ج) — hybrid
             // كان ناقصاً هون فيقدر الأدمن يحفظ فعالية hybrid بلا مكان رغم إنها تحتاجه فعلياً
             'event_location' => 'required_if:event_format,onsite,hybrid|nullable|string|max:255',
@@ -363,7 +396,7 @@ class EventController extends Controller
             'excerpt' => 'nullable|string|max:500',
             'body' => 'required|string',
             'is_international' => 'boolean',
-        ], $this->eventRules()), $this->eventMessages());
+        ], $this->eventRules($request)), $this->eventMessages());
 
         $this->handleMediaUploads($request, $validated, null, 'events', 'events/gallery');
         // فعاليات: صورة رئيسية واحدة فقط، لا معرض صور (بند 9د) — handleMediaUploads يقرأ الملفات من
@@ -403,7 +436,7 @@ class EventController extends Controller
             'body' => 'sometimes|string',
             'is_international' => 'boolean',
             'publish_now' => 'boolean',
-        ], $this->eventRules($event)), $this->eventMessages());
+        ], $this->eventRules($request, $event)), $this->eventMessages());
 
         // "نشر مباشرة" لفعالية كانت مسودة أو مجدولة لتاريخ لاحق: تاريخ النشر يصير الآن (نفس نمط الأخبار)
         $publishNow = $request->boolean('publish_now');

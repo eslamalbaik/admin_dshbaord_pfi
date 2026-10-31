@@ -127,7 +127,7 @@ class PaymentController extends Controller
         ]);
         $payment->update(['transaction_number' => Payment::generateTransactionNumber($payment)]);
 
-        $reviewers = User::whereIn('role', ['accountant', 'admin'])->get();
+        $reviewers = User::dashboardRecipients('finance.payments', ['accountant']);
         if ($reviewers->isNotEmpty()) {
             Notification::send($reviewers, new PaymentSubmittedNotification($payment));
         }
@@ -155,6 +155,8 @@ class PaymentController extends Controller
         // بما أن توليد الـ PDF أصبح يتم في الخلفية (Background Job)،
         // نتحقق مما إذا كانت المهمة قد اكتملت بالفعل أم لا.
         if (! $payment->receipt_pdf_path) {
+            // دفعات صفحة الذمم القديمة انحفظت بدون فاتورة — نطلق توليدها هون بدل ما تضل 409 للأبد
+            \App\Jobs\GeneratePaymentReceiptJob::dispatch($payment->id);
             return $this->error('الإيصال قيد الإصدار حالياً، يرجى المحاولة بعد قليل.', 409);
         }
 
@@ -236,7 +238,7 @@ class PaymentController extends Controller
         // المقاول المحذوف (حذف ناعم) بيضل اسمه ورقمه ظاهرين على دفعاته القديمة
         $query = Payment::with([
             'contractor' => fn ($q) => $q->withTrashed(),
-            'latestStatusChange.changer:id,name',
+            'latestStatusChange.changer:id,name,avatar,role', 'confirmedBy:id,name,avatar,role',
             ...Payment::TITLE_RELATIONS,
         ]);
 
@@ -407,7 +409,7 @@ class PaymentController extends Controller
             $payment->contractor->notify(new PaymentConfirmedNotification($payment));
         }
 
-        return $this->success(new PaymentResource($payment->fresh('contractor')), 'تم تأكيد عملية الدفع بنجاح.');
+        return $this->success(new PaymentResource($payment->fresh(['contractor', 'confirmedBy:id,name,avatar,role'])), 'تم تأكيد عملية الدفع بنجاح.');
     }
 
     /**
@@ -429,7 +431,7 @@ class PaymentController extends Controller
             [],
         );
 
-        return $this->success(new PaymentResource($payment->fresh('contractor')), 'تم رفع صورة الإشعار بنجاح.');
+        return $this->success(new PaymentResource($payment->fresh(['contractor', 'confirmedBy:id,name,avatar,role'])), 'تم رفع صورة الإشعار بنجاح.');
     }
 
     /**
@@ -447,7 +449,7 @@ class PaymentController extends Controller
             $payment->contractor->notify(new PaymentRejectedNotification($payment));
         }
 
-        return $this->success(new PaymentResource($payment->fresh('contractor')), 'تم رفض إشعار التحويل.');
+        return $this->success(new PaymentResource($payment->fresh(['contractor', 'confirmedBy:id,name,avatar,role'])), 'تم رفض إشعار التحويل.');
     }
 
     /**
@@ -482,7 +484,7 @@ class PaymentController extends Controller
         ]);
 
         return $this->success(
-            new PaymentResource($payment->load(['contractor', 'latestStatusChange.changer:id,name'])),
+            new PaymentResource($payment->load(['contractor', 'latestStatusChange.changer:id,name,avatar,role', 'confirmedBy:id,name,avatar,role'])),
             'تم تغيير حالة الدفعة.',
         );
     }

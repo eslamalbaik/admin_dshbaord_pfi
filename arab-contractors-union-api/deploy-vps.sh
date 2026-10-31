@@ -90,7 +90,11 @@ mkdir -p "$APP_DIR/storage/logs" "$APP_DIR/storage/framework/"{cache/data,sessio
 chown -R www-data:www-data "$APP_DIR/storage/logs" "$APP_DIR/storage/framework" "$APP_DIR/bootstrap/cache"
 
 echo "==> تثبيت حزم Composer (بدون dev)"
-composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
+# السكربت بيشتغل بـ root، وComposer بيوقف الـ plugins لحاله لما يشتغل بـ root بدون تفاعل.
+# OpenTelemetry بيحتاج plugin اسمه tbachert/spi يسجّل مدير الـ hooks، وبدونه ما بيطلع ولا trace.
+# COMPOSER_ALLOW_SUPERUSER بيسمح بس بالـ plugins المذكورة بـ allow-plugins بـ composer.json،
+# و--no-scripts بيخلّي السكربتات موقوفة متل قبل (خطوات artisan تحت).
+COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs --no-scripts
 
 echo "==> تثبيت حزم Node (Puppeteer لـ Browsershot)"
 npm install --production

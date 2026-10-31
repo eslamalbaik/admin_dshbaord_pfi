@@ -175,7 +175,7 @@ onMounted(fetchRequests)
 
         <template #no-data>
           <div class="text-center pa-6" style="font-family:Cairo,sans-serif">
-            <VIcon icon="tabler-check-circle" size="48" color="success" class="mb-2" />
+            <VIcon icon="tabler-circle-check" size="48" color="success" class="mb-2" />
             <div>لا توجد طلبات عضوية مسجلة</div>
           </div>
         </template>

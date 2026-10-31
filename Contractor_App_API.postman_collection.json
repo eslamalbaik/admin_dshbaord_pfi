@@ -870,7 +870,7 @@
 									"value": "",
 									"type": "text",
 									"disabled": true,
-									"description": "تغيير الجوال يتطلب تحقق OTP مسبق عبر profile/phone/request-otp و /verify-otp — يُرفض بدونه"
+									"description": "تغيير الجوال مباشر بدون OTP (منذ 2026-10-13) — الرقم لازم يكون غير مستخدَم بحساب آخر"
 								},
 								{
 									"key": "governorate_id",
@@ -1086,7 +1086,7 @@
 								"update"
 							]
 						},
-						"description": "**POST** `/api/v1/contractor/auth/profile/update` — **Form-Data**\n\nتحديث الملف التعريفي الكامل مع الملفات المرفقة.\n\nأخطاء التحقق تعود **برسالة الحقل المحدد** (مثال: \"حقل رقم السجل التجاري مطلوب.\") داخل الهيكل الموحد مع `errors` مفصلة.\n\n---\n**TASK-17 US11 — تعديل ملف الشركة قد يمرّ بموافقة الإدارة**\n\nمحكوم بمفتاح الخادم `PROFILE_EDITS_REQUIRE_APPROVAL` (مطفأ افتراضياً). عندما يكون مطفأً فالسلوك هو نفسه بلا أي تغيير.\n\nعندما يُشعَل، تبقى الاستجابة **200** ويبقى `items` يحمل الملف التعريفي — لكن **بقيمه الحالية غير المعدَّلة** — ويُضاف إليه:\n\n- `pending_review` (boolean): true يعني أن التعديل حُفظ كطلب مراجعة ولم يُطبَّق.\n- `pending_request`: `{ id, status, status_label, proposed_data, proposed_files[], created_at }`.\n\n**المطلوب من التطبيق**: لا تتعامل مع الاستجابة كملف محفوظ. اقرأ `pending_review`، وأظهر «قيد المراجعة» بدل «تم الحفظ»، ويمكنك تمييز الحقول المذكورة في `proposed_data`.\n\n**ما يبقى فورياً بلا مراجعة**: الجوال (بـOTP كما هو)، الشعار، المحافظة والمدينة، و`fcm_token`.\n\n**تعديل ثانٍ أثناء وجود طلب معلّق يُلغي الأول ويحلّ محلّه** — لم يبقَ 422.\n\n**حقلان لم يبقيا مقبولَين إطلاقاً من التطبيق**: `classification` و `specialties`. هما مُدخَلا احتساب رسوم العضوية، وتعديلهما صلاحية إدارية فقط. إرسالهما يُهمَل بصمت (لا يُفشل الطلب) ويُسجَّل بسجل المالية — يُفضَّل التوقف عن إرسالهما."
+						"description": "**POST** `/api/v1/contractor/auth/profile/update` — **Form-Data**\n\nتحديث الملف التعريفي الكامل مع الملفات المرفقة.\n\nأخطاء التحقق تعود **برسالة الحقل المحدد** (مثال: \"حقل رقم السجل التجاري مطلوب.\") داخل الهيكل الموحد مع `errors` مفصلة.\n\n---\n**TASK-17 US11 — تعديل ملف الشركة قد يمرّ بموافقة الإدارة**\n\nمحكوم بمفتاح الخادم `PROFILE_EDITS_REQUIRE_APPROVAL` (مطفأ افتراضياً). عندما يكون مطفأً فالسلوك هو نفسه بلا أي تغيير.\n\nعندما يُشعَل، تبقى الاستجابة **200** ويبقى `items` يحمل الملف التعريفي — لكن **بقيمه الحالية غير المعدَّلة** — ويُضاف إليه:\n\n- `pending_review` (boolean): true يعني أن التعديل حُفظ كطلب مراجعة ولم يُطبَّق.\n- `pending_request`: `{ id, status, status_label, proposed_data, proposed_files[], created_at }`.\n\n**المطلوب من التطبيق**: لا تتعامل مع الاستجابة كملف محفوظ. اقرأ `pending_review`، وأظهر «قيد المراجعة» بدل «تم الحفظ»، ويمكنك تمييز الحقول المذكورة في `proposed_data`.\n\n**ما يبقى فورياً بلا مراجعة**: الجوال (مباشرة بدون OTP)، الشعار، المحافظة والمدينة، و`fcm_token`.\n\n**تعديل ثانٍ أثناء وجود طلب معلّق يُلغي الأول ويحلّ محلّه** — لم يبقَ 422.\n\n**حقلان لم يبقيا مقبولَين إطلاقاً من التطبيق**: `classification` و `specialties`. هما مُدخَلا احتساب رسوم العضوية، وتعديلهما صلاحية إدارية فقط. إرسالهما يُهمَل بصمت (لا يُفشل الطلب) ويُسجَّل بسجل المالية — يُفضَّل التوقف عن إرسالهما."
 					}
 				},
 				{
@@ -1116,7 +1116,7 @@
 								"request-otp"
 							]
 						},
-						"description": "**POST** `/api/v1/contractor/auth/profile/phone/request-otp` — **Form-Data**\n\nيرسل رمز تحقق (OTP) لرقم الجوال الجديد قبل حفظه بالبروفايل — يرفض لو نفس الرقم الحالي أو مستخدَم بحساب آخر. cooldown 35 ثانية بين الطلبات. الاستجابة تتضمّن `otp_preview` بس بالبيئة المحلية (driver=log).",
+						"description": "**POST** `/api/v1/contractor/auth/profile/phone/request-otp` — **Form-Data**\n\n⚠️ متروك منذ 2026-10-13: لم يعد شرطاً لتغيير الجوال، باقٍ فقط لتوافق نسخ التطبيق القديمة.\n\nيرسل رمز تحقق (OTP) لرقم الجوال الجديد — يرفض لو نفس الرقم الحالي أو مستخدَم بحساب آخر. cooldown 35 ثانية بين الطلبات. الاستجابة تتضمّن `otp_preview` بس بالبيئة المحلية (driver=log).",
 						"body": {
 							"mode": "formdata",
 							"formdata": [
@@ -1156,7 +1156,7 @@
 								"verify-otp"
 							]
 						},
-						"description": "**POST** `/api/v1/contractor/auth/profile/phone/verify-otp` — **Form-Data**\n\nيتحقق من الرمز، ويُتيح إرسال نفس رقم الجوال بطلب `profile/update` بعدها لمدة 15 دقيقة. بدون هالخطوة، `profile/update` يرفض أي تغيير برقم الجوال (`phone_verification_required`).",
+						"description": "**POST** `/api/v1/contractor/auth/profile/phone/verify-otp` — **Form-Data**\n\n⚠️ متروك منذ 2026-10-13: `profile/update` صار يقبل رقم الجوال الجديد مباشرة بدون هالخطوة. باقٍ فقط لتوافق نسخ التطبيق القديمة.",
 						"body": {
 							"mode": "formdata",
 							"formdata": [
@@ -1439,7 +1439,7 @@
 								"home"
 							]
 						},
-						"description": "GET /api/v1/contractor/home - home screen, one aggregated call (membership+dues+stats+latest updates).\n\n**`items.latest_updates[]`** — كل عنصر: `type` (tender|news|announcement|due|member|...), `reference_id`, `title`, `subtitle`, `badges[]`, `priority`, `created_at`.\n\n**`reference_id` دائماً رقم (id) بغض النظر عن `type`** — بما فيها `news` (كانت سابقاً ترسل `slug` نصياً لعناصر الأخبار فقط، وحُوِّلت لـ id ليتّسق مع باقي الأنواع). لعرض تفاصيل الخبر مرّر هذا الرقم مباشرة إلى `GET /news/{id}` — لم تعد هناك حاجة لجلب الـ `slug` من قائمة الأخبار.\n\n**تحديث (TASK-16 #1):** `latest_updates` يعيد الآن **5 عناصر** (كان 3 بـ TASK-15 #8، و10 قبلها).\n\nأُضيف مفتاحان لتغذية زر \"عرض المزيد\":\n- **`items.latest_updates_total`** — العدد الكلي للعناصر في الخلاصة.\n- **`items.has_more`** — `true` عندما يتجاوز العدد الكلي الـ5 المعروضة.\n\nيُظهر التطبيق زر \"عرض المزيد\" عند `has_more === true` فقط، ويوجّه إلى `GET /contractor/home/updates` (المُرقَّم بـ 20 عنصراً في الصفحة) بصفحة منفصلة حتى لا تطول الشاشة الرئيسية."
+						"description": "GET /api/v1/contractor/home - home screen, one aggregated call (membership+dues+stats+latest updates).\n\n**`items.latest_updates[]`** — كل عنصر: `type` (tender|news|announcement|due|member|...), `reference_id`, `title`, `subtitle`, `badges[]`, `priority`, `created_at`.\n\n**`reference_id` دائماً رقم (id) بغض النظر عن `type`** — بما فيها `news` (كانت سابقاً ترسل `slug` نصياً لعناصر الأخبار فقط، وحُوِّلت لـ id ليتّسق مع باقي الأنواع). لعرض تفاصيل الخبر مرّر هذا الرقم مباشرة إلى `GET /news/{id}` — لم تعد هناك حاجة لجلب الـ `slug` من قائمة الأخبار.\n\n**تحديث (TASK-16 #1):** `latest_updates` يعيد الآن **5 عناصر** (كان 3 بـ TASK-15 #8، و10 قبلها).\n\nأُضيف مفتاحان لتغذية زر \"عرض المزيد\":\n- **`items.latest_updates_total`** — العدد الكلي للعناصر في الخلاصة.\n- **`items.has_more`** — `true` عندما يتجاوز العدد الكلي الـ5 المعروضة.\n\nيُظهر التطبيق زر \"عرض المزيد\" عند `has_more === true` فقط، ويوجّه إلى `GET /contractor/home/updates` (المُرقَّم بـ 20 عنصراً في الصفحة) بصفحة منفصلة حتى لا تطول الشاشة الرئيسية.\n\n**عناصر `type: circular` تحمل مفتاحاً إضافياً `details`** (لا يظهر بباقي الأنواع) بتفاصيل التعميم كاملة، ليعرضها التطبيق بنافذة التعميم (Pop-up) دون نداء إضافي: `number`, `category`, `body` (نص التعميم كاملاً), `image`, `attachment` (روابط كاملة أو `null`), `is_pinned`, `requires_acknowledgement` (`true` = تعميم عاجل لم يُقرّه المقاول بعد). **`subtitle` للتعميم = نص التعميم نفسه** كنص عادي بلا HTML بسطر واحد، مقصوص على 150 حرفاً + `…` (النص الكامل بـ `details.body`)., `acknowledged`, `published_at`. الإقرار يبقى عبر `POST /contractor/circulars/{reference_id}/acknowledge`."
 					}
 				},
 				{
@@ -1473,7 +1473,7 @@
 								}
 							]
 						},
-						"description": "GET /api/v1/contractor/home/updates - full updates feed, paginated.\n\nنفس شكل عناصر `items.latest_updates` بشاشة `/contractor/home` (راجع وصفها) — بما فيها أن `reference_id` رقم دائماً، وأن عناصر النوع `news` تُفتح مباشرة عبر `GET /news/{reference_id}`."
+						"description": "GET /api/v1/contractor/home/updates - full updates feed, paginated.\n\nنفس شكل عناصر `items.latest_updates` بشاشة `/contractor/home` (راجع وصفها) — بما فيها أن `reference_id` رقم دائماً، وأن عناصر النوع `news` تُفتح مباشرة عبر `GET /news/{reference_id}`. عناصر النوع `circular` تحمل أيضاً `details` بنص التعميم كاملاً."
 					}
 				}
 			]

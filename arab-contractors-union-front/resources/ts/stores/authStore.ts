@@ -104,6 +104,14 @@ export const useAuthStore = defineStore('auth', {
 
       return fetchPromise
     },
+    /** تحديث بيانات المستخدم الحالي (بعد تعديل الملف الشخصي) — الشريط العلوي بيتحدّث فوراً */
+    patchUser(patch: Partial<User>) {
+      if (!this.user)
+        return
+      this.user = { ...this.user, ...patch }
+      if (typeof localStorage !== 'undefined')
+        localStorage.setItem('userData', JSON.stringify(this.user))
+    },
     login(user: User, token: string) {
       const normalized = normalizeUser(user)
       if (!normalized)

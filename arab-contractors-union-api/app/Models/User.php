@@ -54,6 +54,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'permissions' => 'array',
             'is_active' => 'boolean',
+            'last_login_at' => 'datetime',
         ];
     }
 
@@ -95,6 +96,39 @@ class User extends Authenticatable
         }
 
         return $this->isSupervisor() ? array_values($this->permissions ?? []) : null;
+    }
+
+    /**
+     * مستلمو إشعارات لوحة التحكم لقسم (أو أكثر): كل أدمن، والأدوار الإضافية الممرّرة
+     * (مثلاً المحاسب القديم على إشعارات المدفوعات)، وكل مشرف فعّال عنده «عرض» على أي
+     * من الأقسام — يعني حساب "محاسب مالي" المنشأ من شاشة المشرفين بصلاحيات المالية
+     * بيوصله إشعار الدفعة الجديدة بدل ما يروح للأدمن بس.
+     *
+     * @param  string|string[]  $sections  مثل 'finance.payments'
+     * @param  string[]  $extraRoles
+     */
+    public static function dashboardRecipients(string|array $sections, array $extraRoles = []): \Illuminate\Support\Collection
+    {
+        $roles   = array_values(array_unique(array_merge(['admin'], $extraRoles)));
+        $needed  = array_map(fn (string $s) => "{$s}.view", (array) $sections);
+
+        return static::query()
+            ->whereIn('role', [...$roles, self::ROLE_SUPERVISOR])
+            ->get()
+            ->filter(function (User $user) use ($roles, $needed) {
+                if (in_array($user->role, $roles, true)) {
+                    return true;
+                }
+
+                foreach ($needed as $permission) {
+                    if ($user->hasDashboardPermission($permission)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            })
+            ->values();
     }
 
     public function scopeSupervisors($query)

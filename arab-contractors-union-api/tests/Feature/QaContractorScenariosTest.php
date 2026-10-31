@@ -83,7 +83,7 @@ class QaContractorScenariosTest extends TestCase
 
     // ── R: الجبر من طرف المقاول ─────────────────────────────
 
-    public function test_R09_home_last_invoice_is_the_rounded_real_due(): void
+    public function test_R09_home_last_invoice_keeps_its_fraction(): void
     {
         $c = $this->contractor('960_g');
         $this->due($c, 100.40);
@@ -91,9 +91,9 @@ class QaContractorScenariosTest extends TestCase
         Sanctum::actingAs($c, ['*']);
         $home = $this->getJson('/api/v1/contractor/home')->assertOk()->json('items.financial');
 
-        // الجبر صار على نفس الذمة (100.40 ← 101)، مش ذمة جبر لحالها
-        $this->assertEquals(101, (float) $home['last_invoice']['amount_jod']);
-        $this->assertEquals(-101, $this->balance($c)['net_jod']);
+        // الذمة بتضل بكسرها (100.40)، والصافي كمان بكسره
+        $this->assertEquals(100.40, (float) $home['last_invoice']['amount_jod']);
+        $this->assertEquals(-100.40, $this->balance($c)['net_jod']);
     }
 
     public function test_R10_app_balance_matches_the_dashboard(): void
@@ -105,7 +105,7 @@ class QaContractorScenariosTest extends TestCase
         $row  = $this->adminRow($c);
 
         $this->assertSame($row['net_jod'], $mine['net_jod']);
-        $this->assertIsInt($mine['net_jod']);
+        $this->assertEquals(-349.20, $mine['net_jod']);
         $this->assertSame($row['status'], $mine['subscription_status']);
     }
 

@@ -49,7 +49,12 @@ class DashboardPermissions
         'finance' => [
             'label'    => 'الشؤون المالية',
             'children' => [
-                'finance.payments'       => ['label' => 'سجل المدفوعات', 'actions' => [self::VIEW, self::CREATE, self::UPDATE]],
+                'finance.payments'       => [
+                    'label'   => 'سجل المدفوعات',
+                    'actions' => [self::VIEW, self::CREATE, self::UPDATE],
+                    // «تعديل» على المدفوعات هو قبول الدفعات — بدونه المحاسب بيشوف السجل بس وما بيقدر يؤكّد
+                    'hint'    => '«تعديل» = قبول الدفعات ورفضها وتغيير حالتها، «إضافة» = تسجيل دفعة يدوية. «عرض» بيوصّل إشعارات الدفعات الجديدة.',
+                ],
                 'finance.dues'           => ['label' => 'الذمم المالية', 'actions' => self::CRUD],
                 'finance.dues_discounts' => ['label' => 'الخصومات على الذمم', 'actions' => [self::UPDATE]],
                 'finance.balances'       => ['label' => 'أرصدة المقاولين', 'actions' => [self::VIEW, self::UPDATE]],
@@ -118,6 +123,7 @@ class DashboardPermissions
                 'settings.pages'          => ['label' => 'الصفحات الديناميكية', 'actions' => self::CRUD],
                 'settings.lookups'        => ['label' => 'المجالات والاختصاصات والدرجات', 'actions' => self::CRUD],
                 'settings.governorates'   => ['label' => 'المحافظات والمدن', 'actions' => self::CRUD],
+                'settings.country_codes'  => ['label' => 'مقدمات الدول وأعلامها', 'actions' => self::CRUD],
                 'settings.activity_log'   => ['label' => 'سجل النشاط', 'actions' => [self::VIEW]],
             ],
         ],
@@ -211,6 +217,7 @@ class DashboardPermissions
                     'key'     => $leafKey,
                     'label'   => $leaf['label'],
                     'actions' => $leaf['actions'],
+                    'hint'    => $leaf['hint'] ?? null,
                 ])->values(),
             ])->values(),
         ];

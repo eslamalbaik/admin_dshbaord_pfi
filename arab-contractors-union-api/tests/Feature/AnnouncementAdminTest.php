@@ -243,6 +243,26 @@ class AnnouncementAdminTest extends TestCase
         $this->assertNull($announcement->expires_at);
     }
 
+    public function test_store_immediate_publish_ignores_stale_past_published_at_for_expiry(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/announcements', [
+            'title'        => 'مباشر',
+            'body'         => 'نص',
+            'is_published' => true,
+            'expires_at'   => now()->addDays(2)->toDateString(),
+        ])->assertStatus(201);
+
+        $this->postJson('/api/v1/admin/announcements', [
+            'title'        => 'مجدول',
+            'body'         => 'نص',
+            'is_published' => true,
+            'published_at' => now()->addDays(5)->toDateString(),
+            'expires_at'   => now()->addDays(2)->toDateString(),
+        ])->assertStatus(422);
+    }
+
     public function test_update_to_draft_clears_expiry_and_pin(): void
     {
         $this->actingAsAdmin();
@@ -262,5 +282,56 @@ class AnnouncementAdminTest extends TestCase
         $announcement->refresh();
         $this->assertFalse($announcement->is_pinned);
         $this->assertNull($announcement->expires_at);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    //  external_url — optional, https auto-prefixed, validated
+    // ─────────────────────────────────────────────────────────────────────
+
+    public function test_store_prefixes_external_url_without_scheme(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->postJson('/api/v1/admin/announcements', [
+            'title' => 'تعميم برابط', 'body' => 'نص', 'external_url' => 'www.example.com/form',
+        ])->assertStatus(201);
+
+        $this->assertSame('https://www.example.com/form', $response->json('items.external_url'));
+    }
+
+    public function test_store_rejects_invalid_external_url(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/announcements', [
+            'title' => 'تعميم برابط خاطئ', 'body' => 'نص', 'external_url' => 'not a link',
+        ])->assertStatus(422)->assertJsonValidationErrors(['external_url']);
+    }
+
+    public function test_update_can_set_and_clear_external_url(): void
+    {
+        $this->actingAsAdmin();
+        $announcement = Announcement::create(['title' => 'تعميم', 'body' => 'نص', 'is_published' => false]);
+
+        $this->putJson("/api/v1/admin/announcements/{$announcement->id}", ['external_url' => 'example.org'])
+            ->assertOk();
+        $this->assertSame('https://example.org', $announcement->fresh()->external_url);
+
+        $this->putJson("/api/v1/admin/announcements/{$announcement->id}", ['external_url' => ''])
+            ->assertOk();
+        $this->assertNull($announcement->fresh()->external_url);
+    }
+
+    public function test_public_endpoints_return_external_url(): void
+    {
+        $announcement = Announcement::create([
+            'title' => 'منشور', 'body' => 'نص', 'is_published' => true,
+            'published_at' => now()->subHour(), 'external_url' => 'https://example.com',
+        ]);
+
+        $this->getJson('/api/v1/announcements')
+            ->assertOk()->assertJsonPath('items.0.external_url', 'https://example.com');
+        $this->getJson("/api/v1/announcements/{$announcement->id}")
+            ->assertOk()->assertJsonPath('items.external_url', 'https://example.com');
     }
 }

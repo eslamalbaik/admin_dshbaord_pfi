@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import api from '@/plugins/axios'
 import { type ContractorDocumentKey, contractorDocumentLabels } from '@/utils/contractorDocuments'
+import { contractorRules } from '@/utils/contractorValidation'
+import { displayPhone, loadDialCodes } from '@/utils/dialCodes'
+import PhoneInput from '@/components/PhoneInput.vue'
 
 definePage({ meta: { requiresAdmin: true, adminOnly: true } })
 
@@ -139,7 +142,7 @@ const exportContractors = async () => {
         '',  // حقل مستبدل — trade لم يعد مستخدماً
         c.authorized_person ?? '',
         c.authorized_person_id_number ?? '',
-        c.phone ?? '',
+        c.authorized_person_phone || c.phone || '',
         c.email ?? '',
         c.city ?? '',
         getStatusLabel(c.membership_status ?? c.status),
@@ -338,22 +341,31 @@ const openDetails = async (contractor: any) => {
   }
 }
 
-// ── تعديل سريع لاسم المفوض ورقم التواصل (من شاشة "عرض") ──
+loadDialCodes()
+
+// ── تعديل سريع لاسم المفوض وجواله (من شاشة "عرض") — جوال المفوض صار رقم التواصل المعتمد ──
 const contactEditDialog = ref(false)
 const contactEditLoading = ref(false)
 const contactEditError = ref('')
-const contactForm = ref({ authorized_person: '', phone: '' })
+const contactForm = ref({ authorized_person: '', authorized_person_phone: '' })
 
 const openContactEdit = () => {
   contactForm.value = {
     authorized_person: detailsTarget.value?.authorized_person ?? '',
-    phone: detailsTarget.value?.phone ?? '',
+    authorized_person_phone: detailsTarget.value?.authorized_person_phone ?? '',
   }
   contactEditError.value = ''
   contactEditDialog.value = true
 }
 
 const saveContactEdit = async () => {
+  const invalid = contractorRules.personName(contactForm.value.authorized_person) !== true
+    || contractorRules.mobile(contactForm.value.authorized_person_phone) !== true
+  if (invalid) {
+    contactEditError.value = 'صحّح الخانات المعلّمة باللون الأحمر قبل الحفظ.'
+
+    return
+  }
   contactEditLoading.value = true
   contactEditError.value = ''
   try {
@@ -362,7 +374,7 @@ const saveContactEdit = async () => {
     const row = contractors.value.find(c => c.id === detailsTarget.value.id)
     if (row) {
       row.authorized_person = detailsTarget.value.authorized_person
-      row.phone = detailsTarget.value.phone
+      row.authorized_person_phone = detailsTarget.value.authorized_person_phone
     }
     contactEditDialog.value = false
     notify('تم تحديث بيانات التواصل بنجاح.')
@@ -480,8 +492,8 @@ const managementRows = computed(() => {
     { label: 'أسماء الشركاء', value: t.partners || '—', icon: 'tabler-users' },
     { label: 'المفوض بالتوقيع', value: t.authorized_person || '—', icon: 'tabler-signature' },
     { label: 'رقم هوية المفوض', value: t.authorized_person_id_number || '—', icon: 'tabler-id' },
-    { label: 'رقم جوال المفوض', value: t.authorized_person_phone || '—', dir: 'ltr', icon: 'tabler-device-mobile' },
-    { label: 'رقم واتساب المفوض', value: t.authorized_person_whatsapp || '—', dir: 'ltr', icon: 'tabler-brand-whatsapp' },
+    { label: 'رقم جوال المفوض', value: displayPhone(t.authorized_person_phone) || '—', dir: 'ltr', icon: 'tabler-device-mobile' },
+    { label: 'رقم واتساب المفوض', value: displayPhone(t.authorized_person_whatsapp) || '—', dir: 'ltr', icon: 'tabler-brand-whatsapp' },
   ]
 })
 
@@ -489,7 +501,8 @@ const contactRows = computed(() => {
   const t = detailsTarget.value
   if (!t) return []
   return [
-    { label: 'الجوال', value: t.phone || '—', dir: 'ltr', icon: 'tabler-device-mobile' },
+    // خانة الجوال انشالت من الفورم — بتظهر بس للمقاولين القدامى اللي إلهم رقم محفوظ
+    ...(t.phone ? [{ label: 'الجوال', value: t.phone, dir: 'ltr', icon: 'tabler-device-mobile' }] : []),
     { label: 'الهاتف/الفاكس', value: t.fax || '—', dir: 'ltr', icon: 'tabler-phone' },
     { label: 'البريد الإلكتروني', value: t.email || '—', icon: 'tabler-mail' },
     { label: 'المحافظة', value: t.governorate?.name || '—', icon: 'tabler-map' },
@@ -501,6 +514,12 @@ const contactRows = computed(() => {
   ]
 })
 
+// العضوية النشطة إن وُجدت، وإلا آخر عضوية منتهية (مثلاً 31/12/2025) — نفس منطق display_membership بالخادم.
+const membershipExpiry = (t: any) => {
+  const expires = t?.active_membership?.expires_at ?? t?.latest_membership?.expires_at
+  return expires ? String(expires).substring(0, 10) : '—'
+}
+
 const activityRows = computed(() => {
   const t = detailsTarget.value
   if (!t) return []
@@ -508,6 +527,7 @@ const activityRows = computed(() => {
     { label: 'التصنيف العام', value: getGradeTitle(t.classification), icon: 'tabler-award' },
     { label: 'رقم رخصة البلدية', value: t.license_number || '—', icon: 'tabler-license' },
     { label: 'تاريخ التأسيس', value: t.established_date ? String(t.established_date).substring(0, 10) : '—', icon: 'tabler-calendar-star' },
+    { label: 'تاريخ انتهاء العضوية', value: membershipExpiry(t), icon: 'tabler-calendar-exclamation' },
   ]
 })
 
@@ -517,7 +537,7 @@ const documentFields = ([
   { key: 'cr_file', icon: 'tabler-file-certificate' },
   { key: 'id_file', icon: 'tabler-id' },
   { key: 'company_register', icon: 'tabler-building' },
-  { key: 'municipal_license', icon: 'tabler-stamp' },
+  { key: 'municipal_license', icon: 'tabler-rubber-stamp' },
   { key: 'company_approval_letter', icon: 'tabler-checkbox' },
   { key: 'lease_or_ownership_contract', icon: 'tabler-home' },
   { key: 'articles_of_association', icon: 'tabler-file-text' },
@@ -528,6 +548,7 @@ const documentFields = ([
   { key: 'accountant_certificate_or_contract', icon: 'tabler-report-money' },
   { key: 'partners_ids', icon: 'tabler-id-badge-2' },
   { key: 'authorization_letter', icon: 'tabler-signature' },
+  { key: 'authorized_signature', icon: 'tabler-writing-sign' },
 ] as Array<{ key: ContractorDocumentKey, icon: string }>)
   .map(d => ({ ...d, label: contractorDocumentLabels[d.key] }))
 
@@ -601,7 +622,7 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
             </VAvatar>
             <div>
               <div class="font-weight-medium" style="font-family:Cairo,sans-serif">{{ item.name }}</div>
-              <div class="text-caption text-medium-emphasis">{{ item.email || item.phone }}</div>
+              <div class="text-caption text-medium-emphasis">{{ item.email || displayPhone(item.authorized_person_phone) || item.phone }}</div>
             </div>
           </div>
         </template>
@@ -846,27 +867,27 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
                         class="d-flex align-center gap-2 pa-2 rounded-lg"
                         :style="`background: rgba(var(--v-theme-on-surface), ${documentUrl(doc.key) ? 0.03 : 0.015});`"
                       >
-                        <VAvatar :color="documentUrl(doc.key) ? 'primary' : 'secondary'" variant="tonal" size="32" rounded="lg">
+                        <VAvatar :color="documentUrl(doc.key) ? 'primary' : 'secondary'" variant="tonal" size="32" rounded="lg" class="flex-shrink-0">
                           <VIcon :icon="doc.icon" size="16" />
                         </VAvatar>
                         <span
                           class="text-body-2 text-truncate flex-grow-1"
                           :class="documentUrl(doc.key) ? 'font-weight-medium' : 'text-medium-emphasis'"
-                          style="font-family:Cairo,sans-serif"
+                          style="font-family:Cairo,sans-serif; min-width:0"
                         >
                           {{ doc.label }}
                         </span>
                         <template v-if="documentUrl(doc.key)">
-                          <VBtn icon size="x-small" variant="text" color="primary" @click="viewFile(documentUrl(doc.key))">
+                          <VBtn icon size="x-small" variant="text" color="primary" class="flex-shrink-0" @click="viewFile(documentUrl(doc.key))">
                             <VIcon icon="tabler-eye" size="16" />
                             <VTooltip activator="parent">عرض</VTooltip>
                           </VBtn>
-                          <VBtn icon size="x-small" variant="text" color="primary" @click="downloadFile(documentUrl(doc.key), doc.label)">
+                          <VBtn icon size="x-small" variant="text" color="primary" class="flex-shrink-0" @click="downloadFile(documentUrl(doc.key), doc.label)">
                             <VIcon icon="tabler-download" size="16" />
                             <VTooltip activator="parent">تحميل</VTooltip>
                           </VBtn>
                         </template>
-                        <VIcon v-else icon="tabler-file-off" size="16" color="secondary" />
+                        <VIcon v-else icon="tabler-file-off" size="16" color="secondary" class="flex-shrink-0" />
                       </div>
                     </VCol>
                   </VRow>
@@ -900,10 +921,10 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
       </VCard>
     </VDialog>
 
-    <!-- Contact Edit Dialog — اسم المفوض ورقم التواصل -->
+    <!-- Contact Edit Dialog — اسم المفوض وجواله -->
     <VDialog v-model="contactEditDialog" max-width="440" persistent>
       <VCard>
-        <VCardTitle style="font-family:Cairo,sans-serif">تعديل المفوض ورقم التواصل</VCardTitle>
+        <VCardTitle style="font-family:Cairo,sans-serif">تعديل المفوض ورقم جواله</VCardTitle>
         <VCardText>
           <VAlert v-if="contactEditError" type="error" variant="tonal" class="mb-4">
             {{ contactEditError }}
@@ -911,13 +932,14 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
           <VTextField
             v-model="contactForm.authorized_person"
             label="المفوض بالتوقيع"
+            :rules="[contractorRules.personName]"
             class="mb-4"
             style="font-family:Cairo,sans-serif"
           />
-          <VTextField
-            v-model="contactForm.phone"
-            label="رقم الجوال"
-            dir="ltr"
+          <PhoneInput
+            v-model="contactForm.authorized_person_phone"
+            label="رقم جوال المفوض"
+            icon="tabler-phone"
           />
         </VCardText>
         <VCardActions>

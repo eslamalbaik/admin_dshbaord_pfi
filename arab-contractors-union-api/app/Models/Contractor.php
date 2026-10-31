@@ -138,6 +138,24 @@ class Contractor extends Authenticatable
             ->latestOfMany();
     }
 
+    /**
+     * آخر عضوية فعلية (نشطة أو منتهية) بحسب تاريخ الانتهاء — لعرض تاريخ الانتهاء
+     * حتى لما تكون العضوية منتهية (مثلاً 31/12/2025) بدل null.
+     */
+    public function latestMembership()
+    {
+        return $this->hasOne(Membership::class)
+            ->ofMany(['expires_at' => 'max', 'id' => 'max'], function ($q) {
+                $q->whereIn('status', ['active', 'expired'])->whereNotNull('expires_at');
+            });
+    }
+
+    /** العضوية النشطة إن وُجدت، وإلا آخر عضوية منتهية. */
+    public function getDisplayMembershipAttribute(): ?Membership
+    {
+        return $this->activeMembership ?? $this->latestMembership;
+    }
+
     public function payments()
     {
         return $this->hasMany(Payment::class);
@@ -215,19 +233,15 @@ class Contractor extends Authenticatable
     }
 
     /**
-     * الحقول المطلوبة لـ "اكتمال الملف". رقم الهاتف مقصود أنه خارج القائمة:
-     * طلب المالك ألا يُعدّ ناقصاً (المقاول يدخل التطبيق برقمه أصلاً).
+     * الحقول المطلوبة لـ "اكتمال الملف" — نفس الحقول المعلّمة بنجمة بفورم المقاول بلوحة
+     * التحكم (مؤشر "اكتمال الملف %")، حتى ما تقول اللوحة 100% والتطبيق يرفض طلب الشهادة.
+     * خارج القائمة عن قصد (قرار المالك): رقم الهاتف، الشعار، اسم صاحب المنشأة، اسم المفوض
+     * بالتوقيع، رأس المال، الشكل القانوني، تاريخ التسجيل، غايات الشركة.
      */
     private const REQUIRED_PROFILE_FIELDS = [
-        'owner_name'        => 'اسم صاحب المنشأة',
-        'authorized_person' => 'اسم المفوض بالتوقيع',
         'address'           => 'العنوان التفصيلي',
         'license_number'    => 'رقم رخصة البلدية',
         'established_date'  => 'تاريخ التأسيس',
-        'capital'           => 'رأس المال',
-        'legal_form'        => 'الشكل القانوني',
-        'registration_date' => 'تاريخ التسجيل',
-        'company_purposes'  => 'غايات الشركة',
     ];
 
     /**
@@ -239,7 +253,7 @@ class Contractor extends Authenticatable
      */
     public const DOCUMENT_LABELS = [
         'cr_file'                       => 'السجل التجاري',
-        'id_file'                       => 'صورة الهوية',
+        'id_file'                       => 'صورة الهوية الشخصية للمفوض',
         'company_register'              => 'مستخرج عن سجل الشركة',
         'municipal_license'             => 'رخصة المهن (الحرف) سارية المفعول',
         'bank_dealing_letter'           => 'شهادة تعامل للشركة مع بنك',
@@ -252,7 +266,7 @@ class Contractor extends Authenticatable
         'full_time_engineer_certificate'=> 'شهادة مهندس متفرغ',
         'accountant_certificate_or_contract' => 'شهادة تفرغ محاسب من نقابة المحاسبين / أو عقد مع مكتب محاسبين معتمد',
         'secretary_contract'            => 'عقد سكرتير',
-        'authorized_signature'          => 'نموذج التوقيع',
+        'authorized_signature'          => 'كتاب اعتماد التوقيع',
     ];
 
     /** المستندات المطلوبة لاكتمال الملف (بترتيب نموذج التسجيل) — أسماؤها من DOCUMENT_LABELS. */
@@ -290,6 +304,50 @@ class Contractor extends Authenticatable
     public function getProfileDataCompleteAttribute(): bool
     {
         return count($this->missing_profile_fields) === 0;
+    }
+
+    /** جوال المفوض بيتخزن بصيغة موحّدة (05XXXXXXXX) — لأنه صار معرّف دخول للتطبيق. */
+    public function setAuthorizedPersonPhoneAttribute($value): void
+    {
+        $this->attributes['authorized_person_phone'] = \App\Support\PhoneNumber::normalize($value);
+    }
+
+    /**
+     * رقم الجوال اللي بنبعت عليه رموز التحقق: جوال الحساب إن وُجد، وإلا جوال المفوض بالتوقيع
+     * (خانة "رقم الجوال" انشالت من فورم اللوحة، فالمقاولين الجدد ما إلهم إلا جوال المفوض).
+     */
+    public function getSmsPhoneAttribute(): ?string
+    {
+        return $this->phone ?: $this->authorized_person_phone;
+    }
+
+    /**
+     * مقاول التسجيل/استعادة كلمة السر برقم جواله: جوال الحساب أولاً، وإلا جوال المفوض بالتوقيع
+     * لمقاول ما إله جوال حساب — بشرط يكون المفوض لشركة وحدة بس، حتى ما نبعت الرمز لشركة غلط.
+     */
+    public static function findByRegistrationPhone(string $phone): ?self
+    {
+        $phone = trim($phone);
+        if ($phone === '') {
+            return null;
+        }
+
+        $contractor = self::where('phone', $phone)->first();
+        if ($contractor) {
+            return $contractor;
+        }
+
+        $normalized = \App\Support\PhoneNumber::normalize($phone);
+        if (! $normalized) {
+            return null;
+        }
+
+        $candidates = self::where(fn ($q) => $q->whereNull('phone')->orWhere('phone', ''))
+            ->where('authorized_person_phone', $normalized)
+            ->limit(2)
+            ->get();
+
+        return $candidates->count() === 1 ? $candidates->first() : null;
     }
 
     /** فتح حساب على التطبيق = أكمل التحقق من الهوية وضبط كلمة مرور (نفس شرط تسجيل الدخول). */

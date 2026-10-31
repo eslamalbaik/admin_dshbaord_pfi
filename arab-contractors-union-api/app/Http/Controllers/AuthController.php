@@ -32,6 +32,8 @@ class AuthController extends Controller
                 Log::info("Admin login: {$user->email} at " . now());
             }
 
+            $user->forceFill(['last_login_at' => now()])->saveQuietly();
+
             $deviceLabel = substr($request->header('User-Agent', 'Unknown Device'), 0, 120);
             $token = $user->createToken('auth_token', ['*'], now()->addDays(30));
             $token->accessToken->update(['device_label' => $deviceLabel]);
@@ -171,6 +173,8 @@ class AuthController extends Controller
             ]);
             Log::info("New Google admin registered: {$email}");
         }
+
+        $user->forceFill(['last_login_at' => now()])->saveQuietly();
 
         $plainToken = $user->createToken('google_oauth')->plainTextToken;
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDisplay } from 'vuetify'
 import api from '@/plugins/axios'
 import { firstFile, toFileArray, type SingleFileModel } from '@/utils/files'
 
@@ -251,6 +252,52 @@ const openView = (item: any) => {
   viewingItem.value = item
   viewDialog.value = true
 }
+
+const { xs } = useDisplay()
+
+const plainText = (s?: string | null) => (s ?? '').replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim()
+
+// كثير أخبار بيبدأ محتواها بنفس العنوان (منسوخ من فيسبوك/الموقع) — بنشيله من العرض عشان ما يتكرر تحت العنوان
+const viewBodyHtml = computed(() => {
+  const item = viewingItem.value
+  if (!item?.body)
+    return ''
+  const doc = new DOMParser().parseFromString(item.body, 'text/html')
+  let first = doc.body.firstElementChild
+  while (first && !plainText(first.textContent) && !first.querySelector('img,iframe,video')) {
+    first.remove()
+    first = doc.body.firstElementChild
+  }
+  if (first && plainText(first.textContent) === plainText(item.title))
+    first.remove()
+
+  return doc.body.innerHTML
+})
+
+// المقتطف بيظهر كمقدمة بس لو مش مكرر حرفياً بالمحتوى
+const showViewExcerpt = computed(() => {
+  const excerpt = plainText(viewingItem.value?.excerpt)
+  if (!excerpt)
+    return false
+  const bodyText = plainText(new DOMParser().parseFromString(viewBodyHtml.value, 'text/html').body.textContent)
+
+  return !bodyText.includes(excerpt)
+})
+
+const formatLongDate = (d?: string | null) =>
+  d ? new Date(d).toLocaleDateString('ar-PS', { year: 'numeric', month: 'long', day: 'numeric' }) : ''
+
+const viewStatus = computed(() => {
+  const item = viewingItem.value
+  if (!item?.is_published)
+    return { label: 'مسودة', color: 'secondary', icon: 'tabler-file-pencil' }
+  if (item.published_at && new Date(item.published_at) > new Date())
+    return { label: 'مجدول', color: 'warning', icon: 'tabler-calendar-time' }
+
+  return { label: 'منشور', color: 'success', icon: 'tabler-circle-check' }
+})
+
+const lightboxImage = ref<string | null>(null)
 
 const saveNews = async () => {
   if (!form.value.title || !form.value.body) {
@@ -597,60 +644,123 @@ const deleteNews = async () => {
     </VDialog>
 
     <!-- View Details Dialog -->
-    <VDialog v-model="viewDialog" max-width="680" scrollable>
-      <VCard v-if="viewingItem">
-        <VCardTitle class="d-flex align-center justify-space-between" style="font-family:Cairo,sans-serif">
-          <span>{{ viewingItem.title }}</span>
-          <VChip :color="viewingItem.is_published ? 'success' : 'secondary'" size="small" label>
-            {{ viewingItem.is_published ? 'منشور' : 'مسودة' }}
-          </VChip>
-        </VCardTitle>
-        <VCardText>
-          <VImg v-if="viewingItem.image" :src="viewingItem.image" max-height="280" class="mb-4 rounded" cover />
+    <VDialog v-model="viewDialog" max-width="780" scrollable :fullscreen="xs">
+      <VCard v-if="viewingItem" class="news-view">
+        <VBtn
+          icon
+          size="small"
+          variant="elevated"
+          color="surface"
+          class="news-view__close"
+          aria-label="إغلاق"
+          @click="viewDialog = false"
+        >
+          <VIcon icon="tabler-x" size="20" />
+        </VBtn>
 
-          <p v-if="viewingItem.excerpt" class="text-body-1 font-weight-medium mb-4" style="font-family:Cairo,sans-serif">
-            {{ viewingItem.excerpt }}
-          </p>
-
-          <div class="text-body-2 mb-4" style="font-family:Cairo,sans-serif" v-html="viewingItem.body" />
-
-          <div v-if="viewingItem.gallery?.length" class="mb-4">
-            <label class="text-body-2 font-weight-medium mb-2 d-block" style="font-family:Cairo,sans-serif">صور المعرض</label>
-            <div class="d-flex flex-wrap gap-3">
-              <VImg
-                v-for="url in (viewingItem.gallery ?? [])"
-                :key="url"
-                :src="url"
-                width="90"
-                height="90"
-                cover
-                rounded
-              />
-            </div>
+        <VCardText class="pa-0">
+          <div v-if="viewingItem.image" class="news-view__hero">
+            <VImg :src="viewingItem.image" cover width="100%" :height="xs ? 220 : 360" />
           </div>
 
-          <VDivider class="mb-4" />
+          <article class="news-view__article" :class="{ 'news-view__article--no-image': !viewingItem.image }">
+            <div class="d-flex align-center flex-wrap gap-x-4 gap-y-2 mb-4">
+              <VChip :color="viewStatus.color" size="small" label :prepend-icon="viewStatus.icon">
+                {{ viewStatus.label }}
+              </VChip>
+              <span v-if="viewingItem.published_at" class="news-view__meta">
+                <VIcon icon="tabler-calendar" size="16" />
+                {{ formatLongDate(viewingItem.published_at) }}
+              </span>
+            </div>
 
-          <VRow dense>
-            <VCol v-if="viewingItem.video_url" cols="12" md="6">
-              <span class="text-caption text-medium-emphasis d-block">رابط فيديو يوتيوب</span>
-              <a :href="viewingItem.video_url" target="_blank" dir="ltr">{{ viewingItem.video_url }}</a>
-            </VCol>
-            <VCol v-if="viewingItem.external_url" cols="12" md="6">
-              <span class="text-caption text-medium-emphasis d-block">رابط خارجي</span>
-              <a :href="viewingItem.external_url" target="_blank" dir="ltr">{{ viewingItem.external_url }}</a>
-            </VCol>
-            <VCol cols="12" md="6">
-              <span class="text-caption text-medium-emphasis d-block" style="font-family:Cairo,sans-serif">تاريخ النشر</span>
-              <span style="font-family:Cairo,sans-serif">{{ viewingItem.published_at ? new Date(viewingItem.published_at).toLocaleDateString('ar-PS') : '—' }}</span>
-            </VCol>
-          </VRow>
+            <h2 class="news-view__title">
+              {{ viewingItem.title }}
+            </h2>
+
+            <p v-if="showViewExcerpt" class="news-view__excerpt">
+              {{ viewingItem.excerpt }}
+            </p>
+
+            <div class="news-view__content" v-html="viewBodyHtml" />
+
+            <section v-if="viewingItem.gallery?.length" class="mt-8">
+              <h3 class="news-view__section-title">
+                <VIcon icon="tabler-photo" size="18" />
+                صور المعرض
+                <span class="text-medium-emphasis">({{ viewingItem.gallery.length }})</span>
+              </h3>
+              <div class="news-view__gallery">
+                <button
+                  v-for="url in viewingItem.gallery"
+                  :key="url"
+                  type="button"
+                  class="news-view__gallery-item"
+                  aria-label="عرض الصورة بحجم كامل"
+                  @click="lightboxImage = url"
+                >
+                  <VImg :src="url" cover aspect-ratio="1" />
+                </button>
+              </div>
+            </section>
+
+            <section v-if="viewingItem.video_url || viewingItem.external_url" class="mt-8">
+              <h3 class="news-view__section-title">
+                <VIcon icon="tabler-link" size="18" />
+                روابط مرفقة
+              </h3>
+              <div class="d-flex flex-wrap gap-3">
+                <VBtn
+                  v-if="viewingItem.video_url"
+                  :href="viewingItem.video_url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  color="error"
+                  variant="tonal"
+                  prepend-icon="tabler-brand-youtube"
+                >
+                  مشاهدة الفيديو
+                </VBtn>
+                <VBtn
+                  v-if="viewingItem.external_url"
+                  :href="viewingItem.external_url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  color="primary"
+                  variant="tonal"
+                  prepend-icon="tabler-external-link"
+                >
+                  فتح الرابط الخارجي
+                </VBtn>
+              </div>
+            </section>
+          </article>
         </VCardText>
-        <VCardActions>
+
+        <VDivider />
+        <VCardActions class="news-view__actions">
           <VSpacer />
-          <VBtn variant="tonal" color="primary" @click="viewDialog = false; openEdit(viewingItem)">تعديل</VBtn>
-          <VBtn variant="tonal" @click="viewDialog = false">إغلاق</VBtn>
+          <VBtn variant="tonal" color="secondary" @click="viewDialog = false">إغلاق</VBtn>
+          <VBtn
+            v-if="$can('content.news', 'update')"
+            variant="elevated"
+            color="primary"
+            prepend-icon="tabler-pencil"
+            @click="viewDialog = false; openEdit(viewingItem)"
+          >
+            تعديل الخبر
+          </VBtn>
         </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- Gallery Lightbox -->
+    <VDialog :model-value="!!lightboxImage" max-width="1100" @update:model-value="v => { if (!v) lightboxImage = null }">
+      <VCard v-if="lightboxImage" class="news-view">
+        <VBtn icon size="small" variant="elevated" color="surface" class="news-view__close" aria-label="إغلاق" @click="lightboxImage = null">
+          <VIcon icon="tabler-x" size="20" />
+        </VBtn>
+        <VImg :src="lightboxImage" max-height="85vh" contain />
       </VCard>
     </VDialog>
 
@@ -709,6 +819,151 @@ const deleteNews = async () => {
 
 .publish-mode-toggle .v-btn {
   flex: 1 1 0;
+}
+
+/* ── عرض الخبر ── */
+.news-view {
+  position: relative;
+  font-family: Cairo, sans-serif;
+}
+
+.news-view__close {
+  position: absolute;
+  top: 12px;
+  inset-inline-end: 12px;
+  z-index: 2;
+}
+
+.news-view__hero {
+  position: relative;
+  background: rgba(var(--v-theme-on-surface), 0.04);
+}
+
+.news-view__article {
+  padding: 24px 32px 32px;
+}
+
+.news-view__article--no-image {
+  padding-block-start: 28px;
+}
+
+.news-view__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+  font-size: 0.875rem;
+}
+
+/* العنوان كامل على أكثر من سطر — بدون قص */
+.news-view__title {
+  margin: 0 0 16px;
+  color: rgba(var(--v-theme-on-surface), var(--v-high-emphasis-opacity));
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.news-view__article--no-image .news-view__title {
+  padding-inline-end: 40px;
+}
+
+.news-view__excerpt {
+  margin: 0 0 20px;
+  padding: 12px 16px;
+  border-inline-start: 4px solid rgb(var(--v-theme-primary));
+  border-radius: 4px;
+  background: rgba(var(--v-theme-primary), 0.06);
+  color: rgba(var(--v-theme-on-surface), var(--v-high-emphasis-opacity));
+  font-size: 1.05rem;
+  font-weight: 500;
+  line-height: 1.9;
+}
+
+.news-view__content {
+  color: rgba(var(--v-theme-on-surface), 0.85);
+  font-size: 1rem;
+  line-height: 2;
+  overflow-wrap: anywhere;
+}
+
+.news-view__content :deep(p) {
+  margin-block-end: 1em;
+}
+
+.news-view__content :deep(h1),
+.news-view__content :deep(h2),
+.news-view__content :deep(h3) {
+  margin-block: 1.2em 0.6em;
+  font-size: 1.15rem;
+  line-height: 1.6;
+}
+
+.news-view__content :deep(img) {
+  max-inline-size: 100%;
+  block-size: auto;
+  border-radius: 8px;
+}
+
+.news-view__content :deep(ul),
+.news-view__content :deep(ol) {
+  margin-block-end: 1em;
+  padding-inline-start: 1.5em;
+}
+
+.news-view__content :deep(blockquote) {
+  margin: 1em 0;
+  padding-inline-start: 1em;
+  border-inline-start: 3px solid rgba(var(--v-theme-on-surface), 0.2);
+}
+
+.news-view__section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-block-end: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.news-view__gallery {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+}
+
+.news-view__gallery-item {
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  cursor: zoom-in;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.news-view__gallery-item:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.news-view__actions {
+  padding: 12px 24px;
+}
+
+@media (max-width: 599px) {
+  .news-view__article {
+    padding: 18px 16px 24px;
+  }
+
+  .news-view__title {
+    font-size: 1.3rem;
+  }
+
+  .news-view__actions {
+    padding: 10px 16px;
+  }
 }
 
 .gallery-remove-btn {
