@@ -63,7 +63,7 @@ class CertificateSerialVerificationTest extends TestCase
 
         $this->assertCount(600, array_unique($serials));
         foreach ($serials as $s) {
-            $this->assertMatchesRegularExpression('/^[0-9A-HJKMNP-TV-Z]{12}$/', $s);
+            $this->assertMatchesRegularExpression('/^[A-HJKMNP-TV-Z]{12}$/', $s);
             $this->assertTrue(CertificateSerialService::hasValidChecksum($s));
         }
     }
@@ -194,6 +194,23 @@ class CertificateSerialVerificationTest extends TestCase
         foreach ([$scrambled, $reversed, $rtlGroups, $badDashes, "  {$compact}  ", strtolower($compact)] as $pasted) {
             $this->check($pasted)->assertJsonPath('items.state', 'valid');
         }
+    }
+
+    public function test_digit_serial_pasted_with_runs_reversed_still_verifies(): void
+    {
+        // رقم بالصيغة السابقة (فيه أرقام) نسخه قارئ PDF بترتيب قطع معكوس: STS125NEBK8W
+        $cert = $this->issued();
+        $A = \App\Services\CertificateSerialService::ALPHABET;
+        do {
+            $c = '';
+            for ($i = 0; $i < 12; $i++) {
+                $c .= $A[random_int(0, 31)];
+            }
+        } while (! \App\Services\CertificateSerialService::hasValidChecksum($c) || ! preg_match('/\d/', $c) || ! preg_match('/[A-Z]/', $c));
+        \DB::table('certificate_requests')->where('id', $cert->id)->update(['serial_number' => $c]);
+
+        preg_match_all('/\d+|[A-Z]+/', $c, $m);
+        $this->check(implode('', array_reverse($m[0])))->assertJsonPath('items.state', 'valid');
     }
 
     public function test_previous_17_char_serial_still_verifies(): void
