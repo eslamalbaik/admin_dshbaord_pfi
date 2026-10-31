@@ -17,6 +17,10 @@ const step = ref(1)
 const loading = ref(false)
 const uploadProgress = ref(0)
 const errorMsg = ref('')
+// مقاول محفوظ مسبقاً بنفس البيانات — غالباً من محاولة سابقة انحفظت على الخادم مع إن
+// المتصفح ما استلم الرد (انتهت المهلة أو انقطع النت أثناء الرفع)، فالمحاولة الثانية
+// بتطلع "القيمة مستخدمة مسبقاً" على الجوال والبريد والرخصة.
+const existingContractor = ref<{ id: number, name: string, membership_number: string } | null>(null)
 
 const isNewMembership = ref(true)
 const nextMembershipNumber = ref('')
@@ -400,6 +404,29 @@ const reviewItems = computed(() => [
   { step: 3, label: 'عدد المجالات', value: String(form.value.specialties.filter(sp => sp.field_lk_type).length) },
 ])
 
+// بيدوّر على مقاول محفوظ بنفس السجل التجاري أو رقم الرخصة أو البريد اللي بالفورم
+const findSavedContractor = async () => {
+  const f = form.value
+  const keys = [f.commercial_register, f.license_number, f.email].map(v => String(v ?? '').trim()).filter(Boolean)
+  for (const search of keys) {
+    try {
+      const { data } = await api.get('/api/v1/contractors', { params: { search, per_page: 20 } })
+      const rows: any[] = Array.isArray(data?.items) ? data.items : (data?.data ?? [])
+      const match = rows.find(c =>
+        (f.commercial_register && String(c.commercial_register) === String(f.commercial_register))
+        || (f.license_number && String(c.license_number) === String(f.license_number))
+        || (f.email && String(c.email ?? '').toLowerCase() === String(f.email).toLowerCase()))
+      if (match)
+        return { id: match.id, name: match.name, membership_number: match.membership_number }
+    }
+    catch {
+      return null
+    }
+  }
+
+  return null
+}
+
 const submit = async () => {
   // فحص المجموع قبل أي رفع (TASK-16 #3): المتصفح يرفع الجسم كاملاً ثم يُسقطه PHP
   // لتجاوزه post_max_size — فبدون هذا الفحص ينتظر المستخدم رفع كل الملفات ثم يفشل.
@@ -416,6 +443,7 @@ const submit = async () => {
   loading.value = true
   uploadProgress.value = 0
   errorMsg.value = ''
+  existingContractor.value = null
   validationErrors.value = {}
   try {
     const fd = new FormData()
@@ -461,6 +489,26 @@ const submit = async () => {
       scrollToTop()
 
       return
+    }
+
+    // ما وصل رد واضح (مهلة/انقطاع/5xx) أو الخادم رفض قيم مكررة: نتأكد إذا المقاول
+    // انحفظ فعلاً من هالمحاولة أو من محاولة قبلها قبل ما نعرض فشل.
+    const status = err?.response?.status
+    if (!err?.response || status >= 500 || status === 422) {
+      const saved = await findSavedContractor()
+      if (saved && status !== 422) {
+        router.push({ name: 'contractors-edit-id', params: { id: saved.id } })
+
+        return
+      }
+      if (saved) {
+        existingContractor.value = saved
+        errorMsg.value = `هذا المقاول مسجّل مسبقاً باسم «${saved.name}» (رقم العضوية ${saved.membership_number}) — `
+          + 'غالباً انحفظ من المحاولة السابقة مع إن الصفحة ما استلمت الرد. افتح ملفه وكمّل منه بدل التسجيل مرة ثانية.'
+        scrollToTop()
+
+        return
+      }
     }
 
     errorMsg.value = describeRequestError(err, 'فشل تسجيل المقاول. يرجى التحقق من المدخلات.')
@@ -517,6 +565,20 @@ const submit = async () => {
       @click:close="errorMsg = ''"
     >
       {{ errorMsg }}
+      <div
+        v-if="existingContractor"
+        class="mt-2"
+      >
+        <VBtn
+          size="small"
+          color="error"
+          variant="elevated"
+          prepend-icon="tabler-edit"
+          :to="{ name: 'contractors-edit-id', params: { id: existingContractor.id } }"
+        >
+          فتح ملف المقاول
+        </VBtn>
+      </div>
     </VAlert>
     <VAlert
       v-if="stepNotice"
