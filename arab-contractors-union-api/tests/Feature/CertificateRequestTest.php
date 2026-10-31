@@ -212,6 +212,22 @@ class CertificateRequestTest extends TestCase
             ->assertJsonPath('items.type', 'membership');
     }
 
+    /**
+     * بلاغ 2026-10-31: لوحة التحكم قالت "اكتمال الملف 100%" والتطبيق رفض طلب الشهادة لأن
+     * شرط الـ API كان فيه حقول ما بتنحسب باللوحة. الشعار وهاي الحقول الستة مش مطلوبة.
+     */
+    public function test_profile_complete_without_logo_and_dashboard_unstarred_fields(): void
+    {
+        $profile = collect($this->completeProfile())
+            ->except(['owner_name', 'authorized_person', 'capital', 'legal_form', 'registration_date', 'company_purposes', 'phone'])
+            ->all();
+        $contractor = $this->createContractor($profile);
+
+        $this->assertNull($contractor->logo);
+        $this->assertSame([], $contractor->missing_profile_fields);
+        $this->assertTrue($contractor->profile_data_complete);
+    }
+
     /** بيانات ملف تعريفي كامل بدون إنشاء أي سجل عضوية */
     private function completeProfile(): array
     {
