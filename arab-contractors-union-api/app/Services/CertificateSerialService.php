@@ -17,7 +17,14 @@ namespace App\Services;
  */
 class CertificateSerialService
 {
+    /** كل الحروف/الأرقام المقبولة بالإدخال (تشمل أرقام الصيغ التجريبية السابقة) */
     public const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+    /**
+     * أبجدية التوليد: حروف لاتينية فقط (22 حرفاً بدون I L O U). الأرقام بتقسّم النص لقطع منفصلة داخل
+     * سطر عربي، فبعض قارئات PDF بتعكس ترتيب القطع عند النسخ؛ الحروف وحدها = كلمة واحدة ما بتنعكس.
+     */
+    private const GEN_ALPHABET = 'ABCDEFGHJKMNPQRSTVWXYZ';
 
     private const LEN = 12;
     private const LEN_V1 = 17;
@@ -26,10 +33,10 @@ class CertificateSerialService
     {
         $body = '';
         for ($i = 0; $i < self::LEN - 1; $i++) {
-            $body .= self::ALPHABET[random_int(0, 31)];
+            $body .= self::GEN_ALPHABET[random_int(0, 21)];
         }
 
-        return self::format($body . self::checksum($body));
+        return self::format($body . self::GEN_ALPHABET[crc32($body) % 22]);
     }
 
     /** يحوّل المدخل (حروف صغيرة/مسافات/شرطات ناقصة) للصيغة القياسية، أو null لو الشكل غير معروف. */
@@ -66,6 +73,11 @@ class CertificateSerialService
         }
 
         $variants = [$raw, strrev($raw), implode('', array_reverse(str_split($raw, 4)))];
+
+        // قارئ PDF عكس ترتيب القطع (حروف/أرقام متتالية) عند النسخ: STS125NEBK8W ← W8NEBK125STS
+        if (preg_match_all('/\d+|[A-Z]+/', $raw, $m) && count($m[0]) > 1) {
+            $variants[] = implode('', array_reverse($m[0]));
+        }
         if (strlen($raw) === self::LEN_V1) {
             // 17 خانة: خانة الفحص آخراً، فبالنسخ العربي بتطلع أولاً
             $variants[] = substr($raw, 13, 4) . substr($raw, 9, 4) . substr($raw, 5, 4) . substr($raw, 1, 4) . $raw[0];
@@ -129,8 +141,15 @@ class CertificateSerialService
         $compact = str_replace('-', '', $normalized);
         $n = strlen($compact);
 
-        return in_array($n, [self::LEN, self::LEN_V1], true)
-            && self::checksum(substr($compact, 0, $n - 1)) === $compact[$n - 1];
+        if (! in_array($n, [self::LEN, self::LEN_V1], true)) {
+            return false;
+        }
+
+        $body = substr($compact, 0, $n - 1);
+
+        // الحالي: خانة فحص من أبجدية الحروف؛ السابق (تجريبي): من الأبجدية الكاملة
+        return $compact[$n - 1] === self::GEN_ALPHABET[crc32($body) % 22]
+            || $compact[$n - 1] === self::checksum($body);
     }
 
     /** يشيل الفواصل ويصحّح الالتباس (O→0، I/L→1) ويتأكد من الطول والأبجدية؛ null لو غير صالح. */
