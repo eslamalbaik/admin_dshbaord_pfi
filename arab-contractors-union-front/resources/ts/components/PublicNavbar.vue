@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Menu, X, ChevronDown, ChevronLeft, LayoutDashboard, User, LogOut, Bell } from 'lucide-vue-next'
+import { Menu, X, ChevronDown, ChevronLeft, LayoutDashboard, User, LogOut, Bell, Mail, Phone, MapPin } from 'lucide-vue-next'
 import api from '@/plugins/axios'
 import axios from 'axios'
 
@@ -10,6 +10,13 @@ const BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 defineProps<{
   contractorProfile?: any
 }>()
+
+// same contact details as the Gaza branch in PublicFooter.vue — keep them in sync
+const contact = {
+  email: 'info.pcu@gmail.com',
+  phone: '+970-592373805',
+  address: 'غزة - الرمال',
+}
 
 const router = useRouter()
 const scrolled = ref(false)
@@ -156,6 +163,14 @@ onMounted(() => {
 
 <template>
   <div class="pub-header">
+    <!-- Blue contact strip: scrolls away, the white navbar below stays pinned -->
+    <div class="pub-topbar">
+      <div class="pub-container pub-topbar-inner">
+        <a :href="`mailto:${contact.email}`" class="pub-tb-item"><Mail :size="15" /><span>{{ contact.email }}</span></a>
+        <a :href="`tel:${contact.phone.replace(/-/g, '')}`" class="pub-tb-item"><Phone :size="15" /><span dir="ltr">{{ contact.phone }}</span></a>
+        <span class="pub-tb-item pub-tb-address"><MapPin :size="15" /><span>{{ contact.address }}</span></span>
+      </div>
+    </div>
     <!-- Navbar -->
     <nav class="pub-navbar" :class="{ scrolled }">
       <div class="pub-container"><div class="pub-nb-inner">
@@ -278,6 +293,15 @@ div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
 
 .pub-container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
 
+/* Blue contact strip above the navbar. Its height is part of --pub-nav-h in layouts/landing.vue. */
+/* positioned so page heroes (pulled up by --pub-nav-h) paint under it, not over it */
+.pub-topbar { position: relative; z-index: 201; background: #00006e; color: #fff; }
+.pub-topbar-inner { display: flex; align-items: center; gap: 2rem; height: 40px; font-size: .88rem; }
+.pub-tb-item { display: inline-flex; align-items: center; gap: .45rem; color: rgba(255, 255, 255, .92); text-decoration: none; white-space: nowrap; transition: color .2s; }
+.pub-tb-item svg { color: #f5a623; flex-shrink: 0; }
+a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
+.pub-tb-address { margin-inline-start: auto; }
+
 /* Full-width white bar pinned to the top of every public page.
    Its height is --pub-nav-h in layouts/landing.vue — keep them in sync (page heroes slide up under it). */
 .pub-navbar {
@@ -302,6 +326,10 @@ div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
 }
 @media (max-width: 420px) {
   .pub-brand-name small { display: none; }
+}
+@media (max-width: 600px) {
+  .pub-topbar-inner { justify-content: space-between; }
+  .pub-tb-address { display: none; }
 }
 
 .pub-nav-links { display: flex; align-self: stretch; gap: 1.9rem; margin-inline-start: 3.2rem; margin-inline-end: auto; }
@@ -419,6 +447,7 @@ div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
 
 @media (max-width: 1100px) {
   .pub-container { padding: 0 16px; }
+  .pub-topbar-inner { height: 34px; gap: 1.1rem; font-size: .78rem; }
   .pub-nb-inner { height: 68px; }
   .pub-brand-logo { height: 46px; }
   .pub-nav-links { display: none; }
