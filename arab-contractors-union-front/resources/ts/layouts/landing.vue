@@ -20,11 +20,11 @@ import PublicFooter from '@/components/PublicFooter.vue'
   flex-direction: column;
   background: #ffffff;
   font-family: 'Tajawal', 'Cairo', sans-serif;
-  /* height of the floating PublicNavbar (padding + card); the home hero slides up under it */
-  --pub-nav-h: 114px;
+  /* height of the full-width sticky PublicNavbar; page heroes slide up under it */
+  --pub-nav-h: 85px;
 }
 @media (max-width: 1100px) {
-  .lp-layout { --pub-nav-h: 88px; }
+  .lp-layout { --pub-nav-h: 69px; }
 }
 </style>
 

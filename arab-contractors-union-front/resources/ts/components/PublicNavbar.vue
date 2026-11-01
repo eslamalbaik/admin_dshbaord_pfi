@@ -158,7 +158,7 @@ onMounted(() => {
   <div class="pub-header">
     <!-- Navbar -->
     <nav class="pub-navbar" :class="{ scrolled }">
-      <div class="pub-container"><div class="pub-nb-card"><div class="pub-nb-inner">
+      <div class="pub-container"><div class="pub-nb-inner">
         <RouterLink to="/landing" class="pub-brand">
           <img src="/logo.png" alt="اتحاد المقاولين الفلسطينيين" class="pub-brand-logo" />
           <span class="pub-brand-name">اتحاد المقاولين الفلسطينيين<small>Palestinian Contractor Union</small></span>
@@ -261,7 +261,7 @@ onMounted(() => {
           </div>
         </div>
       </div>
-      </div></div>
+      </div>
     </nav>
   </div>
 </template>
@@ -278,21 +278,17 @@ div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
 
 .pub-container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
 
-/* Floating white card: the wrapper is transparent so the home hero shows around it.
-   Its height (padding + card) is --pub-nav-h in layouts/landing.vue — keep them in sync. */
+/* Full-width white bar pinned to the top of every public page.
+   Its height is --pub-nav-h in layouts/landing.vue — keep them in sync (page heroes slide up under it). */
 .pub-navbar {
-  position: sticky; top: 0; z-index: 200;
-  padding: 24px 0 14px; pointer-events: none;
+  position: sticky; top: 0; z-index: 200; width: 100%;
+  background: rgba(255, 255, 255, .97); backdrop-filter: blur(10px);
+  border-bottom: 1px solid #eceef3;
+  box-shadow: 0 2px 12px rgba(0, 0, 80, .05);
+  transition: box-shadow .3s, background .3s;
 }
-.pub-nb-card {
-  pointer-events: auto; position: relative;
-  background: rgba(255, 255, 255, .94); backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, .7); border-radius: 18px;
-  box-shadow: 0 6px 24px rgba(0, 0, 80, .08);
-  transition: box-shadow .3s;
-}
-.pub-navbar.scrolled .pub-nb-card { box-shadow: 0 10px 30px rgba(0, 0, 80, .16); }
-.pub-nb-inner { display: flex; align-items: center; gap: 1rem; min-height: 74px; padding: 0 2.5rem 0 2.5rem; }
+.pub-navbar.scrolled { background: #fff; box-shadow: 0 8px 24px rgba(0, 0, 80, .12); }
+.pub-nb-inner { display: flex; align-items: center; gap: 1rem; height: 84px; }
 
 .pub-brand { display: flex; align-items: center; gap: .75rem; text-decoration: none; flex-shrink: 0; }
 .pub-brand-logo { height: 56px; width: auto; object-fit: contain; }
@@ -321,7 +317,7 @@ div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
 .pub-nav-link { font-family: 'Tajawal', sans-serif; font-size: .92rem; color: #2b2f3a; }
 .pub-nav-link:hover, .router-link-exact-active.pub-nav-link { color: #00006e; }
 .router-link-exact-active.pub-nav-link { font-weight: 700; }
-/* orange bar on the bottom edge of the card under the current page */
+/* orange bar on the bottom edge of the header under the current page */
 .router-link-exact-active.pub-nav-link::after {
   content: ''; position: absolute; bottom: 0; inset-inline: 0; height: 4px; border-radius: 4px 4px 0 0; background: #d67a00;
 }
@@ -366,10 +362,10 @@ div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
 .pub-hamburger { display: none; background: none; border: none; cursor: pointer; padding: 4px; color: #374151; flex-shrink: 0; margin-inline-start: auto; }
 
 .pub-mobile-menu {
-  padding: .75rem 1.5rem 1.25rem; border-top: 1px solid #e5e7eb;
+  padding: .75rem .5rem 1.25rem; border-top: 1px solid #e5e7eb;
   display: flex; flex-direction: column; gap: .2rem; background: transparent;
   /* the navbar is sticky now, so a long open menu scrolls inside itself */
-  max-height: calc(100vh - 110px); overflow-y: auto;
+  max-height: calc(100vh - 68px); overflow-y: auto;
 }
 .pub-mob-link {
   padding: .6rem .875rem; color: #374151; font-size: .9rem; font-weight: 600;
@@ -422,8 +418,8 @@ div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
 .pub-mob-user .pub-nb-name { max-width: none; flex: 1; font-size: .88rem; }
 
 @media (max-width: 1100px) {
-  .pub-navbar { padding: 12px 0 10px; }
-  .pub-nb-inner { min-height: 64px; padding: 0 1rem; }
+  .pub-container { padding: 0 16px; }
+  .pub-nb-inner { height: 68px; }
   .pub-brand-logo { height: 46px; }
   .pub-nav-links { display: none; }
   .pub-hamburger { display: flex; }
