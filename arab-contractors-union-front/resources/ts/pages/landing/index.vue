@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/plugins/axios'
+import PublicNewsTicker from '@/components/PublicNewsTicker.vue'
 import { MotionDirective } from '@vueuse/motion'
 import {
   ArrowLeft, Award, Bookmark, Building2, CalendarDays, ChevronLeft, ChevronRight, Clock, FileSignature,
@@ -249,20 +250,9 @@ onMounted(() => {
       </div>
     </section>
 
-    <!-- ══ PARTNERS ══ -->
-    <div class="container">
-      <div v-reveal class="partners" @mouseenter="stopPartners" @mouseleave="startPartners">
-        <span class="partners-label">الشركاء والجهات المعتمدة:</span>
-        <div class="partners-carousel">
-          <button class="arrow" aria-label="السابق" @click="slidePartners(-1)"><ChevronRight :size="18" /></button>
-          <div ref="partnersTrack" class="partners-track">
-            <span v-for="p in partners" :key="p.label" class="partner" :title="p.label">
-              <img :src="p.logo" :alt="p.label" loading="lazy">
-            </span>
-          </div>
-          <button class="arrow" aria-label="التالي" @click="slidePartners(1)"><ChevronLeft :size="18" /></button>
-        </div>
-      </div>
+    <!-- ══ NEWS TICKER (overlaps the hero's bottom edge) ══ -->
+    <div class="container ticker-wrap">
+      <PublicNewsTicker class="home-ticker" />
     </div>
 
     <!-- ══ ABOUT ══ -->
@@ -452,6 +442,22 @@ onMounted(() => {
         </div>
       </section>
     </div>
+
+    <!-- ══ PARTNERS ══ -->
+    <div class="container partners-wrap">
+      <div v-reveal class="partners" @mouseenter="stopPartners" @mouseleave="startPartners">
+        <span class="partners-label">الشركاء والجهات المعتمدة:</span>
+        <div class="partners-carousel">
+          <button class="arrow" aria-label="السابق" @click="slidePartners(-1)"><ChevronRight :size="18" /></button>
+          <div ref="partnersTrack" class="partners-track">
+            <span v-for="p in partners" :key="p.label" class="partner" :title="p.label">
+              <img :src="p.logo" :alt="p.label" loading="lazy">
+            </span>
+          </div>
+          <button class="arrow" aria-label="التالي" @click="slidePartners(1)"><ChevronLeft :size="18" /></button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -550,10 +556,15 @@ onMounted(() => {
 .play { width: 28px; height: 28px; border-radius: 50%; background: var(--yellow); color: var(--navy); display: grid; place-items: center; }
 
 /* ══ PARTNERS ══ */
+.partners-wrap { padding-bottom: 72px; }
 .partners {
   display: flex; align-items: center; gap: 18px 28px; flex-wrap: wrap;
-  border-top: 1px solid var(--line); margin-top: 64px; padding: 16px 0 8px;
+  border-top: 1px solid var(--line); padding: 28px 0 8px;
 }
+
+/* ══ NEWS TICKER ══ */
+.ticker-wrap { position: relative; z-index: 2; margin-top: -23px; }
+.home-ticker { border-radius: 12px; box-shadow: 0 14px 34px rgba(0, 0, 80, .22); }
 .partners-label { color: #8a90a0; font-weight: 700; font-size: 15px; }
 .partners-label { flex-shrink: 0; }
 .partners-carousel { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; }
@@ -572,16 +583,18 @@ onMounted(() => {
   background-image: radial-gradient(circle, #f4f5f8 6px, transparent 6.5px);
   background-size: 26px 26px; background-repeat: repeat;
 }
-.about { padding: 100px 0 40px; margin-top: 64px; }
+.about { padding: 80px 0 40px; margin-top: 24px; }
 .about-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 56px; align-items: start; }
-.about-heading { font-size: clamp(21px, 1.8vw, 26px); font-weight: 800; line-height: 1.6; margin-bottom: 30px; }
-.features { display: flex; flex-direction: column; gap: 22px; margin-bottom: 24px; }
+.about .eyebrow { margin-bottom: 22px; }
+/* .lp h2 resets margins, so this needs the extra .lp to win */
+.lp .about-heading { max-width: 640px; font-size: clamp(21px, 1.8vw, 26px); font-weight: 800; line-height: 1.75; margin-bottom: 40px; }
+.features { display: flex; flex-direction: column; gap: 18px; margin-bottom: 36px; }
 .feature {
   display: flex; align-items: center; gap: 22px; padding: 26px 26px; border-radius: 14px; background: #f4f5f9;
   box-shadow: 0 10px 28px rgba(15, 23, 60, .06); transition: background .25s, color .25s;
 }
-.feature h3 { font-size: 16px; font-weight: 800; margin-bottom: 8px; }
-.feature p { color: var(--muted); font-size: 14px; line-height: 1.5; }
+.feature h3 { font-size: 17px; font-weight: 800; margin-bottom: 10px; }
+.feature p { color: var(--muted); font-size: 14px; line-height: 1.8; }
 .feature-icon { width: 52px; height: 52px; border-radius: 10px; display: grid; place-items: center; flex-shrink: 0; background: #e3e3f1; color: var(--navy); transition: background .25s, color .25s; }
 .feature.active { background: var(--navy); color: #fff; }
 .feature.active p { color: rgba(255, 255, 255, .82); }
@@ -596,7 +609,7 @@ onMounted(() => {
 
 .stats {
   display: grid; grid-template-columns: repeat(4, 1fr); background: #fff; border: 1px solid #dfe2ea;
-  border-radius: 18px; padding: 26px 20px; margin-top: 28px;
+  border-radius: 18px; padding: 26px 20px; margin-top: 72px;
 }
 .stat { display: flex; align-items: center; justify-content: center; gap: 16px; }
 .stat + .stat { border-inline-start: 1px solid var(--line); }
@@ -695,7 +708,7 @@ onMounted(() => {
 .read-more { display: inline-flex; align-items: center; gap: 10px; color: var(--navy); font-weight: 800; font-size: 15px; margin-top: auto; padding-top: 6px; }
 
 /* ══ APP ══ */
-.app-wrap { padding-top: 140px; padding-bottom: 120px; }
+.app-wrap { padding-top: 140px; padding-bottom: 88px; }
 .app {
   position: relative; overflow: hidden; border-radius: 32px; display: grid; grid-template-columns: 1fr 1fr; align-items: center;
   background: radial-gradient(circle at 42% 50%, #fff 0%, #f1f3f7 30%, #e9ecf2 100%); min-height: 430px; padding: 40px 40px 40px 0;
@@ -747,7 +760,10 @@ onMounted(() => {
   .directory { margin-top: 100px; }
   .dcard-head { flex-wrap: wrap; }
   .dstatus { order: 3; margin-inline-start: 50px; }
-  .app-wrap { padding-top: 100px; padding-bottom: 88px; }
+  .app-wrap { padding-top: 100px; padding-bottom: 56px; }
+  .partners-wrap { padding-bottom: 48px; }
+  .ticker-wrap { margin-top: -20px; }
+  .lp .about-heading { margin-bottom: 28px; }
   .head-row { align-items: flex-start; }
   .directory { border-radius: 22px; }
   .directory-search .btn-navy { padding: 12px 18px; }
