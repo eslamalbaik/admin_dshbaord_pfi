@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { ChevronLeft, Radio } from 'lucide-vue-next'
 import api from '@/plugins/axios'
 
-// "آخر الأخبار" ticker, styled like a TV news lower-third. Sits under the home hero.
+// "آخر التحديثات" ticker, styled like a TV news lower-third. Sits under the home hero.
 // The bar always renders (fallback line when there is no news) so the layout never jumps.
 
 interface TickerItem { key: string; title: string; to: string }
@@ -35,10 +35,10 @@ const duration = computed(() => {
 </script>
 
 <template>
-  <div class="nt" role="region" aria-label="آخر الأخبار">
+  <div class="nt" role="region" aria-label="آخر التحديثات">
     <div class="nt-label">
       <span class="nt-live"><Radio :size="16" /></span>
-      <span class="nt-label-text">آخر الأخبار</span>
+      <span class="nt-label-text">آخر التحديثات</span>
     </div>
 
     <div class="nt-viewport">

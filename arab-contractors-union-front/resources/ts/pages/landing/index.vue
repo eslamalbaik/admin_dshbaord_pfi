@@ -563,7 +563,8 @@ onMounted(() => {
 }
 
 /* ══ NEWS TICKER ══ */
-.ticker-wrap { position: relative; z-index: 2; margin-top: -23px; }
+/* wider than the 1200px content container so the bar reads as a long strip */
+.ticker-wrap { position: relative; z-index: 2; margin-top: -23px; max-width: 1440px; }
 .home-ticker { border-radius: 12px; box-shadow: 0 14px 34px rgba(0, 0, 80, .22); }
 .partners-label { color: #8a90a0; font-weight: 700; font-size: 15px; }
 .partners-label { flex-shrink: 0; }
