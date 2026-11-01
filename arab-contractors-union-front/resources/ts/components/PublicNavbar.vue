@@ -11,22 +11,18 @@ defineProps<{
   contractorProfile?: any
 }>()
 
-// same contact details as the Gaza branch in PublicFooter.vue — keep them in sync
+// same contact details as PublicFooter.vue — keep them in sync
 const contact = {
-  email: 'info.pcu@gmail.com',
-  phone: '+970-592373805',
+  email: 'info@pcu.org.ps',
+  phone: '0597233422',
   address: 'غزة - الرمال',
 }
 
 const router = useRouter()
-const scrolled = ref(false)
 const mobileOpen = ref(false)
 
 const localProfile = ref<any>(null)
 
-function onScroll() { scrolled.value = window.scrollY > 50 }
-onMounted(() => window.addEventListener('scroll', onScroll, { passive: true }))
-onUnmounted(() => window.removeEventListener('scroll', onScroll))
 
 const navLinks = [
   { label: 'الرئيسية', href: '/landing' },
@@ -163,16 +159,16 @@ onMounted(() => {
 
 <template>
   <div class="pub-header">
-    <!-- Blue contact strip: scrolls away, the white navbar below stays pinned -->
+    <!-- Blue contact strip above the white navbar -->
     <div class="pub-topbar">
       <div class="pub-container pub-topbar-inner">
         <a :href="`mailto:${contact.email}`" class="pub-tb-item"><Mail :size="15" /><span>{{ contact.email }}</span></a>
-        <a :href="`tel:${contact.phone.replace(/-/g, '')}`" class="pub-tb-item"><Phone :size="15" /><span dir="ltr">{{ contact.phone }}</span></a>
+        <a :href="`tel:${contact.phone}`" class="pub-tb-item"><Phone :size="15" /><span dir="ltr">{{ contact.phone }}</span></a>
         <span class="pub-tb-item pub-tb-address"><MapPin :size="15" /><span>{{ contact.address }}</span></span>
       </div>
     </div>
     <!-- Navbar -->
-    <nav class="pub-navbar" :class="{ scrolled }">
+    <nav class="pub-navbar">
       <div class="pub-container"><div class="pub-nb-inner">
         <RouterLink to="/landing" class="pub-brand">
           <img src="/logo.png" alt="اتحاد المقاولين الفلسطينيين" class="pub-brand-logo" />
@@ -288,7 +284,6 @@ onMounted(() => {
 
 div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
 
-/* display: contents so the sticky navbar sticks against the whole page, not this wrapper */
 .pub-header { display: contents; }
 
 .pub-container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
@@ -302,25 +297,24 @@ div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
 a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
 .pub-tb-address { margin-inline-start: auto; }
 
-/* Full-width white bar pinned to the top of every public page.
+/* Full-width white bar at the top of every public page (scrolls with the page, not sticky).
    Its height is --pub-nav-h in layouts/landing.vue — keep them in sync (page heroes slide up under it). */
 .pub-navbar {
-  position: sticky; top: 0; z-index: 200; width: 100%;
+  position: relative; z-index: 200; width: 100%;
   background: rgba(255, 255, 255, .97); backdrop-filter: blur(10px);
   border-bottom: 1px solid #eceef3;
   box-shadow: 0 2px 12px rgba(0, 0, 80, .05);
   transition: box-shadow .3s, background .3s;
 }
-.pub-navbar.scrolled { background: #fff; box-shadow: 0 8px 24px rgba(0, 0, 80, .12); }
 .pub-nb-inner { display: flex; align-items: center; gap: 1rem; height: 84px; }
 
 .pub-brand { display: flex; align-items: center; gap: .75rem; text-decoration: none; flex-shrink: 0; }
-.pub-brand-logo { height: 56px; width: auto; object-fit: contain; }
+.pub-brand-logo { height: 74px; width: auto; object-fit: contain; }
 .pub-brand-name {
   display: flex; flex-direction: column; gap: .35rem; color: #0b0b0f; font-family: 'Tajawal', sans-serif;
   font-size: .95rem; font-weight: 700; line-height: 1.2; white-space: nowrap;
 }
-.pub-brand-name small { color: #5b6474; font-size: .82rem; font-weight: 400; direction: ltr; text-align: right; letter-spacing: .02em; }
+.pub-brand-name small { color: #0b0b0f; font-size: .82rem; font-weight: 500; direction: ltr; text-align: right; letter-spacing: .02em; }
 @media (min-width: 1101px) and (max-width: 1199px) {
   .pub-brand-name { display: none; }
 }
@@ -392,8 +386,6 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
 .pub-mobile-menu {
   padding: .75rem .5rem 1.25rem; border-top: 1px solid #e5e7eb;
   display: flex; flex-direction: column; gap: .2rem; background: transparent;
-  /* the navbar is sticky now, so a long open menu scrolls inside itself */
-  max-height: calc(100vh - 68px); overflow-y: auto;
 }
 .pub-mob-link {
   padding: .6rem .875rem; color: #374151; font-size: .9rem; font-weight: 600;
@@ -449,7 +441,7 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
   .pub-container { padding: 0 16px; }
   .pub-topbar-inner { height: 34px; gap: 1.1rem; font-size: .78rem; }
   .pub-nb-inner { height: 68px; }
-  .pub-brand-logo { height: 46px; }
+  .pub-brand-logo { height: 58px; }
   .pub-nav-links { display: none; }
   .pub-hamburger { display: flex; }
   .pub-nb-actions { display: none; }
