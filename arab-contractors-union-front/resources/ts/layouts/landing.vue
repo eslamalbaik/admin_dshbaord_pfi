@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import PublicNavbar from '@/components/PublicNavbar.vue'
 import PublicFooter from '@/components/PublicFooter.vue'
-import PublicNewsTicker from '@/components/PublicNewsTicker.vue'
 </script>
 
 <template>
   <div dir="rtl" class="lp-layout">
     <PublicNavbar />
-    <PublicNewsTicker />
     <RouterView />
     <PublicFooter />
   </div>
@@ -22,12 +20,11 @@ import PublicNewsTicker from '@/components/PublicNewsTicker.vue'
   flex-direction: column;
   background: #ffffff;
   font-family: 'Tajawal', 'Cairo', sans-serif;
-  /* blue contact strip (40px) + PublicNavbar (85px) + PublicNewsTicker (46px incl. its border);
-     page heroes slide up under them */
-  --pub-nav-h: 171px;
+  /* blue contact strip (40px) + PublicNavbar (85px); page heroes slide up under them */
+  --pub-nav-h: 125px;
 }
 @media (max-width: 1100px) {
-  .lp-layout { --pub-nav-h: 143px; }
+  .lp-layout { --pub-nav-h: 103px; }
 }
 </style>
 

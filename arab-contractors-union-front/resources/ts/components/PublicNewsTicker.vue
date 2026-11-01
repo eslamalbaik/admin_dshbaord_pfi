@@ -3,9 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { ChevronLeft, Radio } from 'lucide-vue-next'
 import api from '@/plugins/axios'
 
-// "آخر الأخبار" ticker under the public header, styled like a TV news lower-third.
-// The bar always renders (fallback line when there is no news) so its height,
-// which is part of --pub-nav-h in layouts/landing.vue, never changes.
+// "آخر الأخبار" ticker, styled like a TV news lower-third. Sits under the home hero.
+// The bar always renders (fallback line when there is no news) so the layout never jumps.
 
 interface TickerItem { key: string; title: string; to: string }
 

@@ -210,7 +210,7 @@ onMounted(() => {
 
         <div class="pub-nb-actions">
           <button v-if="!localProfile" class="pub-btn-register" @click="handleRegisterClick">
-            تسجيل الدخول <ChevronLeft :size="16" />
+            دخول مقاول <ChevronLeft :size="16" />
           </button>
           <span v-if="localProfile?.status === 'active'" class="pub-member-pill"><i />عضوية سارية</span>
           <div v-if="localProfile" class="pub-nb-notif" @click.stop="toggleNotifDropdown">
@@ -268,7 +268,7 @@ onMounted(() => {
         </template>
         <div class="pub-mob-actions">
           <button v-if="!localProfile" class="pub-btn-register pub-mob-cta" @click="handleRegisterClick(); mobileOpen = false">
-            تسجيل الدخول <ChevronLeft :size="16" />
+            دخول مقاول <ChevronLeft :size="16" />
           </button>
           <div v-else class="pub-mob-user-wrap">
             <div class="pub-mob-user">
