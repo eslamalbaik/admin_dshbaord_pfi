@@ -580,8 +580,9 @@ onMounted(() => {
 
 /* ══ ABOUT ══ */
 .dotted {
-  background-image: radial-gradient(circle, #f4f5f8 6px, transparent 6.5px);
-  background-size: 26px 26px; background-repeat: repeat;
+  /* small, faint dots: the old 6px ones were too heavy behind the about text */
+  background-image: radial-gradient(circle, #eef0f6 2px, transparent 2.5px);
+  background-size: 24px 24px; background-repeat: repeat;
 }
 .about { padding: 80px 0 40px; margin-top: 24px; }
 .about-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 56px; align-items: start; }

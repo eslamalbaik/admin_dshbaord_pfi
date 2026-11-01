@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Menu, X, ChevronDown, ChevronLeft, LayoutDashboard, User, LogOut, Bell, Mail, Phone, MapPin } from 'lucide-vue-next'
+import { Menu, X, ChevronDown, LayoutDashboard, User, LogOut, Bell, Mail, Phone, MapPin } from 'lucide-vue-next'
 import api from '@/plugins/axios'
 import axios from 'axios'
 
@@ -210,7 +210,7 @@ onMounted(() => {
 
         <div class="pub-nb-actions">
           <button v-if="!localProfile" class="pub-btn-register" @click="handleRegisterClick">
-            دخول مقاول <ChevronLeft :size="16" />
+            دخول المقاول
           </button>
           <span v-if="localProfile?.status === 'active'" class="pub-member-pill"><i />عضوية سارية</span>
           <div v-if="localProfile" class="pub-nb-notif" @click.stop="toggleNotifDropdown">
@@ -268,7 +268,7 @@ onMounted(() => {
         </template>
         <div class="pub-mob-actions">
           <button v-if="!localProfile" class="pub-btn-register pub-mob-cta" @click="handleRegisterClick(); mobileOpen = false">
-            دخول مقاول <ChevronLeft :size="16" />
+            دخول المقاول
           </button>
           <div v-else class="pub-mob-user-wrap">
             <div class="pub-mob-user">
@@ -393,10 +393,10 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
 .router-link-exact-active.pub-dd-link { background: #f2f3fc; color: #000090; font-weight: 700; border-inline-start-color: #d67a00; }
 
 .pub-btn-register {
-  display: flex; align-items: center; justify-content: space-between; gap: 1.6rem;
+  display: flex; align-items: center; justify-content: center; gap: .5rem;
   background: #00006e;
   color: #fff; border: none; border-radius: 10px;
-  min-height: 44px; padding: .6rem 1.2rem .6rem 1.4rem; font-size: .92rem; font-weight: 700;
+  min-height: 44px; padding: .6rem 1.6rem; font-size: .92rem; font-weight: 700;
   cursor: pointer; font-family: 'Tajawal', sans-serif; white-space: nowrap;
   flex-shrink: 0; text-decoration: none;
   transition: all .25s; box-shadow: 0 4px 14px rgba(13,27,75,.25);
