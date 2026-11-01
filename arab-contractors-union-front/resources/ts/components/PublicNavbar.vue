@@ -11,22 +11,18 @@ defineProps<{
   contractorProfile?: any
 }>()
 
-// same contact details as the Gaza branch in PublicFooter.vue — keep them in sync
+// same contact details as PublicFooter.vue — keep them in sync
 const contact = {
-  email: 'info.pcu@gmail.com',
-  phone: '+970-592373805',
+  email: 'info@pcu.org.ps',
+  phone: '0597233422',
   address: 'غزة - الرمال',
 }
 
 const router = useRouter()
-const scrolled = ref(false)
 const mobileOpen = ref(false)
 
 const localProfile = ref<any>(null)
 
-function onScroll() { scrolled.value = window.scrollY > 50 }
-onMounted(() => window.addEventListener('scroll', onScroll, { passive: true }))
-onUnmounted(() => window.removeEventListener('scroll', onScroll))
 
 const navLinks = [
   { label: 'الرئيسية', href: '/landing' },
@@ -163,16 +159,31 @@ onMounted(() => {
 
 <template>
   <div class="pub-header">
-    <!-- Blue contact strip: scrolls away, the white navbar below stays pinned -->
+    <!-- Blue contact strip above the white navbar -->
     <div class="pub-topbar">
       <div class="pub-container pub-topbar-inner">
         <a :href="`mailto:${contact.email}`" class="pub-tb-item"><Mail :size="15" /><span>{{ contact.email }}</span></a>
-        <a :href="`tel:${contact.phone.replace(/-/g, '')}`" class="pub-tb-item"><Phone :size="15" /><span dir="ltr">{{ contact.phone }}</span></a>
+        <a :href="`tel:${contact.phone}`" class="pub-tb-item"><Phone :size="15" /><span dir="ltr">{{ contact.phone }}</span></a>
         <span class="pub-tb-item pub-tb-address"><MapPin :size="15" /><span>{{ contact.address }}</span></span>
+        <!-- same icons as PublicFooter.vue; real profile URLs still pending (href="#") -->
+        <div class="pub-tb-social">
+          <a href="#" class="pub-tb-soc" aria-label="Facebook">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" /></svg>
+          </a>
+          <a href="#" class="pub-tb-soc" aria-label="Instagram">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r=".8" fill="currentColor" /></svg>
+          </a>
+          <a href="#" class="pub-tb-soc" aria-label="LinkedIn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 9h4v11H4zM6 4.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM11 9h3.8v1.6c.6-1 1.8-1.9 3.6-1.9 3.4 0 3.6 2.2 3.6 5V20h-4v-5.3c0-1.3 0-2.9-1.8-2.9S14 13.2 14 14.6V20h-3z" /></svg>
+          </a>
+          <a href="#" class="pub-tb-soc" aria-label="X">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.8 3h3.1l-6.8 7.7L22 21h-6.2l-4.9-6.3L5.3 21H2.2l7.2-8.3L2 3h6.3l4.4 5.8zm-1.1 16.2h1.7L7.4 4.7H5.6z" /></svg>
+          </a>
+        </div>
       </div>
     </div>
     <!-- Navbar -->
-    <nav class="pub-navbar" :class="{ scrolled }">
+    <nav class="pub-navbar">
       <div class="pub-container"><div class="pub-nb-inner">
         <RouterLink to="/landing" class="pub-brand">
           <img src="/logo.png" alt="اتحاد المقاولين الفلسطينيين" class="pub-brand-logo" />
@@ -288,7 +299,6 @@ onMounted(() => {
 
 div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
 
-/* display: contents so the sticky navbar sticks against the whole page, not this wrapper */
 .pub-header { display: contents; }
 
 .pub-container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
@@ -301,26 +311,31 @@ div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
 .pub-tb-item svg { color: #f5a623; flex-shrink: 0; }
 a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
 .pub-tb-address { margin-inline-start: auto; }
+.pub-tb-social { display: flex; align-items: center; gap: .35rem; }
+.pub-tb-soc {
+  display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%;
+  color: #fff; background: rgba(255, 255, 255, .12); transition: background .2s, color .2s;
+}
+.pub-tb-soc:hover { background: #f5a623; color: #00006e; }
 
-/* Full-width white bar pinned to the top of every public page.
+/* Full-width white bar at the top of every public page (scrolls with the page, not sticky).
    Its height is --pub-nav-h in layouts/landing.vue — keep them in sync (page heroes slide up under it). */
 .pub-navbar {
-  position: sticky; top: 0; z-index: 200; width: 100%;
+  position: relative; z-index: 200; width: 100%;
   background: rgba(255, 255, 255, .97); backdrop-filter: blur(10px);
   border-bottom: 1px solid #eceef3;
   box-shadow: 0 2px 12px rgba(0, 0, 80, .05);
   transition: box-shadow .3s, background .3s;
 }
-.pub-navbar.scrolled { background: #fff; box-shadow: 0 8px 24px rgba(0, 0, 80, .12); }
 .pub-nb-inner { display: flex; align-items: center; gap: 1rem; height: 84px; }
 
 .pub-brand { display: flex; align-items: center; gap: .75rem; text-decoration: none; flex-shrink: 0; }
-.pub-brand-logo { height: 56px; width: auto; object-fit: contain; }
+.pub-brand-logo { height: 74px; width: auto; object-fit: contain; }
 .pub-brand-name {
   display: flex; flex-direction: column; gap: .35rem; color: #0b0b0f; font-family: 'Tajawal', sans-serif;
   font-size: .95rem; font-weight: 700; line-height: 1.2; white-space: nowrap;
 }
-.pub-brand-name small { color: #5b6474; font-size: .82rem; font-weight: 400; direction: ltr; text-align: right; letter-spacing: .02em; }
+.pub-brand-name small { color: #0b0b0f; font-size: .82rem; font-weight: 500; direction: ltr; text-align: right; letter-spacing: .02em; }
 @media (min-width: 1101px) and (max-width: 1199px) {
   .pub-brand-name { display: none; }
 }
@@ -328,8 +343,9 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
   .pub-brand-name small { display: none; }
 }
 @media (max-width: 600px) {
-  .pub-topbar-inner { justify-content: space-between; }
   .pub-tb-address { display: none; }
+  .pub-tb-social { margin-inline-start: auto; gap: .25rem; }
+  .pub-tb-soc { width: 24px; height: 24px; }
 }
 
 .pub-nav-links { display: flex; align-self: stretch; gap: 1.9rem; margin-inline-start: 3.2rem; margin-inline-end: auto; }
@@ -392,8 +408,6 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
 .pub-mobile-menu {
   padding: .75rem .5rem 1.25rem; border-top: 1px solid #e5e7eb;
   display: flex; flex-direction: column; gap: .2rem; background: transparent;
-  /* the navbar is sticky now, so a long open menu scrolls inside itself */
-  max-height: calc(100vh - 68px); overflow-y: auto;
 }
 .pub-mob-link {
   padding: .6rem .875rem; color: #374151; font-size: .9rem; font-weight: 600;
@@ -449,7 +463,7 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
   .pub-container { padding: 0 16px; }
   .pub-topbar-inner { height: 34px; gap: 1.1rem; font-size: .78rem; }
   .pub-nb-inner { height: 68px; }
-  .pub-brand-logo { height: 46px; }
+  .pub-brand-logo { height: 58px; }
   .pub-nav-links { display: none; }
   .pub-hamburger { display: flex; }
   .pub-nb-actions { display: none; }
