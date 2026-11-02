@@ -1002,23 +1002,7 @@ paths:
                               expires_at: { type: string, format: date, nullable: true, example: "2025-12-31", description: "Expiry of the active membership, or of the LAST expired membership when none is active (e.g. 2025-12-31). null only when the contractor never had a membership." }
                               expiring_soon: { type: boolean }
                               days_remaining: { type: integer, nullable: true }
-                          financial:
-                            type: object
-                            properties:
-                              balance:
-                                type: string
-                                description: Total obligations in JOD (dues + unpaid penalties + pending payments), 2 decimals.
-                                example: "150.00"
-                              has_overdue: { type: boolean }
-                              last_invoice:
-                                type: object
-                                nullable: true
-                                properties:
-                                  id: { type: integer }
-                                  description: { type: string }
-                                  amount_jod: { type: number }
-                                  status: { $ref: "#/components/schemas/DueStatus" }
-                                  due_date: { type: string, format: date, nullable: true }
+                          financial: { $ref: "#/components/schemas/HomeFinancial" }
                           stats:
                             type: object
                             properties:
@@ -1131,7 +1115,9 @@ paths:
     get:
       tags: [Membership & Finance]
       summary: Subscription (membership) status object
-      description: Single reusable object for membership state. Memberships end on 31 December of each year.
+      description: |
+        Single reusable object for membership state. Memberships end on 31 December of each year.
+        Also returns `financial`: exactly the same object as `GET /contractor/home` → `items.financial` (see HomeFinancial).
       operationId: getSubscription
       responses:
         "200":
@@ -3889,6 +3875,30 @@ components:
           type: array
           items: { $ref: "#/components/schemas/RequirementIssue" }
         outstanding_total_jod: { type: number }
+        financial: { $ref: "#/components/schemas/HomeFinancial" }
+    HomeFinancial:
+      type: object
+      description: Same object in GET /contractor/home (items.financial) and GET /contractor/subscription (items.financial), built by the same server function.
+      properties:
+        balance: { type: string, example: "80.00", description: "Amount still owed after credit and previous payments, 2 decimals (\"0.00\" when nothing is owed)." }
+        amount_due_jod: { type: number, example: 80, description: Same as balance, as a number. }
+        net_jod: { type: number, example: -80, description: "Signed net: positive = contractor has credit, negative = contractor owes." }
+        credit_jod: { type: number, example: 0, description: Available credit in JOD. }
+        dues_jod: { type: number, example: 60, description: Open dues in JOD. }
+        penalties_jod: { type: number, example: 20, description: Open penalties in JOD. }
+        position: { type: string, enum: [owes, credit, settled], example: owes }
+        currency: { type: string, example: JOD }
+        pending_payments_jod: { type: number, example: 50, description: Transfers still under review (not counted in the balance). }
+        has_overdue: { type: boolean }
+        last_invoice:
+          type: object
+          nullable: true
+          properties:
+            id: { type: integer }
+            description: { type: string }
+            amount_jod: { type: number }
+            status: { $ref: "#/components/schemas/DueStatus" }
+            due_date: { type: string, format: date, nullable: true }
     RequirementIssue:
       type: object
       properties:

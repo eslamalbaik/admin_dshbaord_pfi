@@ -126,6 +126,17 @@ class ContractorHomeController extends Controller
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    //  نفس كائن `financial` تبع الرئيسية — يُستخدم كمان في GET contractor/subscription
+    //  حتى يضل الـ endpointين متطابقين حرفياً.
+    // ─────────────────────────────────────────────────────────────────────────
+    public function financialFor(Contractor $contractor): array
+    {
+        $balance = app(ContractorBalanceController::class)->snapshot($contractor->id);
+
+        return $this->financialSummary($contractor, $balance);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     //  الذمم المالية — نفس حسبة "ما عليه" المستخدمة في شاشة الملف المالي
     // ─────────────────────────────────────────────────────────────────────────
     private function financialSummary(Contractor $contractor, array $balance): array

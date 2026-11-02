@@ -385,7 +385,13 @@ class ContractorDashboardController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
     public function subscription(Request $request)
     {
-        return $this->success($this->membershipStatusService->getSubscriptionStatus($request->user()));
+        $contractor = $request->user();
+
+        return $this->success(array_merge(
+            $this->membershipStatusService->getSubscriptionStatus($contractor),
+            // نفس كائن الملف المالي تبع contractor/home بالضبط (نفس الدالة)
+            ['financial' => app(ContractorHomeController::class)->financialFor($contractor)],
+        ));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
