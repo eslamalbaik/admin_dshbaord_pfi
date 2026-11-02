@@ -282,7 +282,7 @@ onMounted(() => {
         </div>
         <div v-reveal-side :delay="150" class="about-visual">
           <span class="about-frame" />
-          <img src="/images/landing/home-about.webp" alt="فريق اتحاد المقاولين" loading="lazy">
+          <img src="/images/landing/home-about-hq.webp" alt="مقر اتحاد المقاولين الفلسطينيين" width="397" height="595" loading="lazy">
         </div>
       </div>
 
