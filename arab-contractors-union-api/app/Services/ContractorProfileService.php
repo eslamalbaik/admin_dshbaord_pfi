@@ -39,6 +39,8 @@ class ContractorProfileService
             'authorized_person'    => $contractor->authorized_person,
             'authorized_person_id_number' => $contractor->authorized_person_id_number,
             'authorized_person_phone'     => $contractor->authorized_person_phone,
+            // نفس الرقم بصيغة دولية (+970599123456 / +962791234567) — للعرض والاتصال بالتطبيق
+            'authorized_person_phone_international' => \App\Support\PhoneNumber::international($contractor->authorized_person_phone),
             'authorized_person_whatsapp'  => $contractor->authorized_person_whatsapp,
             'classification_label' => $contractor->classification_label,
             'email'                => $contractor->email,

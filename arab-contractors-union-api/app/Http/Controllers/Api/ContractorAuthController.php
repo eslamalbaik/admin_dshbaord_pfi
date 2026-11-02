@@ -40,6 +40,7 @@ class ContractorAuthController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
     //  POST /api/contractor/auth/login
     //  الحقول: identifier (رقم العضوية أو جوال المفوض بالتوقيع) + password + fcm_token (اختياري)
+    //  جوال المفوض من أي دولة مفعّلة بالإعدادات (+970 / +962 / +20 …) — GET /api/v1/app/country-codes
     //  membership_number مقبول كاسم قديم لنفس الحقل (توافق مع نسخ التطبيق الحالية)
     // ─────────────────────────────────────────────────────────────────────────
     public function login(LoginRequest $request)
