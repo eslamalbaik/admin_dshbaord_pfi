@@ -37,7 +37,8 @@ const filters = [
 
 const search = ref('')
 const filter = ref('all')
-const sort = ref<'asc' | 'desc'>('asc')
+// الافتراضي آخر نشاط مالي أولاً: الشركة اللي انضافلها ذمة/رسوم/رصيد بتطلع أول صف
+const sort = ref<'recent' | 'asc' | 'desc'>('recent')
 const page = ref(1)
 
 watch([search, filter, sort], () => page.value = 1)
@@ -108,6 +109,7 @@ function openAdjust(r: BalanceRow) {
 function onAdjusted() {
   adjustedMessage.value = `تم تعديل رصيد ${adjustFor.value?.name ?? ''} بنجاح.`
   adjustedSnack.value = true
+  page.value = 1
   queryClient.invalidateQueries({ queryKey: ['contractor-balances'] })
   queryClient.invalidateQueries({ queryKey: ['contractor-balances-summary'] })
 }
@@ -219,7 +221,7 @@ async function exportCsv() {
         </VChipGroup>
         <VSelect
           v-model="sort"
-          :items="[{ value: 'asc', title: 'الأكثر مديونية أولاً' }, { value: 'desc', title: 'الأكبر رصيداً أولاً' }]"
+          :items="[{ value: 'recent', title: 'آخر نشاط مالي أولاً' }, { value: 'asc', title: 'الأكثر مديونية أولاً' }, { value: 'desc', title: 'الأكبر رصيداً أولاً' }]"
           density="compact"
           hide-details
           style="max-width: 220px;"

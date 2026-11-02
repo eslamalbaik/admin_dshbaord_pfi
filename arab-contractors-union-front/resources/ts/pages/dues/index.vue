@@ -54,16 +54,20 @@ function flash(msg: string, isError = false) {
 // ─── القائمة المجمّعة حسب المقاول ───
 const search = ref('')
 const outstandingOnly = ref(false)
+
+// الافتراضي آخر نشاط مالي أولاً: الشركة اللي انضافلها ذمة/غرامة بتطلع أول صف (الخلفية بترتّب، مش الواجهة)
+const sort = ref<'recent' | 'remaining'>('recent')
 const page = ref(1)
 
-watch([search, outstandingOnly], () => page.value = 1)
+watch([search, outstandingOnly, sort], () => page.value = 1)
 
 const { data, isLoading } = useQuery({
-  queryKey: ['dues-by-contractor', search, outstandingOnly, page],
+  queryKey: ['dues-by-contractor', search, outstandingOnly, sort, page],
   queryFn: async () => (await api.get('/api/v1/dashboard/dues/by-contractor', {
     params: {
       search: search.value || undefined,
       outstanding_only: outstandingOnly.value ? 1 : undefined,
+      sort: sort.value,
       page: page.value,
     },
   })).data,
@@ -113,6 +117,8 @@ async function loadDues(contractorId: number) {
 }
 
 function refreshAll() {
+  // الشركة اللي تعدّلت ذممها صارت أول القائمة (ترتيب آخر نشاط) — نرجع للصفحة الأولى حتى تبان
+  page.value = 1
   queryClient.invalidateQueries({ queryKey: ['dues-by-contractor'] })
   queryClient.invalidateQueries({ queryKey: ['dashboard-dues-summary'] })
   queryClient.invalidateQueries({ queryKey: ['contractor-balances'] })
@@ -916,6 +922,13 @@ watch(criteriaForm, () => criteriaPreview.value = null, { deep: true })
           label="عليهم ذمم قائمة فقط"
           color="warning"
           hide-details
+        />
+        <VSelect
+          v-model="sort"
+          :items="[{ value: 'recent', title: 'آخر نشاط مالي أولاً' }, { value: 'remaining', title: 'الأعلى متبقياً أولاً' }]"
+          density="compact"
+          hide-details
+          style="max-width: 220px;"
         />
       </VCardText>
 

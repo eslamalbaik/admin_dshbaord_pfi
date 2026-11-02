@@ -109,8 +109,15 @@ class ContractorDueController extends Controller
                 ->orWhereHas('penalties', fn ($p) => $p->whereIn('status', ['unpaid', 'partially_paid'])));
         }
 
-        $paginator = $query
-            ->orderByRaw('(COALESCE(dues_total_jod,0) - COALESCE(dues_paid_jod,0) + COALESCE(penalties_total,0) - COALESCE(penalties_paid,0)) desc')
+        // الافتراضي "recent": آخر شركة انضافلها/تعدّلت لها ذمة أو غرامة بتطلع أول؛ "remaining" الأعلى متبقياً أولاً
+        if ($request->input('sort') === 'remaining') {
+            $query->orderByRaw('(COALESCE(dues_total_jod,0) - COALESCE(dues_paid_jod,0) + COALESCE(penalties_total,0) - COALESCE(penalties_paid,0)) desc');
+        }
+        else {
+            $query->orderByRaw(\App\Support\ContractorBalances::lastActivitySql() . ' desc');
+        }
+
+        $paginator = $query->orderBy('contractors.id')
             ->paginate(min($request->integer('per_page', 15), 100))
             ->through(function ($c) {
                 $total = (float) $c->dues_total_jod + (float) $c->penalties_total;

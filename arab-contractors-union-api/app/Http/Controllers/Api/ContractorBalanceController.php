@@ -49,7 +49,10 @@ class ContractorBalanceController extends Controller
     /** GET /api/v1/dashboard/balances */
     public function index(Request $request)
     {
-        $query = DB::query()->fromSub($this->balancesQuery(), 'b');
+        $query = DB::query()->fromSub(
+            $this->balancesQuery()->selectRaw(ContractorBalances::lastActivitySql() . ' AS last_activity_at'),
+            'b',
+        );
 
         if ($request->filled('search')) {
             $q = $request->search;
@@ -65,9 +68,14 @@ class ContractorBalanceController extends Controller
             default  => null,
         };
 
-        $direction = $request->input('sort') === 'desc' ? 'desc' : 'asc';
+        // الافتراضي "recent": آخر شركة انضافلها ذمة/غرامة/رصيد بتطلع أول؛ asc/desc ترتيب حسب الصافي
+        match ($request->input('sort', 'recent')) {
+            'asc'   => $query->orderBy('net_jod'),
+            'desc'  => $query->orderByDesc('net_jod'),
+            default => $query->orderByDesc('last_activity_at'),
+        };
 
-        $paginator = $query->orderBy('net_jod', $direction)->orderBy('id')
+        $paginator = $query->orderBy('id')
             ->paginate(min($request->integer('per_page', 15), 500))
             ->through(fn ($row) => $this->formatRow($row));
 
