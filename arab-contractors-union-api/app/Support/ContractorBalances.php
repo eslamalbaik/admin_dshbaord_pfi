@@ -53,7 +53,25 @@ class ContractorBalances
             ->selectRaw("ROUND({$obligations}, 2) AS obligations_jod")
             ->selectRaw("ROUND({$duesObligations}, 2) AS dues_obligations_jod")
             ->selectRaw('EXISTS(SELECT 1 FROM contractor_dues cy WHERE cy.contractor_id = contractors.id
-                          AND cy.deleted_at IS NULL AND cy.year = ?) AS has_current_year_due', [now()->year]);
+                          AND cy.deleted_at IS NULL AND cy.year = ?) AS has_current_year_due', [now()->year])
+            // أبعد تاريخ انتهاء لعضوية فعّالة — وحده بيحدد "فعّالة/منتهية" (ContractorBalanceController::membershipStatus)
+            ->selectRaw("(SELECT MAX(m.expires_at) FROM memberships m
+                          WHERE m.contractor_id = contractors.id AND m.status = 'active') AS membership_expires_at");
+    }
+
+    /**
+     * آخر نشاط مالي على الشركة: أحدث إضافة/تعديل/حذف لذمة أو غرامة أو رصيد دائن (تعديلات الرصيد اليدوية
+     * بتنشئ واحداً منها). شاشتا الأرصدة والذمم بترتّب عليه افتراضياً حتى الشركة اللي انضافلها شي تطلع أول.
+     * GREATEST غير موجودة بـSQLite الاختبارات، و MAX بعدة وسائط هي مقابلها هناك؛ الاثنتان بترجع NULL
+     * لو أي وسيط NULL، فكل وسيط ملفوف بـCOALESCE. يتوقع جدول contractors بالاستعلام الخارجي.
+     */
+    public static function lastActivitySql(): string
+    {
+        $greatest = \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'sqlite' ? 'MAX' : 'GREATEST';
+        $latest = fn (string $table) => "COALESCE((SELECT MAX(x.updated_at) FROM {$table} x
+                                          WHERE x.contractor_id = contractors.id), '1970-01-01 00:00:00')";
+
+        return "{$greatest}({$latest('contractor_dues')}, {$latest('penalties')}, {$latest('contractor_credits')})";
     }
 
     /** الصافي الدقيق لشركة واحدة (قبل الجبر) */

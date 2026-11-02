@@ -33,13 +33,6 @@ class ContractorBalanceController extends Controller
     /** فائض دفعات الذمم/الغرامات والدفعات المقدمة غير الموزَّع يُعتبر رصيداً للشركة */
     public const CREDIT_PAYMENT_TYPES = ContractorBalances::CREDIT_PAYMENT_TYPES;
 
-    /**
-     * نسبة السداد اللي بتكفي لتنعرض العضوية "فعّالة" وهو لسا عليه باقي بسيط (قرار eslam 2026-10-10):
-     * سدّد 95% أو أكثر من مجموع ذممه ← فعّالة، والباقي بيضل ذمة عليه. الغرامات برّا النسبة
-     * (قرار 2026-10-11): أي غرامة مفتوحة بتخلّي العضوية منتهية.
-     */
-    public const ACTIVE_PAID_RATIO = 0.95;
-
     /** نفس تسميات عمود "حالة العضوية" بصفحة الأرصدة */
     public const STATUS_LABELS = [
         'active'    => 'فعّالة',
@@ -51,7 +44,10 @@ class ContractorBalanceController extends Controller
     /** GET /api/v1/dashboard/balances */
     public function index(Request $request)
     {
-        $query = DB::query()->fromSub($this->balancesQuery(), 'b');
+        $query = DB::query()->fromSub(
+            $this->balancesQuery()->selectRaw(ContractorBalances::lastActivitySql() . ' AS last_activity_at'),
+            'b',
+        );
 
         if ($request->filled('search')) {
             $q = $request->search;
@@ -67,9 +63,14 @@ class ContractorBalanceController extends Controller
             default  => null,
         };
 
-        $direction = $request->input('sort') === 'desc' ? 'desc' : 'asc';
+        // الافتراضي "recent": آخر شركة انضافلها ذمة/غرامة/رصيد بتطلع أول؛ asc/desc ترتيب حسب الصافي
+        match ($request->input('sort', 'recent')) {
+            'asc'   => $query->orderBy('net_jod'),
+            'desc'  => $query->orderByDesc('net_jod'),
+            default => $query->orderByDesc('last_activity_at'),
+        };
 
-        $paginator = $query->orderBy('net_jod', $direction)->orderBy('id')
+        $paginator = $query->orderBy('id')
             ->paginate(min($request->integer('per_page', 15), 500))
             ->through(fn ($row) => $this->formatRow($row));
 
@@ -100,7 +101,7 @@ class ContractorBalanceController extends Controller
         // المطلوب دفعه فعلياً بعد خصم الأرصدة والدفعات السابقة (صفر لو ما عليه شي)
         $balance['amount_due_jod'] = max(0.0, round(-$balance['net_jod'], 2));
 
-        // حالة الاشتراك بنفس قاعدة الداشبورد (عليه ذمم = منتهية)، حتى يعرض التطبيق نفس اللي بيشوفه المحاسب
+        // حالة الاشتراك بنفس قاعدة الداشبورد (حسب تاريخ انتهاء العضوية)، حتى يعرض التطبيق نفس اللي بيشوفه المحاسب
         $balance['subscription_status'] = $this->membershipStatus($row);
         $balance['subscription_status_label'] = self::STATUS_LABELS[$balance['subscription_status']]
             ?? $balance['subscription_status'];
@@ -223,39 +224,19 @@ class ContractorBalanceController extends Controller
     }
 
     /**
-     * حالة العضوية الفعلية لحساب "فعّال" إدارياً، حسب الرصيد بس (قرار الإدارة 2026-10-05):
-     * - عليه غرامة مفتوحة (ولو جزء بسيط منها) ← "منتهية" (قرار 2026-10-11).
-     * - عليه رصيد صافي سالب أكبر من 5% من مجموع ذممه ← "منتهية".
-     * - رصيده صفر أو له، أو اللي عليه ≤ 5% من ذممه (يعني سدّد 95% فأكثر، قرار 2026-10-10) ← "فعّالة"،
-     *   حتى لو تاريخ آخر عضوية مسجّلة فات، لأن الرسوم السنوية بتنزل كذمم.
-     * باقي الحالات الإدارية (معلّق، موقوف، منتهي) بتنعرض كما هي.
+     * حالة العضوية المعروضة حسب تاريخ انتهاء العضوية بس (قرار 2026-10-12، بدل قاعدة الـ95% والغرامات):
+     * أبعد expires_at لعضوية فعّالة لسا ما فات (اليوم نفسه محسوب) ← "فعّالة"، غير هيك أو ما في تاريخ ← "منتهية".
+     * الرصيد والذمم والغرامات ما بتأثر عالحالة. "معلّق" و"موقوف" إداريين بينعرضوا كما هم.
      */
     public function membershipStatus(object $row): string
     {
-        // "منتهية" إدارياً كمان بتمشي على قاعدة الـ95% إذا انحسبت عليه رسوم السنة الحالية:
-        // المقاول اللي سدّد 95% من كل اللي عليه (ومنها رسوم هالسنة) عضويته سارية، حتى لو ما
-        // انعملّه تجديد يدوي (حالة 9565_g: 608 من 640). بدون ذمة للسنة الحالية بتضل "منتهية"،
-        // عشان المنتهي القديم اللي ما عليه شي ما ينقلب "فعّالة" لحاله.
-        $eligible = $row->status === 'active'
-            || ($row->status === 'expired' && ! empty($row->has_current_year_due));
-
-        if (! $eligible) {
+        if (! in_array($row->status, ['active', 'expired'], true)) {
             return $row->status;
         }
 
-        if ((float) ($row->penalties_jod ?? 0) > 0) {
-            return 'expired';
-        }
+        $expiresAt = $row->membership_expires_at ?? null;
 
-        $owed = round(-(float) $row->net_jod, 2);
-        if ($owed <= 0) {
-            return 'active';
-        }
-
-        $allowed = round((float) ($row->dues_obligations_jod ?? 0) * (1 - self::ACTIVE_PAID_RATIO), 2);
-
-        // مقارنة بالقروش (أعداد صحيحة) عشان حالة الـ95% بالضبط ما تفشل بفرق كسور عشرية
-        return (int) round($owed * 100) <= (int) round($allowed * 100) ? 'active' : 'expired';
+        return $expiresAt && substr((string) $expiresAt, 0, 10) >= now()->toDateString() ? 'active' : 'expired';
     }
 
     /**
