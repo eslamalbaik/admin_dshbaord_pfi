@@ -556,7 +556,7 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
       <VCardText class="d-flex gap-4 flex-wrap">
         <VTextField
           v-model="search"
-          placeholder="بحث باسم المقاول، العضوية، السجل..."
+          placeholder="بحث باسم المقاول، العضوية، الجوال، السجل..."
           prepend-inner-icon="tabler-search"
           density="compact"
           style="max-width:360px"
