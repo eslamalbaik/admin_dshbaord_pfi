@@ -23,12 +23,20 @@ class ContractorController extends Controller
 
         if ($request->filled('search')) {
             $q = $request->search;
-            $query->where(function ($qb) use ($q) {
+            $phone = $this->normalizePhoneSearch($q);
+            $query->where(function ($qb) use ($q, $phone) {
                 $qb->where('name', 'like', "%{$q}%")
                    ->orWhere('license_number', 'like', "%{$q}%")
                    ->orWhere('email', 'like', "%{$q}%")
                    ->orWhere('membership_number', 'like', "%{$q}%")
-                   ->orWhere('commercial_register', 'like', "%{$q}%");
+                   ->orWhere('commercial_register', 'like', "%{$q}%")
+                   ->orWhere('phone', 'like', "%{$q}%")
+                   ->orWhere('authorized_person_phone', 'like', "%{$q}%");
+
+                if ($phone !== null) {
+                    $qb->orWhere('phone', 'like', "%{$phone}%")
+                       ->orWhere('authorized_person_phone', 'like', "%{$phone}%");
+                }
             });
         }
 
@@ -76,6 +84,25 @@ class ContractorController extends Controller
      * قاعدة Laravel الخام إعادة استخدام قيمة (جوال، بريد، رقم عضوية...) لمقاول محذوف سابقاً،
      * لأنها تتحقق من كل الصفوف بالجدول مباشرة بدون المرور بـ global scope الخاص بـ SoftDeletes.
      */
+    // الجوال مخزن 9 أرقام بدون صفر ("599123456")، والأدمن بيكتبه "0599 123 456" أو "+970599..."
+    // أو بأرقام عربية — نحوّله لنفس الصيغة. أقل من 4 أرقام = مش بحث جوال (يطابق كل شي تقريباً).
+    private function normalizePhoneSearch(string $q): ?string
+    {
+        $d = preg_replace('/\D/', '', strtr($q, [
+            '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
+            '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+        ]));
+
+        if (str_starts_with($d, '00970')) {
+            $d = substr($d, 5);
+        } elseif (str_starts_with($d, '970') && strlen($d) > 9) {
+            $d = substr($d, 3);
+        }
+        $d = ltrim($d, '0');
+
+        return strlen($d) >= 4 ? $d : null;
+    }
+
     // رقم مكتوب بدون لاحقة ("184") يُكمَل إلى "184_g" قبل التحقق — كل الأرقام بصيغة _g
     private function normalizeMembershipNumber(Request $request): void
     {
