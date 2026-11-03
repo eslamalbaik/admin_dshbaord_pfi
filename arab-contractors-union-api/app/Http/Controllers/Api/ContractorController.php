@@ -198,19 +198,19 @@ class ContractorController extends Controller
                 $this->uniqueIgnoringSoftDeleted('phone', $isUpdate, $contractorId),
             ],
             'city'                          => 'nullable|string|max:100',
-            // إلزامية عند الإنشاء فقط (REQ-01 #5) — تبقى nullable عند التعديل حتى لا يُحظر
-            // حفظ أي تعديل آخر على مقاولين قدامى لا تملك سجلاتهم هذه الحقول أصلاً بعد.
-            'governorate_id'                => ($isUpdate ? 'nullable' : 'required') . '|integer|exists:governorates,id',
-            'city_id'                       => ($isUpdate ? 'nullable' : 'required') . '|integer|exists:cities,id',
-            'district'                      => ($isUpdate ? 'nullable' : 'required') . '|string|max:100',
+            // العنوان اختياري من لوحة الاتحاد (طلب المالك 3/11/2026): المقاول هو اللي بيعبّيه
+            // من التطبيق، وملفه بيضل ناقص (missing_profile_fields) لحد ما يكمّله.
+            'governorate_id'                => 'nullable|integer|exists:governorates,id',
+            'city_id'                       => 'nullable|integer|exists:cities,id',
+            'district'                      => 'nullable|string|max:100',
             'address'                       => 'nullable|string',
             'notes'                         => 'nullable|string',
 
             // Text fields
             'partners'                      => ['nullable', 'string', 'not_regex:' . self::NO_DIGITS],
             'fax'                           => ['nullable', 'string', 'regex:' . self::FAX_PATTERN],
-            'building'                      => ($isUpdate ? 'nullable' : 'required') . '|string|max:100',
-            'floor'                         => ($isUpdate ? 'nullable' : 'required') . '|string|max:50',
+            'building'                      => 'nullable|string|max:100',
+            'floor'                         => 'nullable|string|max:50',
             'capital'                       => 'nullable|numeric|min:0|max:999999999999',
             // تاريخ التسجيل حتى أمس فقط بتوقيت غزة (التطبيق يعمل بـ UTC فيتأخر "اليوم" حتى 3 ساعات)
             'registration_date'             => 'nullable|date|before:' . now('Asia/Gaza')->toDateString(),
