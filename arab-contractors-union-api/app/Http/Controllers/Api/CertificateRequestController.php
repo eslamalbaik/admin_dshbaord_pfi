@@ -648,11 +648,17 @@ class CertificateRequestController extends Controller
     /** GET /api/v1/certificates/verify/{token} */
     public function verify(string $token)
     {
-        try {
-            $payload = json_decode(Crypt::decryptString(urldecode($token)), true);
-            $certRequest = CertificateRequest::find($payload['id'] ?? null);
-        } catch (\Throwable $e) {
-            $certRequest = null;
+        // الرمز القصير المطبوع بـQR الشهادة، وإلا الصيغة المشفّرة القديمة
+        $id = MembershipCertificatePdfService::certificateIdFromToken($token);
+        if ($id !== null) {
+            $certRequest = CertificateRequest::find($id);
+        } else {
+            try {
+                $payload = json_decode(Crypt::decryptString(urldecode($token)), true);
+                $certRequest = CertificateRequest::find($payload['id'] ?? null);
+            } catch (\Throwable $e) {
+                $certRequest = null;
+            }
         }
 
         if (! $certRequest || $certRequest->status !== 'issued') {

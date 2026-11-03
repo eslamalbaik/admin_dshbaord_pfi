@@ -475,4 +475,24 @@ class CertificateRequestTest extends TestCase
             ['address' => 'خانيونس', 'decision_number' => '07/2023', 'decision_date' => '2023-05-14'],
         );
     }
+
+    /** الرمز القصير المطبوع بـQR الشهادة يتحقق منها، والرقم المعدّل يدوياً يُرفض */
+    public function test_verify_accepts_printed_qr_token_and_rejects_tampered_one(): void
+    {
+        $contractor  = $this->createContractor();
+        $certRequest = CertificateRequest::create(['contractor_id' => $contractor->id, 'type' => 'membership', 'status' => 'issued']);
+        $token       = \App\Services\MembershipCertificatePdfService::verificationToken($certRequest->id);
+
+        $this->getJson("/api/v1/certificates/verify/{$token}")
+            ->assertOk()
+            ->assertJsonPath('items.valid', true)
+            ->assertJsonPath('items.serial', 'MC-' . str_pad((string) $certRequest->id, 6, '0', STR_PAD_LEFT));
+
+        $other = CertificateRequest::create(['contractor_id' => $contractor->id, 'type' => 'membership', 'status' => 'issued']);
+        $forged = $other->id . substr($token, strlen((string) $certRequest->id));
+
+        $this->getJson("/api/v1/certificates/verify/{$forged}")
+            ->assertOk()
+            ->assertJsonPath('items.valid', false);
+    }
 }
