@@ -28,9 +28,7 @@ class MembershipCertificatePdfService
 {
     /** ارتفاع الترويسة والتذييل بالمليمتر — مشتق من نسبة أبعاد الصورتين على عرض A4 المطبوع (180mm) */
     private const HEADER_HEIGHT_MM = 45;
-    private const FOOTER_HEIGHT_MM = 28;
-    /** مساحة صف الرقم التسلسلي + QR فوق صورة التذييل */
-    private const SERIAL_ROW_MM = 11;
+    private const FOOTER_HEIGHT_MM = 24; // صورة التذييل 2481×315 على 180mm ≈ 23mm
 
     /**
      * @param  bool  $preview  يكتب في certificates/preview بدل مسار الشهادة الرسمي.
@@ -71,31 +69,21 @@ class MembershipCertificatePdfService
     }
 
     /**
-     * خطوات تصغير الشهادة من الأكبر للأصغر. نبدأ من أول خطوة يُقدَّر أنها تسع عدد الصفوف
-     * (التقديرات محافظة فنبدأ بخطوتين أكبر منها)، والحلقة بتنزل خطوة كل ما طلعت صفحتين:
-     * خطوط الجدول أصغر، ثم تصغير المتن والختم كله.
+     * خطوات تصغير الشهادة من الأكبر للأصغر. الحلقة بتبدأ دايماً من أكبر خط وبتنزل خطوة كل ما
+     * طلعت صفحتين (كل رسم أقل من ثانية): خطوط الجدول أصغر، ثم كاحتياط أخير تصغير المتن والختم كله.
      *
      * @return list<array{font: float, pad: float, scale: float, seal: float}>
      */
-    public static function layoutSteps(int $rowCount): array
+    public static function layoutSteps(): array
     {
-        // [أقصى صفوف تقديرياً, خط الجدول, حشوة الخلية]
+        // [خط الجدول, حشوة الخلية] بالـpt
         $table = [
-            [3, 16, 2.5], [3, 14, 2], [4, 12, 1.5], [4, 11, 1.2], [5, 10, 1], [5, 9, 0.8],
-            [6, 8.5, 0.5], [7, 8, 0.45], [8, 7.5, 0.4],
-            [10, 6.5, 0.3], [13, 5.5, 0.2], [14, 5, 0.2], [17, 4.5, 0.1], [PHP_INT_MAX, 4, 0.1],
+            [16, 2.5], [14, 2], [12, 1.5], [11, 1.2], [10, 1], [9, 0.8], [8.5, 0.5], [8, 0.45],
+            [7.5, 0.4], [6.5, 0.3], [5.5, 0.2], [5, 0.2], [4.5, 0.1], [4, 0.1],
         ];
 
-        $first = 0;
-        foreach ($table as $i => [$maxRows]) {
-            if ($rowCount <= $maxRows) {
-                $first = max(0, $i - 2);
-                break;
-            }
-        }
-
         $steps = [];
-        foreach (array_slice($table, $first) as [$maxRows, $font, $pad]) {
+        foreach ($table as [$font, $pad]) {
             $steps[] = ['font' => $font, 'pad' => $pad, 'scale' => 1.0, 'seal' => 1.0];
         }
         // احتياط أخير: تصغير المتن كله تدريجياً مع أصغر جدول
@@ -144,10 +132,8 @@ class MembershipCertificatePdfService
             : "شركة/ {$contractor->name}";
 
         $specialtiesRows = '';
-        $rowCount        = 0;
         foreach (ContractorLookups::buildFieldsTree($contractor->specialties) as $field) {
             foreach ($field['specializations'] as $spec) {
-                $rowCount++;
                 // القالب المعتمد يكتب الدرجة بصيغتها المختصرة ("أولى أ") لا بمسمّى
                 // العرض في اللوحة ("الدرجة الأولى (1)")، فنقدّم القيمة الخام.
                 $grade = $spec['grade'] ?? $spec['grade_label'] ?? '—';
@@ -164,9 +150,9 @@ class MembershipCertificatePdfService
 
         // الشهادة يجب أن تبقى صفحة واحدة مهما كان عدد التخصصات. كتلة التوقيع (الختم + الأسماء)
         // لا تقبل التقسيم في mPDF، فإن لم يتبقَّ لها ارتفاع كافٍ قفزت لصفحة ثانية بالكامل.
-        // لذلك: نبدأ بحجم مناسب لعدد الصفوف (قياساً)، ثم نولّد ونعدّ الصفحات، وإن زادت عن
-        // صفحة نجرّب الخطوة الأصغر التالية — فالنتيجة صفحة واحدة دائماً بغض النظر عن التقدير.
-        $layoutSteps = self::layoutSteps($rowCount);
+        // لذلك: نبدأ بأكبر خط، نولّد ونعدّ الصفحات، وإن زادت عن صفحة نجرّب الخطوة الأصغر التالية —
+        // فالنتيجة صفحة واحدة دائماً بأكبر خط بيوسع. (الختم والتوقيع صاروا بالتذييل، فما بيقفزوا.)
+        $layoutSteps = self::layoutSteps();
 
 
         $presidentName   = \App\Models\Setting::get('union_president_name', 'المهندس/ سهيل هاشم السقا');
@@ -200,8 +186,11 @@ class MembershipCertificatePdfService
                 'line' => $pt(17), 'classified' => $pt(16), 'validity' => $pt(16), 'sign' => $pt(13),
                 'gapS' => $pt(6), 'gapM' => $pt(10),
             ];
-            $sealW = (int) round(150 * $step['seal']);
-            $sealH = (int) round(116 * $step['seal']);
+            // حجم الختم الطبيعي (170×132px ≈ 45×35mm)
+            $sealW = (int) round(170 * $step['seal']);
+            $sealH = (int) round(132 * $step['seal']);
+            // ارتفاع كتلة الختم والتوقيع المحجوز فوق التذييل (px→mm على 96dpi + 2mm هامش)
+            $signMm = (int) ceil($sealH * 25.4 / 96) + 3;
 
             // أحجام الخطوط والألوان والمحاذاة أدناه منقولة حرفياً من قالب Word المعتمد
             // (w:sz بأنصاف النقاط ÷ 2 = pt). أي تعديل هنا يخرج الشهادة عن مطابقة الأصل.
@@ -234,11 +223,6 @@ class MembershipCertificatePdfService
   table.data-table th { background-color: #8C8C8C; }
   table.data-table td { font-family: arial; }
   .validity { font-size: {$f['validity']}; font-weight: bold; margin-top: {$f['gapM']}; line-height: 1.4; }
-  /* عرض أضيق ومتوسّط يقرّب الختم من نص التوقيع بدل تباعدهما على طرفي الصفحة */
-  .sign-block { width: 74%; margin: {$f['gapS']} auto 0 auto; }
-  .sign-block td { vertical-align: middle; }
-  .sign-text { text-align: center; font-size: {$f['sign']}; font-weight: bold; line-height: 1.35; }
-  .seal-cell { text-align: center; }
 </style>
 
 <!-- التاريخ والرقم بنفس السطر: بجدول RTL أول خلية يميناً، فالتاريخ يميناً والرقم ع يساره -->
@@ -269,19 +253,6 @@ class MembershipCertificatePdfService
   هذه الشهادة سارية المفعول حتى تاريخ {$validUntil}م وبعدها تعتبر لاغيه.
 </div>
 
-<!-- في جدول RTL أول خلية تُرسم يميناً: الختم يميناً ونص التوقيع شماله -->
-<table class="sign-block" autosize="1">
-  <tr>
-    <td width="50%" class="seal-cell">
-      <img src="{$sealImg}" width="{$sealW}" height="{$sealH}">
-    </td>
-    <td width="50%" class="sign-text">
-      {$presidentName}<br>
-      {$presidentTitle1}<br>
-      {$presidentTitle2}
-    </td>
-  </tr>
-</table>
 HTML;
 
             $tempDir = storage_path('app/mpdf-tmp');
@@ -310,7 +281,8 @@ HTML;
                 // margin_header(8) + headerH هو أدنى حد؛ أقل منه يدوس المتن صورة الترويسة.
                 // +2 هامش أمان لأن صندوق أول سطر يبدأ قبل حدّ الهامش بكسر نقطة.
                 'margin_top'    => $headerH + 10,
-                'margin_bottom' => $footerH + self::SERIAL_ROW_MM + 8,
+                // الشريط (ختم + توقيع + QR) بارتفاع الختم، فوق صورة التذييل
+                'margin_bottom' => $footerH + $signMm + 8,
                 'margin_header' => 8,
                 'margin_footer' => 8,
                 'tempDir'       => $tempDir,
@@ -340,17 +312,25 @@ HTML;
             );
 
             // أسفل الشهادة: الرقم التسلسلي ورمز QR يوجّه لصفحة التحقق، ثم صورة التذييل الرسمي
+            // أسفل الصفحة فوق التذييل: الختم والتوقيع (مكانهما بالقالب الأصلي، يميناً) بنفس الشريط مع
+            // رمز QR والرقم التسلسلي (يساراً) — فما بيتأثروا بطول جدول التخصصات ولا بيسرقوا سطر زيادة.
+            // الجدول LTR: أول خلية يساراً. الرقم بخلية LTR مستقلة فالنسخ من الـPDF بيطلع بالترتيب الصحيح.
             $mpdf->SetHTMLFooter(
-                '<table dir="ltr" width="100%" style="margin-bottom:1mm;direction:ltr;"><tr>'
-                // الرقم بخلية LTR مستقلة بدون نص عربي حواليه، فالنسخ من الـPDF بيطلع بالترتيب الصحيح
+                '<table dir="ltr" width="100%" style="margin-bottom:2mm;direction:ltr;border-collapse:collapse;"><tr>'
                 . '<td style="width:13mm;text-align:left;vertical-align:middle;"><img src="' . $qrDataUri . '" width="42" height="42"></td>'
-                . '<td style="direction:ltr;text-align:left;font-family:calibri;font-size:11pt;color:#002060;vertical-align:middle;">'
-                . '<b>' . e($serial) . '</b>'
+                . '<td style="width:52mm;vertical-align:middle;">'
+                .   '<table dir="ltr" width="100%" style="border-collapse:collapse;"><tr><td style="direction:ltr;text-align:left;font-family:calibri;font-size:11pt;color:#002060;">'
+                .   '<b>' . e($serial) . '</b></td></tr>'
+                .   '<tr><td dir="rtl" style="text-align:left;font-family:calibri;font-size:7pt;color:#444;">'
+                .   '<span style="color:#D80F18;font-size:8pt;">الرقم التسلسلي للشهادة</span><br>'
+                .   'امسح الرمز للتحقق من صحة الشهادة'
+                .   '</td></tr></table>'
                 . '</td>'
-                . '<td style="text-align:right;font-family:calibri;font-size:8pt;color:#444;vertical-align:middle;">'
-                . '<span style="color:#D80F18;font-size:9pt;">الرقم التسلسلي للشهادة</span><br>'
-                . 'للتحقق من صحة الشهادة امسح الرمز أو زر صفحة التحقق في موقع الاتحاد وأدخل الرقم'
+                . '<td dir="rtl" style="text-align:center;vertical-align:middle;font-family:calibri;font-weight:bold;font-size:' . $f['sign'] . ';line-height:1.35;">'
+                . e($presidentName) . '<br>' . e($presidentTitle1) . '<br>' . e($presidentTitle2)
                 . '</td>'
+                . '<td style="width:' . ((int) ceil($sealW * 25.4 / 96) + 2) . 'mm;text-align:right;vertical-align:middle;">'
+                . '<img src="' . $sealImg . '" width="' . $sealW . '" height="' . $sealH . '"></td>'
                 . '</tr></table>'
                 . '<img src="' . $footerImg . '" style="width:100%;">'
             );
