@@ -133,8 +133,9 @@ class ContractorController extends Controller
                 $this->uniqueIgnoringSoftDeleted('membership_number', $isUpdate, $contractorId),
                 new \App\Rules\MembershipNumber,
             ],
+            // اختياري عند الإنشاء من لوحة التحكم، ويبقى إلزامياً عند التعديل كما كان
             'commercial_register'           => [
-                'required',
+                $isUpdate ? 'required' : 'nullable',
                 'digits:9',
                 $this->uniqueIgnoringSoftDeleted('commercial_register', $isUpdate, $contractorId),
             ],
