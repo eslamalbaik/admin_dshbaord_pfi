@@ -230,6 +230,10 @@ Route::prefix('v1')->group(function () {
     //  Certificate Verification (QR) — Public (no auth)
     // --------------------------------------------------------
     Route::get('certificates/verify/{token}', [\App\Http\Controllers\Api\CertificateRequestController::class, 'verify']);
+    // البحث بالرقم التسلسلي المطبوع على الشهادة (صفحة pcu.org.ps/verify). الأرقام
+    // متسلسلة، فالـthrottle يحدّ من تجربتها واحداً واحداً.
+    Route::get('certificates/verify-serial/{serial}', [\App\Http\Controllers\Api\CertificateRequestController::class, 'verifyBySerial'])
+        ->middleware('throttle:10,1');
     // ملف الشهادة للمقاول برابط موقَّع — بيسجّل فتحه (اللوحة بتعرض "فتحها المقاول")
     Route::get('certificates/{certificateRequest}/certificate.pdf', [\App\Http\Controllers\Api\CertificateRequestController::class, 'file'])
         ->name('certificates.file');

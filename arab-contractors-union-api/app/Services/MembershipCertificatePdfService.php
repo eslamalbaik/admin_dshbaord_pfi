@@ -148,6 +148,7 @@ class MembershipCertificatePdfService
         if (! is_dir($tempDir)) {
             mkdir($tempDir, 0775, true);
         }
+        $verifyPageUrl = e(config('app.certificate_verify_url'));
         $qrFile = $tempDir . DIRECTORY_SEPARATOR . "qr-{$serial}-" . uniqid() . '.svg';
         file_put_contents($qrFile, QrCode::format('svg')->size(300)->margin(0)->errorCorrection('M')
             ->color(0, 0, 0)->generate(self::verificationUrl($certRequest->id)));
@@ -198,16 +199,18 @@ class MembershipCertificatePdfService
   /* عرض أضيق ومتوسّط يقرّب الختم من نص التوقيع بدل تباعدهما على طرفي الصفحة.
      تحت الاسم والصفتين فراغ للتوقيع اليدوي. */
   .sign-block { width: 100%; margin: 6pt 0 0 0; }
-  .sign-block td { vertical-align: middle; }
+  /* الأعمدة الثلاثة تبدأ من خط علوي واحد وبارتفاع متقارب (~34mm):
+     QR ‏85px + ثلاثة أسطر، الختم ‏128px، والاسم وصفتاه + فراغ التوقيع */
+  .sign-block td { vertical-align: top; }
   .seal-cell { text-align: center; }
-  /* خانة التحقق يمين الصفحة: QR والرقم المرجعي، بلا إطارات */
+  /* خانة التحقق يمين الصفحة: QR والرقم التسلسلي، بلا إطارات */
   .verify-cell { text-align: center; color: #000; font-size: 8pt; line-height: 1.3; }
   .verify-ref { font-size: 10pt; font-weight: bold; }
   .sign-text { text-align: center; font-weight: bold; line-height: 1.35; }
   .sign-name { color: #2E3192; font-size: 15pt; }
   .sign-title1 { font-size: 14pt; }
   .sign-title2 { font-size: 11pt; }
-  .sign-space { height: 14mm; }
+  .sign-space { height: 16mm; }
 </style>
 
 
@@ -237,12 +240,13 @@ class MembershipCertificatePdfService
 <table class="sign-block" autosize="1">
   <tr>
     <td width="30%" class="verify-cell">
-      <img src="{$qrFile}" width="90" height="90"><br>
-      الرقم المرجعي: <span class="verify-ref" dir="ltr">{$serial}</span><br>
-      امسح الرمز للتحقق من صحة الشهادة
+      <img src="{$qrFile}" width="85" height="85"><br>
+      الرقم التسلسلي: <span class="verify-ref" dir="ltr">{$serial}</span><br>
+      امسح الرمز للتحقق من صحة الشهادة<br>
+      <span dir="ltr">{$verifyPageUrl}</span>
     </td>
     <td width="32%" class="seal-cell">
-      <img src="{$sealImg}" width="170" height="143">
+      <img src="{$sealImg}" width="152" height="128">
     </td>
     <td width="38%" class="sign-text">
       <span class="sign-name">{$presidentName}</span><br>

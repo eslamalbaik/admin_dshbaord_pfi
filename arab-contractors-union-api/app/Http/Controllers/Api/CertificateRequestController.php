@@ -661,6 +661,24 @@ class CertificateRequestController extends Controller
             }
         }
 
+        return $this->verificationResult($certRequest);
+    }
+
+    /**
+     * GET /api/v1/certificates/verify-serial/{serial}
+     * يقبل "MC-000123" أو "mc000123" أو "123". الرقم التسلسلي "MC-" خاص بشهادة العضوية.
+     */
+    public function verifyBySerial(string $serial)
+    {
+        $certRequest = preg_match('/^(?:MC-?)?0*(\d{1,9})$/i', trim($serial), $m)
+            ? CertificateRequest::where('type', 'membership')->find((int) $m[1])
+            : null;
+
+        return $this->verificationResult($certRequest);
+    }
+
+    private function verificationResult(?CertificateRequest $certRequest)
+    {
         if (! $certRequest || $certRequest->status !== 'issued') {
             return $this->success(['valid' => false]);
         }

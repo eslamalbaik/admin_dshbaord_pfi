@@ -66,7 +66,7 @@ onMounted(async () => {
           <div class="v-row"><span class="label">اسم المقاول</span><span class="value">{{ result.contractor_name }}</span></div>
           <div class="v-row"><span class="label">رقم العضوية</span><span class="value">{{ result.membership_number }}</span></div>
           <div class="v-row"><span class="label">نوع الشهادة</span><span class="value">{{ result.type_label }}</span></div>
-          <div class="v-row"><span class="label">الرقم المرجعي</span><span class="value">{{ result.serial }}</span></div>
+          <div class="v-row"><span class="label">الرقم التسلسلي</span><span class="value">{{ result.serial }}</span></div>
           <div class="v-row"><span class="label">تاريخ الإصدار</span><span class="value">{{ fmtDate(result.issued_at) }}</span></div>
           <div class="v-row"><span class="label">سارية حتى</span><span class="value">{{ fmtDate(result.membership_valid_until) }}</span></div>
         </div>

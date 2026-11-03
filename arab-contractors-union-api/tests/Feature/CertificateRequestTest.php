@@ -495,4 +495,27 @@ class CertificateRequestTest extends TestCase
             ->assertOk()
             ->assertJsonPath('items.valid', false);
     }
+
+    /** صفحة pcu.org.ps/verify: البحث بالرقم التسلسلي المطبوع، بصيغه المختلفة */
+    public function test_verify_by_serial_finds_issued_membership_certificate_only(): void
+    {
+        $contractor = $this->createContractor();
+        $issued     = CertificateRequest::create(['contractor_id' => $contractor->id, 'type' => 'membership', 'status' => 'issued']);
+        $pending    = CertificateRequest::create(['contractor_id' => $contractor->id, 'type' => 'membership', 'status' => 'pending']);
+        $other      = CertificateRequest::create(['contractor_id' => $contractor->id, 'type' => 'good_standing', 'status' => 'issued']);
+        $serial     = 'MC-' . str_pad((string) $issued->id, 6, '0', STR_PAD_LEFT);
+
+        foreach ([$serial, strtolower(str_replace('-', '', $serial)), (string) $issued->id] as $input) {
+            $this->getJson('/api/v1/certificates/verify-serial/' . $input)
+                ->assertOk()
+                ->assertJsonPath('items.valid', true)
+                ->assertJsonPath('items.serial', $serial);
+        }
+
+        foreach (["MC-{$pending->id}", "MC-{$other->id}", 'MC-999999', 'abc'] as $input) {
+            $this->getJson('/api/v1/certificates/verify-serial/' . $input)
+                ->assertOk()
+                ->assertJsonPath('items.valid', false);
+        }
+    }
 }

@@ -22,6 +22,9 @@ return [
     // كلمة سر المالك (owner password) لحماية PDF الشهادات من التعديل/النسخ — لا تُطلب لفتح الملف
     'certificate_pdf_owner_password' => env('CERTIFICATE_PDF_OWNER_PASSWORD', 'union-cert-2026'),
 
+    // رابط التحقق المختصر المطبوع تحت QR شهادة العضوية — صفحة بحث بالرقم التسلسلي
+    'certificate_verify_url' => env('CERTIFICATE_VERIFY_URL', 'https://pcu.org.ps/verify'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment
