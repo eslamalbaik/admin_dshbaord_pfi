@@ -286,7 +286,6 @@ const blockingMissing = (s: number): string[] => {
   if (s === 1) {
     if (!filled(f.name)) missing.push('اسم طالب الانتساب')
     if (!membershipValid(f.membership_number)) missing.push('رقم العضوية')
-    if (!/^[0-9]{9}$/.test(f.commercial_register ?? '')) missing.push('رقم السجل التجاري')
     if (f.is_existing_member && !lastMembershipYearValid(f.last_membership_year)) missing.push('آخر سنة عضوية')
   }
   // خانات اختيارية لكن معبّأة بصيغة خاطئة (حروف بخانة أرقام، هوية ليست 9 أرقام...) — الخادم سيرفضها
@@ -299,7 +298,7 @@ const blockingMissing = (s: number): string[] => {
 const starredChecks = computed<Record<number, boolean[]>>(() => {
   const f = form.value
   return {
-    1: [filled(f.name), membershipValid(f.membership_number), /^[0-9]{9}$/.test(f.commercial_register ?? '')],
+    1: [filled(f.name), membershipValid(f.membership_number)],
     2: [],
     3: [
       f.specialties.every(sp => !!sp.field_lk_type && !!sp.specialization_lk_type && !!sp.classification),
@@ -755,13 +754,12 @@ const submit = async () => {
               <VTextField
                 v-model="form.commercial_register"
                 v-numeric
-                label="رقم السجل التجاري *"
+                label="رقم السجل التجاري"
                 inputmode="numeric"
                 maxlength="9"
                 :error-messages="validationErrors.commercial_register"
                 :rules="[
-                  v => !!v || 'رقم السجل التجاري مطلوب',
-                  v => /^[0-9]{9}$/.test(v) || 'يجب أن يتكون من 9 أرقام بالضبط'
+                  v => !v || /^[0-9]{9}$/.test(v) || 'يجب أن يتكون من 9 أرقام بالضبط'
                 ]"
               />
             </VCol>
