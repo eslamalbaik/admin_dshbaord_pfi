@@ -278,7 +278,7 @@ class ContractorController extends Controller
                 if ($contractor && $contractor->$field) {
                     Storage::disk('public')->delete($contractor->$field);
                 }
-                $validated[$field] = $request->file($field)->store($path, 'public');
+                $validated[$field] = \App\Support\UploadLimits::storeDocument($request->file($field), $path);
                 $uploaded[] = $field;
             }
         }
