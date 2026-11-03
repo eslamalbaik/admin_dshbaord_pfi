@@ -50,7 +50,7 @@ class ContractorFileService
         foreach (self::FILE_FIELDS as $field => $path) {
             if ($request->hasFile($field)) {
                 // 1. ارفع الجديد أولاً
-                $newPath = $request->file($field)->store($path, 'public');
+                $newPath = \App\Support\UploadLimits::storeDocument($request->file($field), $path);
 
                 // 2. تأكد من النجاح ثم احذف القديم
                 if ($newPath && $contractor->$field) {

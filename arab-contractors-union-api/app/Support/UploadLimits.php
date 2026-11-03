@@ -42,10 +42,83 @@ class UploadLimits
      * قاعدة التحقق الموحّدة لمستندات المقاول الرسمية — لوحة الأدمن وتعديل الملف من
      * التطبيق معاً. كان التطبيق (UpdateFullProfileRequest) على mimes:pdf,jpg,jpeg,png
      * و max:10240 ثابتين، فيُرفض ملف Word يقبله الأدمن.
+     *
+     * الصيغة تُفحص بـ ContractorDocument لا بـ mimes: قاعدة mimes تعتمد على تخمين
+     * fileinfo وحده، فترفض ملفات صحيحة يقرؤها fileinfo على أنها octet-stream أو zip
+     * (PDF مولَّد من تطبيقات البنوك وفي أوله بايتات زائدة قبل %PDF، أو docx).
      */
-    public static function documentRule(): string
+    public static function documentRule(): array
     {
-        return 'nullable|file|mimes:' . implode(',', self::ALLOWED_EXTENSIONS) . '|max:' . self::maxFileKb();
+        return ['nullable', 'file', new \App\Rules\ContractorDocument, 'max:' . self::maxFileKb()];
+    }
+
+    /**
+     * الصيغة الحقيقية لملف مستند من بين ALLOWED_EXTENSIONS، أو null إن لم يكن منها.
+     * أولاً تخمين fileinfo، ثم فحص التوقيع (magic bytes) للحالات التي يخطئ فيها.
+     */
+    public static function detectDocumentExtension(\Illuminate\Http\UploadedFile $file): ?string
+    {
+        $guess = strtolower((string) $file->guessExtension());
+        if ($guess === 'jpe') {
+            $guess = 'jpg';
+        }
+        if (in_array($guess, self::ALLOWED_EXTENSIONS, true)) {
+            return $guess;
+        }
+
+        $path = $file->getRealPath();
+        if (! $path || ! is_readable($path)) {
+            return null;
+        }
+
+        $head = (string) @file_get_contents($path, false, null, 0, 1024);
+        if ($head === '') {
+            return null;
+        }
+
+        if (str_starts_with($head, "\xFF\xD8\xFF")) {
+            return 'jpg';
+        }
+        if (str_starts_with($head, "\x89PNG\r\n\x1A\n")) {
+            return 'png';
+        }
+        // مولّدات PDF في بعض البنوك تضع بايتات قبل الترويسة — المواصفة تسمح بها ضمن أول 1024 بايت.
+        if (str_contains($head, '%PDF-')) {
+            return 'pdf';
+        }
+        if (str_starts_with($head, "PK\x03\x04") && class_exists(\ZipArchive::class)) {
+            $zip = new \ZipArchive;
+            if ($zip->open($path) === true) {
+                $isWord = $zip->locateName('word/document.xml') !== false;
+                $zip->close();
+                if ($isWord) {
+                    return 'docx';
+                }
+            }
+        }
+        // حاوية OLE: Word 97-2003 (.doc) أو docx محمي بكلمة سر — نعتمد امتداد العميل للتمييز.
+        if (str_starts_with($head, "\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1")) {
+            $client = strtolower($file->getClientOriginalExtension());
+            if (in_array($client, ['doc', 'docx'], true)) {
+                return $client;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * يحفظ مستنداً بامتداده الحقيقي. store() العادية تبني الاسم من guessExtension، فملف
+     * قُبل بفحص التوقيع كان سيُحفظ بلا امتداد ولا يفتحه المتصفح.
+     */
+    public static function storeDocument(\Illuminate\Http\UploadedFile $file, string $dir, string $disk = 'public'): string|false
+    {
+        $ext = self::detectDocumentExtension($file);
+        if ($ext === null) {
+            return $file->store($dir, $disk);
+        }
+
+        return $file->storeAs($dir, \Illuminate\Support\Str::random(40) . '.' . $ext, $disk);
     }
 
     /**

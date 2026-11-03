@@ -123,4 +123,89 @@ class ContractorProfileUploadRulesTest extends TestCase
         $this->assertStringContainsString('docx', $message);
         $this->assertStringNotContainsString('cr file', $message);
     }
+
+    /** ملف حقيقي على القرص (لا fake) حتى يمر عبر fileinfo فعلاً كما في الإنتاج. */
+    private function realFile(string $name, string $bytes, string $clientMime = 'application/octet-stream'): UploadedFile
+    {
+        $path = tempnam(sys_get_temp_dir(), 'doc');
+        file_put_contents($path, $bytes);
+
+        return new UploadedFile($path, $name, $clientMime, null, true);
+    }
+
+    private function minimalPdf(): string
+    {
+        return "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n";
+    }
+
+    public function test_bank_pdf_with_bytes_before_header_is_accepted_and_saved_as_pdf(): void
+    {
+        $contractor = $this->actingAsContractor();
+
+        // كشف حساب من تطبيق بنك: بايتات قبل %PDF فيقرؤه fileinfo octet-stream، و mimes كانت ترفضه.
+        $file = $this->realFile('كشف_الحساب_0451153.pdf', "\r\n\x00\x00JUNK" . $this->minimalPdf(), 'application/pdf');
+
+        $this->upload([
+            'articles_of_association' => $file,
+            'bank_dealing_letter'     => $this->realFile('كشف_الحساب_0451153.pdf', "\r\n\x00\x00JUNK" . $this->minimalPdf(), 'application/pdf'),
+        ])->assertStatus(200);
+
+        $contractor->refresh();
+        $this->assertStringEndsWith('.pdf', $contractor->articles_of_association);
+        $this->assertStringEndsWith('.pdf', $contractor->bank_dealing_letter);
+        Storage::disk('public')->assertExists($contractor->articles_of_association);
+    }
+
+    public function test_docx_detected_as_zip_is_accepted(): void
+    {
+        $contractor = $this->actingAsContractor();
+
+        $zipPath = tempnam(sys_get_temp_dir(), 'docx');
+        $zip = new \ZipArchive;
+        $zip->open($zipPath, \ZipArchive::OVERWRITE);
+        $zip->addFromString('word/document.xml', '<w:document/>');
+        $zip->close();
+
+        $this->upload([
+            'internal_bylaws' => $this->realFile('bylaws.docx', file_get_contents($zipPath)),
+        ])->assertStatus(200);
+
+        $this->assertStringEndsWith('.docx', $contractor->refresh()->internal_bylaws);
+    }
+
+    public function test_empty_file_gets_a_clear_message(): void
+    {
+        $this->actingAsContractor();
+
+        $response = $this->upload(['articles_of_association' => $this->realFile('x.pdf', '')]);
+
+        $response->assertStatus(422);
+        $this->assertStringContainsString('فارغ', implode(' ', $response->json('errors.articles_of_association')));
+    }
+
+    public function test_real_xlsx_is_rejected_and_message_names_the_uploaded_type(): void
+    {
+        $this->actingAsContractor();
+
+        $zipPath = tempnam(sys_get_temp_dir(), 'xlsx');
+        $zip = new \ZipArchive;
+        $zip->open($zipPath, \ZipArchive::OVERWRITE);
+        $zip->addFromString('xl/workbook.xml', '<workbook/>');
+        $zip->close();
+
+        $response = $this->upload(['articles_of_association' => $this->realFile('statement.xlsx', file_get_contents($zipPath))]);
+
+        $response->assertStatus(422);
+        $message = implode(' ', $response->json('errors.articles_of_association'));
+        $this->assertStringContainsString('عقد تأسيس الشركة', $message);
+        $this->assertStringContainsString('الملف المرفوع: xlsx', $message);
+    }
+
+    public function test_php_disguised_as_pdf_is_rejected(): void
+    {
+        $this->actingAsContractor();
+
+        $this->upload(['articles_of_association' => $this->realFile('shell.php', "<?php echo 1; %PDF-1.4")])
+            ->assertStatus(422);
+    }
 }
