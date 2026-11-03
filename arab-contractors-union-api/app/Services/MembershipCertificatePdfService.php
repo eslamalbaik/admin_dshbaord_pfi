@@ -17,18 +17,18 @@ use Mpdf\Mpdf;
  *   قياساً: 68 م.ب و11 ثانية مقابل 293 م.ب و24 ثانية لكل شهادة.
  *
  * الترويسة الرسمية:
- *   الأصول الثلاثة مستخرَجة من نفس قالب Word المعتمد (resources/certificate-assets)،
- *   فتبقى الهوية البصرية مطابقة للمصدر. تُركَّب عبر SetHTMLHeader/SetHTMLFooter
- *   لا عبر SetWatermarkImage — لأن الترويسة شريط نسبته 4:1 والتذييل 6.5:1، وتمطيط
- *   أيّهما ليملأ صفحة A4 يشوّه الشعار. الهوامش تحجز لهما المساحة.
+ *   الأصول الثلاثة مستخرَجة من قالب "ترويسة الاتحاد" الجديد (resources/certificate-assets).
+ *   الترويسة والتذييل بعرض الورقة كاملاً (210mm، بلا هوامش) كما في قالب Word، فتُرسم
+ *   كعناصر position:fixed لا عبر SetHTMLHeader/Footer اللذين يحصرانها داخل الهوامش.
+ *   الشعار الباهت بالخلفية علامة مائية بنفس مقاسه في القالب.
  *
  * ملاحظة: التوليد يستغرق ثوانيَ عدة، فلا يجوز استدعاؤه داخل طلب HTTP متزامن.
  */
 class MembershipCertificatePdfService
 {
-    /** ارتفاع الترويسة والتذييل بالمليمتر — مشتق من نسبة أبعاد الصورتين على عرض A4 المطبوع (180mm) */
-    private const HEADER_HEIGHT_MM = 45;
-    private const FOOTER_HEIGHT_MM = 28;
+    /** ارتفاع الترويسة والتذييل بالمليمتر — نسبة أبعاد الصورتين (1241×286 و2040×259) على عرض 210mm */
+    private const HEADER_HEIGHT_MM = 48.4;
+    private const FOOTER_HEIGHT_MM = 26.7;
 
     /**
      * @param  bool  $preview  يكتب في certificates/preview بدل مسار الشهادة الرسمي.
@@ -112,9 +112,12 @@ class MembershipCertificatePdfService
         $presidentTitle2 = \App\Models\Setting::get('union_president_title2', 'النائب الأول لرئيس الاتحاد');
 
         $assets   = resource_path('certificate-assets');
-        $headerImg = $assets . DIRECTORY_SEPARATOR . 'letterhead-header.jpg';
-        $footerImg = $assets . DIRECTORY_SEPARATOR . 'letterhead-footer.png';
-        $sealImg   = $assets . DIRECTORY_SEPARATOR . 'union-seal.jpg';
+        $headerImg    = $assets . DIRECTORY_SEPARATOR . 'letterhead-header.png';
+        $footerImg    = $assets . DIRECTORY_SEPARATOR . 'letterhead-footer.png';
+        $watermarkImg = $assets . DIRECTORY_SEPARATOR . 'letterhead-watermark.png';
+        $headerH      = self::HEADER_HEIGHT_MM;
+        $footerH      = self::FOOTER_HEIGHT_MM;
+        $footerTop    = 297 - $footerH;
 
         $companyLabelEsc  = e($companyLabel);
         $addressEsc       = e($address);
@@ -134,10 +137,6 @@ class MembershipCertificatePdfService
         $html = <<<HTML
 <style>
   body { font-family: calibri; direction: rtl; color: #000; font-size: 17pt; }
-  .meta { text-align: right; margin: 0 0 2pt 0; font-family: calibri; line-height: 1.3; }
-  /* "الرقم:" و"التاريخ:" أحمر 10، والقيمة مقابلهما أزرق غامق سميك 11 */
-  .meta-label { color: #D80F18; font-size: 10pt; }
-  .meta-value { color: #002060; font-size: 11pt; font-weight: bold; }
   .title {
     font-family: ptboldheading; text-align: center;
     font-size: 26pt; font-weight: bold; margin: 2pt 0 10pt 0;
@@ -159,14 +158,15 @@ class MembershipCertificatePdfService
   table.data-table th { background-color: #8C8C8C; }
   table.data-table td { font-family: arial; }
   .validity { font-size: 16pt; font-weight: bold; margin-top: 10pt; line-height: 1.4; }
-  /* عرض أضيق ومتوسّط يقرّب الختم من نص التوقيع بدل تباعدهما على طرفي الصفحة */
-  .sign-block { width: 74%; margin: 6pt auto 0 auto; }
-  .sign-block td { vertical-align: middle; }
-  .sign-text { text-align: center; font-size: 13pt; font-weight: bold; line-height: 1.35; }
-  .seal-cell { text-align: center; }
+  /* كتلة التوقيع على يسار الصفحة: الاسم والصفتان، وتحتها فراغ للتوقيع اليدوي والختم */
+  .sign-block { width: 100%; margin: 8pt 0 0 0; }
+  .sign-text { text-align: center; font-weight: bold; line-height: 1.35; }
+  .sign-name { color: #2E3192; font-size: 15pt; }
+  .sign-title1 { font-size: 14pt; }
+  .sign-title2 { font-size: 11pt; }
+  .sign-space { height: 24mm; }
 </style>
 
-<div class="meta"><span class="meta-label">الرقـم:</span> <span class="meta-value" dir="ltr">{$serial}</span><br><span class="meta-label">التاريخ:</span> <span class="meta-value">{$issuedAt}</span></div>
 
 <div class="title">شهادة عضـــــــــوية</div>
 
@@ -190,16 +190,15 @@ class MembershipCertificatePdfService
   هذه الشهادة سارية المفعول حتى تاريخ {$validUntil}م وبعدها تعتبر لاغيه.
 </div>
 
-<!-- في جدول RTL أول خلية تُرسم يميناً: الختم يميناً ونص التوقيع شماله -->
-<table class="sign-block" autosize="1">
+<!-- في جدول RTL أول خلية تُرسم يميناً: الخلية الفارغة يميناً والتوقيع شمالها -->
+<table class="sign-block" width="100%" autosize="1">
   <tr>
-    <td width="50%" class="seal-cell">
-      <img src="{$sealImg}" width="195" height="151">
-    </td>
+    <td width="50%"></td>
     <td width="50%" class="sign-text">
-      {$presidentName}<br>
-      {$presidentTitle1}<br>
-      {$presidentTitle2}
+      <span class="sign-name">{$presidentName}</span><br>
+      <span class="sign-title1">{$presidentTitle1}</span><br>
+      <span class="sign-title2">{$presidentTitle2}</span>
+      <div class="sign-space"></div>
     </td>
   </tr>
 </table>
@@ -209,9 +208,6 @@ HTML;
         if (! is_dir($tempDir)) {
             mkdir($tempDir, 0775, true);
         }
-
-        $headerH = self::HEADER_HEIGHT_MM;
-        $footerH = self::FOOTER_HEIGHT_MM;
 
         // خطوط القالب المعتمد نفسها، مشحونة من resources/certificate-assets/fonts
         // لتُطابق الشهادة الأصل بصرياً على أي سيرفر بلا خطوط نظام.
@@ -226,14 +222,9 @@ HTML;
             'orientation'   => 'P',
             'margin_left'   => 15,
             'margin_right'  => 15,
-            // الهامش العلوي/السفلي يبدأ بعد الترويسة/التذييل، وmargin_header/footer
-            // يحدّدان بعدهما عن حافة الورقة
-            // margin_header(8) + headerH هو أدنى حد؛ أقل منه يدوس المتن صورة الترويسة.
-            // +2 هامش أمان لأن صندوق أول سطر يبدأ قبل حدّ الهامش بكسر نقطة.
-            'margin_top'    => $headerH + 10,
-            'margin_bottom' => $footerH + 8,
-            'margin_header' => 8,
-            'margin_footer' => 8,
+            // الترويسة والتذييل ملتصقان بحافة الورقة؛ الهامشان يحجزان مساحتهما للمتن
+            'margin_top'    => $headerH + 4,
+            'margin_bottom' => $footerH + 2,
             'tempDir'       => $tempDir,
 
             'fontDir'  => array_merge($defaultConfig['fontDir'], [$assets . DIRECTORY_SEPARATOR . 'fonts']),
@@ -253,12 +244,33 @@ HTML;
         $mpdf->autoScriptToLang = false;
         $mpdf->autoLangToFont   = false;
 
-        // الترويسة والتذييل الرسميان — مستخرَجان من قالب Word المعتمد، بعرض كامل
-        // ونسبة أبعاد محفوظة (لا تمطيط)
-        $mpdf->SetHTMLHeader('<img src="' . $headerImg . '" style="width:100%;">');
-        $mpdf->SetHTMLFooter('<img src="' . $footerImg . '" style="width:100%;">');
+        // الشعار الباهت بوسط الصفحة خلف المتن، بمقاسه في قالب Word (123×100mm).
+        // الصورة باهتة أصلاً، فلا شفافية إضافية.
+        $mpdf->SetWatermarkImage($watermarkImg, 1, [123, 100], 'P');
+        $mpdf->showWatermarkImage = true;
+        $mpdf->watermarkImgBehind = true;
 
         $mpdf->WriteHTML($html);
+
+        // الترويسة والتذييل بعرض الورقة كاملاً تُرسم بإحداثيات مطلقة بعد المتن — الهوامش تبقيه
+        // بعيداً عنهما. position:fixed لا يُحترم هنا، وSetHTMLHeader/Footer يحصرانهما داخل
+        // الهوامش، وAddPage قبل WriteHTML يدفع المتن لصفحة ثانية.
+        // التذييل يقع تحت الهامش السفلي، فبدون إيقاف القفز التلقائي يفتح صفحة ثانية فارغة.
+        $mpdf->SetAutoPageBreak(false);
+        // constrain=false: بدونه mPDF يصغّر الصورة لعرض المتن (180mm) بدل عرض الورقة
+        $mpdf->Image($headerImg, 0, 0, 210, $headerH, '', '', true, false);
+        $mpdf->Image($footerImg, 0, $footerTop, 210, $footerH, '', '', true, false);
+
+        // الترويسة تطبع "الرقم: ....." و"التاريخ: ....." بنفسها؛ القيمة تُكتب فوق النقاط
+        // بخلفية بيضاء تغطيها. المواضع مقيسة من بكسلات النقاط بصورة الترويسة (× 210/1241):
+        // نقاط الرقم 27–44.5mm، نقاط التاريخ 155.7–173mm، وكلاهما على ارتفاع 39.6–42mm.
+        $mpdf->SetFillColor(255, 255, 255);
+        $mpdf->SetTextColor(0, 32, 96);
+        $mpdf->SetFont('calibri', 'B', 10);
+        $mpdf->SetXY(26.5, 38);
+        $mpdf->Cell(18.5, 5.5, $serial, 0, 0, 'C', true);
+        $mpdf->SetXY(155, 38);
+        $mpdf->Cell(18.5, 5.5, $issuedAt, 0, 0, 'C', true);
 
         // قفل تعديل/نسخ المحتوى بكلمة سر مالك — بدون كلمة سر مستخدم، فالملف يُفتح ويُطبع بحرية
         $mpdf->SetProtection(['print', 'copy'], '', config('app.certificate_pdf_owner_password'));
