@@ -359,13 +359,6 @@ const blockingMissing = (s: number): string[] => {
     if (!membershipValid(f.membership_number)) missing.push('رقم العضوية')
     if (!/^[0-9]{9}$/.test(f.commercial_register ?? '')) missing.push('رقم السجل التجاري')
   }
-  if (s === 3) {
-    if (!f.governorate_id) missing.push('المحافظة')
-    if (!f.city_id) missing.push('المدينة')
-    if (!filled(f.district)) missing.push('الحي')
-    if (!filled(f.building)) missing.push('العمارة')
-    if (!filled(f.floor)) missing.push('الطابق')
-  }
   // خانات اختيارية لكن معبّأة بصيغة خاطئة (حروف بخانة أرقام، هوية ليست 9 أرقام...) — الخادم سيرفضها
   missing.push(...invalidFormatFields(f, s))
 
@@ -379,8 +372,6 @@ const starredChecks = computed<Record<number, boolean[]>>(() => {
     1: [filled(f.name), membershipValid(f.membership_number), /^[0-9]{9}$/.test(f.commercial_register ?? '')],
     2: [],
     3: [
-      !!f.governorate_id, !!f.city_id, filled(f.district), filled(f.address),
-      filled(f.building), filled(f.floor), /^[0-9]{5}$/.test(f.license_number ?? ''), filled(f.established_date),
       f.specialties.every(sp => !!sp.field_lk_type && !!sp.specialization_lk_type && !!sp.classification),
     ],
     4: documentKeys.filter(k => k !== 'id_file' && k !== 'authorized_signature').map(k => docPresent(k)),
@@ -999,9 +990,8 @@ const submit = async () => {
                 :items="governorates"
                 item-title="name"
                 item-value="id"
-                label="المحافظة *"
+                label="المحافظة"
                 :error-messages="validationErrors.governorate_id"
-                :rules="[v => !!v || 'المحافظة مطلوبة']"
               />
             </VCol>
             <VCol
@@ -1014,10 +1004,9 @@ const submit = async () => {
                 :items="citiesForGovernorate(form.governorate_id)"
                 item-title="name"
                 item-value="id"
-                label="المدينة *"
+                label="المدينة"
                 :disabled="!form.governorate_id"
                 :error-messages="validationErrors.city_id"
-                :rules="[v => !!v || 'المدينة مطلوبة']"
               />
             </VCol>
             <VCol
@@ -1026,9 +1015,8 @@ const submit = async () => {
             >
               <VTextField
                 v-model="form.district"
-                label="الحي *"
+                label="الحي"
                 :error-messages="validationErrors.district"
-                :rules="[v => !!v || 'الحي مطلوب']"
               />
             </VCol>
             <VCol
@@ -1037,9 +1025,8 @@ const submit = async () => {
             >
               <VTextField
                 v-model="form.address"
-                label="العنوان التفصيلي (الشارع) *"
+                label="العنوان التفصيلي (الشارع)"
                 :error-messages="validationErrors.address"
-                :rules="[v => !!v || 'العنوان التفصيلي مطلوب']"
               />
             </VCol>
             <VCol
@@ -1048,9 +1035,8 @@ const submit = async () => {
             >
               <VTextField
                 v-model="form.building"
-                label="العمارة *"
+                label="العمارة"
                 :error-messages="validationErrors.building"
-                :rules="[v => !!v || 'العمارة مطلوبة']"
               />
             </VCol>
             <VCol
@@ -1059,9 +1045,8 @@ const submit = async () => {
             >
               <VTextField
                 v-model="form.floor"
-                label="الطابق *"
+                label="الطابق"
                 :error-messages="validationErrors.floor"
-                :rules="[v => !!v || 'الطابق مطلوب']"
               />
             </VCol>
           </VRow>
@@ -1091,13 +1076,12 @@ const submit = async () => {
               <VTextField
                 v-model="form.license_number"
                 v-numeric
-                label="رقم رخصة البلدية *"
+                label="رقم رخصة البلدية"
                 inputmode="numeric"
                 maxlength="5"
                 :error-messages="validationErrors.license_number"
                 :rules="[
-                  v => !!v || 'رقم رخصة البلدية مطلوب',
-                  v => /^[0-9]{5}$/.test(v) || 'يجب أن يتكون من 5 أرقام بالضبط'
+                  v => !v || /^[0-9]{5}$/.test(v) || 'يجب أن يتكون من 5 أرقام بالضبط'
                 ]"
               />
             </VCol>
@@ -1107,10 +1091,10 @@ const submit = async () => {
             >
               <VTextField
                 v-model="form.established_date"
-                label="تاريخ التأسيس *"
+                label="تاريخ التأسيس"
                 type="date"
                 :error-messages="validationErrors.established_date"
-                :rules="[v => !!v || 'تاريخ التأسيس مطلوب', contractorRules.notFuture]"
+                :rules="[contractorRules.notFuture]"
               />
             </VCol>
             <VCol
