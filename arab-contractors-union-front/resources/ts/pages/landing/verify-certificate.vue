@@ -88,7 +88,7 @@ async function copyText(text: string, what: 'serial' | 'link') {
 function shareLink() {
   const s = result.value?.serial_number
   if (!s) return
-  copyText(`${window.location.origin}/landing/verify-certificate?serial=${encodeURIComponent(s)}`, 'link')
+  copyText(`${window.location.origin}/verify?serial=${encodeURIComponent(s)}`, 'link')
 }
 
 async function pasteFromClipboard() {

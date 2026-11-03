@@ -17,18 +17,18 @@ use Mpdf\Mpdf;
  *   قياساً: 68 م.ب و11 ثانية مقابل 293 م.ب و24 ثانية لكل شهادة.
  *
  * الترويسة الرسمية:
- *   الأصول الثلاثة مستخرَجة من نفس قالب Word المعتمد (resources/certificate-assets)،
- *   فتبقى الهوية البصرية مطابقة للمصدر. تُركَّب عبر SetHTMLHeader/SetHTMLFooter
- *   لا عبر SetWatermarkImage — لأن الترويسة شريط نسبته 4:1 والتذييل 6.5:1، وتمطيط
- *   أيّهما ليملأ صفحة A4 يشوّه الشعار. الهوامش تحجز لهما المساحة.
+ *   الأصول مستخرَجة من قالب "ترويسة الاتحاد" (resources/certificate-assets).
+ *   الترويسة والتذييل بعرض الورقة كاملاً (210mm، بلا هوامش) كما في قالب Word، فتُرسم
+ *   بإحداثيات مطلقة لا عبر SetHTMLHeader/Footer اللذين يحصرانهما داخل الهوامش.
+ *   الشعار الباهت بالخلفية علامة مائية بنفس مقاسه في القالب.
  *
  * ملاحظة: التوليد يستغرق ثوانيَ عدة، فلا يجوز استدعاؤه داخل طلب HTTP متزامن.
  */
 class MembershipCertificatePdfService
 {
-    /** ارتفاع الترويسة والتذييل بالمليمتر — مشتق من نسبة أبعاد الصورتين على عرض A4 المطبوع (180mm) */
-    private const HEADER_HEIGHT_MM = 45;
-    private const FOOTER_HEIGHT_MM = 24; // صورة التذييل 2481×315 على 180mm ≈ 23mm
+    /** ارتفاع الترويسة والتذييل بالمليمتر — نسبة أبعاد الصورتين (1241×286 و2040×259) على عرض 210mm */
+    private const HEADER_HEIGHT_MM = 48.4;
+    private const FOOTER_HEIGHT_MM = 26.7;
 
     /**
      * @param  bool  $preview  يكتب في certificates/preview بدل مسار الشهادة الرسمي.
@@ -62,10 +62,13 @@ class MembershipCertificatePdfService
             : now()->endOfYear()->startOfDay();
     }
 
-    /** رابط صفحة التحقق العامة (بالموقع العام) — هو اللي بيحمله رمز QR على الشهادة */
+    /**
+     * رابط صفحة التحقق العامة — هو اللي بيحمله رمز QR على الشهادة. الرابط المختصر
+     * (pcu.org.ps/verify) بيعرض نفس صفحة landing/verify-certificate، وهي باقية للروابط القديمة.
+     */
     public static function verificationUrl(string $serial): string
     {
-        return rtrim((string) config('app.frontend_url'), '/') . '/landing/verify-certificate?serial=' . urlencode($serial);
+        return config('app.certificate_verify_url') . '?serial=' . urlencode($serial);
     }
 
     /**
@@ -159,10 +162,24 @@ class MembershipCertificatePdfService
         $presidentTitle1 = \App\Models\Setting::get('union_president_title1', 'نقيب المقاولين الفلسطينيين');
         $presidentTitle2 = \App\Models\Setting::get('union_president_title2', 'النائب الأول لرئيس الاتحاد');
 
-        $assets   = resource_path('certificate-assets');
-        $headerImg = $assets . DIRECTORY_SEPARATOR . 'letterhead-header.jpg';
-        $footerImg = $assets . DIRECTORY_SEPARATOR . 'letterhead-footer.png';
-        $sealImg   = $assets . DIRECTORY_SEPARATOR . 'union-seal.jpg';
+        $assets       = resource_path('certificate-assets');
+        $headerImg    = $assets . DIRECTORY_SEPARATOR . 'letterhead-header.png';
+        $footerImg    = $assets . DIRECTORY_SEPARATOR . 'letterhead-footer.png';
+        $watermarkImg = $assets . DIRECTORY_SEPARATOR . 'letterhead-watermark.png';
+        $sealImg      = $assets . DIRECTORY_SEPARATOR . 'union-seal.png';
+        $headerH      = self::HEADER_HEIGHT_MM;
+        $footerH      = self::FOOTER_HEIGHT_MM;
+
+        $tempDir = storage_path('app/mpdf-tmp');
+        if (! is_dir($tempDir)) {
+            mkdir($tempDir, 0775, true);
+        }
+        // QR التحقق كملف SVG مؤقت (يُحذف بعد التوليد)؛ الرابط المختصر مطبوع تحته نصاً
+        $verifyPageUrl = e(config('app.certificate_verify_url'));
+        $qrFile = $tempDir . DIRECTORY_SEPARATOR . "qr-{$reference}-" . uniqid() . '.svg';
+        file_put_contents($qrFile, \SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(300)->margin(0)
+            ->errorCorrection('M')->color(0, 0, 0)->generate($verifyUrl));
+        $serialEsc = e($serial);
 
         $companyLabelEsc  = e($companyLabel);
         $addressEsc       = e($address);
@@ -186,29 +203,26 @@ class MembershipCertificatePdfService
                 'line' => $pt(17), 'classified' => $pt(16), 'validity' => $pt(16), 'sign' => $pt(13),
                 'gapS' => $pt(6), 'gapM' => $pt(10),
             ];
-            // حجم الختم الطبيعي (170×132px ≈ 45×35mm)
-            $sealW = (int) round(170 * $step['seal']);
-            $sealH = (int) round(132 * $step['seal']);
-            // ارتفاع كتلة الختم والتوقيع المحجوز فوق التذييل (px→mm على 96dpi + 2mm هامش)
-            $signMm = (int) ceil($sealH * 25.4 / 96) + 3;
+            // سطر التوقيع: الأعمدة الثلاثة بارتفاع متقارب (~34mm بالحجم الطبيعي) — الختم 152×128px،
+            // الـQR ‏85px + ثلاثة أسطر، والاسم وصفتاه + فراغ التوقيع اليدوي
+            $sealW   = (int) round(152 * $step['seal']);
+            $sealH   = (int) round(128 * $step['seal']);
+            $qrPx    = (int) round(85 * $step['seal']);
+            $signGap = round(16 * $step['seal'], 1) . 'mm';
 
             // أحجام الخطوط والألوان والمحاذاة أدناه منقولة حرفياً من قالب Word المعتمد
             // (w:sz بأنصاف النقاط ÷ 2 = pt). أي تعديل هنا يخرج الشهادة عن مطابقة الأصل.
             $html = <<<HTML
 <style>
   body { font-family: calibri; direction: rtl; color: #000; font-size: {$f['body']}; }
-  .meta { margin: 0 0 2pt 0; font-family: calibri; }
-  .meta td { padding: 0; line-height: 1.3; white-space: nowrap; }
-  /* "الرقم:" و"التاريخ:" أحمر 10، والقيمة مقابلهما أزرق غامق سميك 11 */
-  .meta-label { color: #D80F18; font-size: 10pt; }
-  .meta-value { color: #002060; font-size: 11pt; font-weight: bold; }
+  /* العنوان واسم الشركة بكحلي هوية الاتحاد — نفس لون "اتحاد المقاولين الفلسطينيين" بالترويسة */
   .title {
-    font-family: ptboldheading; text-align: center;
+    font-family: ptboldheading; text-align: center; color: #2E3192;
     font-size: {$f['title']}; font-weight: bold; margin: 2pt 0 {$f['gapM']} 0;
   }
   .line { margin: 0 0 {$f['gapS']} 0; line-height: 1.4; font-weight: bold; }
   .intro { font-family: timesnewroman; font-size: {$f['intro']}; font-weight: bold; }
-  .company { font-family: ptboldheading; font-size: {$f['company']}; font-weight: bold; }
+  .company { font-family: ptboldheading; font-size: {$f['company']}; font-weight: bold; color: #2E3192; }
   .addr { font-size: {$f['line']}; font-weight: bold; }
   .member-no { font-size: {$f['line']}; font-weight: bold; }
   .classified { font-size: {$f['classified']}; font-weight: bold; }
@@ -223,13 +237,19 @@ class MembershipCertificatePdfService
   table.data-table th { background-color: #8C8C8C; }
   table.data-table td { font-family: arial; }
   .validity { font-size: {$f['validity']}; font-weight: bold; margin-top: {$f['gapM']}; line-height: 1.4; }
+  /* الأعمدة الثلاثة تبدأ من خط علوي واحد */
+  .sign-block { width: 100%; margin: {$f['gapS']} 0 0 0; }
+  .sign-block td { vertical-align: top; }
+  .seal-cell { text-align: center; }
+  .sign-text { text-align: center; font-weight: bold; line-height: 1.35; }
+  .sign-name { color: #2E3192; font-size: {$pt(15)}; }
+  .sign-title1 { font-size: {$pt(14)}; }
+  .sign-title2 { font-size: {$pt(11)}; }
+  .sign-space { height: {$signGap}; }
+  /* خانة التحقق يمين الصفحة: QR والرقم التسلسلي ورابط التحقق، بالأسود وبلا إطارات */
+  .verify-cell { text-align: center; color: #000; font-size: {$pt(8)}; line-height: 1.3; }
+  .verify-ref { font-size: {$pt(10)}; font-weight: bold; }
 </style>
-
-<!-- التاريخ والرقم بنفس السطر: بجدول RTL أول خلية يميناً، فالتاريخ يميناً والرقم ع يساره -->
-<table class="meta"><tr>
-  <td><span class="meta-label">التاريخ:</span> <span class="meta-value">{$issuedAt}</span></td>
-  <td style="padding-right:22pt;"><span class="meta-label">الرقـم:</span> <span class="meta-value" dir="ltr">{$reference}</span></td>
-</tr></table>
 
 <div class="title">شهادة عضـــــــــوية</div>
 
@@ -253,15 +273,29 @@ class MembershipCertificatePdfService
   هذه الشهادة سارية المفعول حتى تاريخ {$validUntil}م وبعدها تعتبر لاغيه.
 </div>
 
+<!-- في جدول RTL أول خلية تُرسم يميناً: التحقق يميناً، الختم بالوسط، والتوقيع يساراً.
+     الرقم التسلسلي بـspan LTR معزول فالنسخ من الـPDF بيطلع بالترتيب الصحيح. -->
+<table class="sign-block" autosize="1">
+  <tr>
+    <td width="30%" class="verify-cell">
+      <img src="{$qrFile}" width="{$qrPx}" height="{$qrPx}"><br>
+      الرقم التسلسلي: <span class="verify-ref" dir="ltr">{$serialEsc}</span><br>
+      امسح الرمز للتحقق من صحة الشهادة<br>
+      <span dir="ltr">{$verifyPageUrl}</span>
+    </td>
+    <td width="32%" class="seal-cell">
+      <img src="{$sealImg}" width="{$sealW}" height="{$sealH}">
+    </td>
+    <td width="38%" class="sign-text">
+      <span class="sign-name">{$presidentName}</span><br>
+      <span class="sign-title1">{$presidentTitle1}</span><br>
+      <span class="sign-title2">{$presidentTitle2}</span>
+      <div class="sign-space"></div>
+    </td>
+  </tr>
+</table>
+
 HTML;
-
-            $tempDir = storage_path('app/mpdf-tmp');
-            if (! is_dir($tempDir)) {
-                mkdir($tempDir, 0775, true);
-            }
-
-            $headerH = self::HEADER_HEIGHT_MM;
-            $footerH = self::FOOTER_HEIGHT_MM;
 
             // خطوط القالب المعتمد نفسها، مشحونة من resources/certificate-assets/fonts
             // لتُطابق الشهادة الأصل بصرياً على أي سيرفر بلا خطوط نظام.
@@ -276,15 +310,9 @@ HTML;
                 'orientation'   => 'P',
                 'margin_left'   => 15,
                 'margin_right'  => 15,
-                // الهامش العلوي/السفلي يبدأ بعد الترويسة/التذييل، وmargin_header/footer
-                // يحدّدان بعدهما عن حافة الورقة
-                // margin_header(8) + headerH هو أدنى حد؛ أقل منه يدوس المتن صورة الترويسة.
-                // +2 هامش أمان لأن صندوق أول سطر يبدأ قبل حدّ الهامش بكسر نقطة.
-                'margin_top'    => $headerH + 10,
-                // الشريط (ختم + توقيع + QR) بارتفاع الختم، فوق صورة التذييل
-                'margin_bottom' => $footerH + $signMm + 8,
-                'margin_header' => 8,
-                'margin_footer' => 8,
+                // الترويسة والتذييل ملتصقان بحافة الورقة؛ الهامشان يحجزان مساحتهما للمتن
+                'margin_top'    => $headerH + 4,
+                'margin_bottom' => $footerH + 2,
                 'tempDir'       => $tempDir,
 
                 'fontDir'  => array_merge($defaultConfig['fontDir'], [$assets . DIRECTORY_SEPARATOR . 'fonts']),
@@ -304,37 +332,11 @@ HTML;
             $mpdf->autoScriptToLang = false;
             $mpdf->autoLangToFont   = false;
 
-            // الترويسة والتذييل الرسميان — مستخرَجان من قالب Word المعتمد، بعرض كامل
-            // ونسبة أبعاد محفوظة (لا تمطيط)
-            $mpdf->SetHTMLHeader('<img src="' . $headerImg . '" style="width:100%;">');
-            $qrDataUri = 'data:image/svg+xml;base64,' . base64_encode(
-                \SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(200)->margin(0)->errorCorrection('M')->generate($verifyUrl)
-            );
-
-            // أسفل الشهادة: الرقم التسلسلي ورمز QR يوجّه لصفحة التحقق، ثم صورة التذييل الرسمي
-            // أسفل الصفحة فوق التذييل: الختم والتوقيع (مكانهما بالقالب الأصلي، يميناً) بنفس الشريط مع
-            // رمز QR والرقم التسلسلي (يساراً) — فما بيتأثروا بطول جدول التخصصات ولا بيسرقوا سطر زيادة.
-            // الجدول LTR: أول خلية يساراً. الرقم بخلية LTR مستقلة فالنسخ من الـPDF بيطلع بالترتيب الصحيح.
-            $mpdf->SetHTMLFooter(
-                '<table dir="ltr" width="100%" style="margin-bottom:2mm;direction:ltr;border-collapse:collapse;"><tr>'
-                . '<td style="width:13mm;text-align:left;vertical-align:middle;"><img src="' . $qrDataUri . '" width="42" height="42"></td>'
-                . '<td style="width:52mm;vertical-align:middle;">'
-                .   '<table dir="ltr" width="100%" style="border-collapse:collapse;"><tr><td style="direction:ltr;text-align:left;font-family:calibri;font-size:11pt;color:#002060;">'
-                .   '<b>' . e($serial) . '</b></td></tr>'
-                .   '<tr><td dir="rtl" style="text-align:left;font-family:calibri;font-size:7pt;color:#444;">'
-                .   '<span style="color:#D80F18;font-size:8pt;">الرقم التسلسلي للشهادة</span><br>'
-                .   'امسح الرمز للتحقق من صحة الشهادة'
-                .   '</td></tr></table>'
-                . '</td>'
-                . '<td dir="rtl" style="text-align:center;vertical-align:middle;font-family:calibri;font-weight:bold;font-size:' . $f['sign'] . ';line-height:1.35;">'
-                . e($presidentName) . '<br>' . e($presidentTitle1) . '<br>' . e($presidentTitle2)
-                . '</td>'
-                . '<td style="width:' . ((int) ceil($sealW * 25.4 / 96) + 2) . 'mm;text-align:right;vertical-align:middle;">'
-                . '<img src="' . $sealImg . '" width="' . $sealW . '" height="' . $sealH . '"></td>'
-                . '</tr></table>'
-                . '<img src="' . $footerImg . '" style="width:100%;">'
-            );
-
+            // الشعار الباهت بوسط الصفحة خلف المتن، بمقاسه في قالب Word (123×100mm).
+            // الصورة باهتة أصلاً، فلا شفافية إضافية.
+            $mpdf->SetWatermarkImage($watermarkImg, 1, [123, 100], 'P');
+            $mpdf->showWatermarkImage = true;
+            $mpdf->watermarkImgBehind = true;
 
             $mpdf->WriteHTML($html);
 
@@ -344,6 +346,25 @@ HTML;
             }
         }
 
+        // الترويسة والتذييل بعرض الورقة كاملاً تُرسم بإحداثيات مطلقة بعد المتن — الهوامش تبقيه
+        // بعيداً عنهما. SetHTMLHeader/Footer يحصرانهما داخل الهوامش، وAddPage قبل WriteHTML
+        // يدفع المتن لصفحة ثانية. التذييل تحت الهامش السفلي، فبدون إيقاف القفز التلقائي
+        // يفتح صفحة ثانية فارغة. constrain=false: بدونه mPDF يصغّر الصورة لعرض المتن (180mm).
+        $mpdf->SetAutoPageBreak(false);
+        $mpdf->Image($headerImg, 0, 0, 210, $headerH, '', '', true, false);
+        $mpdf->Image($footerImg, 0, 297 - $footerH, 210, $footerH, '', '', true, false);
+
+        // الترويسة تطبع "الرقم: ....." و"التاريخ: ....." بنفسها؛ القيمة تُكتب فوق النقاط
+        // بخلفية بيضاء تغطيها. المواضع مقيسة من بكسلات النقاط بصورة الترويسة (× 210/1241):
+        // نقاط الرقم 27–44.5mm، نقاط التاريخ 155.7–173mm، وكلاهما على ارتفاع 39.6–42mm.
+        $mpdf->SetFillColor(255, 255, 255);
+        $mpdf->SetTextColor(0, 32, 96);
+        $mpdf->SetFont('calibri', 'B', 10);
+        $mpdf->SetXY(26.5, 38);
+        $mpdf->Cell(18.5, 5.5, $reference, 0, 0, 'C', true);
+        $mpdf->SetXY(155, 38);
+        $mpdf->Cell(18.5, 5.5, $issuedAt, 0, 0, 'C', true);
+
         // قفل تعديل/نسخ المحتوى بكلمة سر مالك — بدون كلمة سر مستخدم، فالملف يُفتح ويُطبع بحرية
         $mpdf->SetProtection(['print', 'copy'], '', config('app.certificate_pdf_owner_password'));
 
@@ -352,6 +373,7 @@ HTML;
             : "certificates/membership/{$reference}.pdf";
 
         Storage::disk('public')->put($path, $mpdf->Output('', 'S'));
+        @unlink($qrFile);
 
         return $path;
     }
