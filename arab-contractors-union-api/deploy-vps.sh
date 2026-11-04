@@ -16,6 +16,9 @@ MONOREPO_DIR="/var/www/pcuorg/monorepo"
 MONOREPO_BRANCH="feature/arab-contractors-union"
 BACKUP_DIR="$HOME/pcu-backups"
 KEEP_DAYS=30
+# نسخة storage ≈250MB لكل نشرة وstaging بينشر 5-6 مرات باليوم: الاحتفاظ بالعمر وحده (30 يوم) ملأ القرص
+# المشترك مع الإنتاج لـ99% (2026-11-04). فنحتفظ بآخر N نسخة بس، وبالعمر للباقي.
+KEEP_STORAGE_BACKUPS=10
 STAMP="$(date +%F-%H%M)"
 
 cd "$APP_DIR"
@@ -125,5 +128,8 @@ sudo systemctl restart pcu-api-queue pcu-api-reverb || echo "⚠ تخطّي: خ�
 # ---------------------------------------------------------------
 find "$BACKUP_DIR" -name 'db-*.sql'          -mtime "+$KEEP_DAYS" -delete
 find "$BACKUP_DIR" -name 'storage-*.tar.gz'  -mtime "+$KEEP_DAYS" -delete
+# المجلد الرئيسي بس (بدون production/): الأحدث أولاً، نتخطّى آخر N ونحذف الباقي. || true لأن set -o pipefail
+# بيفشّل النشر بعد ما يخلص لو ما في نسخ أصلاً.
+ls -1t "$BACKUP_DIR"/storage-*.tar.gz 2>/dev/null | tail -n +"$((KEEP_STORAGE_BACKUPS + 1))" | xargs -r rm -f || true
 
 echo "✔ تم النشر بنجاح — $STAMP"
