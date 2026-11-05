@@ -34,7 +34,7 @@ class UpdateFullProfileRequest extends FormRequest
             // مراجعة ولا أثر. إعادتهما هنا تُعيد فتح الثغرة.
             'established_date'              => 'nullable|date',
             'email'                         => 'nullable|email|unique:contractors,email,' . $contractorId,
-            'phone'                         => 'nullable|string|max:20|unique:contractors,phone,' . $contractorId,
+            // phone غير مقبول هنا — رقم الجوال لا يُغيَّر من التطبيق (ContractorAuthController::attemptsPhoneChange)
             'governorate_id'                => 'nullable|integer|exists:governorates,id',
             'city_id'                       => 'nullable|integer|exists:cities,id',
             'address'                       => 'nullable|string',

@@ -31,6 +31,7 @@ class OtpService
      * @return array{otp: int, expires_in: int, is_preview: bool}
      *
      * @throws \App\Exceptions\OtpCooldownException
+     * @throws \App\Exceptions\SmsSendFailedException
      */
     public function sendOtp(
         string $purpose,
@@ -47,7 +48,14 @@ class OtpService
             throw new \App\Exceptions\OtpCooldownException($expiresIn);
         }
 
-        $otp = 123456; // TODO: mt_rand(100000, 999999) في الإنتاج
+        $otp = random_int(100000, 999999);
+
+        $message = str_replace('{otp}', (string) $otp, $smsMessage);
+
+        // الإرسال قبل التخزين: لو فشل لا يبقى رمز لم يصل ولا cooldown يمنع إعادة المحاولة
+        if (! $this->sms->send($phone, $message)) {
+            throw new \App\Exceptions\SmsSendFailedException();
+        }
 
         Cache::put(
             $this->otpKey($purpose, $subjectId),
@@ -56,9 +64,6 @@ class OtpService
         );
 
         Cache::put($cooldownKey, time() + $cooldown, now()->addSeconds($cooldown));
-
-        $message = str_replace('{otp}', (string) $otp, $smsMessage);
-        $this->sms->send($phone, $message);
 
         $isPreview = config('services.sms.driver', 'log') === 'log';
 

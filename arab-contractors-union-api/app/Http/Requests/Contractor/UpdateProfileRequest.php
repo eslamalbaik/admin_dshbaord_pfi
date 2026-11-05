@@ -13,11 +13,9 @@ class UpdateProfileRequest extends FormRequest
 
     public function rules(): array
     {
-        $contractorId = $this->user('contractor')->id;
-
         return [
             // اسم الشركة لا يُعدَّل مباشرة — فقط عبر طلب تعديل اسم شركة تُوافق عليه الإدارة
-            'phone'          => 'sometimes|string|max:20|unique:contractors,phone,' . $contractorId,
+            // phone غير مقبول هنا — رقم الجوال لا يُغيَّر من التطبيق (ContractorAuthController::attemptsPhoneChange)
             'governorate_id' => 'nullable|integer|exists:governorates,id',
             'city_id'        => 'nullable|integer|exists:cities,id',
             'address'        => 'nullable|string',

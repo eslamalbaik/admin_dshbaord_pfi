@@ -2,14 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Exceptions\OtpCooldownException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Contractor\ChangePasswordRequest;
 use App\Http\Requests\Contractor\LoginRequest;
-use App\Http\Requests\Contractor\RequestPhoneChangeOtpRequest;
 use App\Http\Requests\Contractor\UpdateFullProfileRequest;
 use App\Http\Requests\Contractor\UpdateProfileRequest;
-use App\Http\Requests\Contractor\VerifyPhoneChangeOtpRequest;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\Contractor;
 use App\Models\User;
@@ -17,8 +14,8 @@ use App\Notifications\ContractorProfileUpdatedNotification;
 use App\Services\ContractorFileService;
 use App\Services\ContractorProfilePdfService;
 use App\Services\ContractorProfileService;
-use App\Services\OtpService;
 use App\Support\ApiMessages;
+use App\Support\PhoneNumber;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -32,7 +29,6 @@ class ContractorAuthController extends Controller
     public function __construct(
         private ContractorProfileService    $profileService,
         private ContractorFileService       $fileService,
-        private OtpService                  $otpService,
         private ContractorProfilePdfService $pdfService,
     ) {
     }
@@ -177,12 +173,18 @@ class ContractorAuthController extends Controller
 
     // ─────────────────────────────────────────────────────────────────────────
     //  PATCH /api/contractor/auth/profile
-    //  تعديل بيانات المقاول (الاسم، الهاتف، المحافظة والمدينة بالـ ID)
+    //  تعديل بيانات المقاول (الاسم، المحافظة والمدينة بالـ ID) — الجوال لا يُغيَّر من هنا
     // ─────────────────────────────────────────────────────────────────────────
     public function updateProfile(UpdateProfileRequest $request)
     {
         $contractor = $request->user('contractor');
+
+        if ($this->attemptsPhoneChange($request, $contractor)) {
+            return $this->phoneChangeNotAllowed();
+        }
+
         $validated = $request->validated();
+        unset($validated['phone']);
 
         $before = $contractor->only(array_keys($validated));
 
@@ -196,58 +198,49 @@ class ContractorAuthController extends Controller
 
     // ─────────────────────────────────────────────────────────────────────────
     //  POST /api/v1/contractor/auth/profile/phone/request-otp
-    //  (اختياري، للتوافق) طلب رمز تحقق لرقم جوال جديد — لم يعد شرطاً لتعديله
+    //  POST /api/v1/contractor/auth/profile/phone/verify-otp
+    //  رقم الجوال لا يُغيَّر من التطبيق — من لوحة الإدارة فقط (قرار المالك 2026-11-05،
+    //  يلغي التعديل المباشر المعتمد 2026-10-13). المساران باقيان حتى تحصل نسخ التطبيق
+    //  القديمة على رسالة واضحة بدل 404.
     // ─────────────────────────────────────────────────────────────────────────
-    public function requestPhoneChangeOtp(RequestPhoneChangeOtpRequest $request)
+    public function requestPhoneChangeOtp()
     {
-        $contractor = $request->user('contractor');
-        $newPhone = trim($request->phone);
-
-        if ($newPhone === $contractor->phone) {
-            return $this->error('رقم الجوال المُدخل هو نفس رقمك الحالي.', 422, null, 'same_phone');
-        }
-
-        if (Contractor::where('phone', $newPhone)->where('id', '!=', $contractor->id)->exists()) {
-            return $this->error('رقم الجوال هذا مستخدَم بحساب آخر.', 422, null, 'phone_taken');
-        }
-
-        try {
-            $result = $this->otpService->sendOtp(
-                'profile_phone',
-                $contractor->id,
-                $newPhone,
-                'اتحاد المقاولين: رمز تحقق تغيير رقم الجوال: {otp}. صالح لمدة 10 دقائق.',
-            );
-        } catch (OtpCooldownException $e) {
-            return $this->error($e->getMessage(), 429, ['expires_in' => $e->expiresIn], 'otp_cooldown');
-        }
-
-        $data = ['expires_in' => $result['expires_in']];
-        if ($result['is_preview']) {
-            $data['otp_preview'] = $result['otp'];
-        }
-
-        return $this->success($data, 'تم إرسال رمز التحقق إلى رقم الجوال الجديد.');
+        return $this->phoneChangeNotAllowed();
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  POST /api/v1/contractor/auth/profile/phone/verify-otp
-    //  (اختياري، للتوافق) تأكيد الرمز — profile/update لم يعد يشترطه
-    // ─────────────────────────────────────────────────────────────────────────
-    public function verifyPhoneChangeOtp(VerifyPhoneChangeOtpRequest $request)
+    public function verifyPhoneChangeOtp()
     {
-        $contractor = $request->user('contractor');
+        return $this->phoneChangeNotAllowed();
+    }
 
-        try {
-            $cached = $this->otpService->verifyOtp('profile_phone', $contractor->id, $request->otp);
-        } catch (ValidationException $e) {
-            return $this->error('رمز التحقق غير صحيح أو انتهت صلاحيته.', 422, null, 'invalid_otp');
+    private function phoneChangeNotAllowed()
+    {
+        return $this->error(
+            'لا يمكن تغيير رقم الجوال من التطبيق. لتغييره تواصل مع الاتحاد.',
+            403,
+            null,
+            'phone_change_not_allowed',
+        );
+    }
+
+    /**
+     * التطبيق يعيد إرسال الرقم الحالي مع كل حفظ للملف — يُقبل ويُتجاهل، وكذلك الفراغ. رقم
+     * مختلف يُرفض. "الحالي" = جوال الحساب أو جوال المفوض بعد توحيد الصيغة.
+     */
+    private function attemptsPhoneChange(Request $request, Contractor $contractor): bool
+    {
+        $sent = PhoneNumber::normalize(is_string($request->input('phone')) ? $request->input('phone') : null);
+
+        if (! $sent) {
+            return false;
         }
 
-        // صالح 15 دقيقة — كافية لإكمال حفظ باقي التعديلات بنفس الشاشة
-        $this->otpService->storeVerifiedResult('profile_phone', $contractor->id, $cached['phone']);
+        $current = array_filter([
+            PhoneNumber::normalize($contractor->phone),
+            PhoneNumber::normalize($contractor->authorized_person_phone),
+        ]);
 
-        return $this->success(['phone' => $cached['phone']], 'تم التحقق من رقم الجوال بنجاح.');
+        return ! in_array($sent, $current, true);
     }
 
     /**
@@ -298,6 +291,10 @@ class ContractorAuthController extends Controller
             return $this->error('غير مصرح بالوصول.', 401);
         }
 
+        if ($this->attemptsPhoneChange($request, $contractor)) {
+            return $this->phoneChangeNotAllowed();
+        }
+
         $validated = $request->validated();
 
         // نسخ التطبيق التي لم تكن تستلم established_date بالملف تُرسله فارغاً في كل حفظ،
@@ -306,17 +303,9 @@ class ContractorAuthController extends Controller
             unset($validated['established_date']);
         }
 
-        // رقم الجوال يتعدّل مباشرة بدون OTP (قرار المالك 2026-10-13). التفرّد مضمون بـ
-        // UpdateFullProfileRequest. الفراغ لا يعني "احذف الرقم": الجوال معرّف دخول، ونموذج
-        // التطبيق قد يرسل الحقل فارغاً فكان سيمسح الرقم ويقفل الحساب.
-        // مسارا phone/request-otp و phone/verify-otp باقيان لتوافق نسخ التطبيق القديمة، لكن
-        // لم يبقَ شيء يشترطهما.
-        if (array_key_exists('phone', $validated)) {
-            $validated['phone'] = is_string($validated['phone']) ? trim($validated['phone']) : $validated['phone'];
-            if (empty($validated['phone'])) {
-                unset($validated['phone']);
-            }
-        }
+        // رقم الجوال لا يُغيَّر من التطبيق (راجع attemptsPhoneChange) — الرقم الحالي المُعاد
+        // إرساله مع الحفظ يُتجاهل.
+        unset($validated['phone']);
 
         $this->rejectFeeRelevantFields($request, $contractor);
 

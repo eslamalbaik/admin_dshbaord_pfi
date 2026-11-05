@@ -18,6 +18,8 @@ class AppServiceProvider extends ServiceProvider
                 'hotsms' => new \App\Services\Sms\HotSmsSender(
                     config('services.sms.hotsms.api_token'),
                     config('services.sms.hotsms.sender'),
+                    config('services.sms.hotsms.api', 'v1'),
+                    (string) config('services.sms.hotsms.type', '0'),
                 ),
                 default => new \App\Services\Sms\LogSmsSender(),
             },
