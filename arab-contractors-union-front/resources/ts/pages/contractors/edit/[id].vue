@@ -21,6 +21,7 @@ const form = ref({
   name: '',
   capital: '',
   registration_date: '',
+  membership_expires_at: '',
   legal_form: '',
   company_purposes: '',
 
@@ -34,6 +35,7 @@ const form = ref({
 
   // Step 3: العنوان وبيانات الاتصال
   phone: '',
+  phone_country_code: '970',
   fax: '',
   email: '',
   governorate_id: null as number | null,
@@ -228,14 +230,14 @@ const fetchContractor = async () => {
     
     // Populate text fields only
     const textFields = [
-      'membership_number', 'commercial_register', 'name', 'capital', 'registration_date',
+      'membership_number', 'commercial_register', 'name', 'capital', 'registration_date', 'membership_expires_at',
       'legal_form', 'company_purposes', 'owner_name', 'authorized_person',
       'authorized_person_id_number', 'authorized_person_phone', 'authorized_person_whatsapp',
-      'phone', 'fax', 'email', 'governorate_id', 'city_id', 'district', 'building', 'floor',
+      'phone', 'phone_country_code', 'fax', 'email', 'governorate_id', 'city_id', 'district', 'building', 'floor',
       'address', 'established_date', 'license_number', 'classification', 'notes'
     ]
     
-    const dateFields = ['established_date']
+    const dateFields = ['established_date', 'membership_expires_at']
 
     textFields.forEach(field => {
       if (contractor[field] !== null && contractor[field] !== undefined) {
@@ -373,11 +375,11 @@ const submit = async () => {
     if (errors) {
         validationErrors.value = errors
         // Jump to the first step with an error if available
-        if (errors.membership_number || errors.commercial_register || errors.name || errors.capital || errors.registration_date || errors.legal_form) {
+        if (errors.membership_number || errors.commercial_register || errors.name || errors.capital || errors.registration_date || errors.membership_expires_at || errors.legal_form) {
             step.value = 1
         } else if (errors.owner_name || errors.partners || errors.authorized_person) {
             step.value = 2
-        } else if (errors.phone || errors.fax || errors.email || errors.governorate_id || errors.city_id || errors.district || errors.address || errors.building || errors.floor || errors.license_number || errors.established_date || errors.classification || errors.specialties) {
+        } else if (errors.phone || errors.phone_country_code || errors.fax || errors.email || errors.governorate_id || errors.city_id || errors.district || errors.address || errors.building || errors.floor || errors.license_number || errors.established_date || errors.classification || errors.specialties) {
             step.value = 3
         } else {
             step.value = 4
@@ -447,6 +449,9 @@ const submit = async () => {
           </VCol>
           <VCol cols="12" md="4">
             <VTextField v-model="form.registration_date" label="تاريخ التسجيل" type="date" :error-messages="validationErrors.registration_date" />
+          </VCol>
+          <VCol cols="12" md="4">
+            <VTextField v-model="form.membership_expires_at" label="تاريخ انتهاء العضوية" type="date" hint="منه بس بتنحسب حالة العضوية: قبله فعّالة، بعده منتهية" persistent-hint :error-messages="validationErrors.membership_expires_at" />
           </VCol>
           <VCol cols="12" md="4">
             <VTextField v-model="form.legal_form" label="الشكل القانوني للشركة" placeholder="مثال: مساهمة، تضامن، إلخ" :error-messages="validationErrors.legal_form" />
@@ -525,13 +530,11 @@ const submit = async () => {
       <VCardText>
         <VRow>
           <VCol cols="12" md="4">
-            <VTextField
-              v-model="form.phone"
-              label="رقم الجوال *"
-              prefix="🇵🇸 +970"
-              placeholder="59XXXXXXX"
-              :error-messages="validationErrors.phone"
-              :rules="[v => !!v || 'مطلوب', v => /^[0-9]{9}$/.test(v) || 'يجب إدخال 9 أرقام (مثال: 599123456)']"
+            <ContractorPhoneField
+              v-model:phone="form.phone"
+              v-model:country-code="form.phone_country_code"
+              required
+              :error-messages="validationErrors.phone || validationErrors.phone_country_code"
             />
           </VCol>
           <VCol cols="12" md="4">

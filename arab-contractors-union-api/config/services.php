@@ -59,6 +59,10 @@ return [
         'hotsms' => [
             'api_token' => env('HOTSMS_API_TOKEN'),
             'sender'    => env('HOTSMS_SENDER', 'PCU'),
+            // v1 = sendbulksms.php?api_token=... (حساب الاتحاد)، v2 = REST + Bearer
+            'api'       => env('HOTSMS_API', 'v1'),
+            // قيمة type بواجهة v1 — 0 كما في مثال HotSMS؛ تأكد منهم إن ظهر النص العربي مشوّهاً
+            'type'      => env('HOTSMS_TYPE', '0'),
         ],
     ],
 

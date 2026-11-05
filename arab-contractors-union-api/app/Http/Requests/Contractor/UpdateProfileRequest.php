@@ -17,7 +17,6 @@ class UpdateProfileRequest extends FormRequest
 
         return [
             // اسم الشركة لا يُعدَّل مباشرة — فقط عبر طلب تعديل اسم شركة تُوافق عليه الإدارة
-            'phone'          => 'sometimes|string|max:20|unique:contractors,phone,' . $contractorId,
             'governorate_id' => 'nullable|integer|exists:governorates,id',
             'city_id'        => 'nullable|integer|exists:cities,id',
             'address'        => 'nullable|string',

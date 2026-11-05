@@ -40,6 +40,9 @@ Route::prefix('v1')->group(function () {
         // throttle:auth (5 محاولات كل دقيقة) لمنع brute force
         Route::middleware('throttle:auth')->post('login', [ContractorAuthController::class, 'login']);
 
+        // الدول المدعومة لرقم الجوال (شاشات التسجيل واستعادة كلمة المرور)
+        Route::get('countries', [ContractorRegisterController::class, 'countries']);
+
         // تسجيل العضو (خطوتان): التحقق من الهوية ثم تعيين كلمة المرور
         Route::middleware('throttle:auth')->group(function () {
             Route::post('verify-identity', [ContractorRegisterController::class, 'verifyIdentity']);

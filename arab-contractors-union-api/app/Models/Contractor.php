@@ -29,7 +29,7 @@ class Contractor extends Authenticatable
         'authorized_person_id_number', 'authorized_person_phone', 'authorized_person_whatsapp',
         'commercial_register',
         'license_number', 'classification', 'owner_name',
-        'email', 'phone', 'phone_verified_at', 'city', 'governorate_id', 'city_id', 'district', 'address',
+        'email', 'phone', 'phone_country_code', 'phone_verified_at', 'city', 'governorate_id', 'city_id', 'district', 'address',
         'classification_decision_number', 'classification_decision_date',
         'status', 'is_frozen', 'profile_completed', 'profile_approved_by',
         'cr_file', 'id_file', 'notes',
@@ -296,6 +296,20 @@ class Contractor extends Authenticatable
     public function getHasAppAccountAttribute(): bool
     {
         return (bool) $this->password && (bool) $this->phone_verified_at;
+    }
+
+    /** العمود NOT NULL — قيمة فارغة من النموذج تعني الدولة الافتراضية (فلسطين). */
+    public function setPhoneCountryCodeAttribute(?string $value): void
+    {
+        $this->attributes['phone_country_code'] = $value ?: \App\Support\PhoneCountries::DEFAULT_CODE;
+    }
+
+    /** الرقم بالصيغة الدولية (+970597245424) — هو ما يُرسَل إليه الـ SMS. */
+    public function getPhoneInternationalAttribute(): ?string
+    {
+        return $this->phone
+            ? \App\Support\PhoneCountries::international($this->phone_country_code, $this->phone)
+            : null;
     }
 
     /**

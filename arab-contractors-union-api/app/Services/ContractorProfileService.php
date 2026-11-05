@@ -43,6 +43,8 @@ class ContractorProfileService
             'classification_label' => $contractor->classification_label,
             'email'                => $contractor->email,
             'phone'                => $contractor->phone,
+            'country_code'         => $contractor->phone_country_code,
+            'phone_international'  => $contractor->phone_international,
 
             // المحافظة والمدينة كأوبجكت id + name (البيانات القديمة النصية تُرجَع بـ id = null)
             'governorate' => $contractor->governorate ? [

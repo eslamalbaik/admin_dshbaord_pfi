@@ -7,6 +7,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    ActivityLogDetailsDialog: typeof import('./resources/ts/components/ActivityLogDetailsDialog.vue')['default']
     AdminNotificationToasts: typeof import('./resources/ts/components/AdminNotificationToasts.vue')['default']
     AppAutocomplete: typeof import('./resources/ts/@core/components/app-form-elements/AppAutocomplete.vue')['default']
     AppBarSearch: typeof import('./resources/ts/@core/components/AppBarSearch.vue')['default']
@@ -55,7 +56,6 @@ declare module 'vue' {
     TheCustomizer: typeof import('./resources/ts/@core/components/TheCustomizer.vue')['default']
     ThemeSwitcher: typeof import('./resources/ts/@core/components/ThemeSwitcher.vue')['default']
     TiptapEditor: typeof import('./resources/ts/@core/components/TiptapEditor.vue')['default']
-    VueApexCharts: typeof import('vue3-apexcharts')['default']
     WhatsappPhoneField: typeof import('./resources/ts/components/marketplace/WhatsappPhoneField.vue')['default']
   }
 }

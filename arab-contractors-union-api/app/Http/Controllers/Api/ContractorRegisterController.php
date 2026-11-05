@@ -9,6 +9,7 @@ use App\Models\Contractor;
 use App\Models\User;
 use App\Notifications\ContractorActivatedNotification;
 use App\Services\OtpService;
+use App\Support\PhoneCountries;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
@@ -30,10 +31,16 @@ class ContractorRegisterController extends Controller
     {
         $request->validate([
             'phone'          => 'required|string',
+            'country_code'   => 'nullable|string|max:6',
             'terms_accepted' => 'required|accepted',
         ]);
 
-        $contractor = Contractor::where('phone', trim($request->phone))->first();
+        $phone = PhoneCountries::normalize($request->country_code, $request->phone);
+        if (! $phone) {
+            return $this->invalidPhone();
+        }
+
+        $contractor = $this->findByPhone($phone);
 
         if (! $contractor) {
             return $this->error('لا يوجد حساب مرتبط برقم الجوال المُدخل.', 404, null, 'contractor_not_found');
@@ -59,7 +66,7 @@ class ContractorRegisterController extends Controller
             $result = $this->otpService->sendOtp(
                 'register',
                 $contractor->id,
-                $contractor->phone,
+                $contractor->phone_international,
                 'رمز التحقق الخاص بك في اتحاد المقاولين الفلسطينيين: {otp}. صالح لمدة 10 دقائق.',
             );
         } catch (OtpCooldownException $e) {
@@ -71,6 +78,8 @@ class ContractorRegisterController extends Controller
             'name'                => $contractor->name,
             'authorized_person'   => $contractor->authorized_person,
             'phone'               => $contractor->phone,
+            'country_code'        => $contractor->phone_country_code,
+            'phone_international' => $contractor->phone_international,
             'commercial_register' => $contractor->commercial_register,
             'membership_number'   => $contractor->membership_number,
             'has_password'        => !empty($contractor->password),
@@ -92,11 +101,17 @@ class ContractorRegisterController extends Controller
     public function verifyOtp(Request $request)
     {
         $request->validate([
-            'phone' => 'required|string',
-            'otp'   => 'required|string|size:6',
+            'phone'        => 'required|string',
+            'country_code' => 'nullable|string|max:6',
+            'otp'          => 'required|string|size:6',
         ]);
 
-        $contractor = Contractor::where('phone', trim($request->phone))->first();
+        $phone = PhoneCountries::normalize($request->country_code, $request->phone);
+        if (! $phone) {
+            return $this->invalidPhone();
+        }
+
+        $contractor = $this->findByPhone($phone);
 
         if (! $contractor) {
             return $this->error('لا يوجد حساب مرتبط برقم الجوال المُدخل.', 404, null, 'contractor_not_found');
@@ -121,6 +136,8 @@ class ContractorRegisterController extends Controller
             'commercial_register' => $contractor->commercial_register,
             'membership_number'   => $contractor->membership_number,
             'phone'               => $contractor->phone,
+            'country_code'        => $contractor->phone_country_code,
+            'phone_international' => $contractor->phone_international,
             'phone_verified'      => true,
             'has_password'        => !empty($contractor->password),
         ], $contractor->password
@@ -134,10 +151,16 @@ class ContractorRegisterController extends Controller
     public function resendOtp(Request $request)
     {
         $request->validate([
-            'phone' => 'required|string',
+            'phone'        => 'required|string',
+            'country_code' => 'nullable|string|max:6',
         ]);
 
-        $contractor = Contractor::where('phone', trim($request->phone))->first();
+        $phone = PhoneCountries::normalize($request->country_code, $request->phone);
+        if (! $phone) {
+            return $this->invalidPhone();
+        }
+
+        $contractor = $this->findByPhone($phone);
 
         if (! $contractor) {
             return $this->error('لا يوجد حساب مرتبط برقم الجوال المُدخل.', 404, null, 'contractor_not_found');
@@ -155,7 +178,7 @@ class ContractorRegisterController extends Controller
             $result = $this->otpService->sendOtp(
                 'register',
                 $contractor->id,
-                $contractor->phone,
+                $contractor->phone_international,
                 'رمز التحقق الخاص بك في اتحاد المقاولين الفلسطينيين: {otp}. صالح لمدة 10 دقائق.',
             );
         } catch (OtpCooldownException $e) {
@@ -163,9 +186,11 @@ class ContractorRegisterController extends Controller
         }
 
         $data = [
-            'phone'        => $contractor->phone,
-            'otp_required' => true,
-            'expires_in'   => $result['expires_in'],
+            'phone'               => $contractor->phone,
+            'country_code'        => $contractor->phone_country_code,
+            'phone_international' => $contractor->phone_international,
+            'otp_required'        => true,
+            'expires_in'          => $result['expires_in'],
         ];
 
         if ($result['is_preview']) {
@@ -183,12 +208,18 @@ class ContractorRegisterController extends Controller
     {
         $request->validate([
             'phone'                 => 'required|string',
+            'country_code'          => 'nullable|string|max:6',
             'password'              => 'required|string|min:8',
             'password_confirmation' => 'required|string',
             'fcm_token'             => 'nullable|string|max:500',
         ]);
 
-        $contractor = Contractor::where('phone', trim($request->phone))->first();
+        $phone = PhoneCountries::normalize($request->country_code, $request->phone);
+        if (! $phone) {
+            return $this->invalidPhone();
+        }
+
+        $contractor = $this->findByPhone($phone);
 
         if (! $contractor) {
             return $this->error('لا يوجد حساب مرتبط برقم الجوال المُدخل.', 404, null, 'contractor_not_found');
@@ -243,6 +274,8 @@ class ContractorRegisterController extends Controller
                 'name'                => $contractor->name,
                 'authorized_person'   => $contractor->authorized_person,
                 'phone'               => $contractor->phone,
+                'country_code'        => $contractor->phone_country_code,
+                'phone_international' => $contractor->phone_international,
                 'classification'      => $contractor->classification,
             ],
             'تم تسجيل حسابك وتسجيل الدخول بنجاح.',
@@ -256,10 +289,16 @@ class ContractorRegisterController extends Controller
     public function forgotPasswordSendOtp(Request $request)
     {
         $request->validate([
-            'phone' => 'required|string',
+            'phone'        => 'required|string',
+            'country_code' => 'nullable|string|max:6',
         ]);
 
-        $contractor = Contractor::where('phone', trim($request->phone))->first();
+        $phone = PhoneCountries::normalize($request->country_code, $request->phone);
+        if (! $phone) {
+            return $this->invalidPhone();
+        }
+
+        $contractor = $this->findByPhone($phone);
 
         if (! $contractor) {
             return $this->error('لا يوجد حساب مرتبط برقم الجوال المُدخل.', 404, null, 'contractor_not_found');
@@ -278,7 +317,7 @@ class ContractorRegisterController extends Controller
             $result = $this->otpService->sendOtp(
                 'forgot',
                 $contractor->id,
-                $contractor->phone,
+                $contractor->phone_international,
                 'رمز استعادة كلمة المرور في اتحاد المقاولين الفلسطينيين: {otp}. صالح لمدة 10 دقائق.',
             );
         } catch (OtpCooldownException $e) {
@@ -289,6 +328,8 @@ class ContractorRegisterController extends Controller
             'id'                  => $contractor->id,
             'membership_number'   => $contractor->membership_number,
             'phone'               => $contractor->phone,
+            'country_code'        => $contractor->phone_country_code,
+            'phone_international' => $contractor->phone_international,
             'expires_in'          => $result['expires_in'],
         ];
 
@@ -305,12 +346,18 @@ class ContractorRegisterController extends Controller
     public function forgotPasswordReset(Request $request)
     {
         $request->validate([
-            'phone'    => 'required|string',
-            'otp'      => 'required|string|size:6',
-            'password' => 'required|string|min:8|confirmed',
+            'phone'        => 'required|string',
+            'country_code' => 'nullable|string|max:6',
+            'otp'          => 'required|string|size:6',
+            'password'     => 'required|string|min:8|confirmed',
         ]);
 
-        $contractor = Contractor::where('phone', trim($request->phone))->first();
+        $phone = PhoneCountries::normalize($request->country_code, $request->phone);
+        if (! $phone) {
+            return $this->invalidPhone();
+        }
+
+        $contractor = $this->findByPhone($phone);
 
         if (! $contractor) {
             return $this->error('لا يوجد حساب مرتبط برقم الجوال المُدخل.', 404, null, 'contractor_not_found');
@@ -350,10 +397,38 @@ class ContractorRegisterController extends Controller
                 'name'                => $contractor->name,
                 'authorized_person'   => $contractor->authorized_person,
                 'phone'               => $contractor->phone,
+                'country_code'        => $contractor->phone_country_code,
+                'phone_international' => $contractor->phone_international,
                 'classification'      => $contractor->classification,
             ],
             'تم استعادة وتغيير كلمة المرور بنجاح وتسجيل دخولك.',
             200
         );
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  GET /api/v1/contractor/auth/countries
+    //  الدول المدعومة لرقم الجوال — تعرضها شاشات التسجيل واستعادة كلمة المرور
+    // ─────────────────────────────────────────────────────────────────────────
+    public function countries()
+    {
+        return $this->success([
+            'default_code' => PhoneCountries::DEFAULT_CODE,
+            'countries'    => PhoneCountries::all(),
+        ], 'تم جلب الدول المدعومة بنجاح.');
+    }
+
+    /** @param array{code: string, national: string} $phone */
+    private function findByPhone(array $phone): ?Contractor
+    {
+        // '0' . national: أرقام قديمة قد تكون مخزّنة بصفر البداية
+        return Contractor::whereIn('phone', [$phone['national'], '0' . $phone['national']])
+            ->whereIn('phone_country_code', PhoneCountries::lookupCodes($phone['code']))
+            ->first();
+    }
+
+    private function invalidPhone()
+    {
+        return $this->error('رقم الجوال أو رمز الدولة غير صالح.', 422, null, 'invalid_phone');
     }
 }

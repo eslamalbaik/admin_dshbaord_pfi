@@ -74,6 +74,9 @@ class ContractorController extends Controller
         $page->getCollection()->each(fn ($c) => $c->setAttribute(
             'membership_status',
             isset($rows[$c->id]) ? $balances->membershipStatus($rows[$c->id]) : $c->status,
+        )->setAttribute(
+            'membership_expires_at',
+            isset($rows[$c->id]->membership_expires_at) ? substr((string) $rows[$c->id]->membership_expires_at, 0, 10) : null,
         ));
 
         return $this->paginated($page);
@@ -145,6 +148,8 @@ class ContractorController extends Controller
                 $this->uniqueIgnoringSoftDeleted('license_number', $isUpdate, $contractorId),
             ],
             'status'                        => 'sometimes|in:active,pending,expired,suspended',
+            // مش عمود بجدول المقاولين — بيتخزّن على memberships.expires_at (syncMembershipExpiry)
+            'membership_expires_at'         => 'nullable|date',
             'classification'                => 'nullable|string|max:10',
             'field_lk_type'                 => 'nullable|integer',
             'specialization_lk_type'        => 'nullable|integer',
@@ -159,7 +164,8 @@ class ContractorController extends Controller
                 'nullable', 'string', 'max:20',
                 $this->uniqueIgnoringSoftDeleted('phone', $isUpdate, $contractorId),
             ],
-            'city'                          => 'nullable|string|max:100',
+            'phone_country_code'            => ['nullable', 'string', \Illuminate\Validation\Rule::in(\App\Support\PhoneCountries::codes())],
+            'city'                       => 'nullable|string|max:100',
             // إلزامية عند الإنشاء فقط (REQ-01 #5) — تبقى nullable عند التعديل حتى لا يُحظر
             // حفظ أي تعديل آخر على مقاولين قدامى لا تملك سجلاتهم هذه الحقول أصلاً بعد.
             'governorate_id'                => ($isUpdate ? 'nullable' : 'required') . '|integer|exists:governorates,id',
@@ -308,11 +314,13 @@ class ContractorController extends Controller
             'commercial_register'           => 'رقم السجل التجاري',
             'license_number'                => 'رقم الترخيص',
             'status'                        => 'الحالة',
-            'classification'                => 'التصنيف',
+            'membership_expires_at'         => 'تاريخ انتهاء العضوية',
+            'classification'               => 'التصنيف',
             'established_date'              => 'تاريخ التأسيس',
             'owner_name'                    => 'اسم المالك',
             'email'                         => 'البريد الإلكتروني',
             'phone'                         => 'الجوال',
+            'phone_country_code'            => 'رمز دولة الجوال',
             'city'                          => 'المدينة',
             'governorate_id'                => 'المحافظة',
             'city_id'                       => 'المدينة',
@@ -345,6 +353,50 @@ class ContractorController extends Controller
         }
     }
 
+    /**
+     * تاريخ انتهاء العضوية من فورم المقاول ← expires_at للعضوية الفعّالة صاحبة أبعد تاريخ، أو عضوية
+     * جديدة إذا ما عنده. هالتاريخ وحده بيحدد "فعّالة/منتهية" (ContractorBalanceController::membershipStatus).
+     * حقل فاضي ما بيغيّر شي. تاريخ لسا ما فات بيرجّع المعلّق/المنتهي "نشط" (زي MembershipRenewalService).
+     */
+    private function syncMembershipExpiry(Request $request, Contractor $contractor, ?string $expiresAt): void
+    {
+        if (! $expiresAt) {
+            return;
+        }
+
+        $expires = \Carbon\Carbon::parse($expiresAt)->startOfDay();
+
+        $membership = $contractor->memberships()->where('status', 'active')
+            ->orderByDesc('expires_at')->orderByDesc('id')->first();
+
+        $old = $membership?->expires_at?->toDateString();
+
+        if ($membership) {
+            $membership->update(['expires_at' => $expires]);
+        } else {
+            $contractor->memberships()->create([
+                'type'        => 'new',
+                'status'      => 'active',
+                'amount'      => 0,
+                'expires_at'  => $expires,
+                'notes'       => 'تاريخ انتهاء مُدخل يدوياً من ملف المقاول',
+                'reviewed_by' => $request->user()?->id,
+                'reviewed_at' => now(),
+            ]);
+        }
+
+        if ($expires->gte(today()) && in_array($contractor->status, ['pending', 'expired'], true)) {
+            $contractor->update(['status' => 'active']);
+        }
+
+        if ($old !== $expires->toDateString()) {
+            \App\Services\AuditLogService::record($request->user(), 'contractor.membership_expiry_changed', $contractor, [
+                'old_expires_at' => $old,
+                'new_expires_at' => $expires->toDateString(),
+            ]);
+        }
+    }
+
     // POST /api/contractors
     public function store(Request $request)
     {
@@ -353,15 +405,27 @@ class ContractorController extends Controller
         $this->handleFileUploads($request, $validated);
         $this->syncLocation($validated);
 
+        $expiresAt = $validated['membership_expires_at'] ?? null;
+        unset($validated['membership_expires_at']);
+
         if (isset($validated['specialties'])) {
             $validated['specialties'] = json_decode($validated['specialties'], true);
         }
 
         $contractor = Contractor::create($validated);
+        $this->syncMembershipExpiry($request, $contractor, $expiresAt);
 
         \App\Services\AuditLogService::record($request->user(), 'contractor.created', $contractor, ['name' => $contractor->name, 'membership_number' => $contractor->membership_number]);
 
-        return $this->success($contractor->toArray(), 'تم إضافة المقاول بنجاح.', 201);
+        return $this->success($contractor->fresh()->toArray(), 'تم إضافة المقاول بنجاح.', 201);
+    }
+
+    /** أبعد تاريخ انتهاء لعضوية فعّالة — نفس اللي بتنحسب منه حالة العضوية */
+    private function membershipExpiresAt(Contractor $contractor): ?string
+    {
+        $date = $contractor->memberships()->where('status', 'active')->max('expires_at');
+
+        return $date ? substr((string) $date, 0, 10) : null;
     }
 
     // GET /api/contractors/{id}
@@ -369,7 +433,10 @@ class ContractorController extends Controller
     {
         $contractor->withFileUrls = true;
 
-        return $this->success($contractor->load(['activeMembership', 'governorate:id,name'])->toArray());
+        return $this->success($contractor->load(['activeMembership', 'governorate:id,name'])->toArray() + [
+            'membership_expires_at' => $this->membershipExpiresAt($contractor),
+            'membership_status'     => app(ContractorBalanceController::class)->statusFor($contractor->id),
+        ]);
     }
 
     // PUT/PATCH /api/contractors/{id}
@@ -380,11 +447,16 @@ class ContractorController extends Controller
         $this->handleFileUploads($request, $validated, $contractor);
         $this->syncLocation($validated);
 
+        $expiresAt = $validated['membership_expires_at'] ?? null;
+        unset($validated['membership_expires_at']);
+
         if (isset($validated['specialties'])) {
             $validated['specialties'] = json_decode($validated['specialties'], true);
         }
-        
+
         $contractor->update($validated);
+        $this->syncMembershipExpiry($request, $contractor, $expiresAt);
+        $contractor->refresh();
         $contractor->withFileUrls = true;
 
         \App\Services\AuditLogService::record($request->user(), 'contractor.updated', $contractor, ['name' => $contractor->name]);
@@ -473,6 +545,7 @@ class ContractorController extends Controller
                 'nullable', 'string', 'max:20',
                 $this->uniqueIgnoringSoftDeleted('phone', true, $contractor->id),
             ],
+            'phone_country_code' => ['nullable', 'string', \Illuminate\Validation\Rule::in(\App\Support\PhoneCountries::codes())],
         ], $this->getValidationMessages());
 
         $contractor->update($validated);

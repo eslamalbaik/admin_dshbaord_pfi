@@ -52,6 +52,7 @@ const form = ref({
   name: '',
   capital: '',
   registration_date: '',
+  membership_expires_at: '',
   legal_form: '',
   company_purposes: '',
 
@@ -65,6 +66,7 @@ const form = ref({
 
   // Step 3: العنوان وبيانات الاتصال
   phone: '',
+  phone_country_code: '970',
   fax: '',
   email: '',
   governorate_id: null as number | null,
@@ -250,9 +252,9 @@ const uploadedDocsCount = computed(() => documentKeys.filter(k => hasFile(k)).le
 // أي خطوة يتبع لها كل حقل — لإرجاع المستخدم للخطوة الصحيحة عند خطأ من الخادم
 // ولتعليم الخطوة بعلامة خطأ في الشريط.
 const STEP_FIELDS: Record<number, string[]> = {
-  1: ['membership_number', 'commercial_register', 'name', 'capital', 'registration_date', 'legal_form', 'company_purposes'],
+  1: ['membership_number', 'commercial_register', 'name', 'capital', 'registration_date', 'membership_expires_at', 'legal_form', 'company_purposes'],
   2: ['owner_name', 'partners', 'authorized_person', 'authorized_person_id_number', 'authorized_person_phone', 'authorized_person_whatsapp'],
-  3: ['phone', 'fax', 'email', 'governorate_id', 'city_id', 'district', 'address', 'building', 'floor', 'license_number', 'established_date', 'classification', 'specialties'],
+  3: ['phone', 'phone_country_code', 'fax', 'email', 'governorate_id', 'city_id', 'district', 'address', 'building', 'floor', 'license_number', 'established_date', 'classification', 'specialties'],
 }
 const stepOfField = (key: string) =>
   Number(Object.keys(STEP_FIELDS).find(s => STEP_FIELDS[Number(s)].includes(key)) ?? 4)
@@ -290,7 +292,7 @@ const starredChecks = computed<Record<number, boolean[]>>(() => {
     1: [filled(f.name), membershipValid(f.membership_number)],
     2: [],
     3: [
-      /^[0-9]{9}$/.test(f.phone ?? ''), !!f.governorate_id, !!f.city_id, filled(f.district), filled(f.address),
+      /^[0-9]{7,10}$/.test(f.phone ?? ''), !!f.governorate_id, !!f.city_id, filled(f.district), filled(f.address),
       filled(f.building), filled(f.floor), /^[0-9]{5}$/.test(f.license_number ?? ''), filled(f.established_date),
       f.specialties.every(sp => !!sp.field_lk_type && !!sp.specialization_lk_type && !!sp.classification),
     ],
@@ -368,7 +370,7 @@ const reviewItems = computed(() => [
   { step: 1, label: 'السجل التجاري', value: form.value.commercial_register },
   { step: 2, label: 'المفوض بالتوقيع', value: form.value.authorized_person },
   { step: 2, label: 'عدد الشركاء', value: form.value.partners.length ? String(form.value.partners.length) : '' },
-  { step: 3, label: 'الجوال', value: form.value.phone ? `+970${form.value.phone}` : '', ltr: true },
+  { step: 3, label: 'الجوال', value: form.value.phone ? `+${form.value.phone_country_code}${form.value.phone}` : '', ltr: true },
   { step: 3, label: 'العنوان', value: [governorateName.value, cityName.value, form.value.district].filter(Boolean).join(' - ') },
   { step: 3, label: 'عدد المجالات', value: String(form.value.specialties.filter(sp => sp.field_lk_type).length) },
 ])
@@ -659,6 +661,20 @@ const submit = async () => {
                   :error-messages="validationErrors.registration_date"
                 />
               </VCol>
+              <VCol
+                cols="12"
+                sm="6"
+                md="4"
+              >
+                <VTextField
+                  v-model="form.membership_expires_at"
+                  label="تاريخ انتهاء العضوية"
+                  type="date"
+                  hint="منه بس بتنحسب حالة العضوية: قبله فعّالة، بعده منتهية"
+                  persistent-hint
+                  :error-messages="validationErrors.membership_expires_at"
+                />
+              </VCol>
             </VRow>
           </div>
 
@@ -917,15 +933,11 @@ const submit = async () => {
               cols="12"
               md="4"
             >
-              <VTextField
-                v-model="form.phone"
-                label="رقم الجوال *"
-                prefix="+970"
-                placeholder="59XXXXXXX"
-                inputmode="numeric"
-                maxlength="9"
-                :error-messages="validationErrors.phone"
-                :rules="[v => !!v || 'رقم الجوال مطلوب', v => /^[0-9]{9}$/.test(v) || 'يجب إدخال 9 أرقام (مثال: 599123456)']"
+              <ContractorPhoneField
+                v-model:phone="form.phone"
+                v-model:country-code="form.phone_country_code"
+                required
+                :error-messages="validationErrors.phone || validationErrors.phone_country_code"
               />
             </VCol>
             <VCol

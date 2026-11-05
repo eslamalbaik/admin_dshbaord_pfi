@@ -191,6 +191,10 @@
 			"key": "file_field",
 			"value": "cr_file",
 			"type": "string"
+		},
+		{
+			"key": "country_code",
+			"value": "970"
 		}
 	],
 	"item": [
@@ -268,6 +272,31 @@
 					}
 				},
 				{
+					"name": "Countries — الدول المدعومة لرقم الجوال",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/auth/countries",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"auth",
+								"countries"
+							]
+						},
+						"description": "عام (بدون توكن). يرجّع الدول المدعومة لرقم الجوال في شاشات التسجيل واستعادة كلمة المرور.\n\nitems.default_code = \"970\"، و items.countries[] لكل دولة: iso، code (بدون +، هذا ما يُرسل كـ country_code)، dial_code (+970)، name_ar، name_en، flag، min_length/max_length (طول الرقم بدون صفر البداية)، example، is_default.\n\nphone يُقبل بصفر البداية أو بدونه، وبالأرقام العربية. الرقم نفسه في دولة أخرى لا يطابق. 970 و972 متبادلان للأرقام الفلسطينية. رقم غير صالح للدولة → 422 error=invalid_phone.\n\nاستجابات التسجيل واستعادة كلمة المرور صارت ترجع أيضاً country_code و phone_international (+201001234567)."
+					},
+					"response": []
+				},
+				{
 					"name": "Register — 1) Verify Identity",
 					"request": {
 						"method": "POST",
@@ -285,6 +314,12 @@
 									"value": "{{phone}}",
 									"type": "text",
 									"description": "رقم جوال المقاول"
+								},
+								{
+									"key": "country_code",
+									"value": "{{country_code}}",
+									"type": "text",
+									"description": "اختياري — رمز الدولة بدون + (مثل 970، 20، 962). الافتراضي 970 (فلسطين). القائمة من GET contractor/auth/countries. يُتجاهل إذا أُرسل phone بصيغة دولية (+201001234567)."
 								},
 								{
 									"key": "terms_accepted",
@@ -325,6 +360,12 @@
 									"key": "phone",
 									"value": "{{phone}}",
 									"type": "text"
+								},
+								{
+									"key": "country_code",
+									"value": "{{country_code}}",
+									"type": "text",
+									"description": "اختياري — رمز الدولة بدون + (مثل 970، 20، 962). الافتراضي 970 (فلسطين). القائمة من GET contractor/auth/countries. يُتجاهل إذا أُرسل phone بصيغة دولية (+201001234567)."
 								},
 								{
 									"key": "otp",
@@ -380,6 +421,12 @@
 									"key": "phone",
 									"value": "{{phone}}",
 									"type": "text"
+								},
+								{
+									"key": "country_code",
+									"value": "{{country_code}}",
+									"type": "text",
+									"description": "اختياري — رمز الدولة بدون + (مثل 970، 20، 962). الافتراضي 970 (فلسطين). القائمة من GET contractor/auth/countries. يُتجاهل إذا أُرسل phone بصيغة دولية (+201001234567)."
 								},
 								{
 									"key": "password",
@@ -446,6 +493,12 @@
 									"key": "phone",
 									"value": "{{phone}}",
 									"type": "text"
+								},
+								{
+									"key": "country_code",
+									"value": "{{country_code}}",
+									"type": "text",
+									"description": "اختياري — رمز الدولة بدون + (مثل 970، 20، 962). الافتراضي 970 (فلسطين). القائمة من GET contractor/auth/countries. يُتجاهل إذا أُرسل phone بصيغة دولية (+201001234567)."
 								}
 							]
 						},
@@ -481,6 +534,12 @@
 									"value": "{{phone}}",
 									"type": "text",
 									"description": "رقم جوال المقاول المسجّل (بدل رقم العضوية والسجل التجاري)"
+								},
+								{
+									"key": "country_code",
+									"value": "{{country_code}}",
+									"type": "text",
+									"description": "اختياري — رمز الدولة بدون + (مثل 970، 20، 962). الافتراضي 970 (فلسطين). القائمة من GET contractor/auth/countries. يُتجاهل إذا أُرسل phone بصيغة دولية (+201001234567)."
 								}
 							]
 						},
@@ -517,6 +576,12 @@
 									"value": "{{phone}}",
 									"type": "text",
 									"description": "رقم جوال المقاول المسجّل"
+								},
+								{
+									"key": "country_code",
+									"value": "{{country_code}}",
+									"type": "text",
+									"description": "اختياري — رمز الدولة بدون + (مثل 970، 20، 962). الافتراضي 970 (فلسطين). القائمة من GET contractor/auth/countries. يُتجاهل إذا أُرسل phone بصيغة دولية (+201001234567)."
 								},
 								{
 									"key": "otp",
@@ -796,7 +861,7 @@
 								"profile"
 							]
 						},
-						"description": "تحديث حقول محددة من الملف التعريفي.\n\n⚠️ كان هذا الطلب POST في النسخة السابقة وهو خطأ — المسار الحي هو PATCH.\nلتحديث الملف كاملاً (مع ملفات) استخدم POST /contractor/auth/profile/update.\n\nالحقول: phone, governorate_id, city_id, address, fcm_token — كلها sometimes/nullable."
+						"description": "تحديث حقول محددة من الملف التعريفي.\n\n⚠️ كان هذا الطلب POST في النسخة السابقة وهو خطأ — المسار الحي هو PATCH.\nلتحديث الملف كاملاً (مع ملفات) استخدم POST /contractor/auth/profile/update.\n\nالحقول: phone, governorate_id, city_id, address, fcm_token — كلها sometimes/nullable.\n\n⛔ رقم الجوال لا يُغيَّر من هنا. إرسال الرقم الحالي نفسه مقبول ويُتجاهل، أما رقم مختلف (أو نفس الأرقام بدولة أخرى) فيرجّع 403 مع error = phone_change_not_allowed ولا يُحفظ أي شيء."
 					}
 				},
 				{
@@ -1086,11 +1151,11 @@
 								"update"
 							]
 						},
-						"description": "**POST** `/api/v1/contractor/auth/profile/update` — **Form-Data**\n\nتحديث الملف التعريفي الكامل مع الملفات المرفقة.\n\nأخطاء التحقق تعود **برسالة الحقل المحدد** (مثال: \"حقل رقم السجل التجاري مطلوب.\") داخل الهيكل الموحد مع `errors` مفصلة.\n\n---\n**TASK-17 US11 — تعديل ملف الشركة قد يمرّ بموافقة الإدارة**\n\nمحكوم بمفتاح الخادم `PROFILE_EDITS_REQUIRE_APPROVAL` (مطفأ افتراضياً). عندما يكون مطفأً فالسلوك هو نفسه بلا أي تغيير.\n\nعندما يُشعَل، تبقى الاستجابة **200** ويبقى `items` يحمل الملف التعريفي — لكن **بقيمه الحالية غير المعدَّلة** — ويُضاف إليه:\n\n- `pending_review` (boolean): true يعني أن التعديل حُفظ كطلب مراجعة ولم يُطبَّق.\n- `pending_request`: `{ id, status, status_label, proposed_data, proposed_files[], created_at }`.\n\n**المطلوب من التطبيق**: لا تتعامل مع الاستجابة كملف محفوظ. اقرأ `pending_review`، وأظهر «قيد المراجعة» بدل «تم الحفظ»، ويمكنك تمييز الحقول المذكورة في `proposed_data`.\n\n**ما يبقى فورياً بلا مراجعة**: الجوال (بـOTP كما هو)، الشعار، المحافظة والمدينة، و`fcm_token`.\n\n**تعديل ثانٍ أثناء وجود طلب معلّق يُلغي الأول ويحلّ محلّه** — لم يبقَ 422.\n\n**حقلان لم يبقيا مقبولَين إطلاقاً من التطبيق**: `classification` و `specialties`. هما مُدخَلا احتساب رسوم العضوية، وتعديلهما صلاحية إدارية فقط. إرسالهما يُهمَل بصمت (لا يُفشل الطلب) ويُسجَّل بسجل المالية — يُفضَّل التوقف عن إرسالهما."
+						"description": "**POST** `/api/v1/contractor/auth/profile/update` — **Form-Data**\n\nتحديث الملف التعريفي الكامل مع الملفات المرفقة.\n\nأخطاء التحقق تعود **برسالة الحقل المحدد** (مثال: \"حقل رقم السجل التجاري مطلوب.\") داخل الهيكل الموحد مع `errors` مفصلة.\n\n---\n**TASK-17 US11 — تعديل ملف الشركة قد يمرّ بموافقة الإدارة**\n\nمحكوم بمفتاح الخادم `PROFILE_EDITS_REQUIRE_APPROVAL` (مطفأ افتراضياً). عندما يكون مطفأً فالسلوك هو نفسه بلا أي تغيير.\n\nعندما يُشعَل، تبقى الاستجابة **200** ويبقى `items` يحمل الملف التعريفي — لكن **بقيمه الحالية غير المعدَّلة** — ويُضاف إليه:\n\n- `pending_review` (boolean): true يعني أن التعديل حُفظ كطلب مراجعة ولم يُطبَّق.\n- `pending_request`: `{ id, status, status_label, proposed_data, proposed_files[], created_at }`.\n\n**المطلوب من التطبيق**: لا تتعامل مع الاستجابة كملف محفوظ. اقرأ `pending_review`، وأظهر «قيد المراجعة» بدل «تم الحفظ»، ويمكنك تمييز الحقول المذكورة في `proposed_data`.\n\n**ما يبقى فورياً بلا مراجعة**: الجوال (بـOTP كما هو)، الشعار، المحافظة والمدينة، و`fcm_token`.\n\n**تعديل ثانٍ أثناء وجود طلب معلّق يُلغي الأول ويحلّ محلّه** — لم يبقَ 422.\n\n**حقلان لم يبقيا مقبولَين إطلاقاً من التطبيق**: `classification` و `specialties`. هما مُدخَلا احتساب رسوم العضوية، وتعديلهما صلاحية إدارية فقط. إرسالهما يُهمَل بصمت (لا يُفشل الطلب) ويُسجَّل بسجل المالية — يُفضَّل التوقف عن إرسالهما.\n\n⛔ رقم الجوال لا يُغيَّر من هنا. إرسال الرقم الحالي نفسه مقبول ويُتجاهل، أما رقم مختلف (أو نفس الأرقام بدولة أخرى) فيرجّع 403 مع error = phone_change_not_allowed ولا يُحفظ أي شيء."
 					}
 				},
 				{
-					"name": "Request Phone Change OTP",
+					"name": "⛔ Request Phone Change OTP (متوقف)",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -1116,7 +1181,7 @@
 								"request-otp"
 							]
 						},
-						"description": "**POST** `/api/v1/contractor/auth/profile/phone/request-otp` — **Form-Data**\n\nيرسل رمز تحقق (OTP) لرقم الجوال الجديد قبل حفظه بالبروفايل — يرفض لو نفس الرقم الحالي أو مستخدَم بحساب آخر. cooldown 35 ثانية بين الطلبات. الاستجابة تتضمّن `otp_preview` بس بالبيئة المحلية (driver=log).",
+						"description": "⛔ متوقف: رقم الجوال لا يُغيَّر من التطبيق، ويُغيَّر من لوحة الإدارة فقط. هذا المسار يرجّع دائماً 403 مع error = phone_change_not_allowed. باقٍ حتى تحصل نسخ التطبيق القديمة على رسالة واضحة. على تطبيق الموبايل إخفاء خيار تغيير الرقم وعرضه للقراءة فقط.",
 						"body": {
 							"mode": "formdata",
 							"formdata": [
@@ -1124,13 +1189,19 @@
 									"key": "phone",
 									"value": "0599123456",
 									"type": "text"
+								},
+								{
+									"key": "country_code",
+									"value": "{{country_code}}",
+									"type": "text",
+									"description": "اختياري — رمز الدولة بدون + (970، 20، 962...). الافتراضي 970. القائمة من GET contractor/auth/countries."
 								}
 							]
 						}
 					}
 				},
 				{
-					"name": "Verify Phone Change OTP",
+					"name": "⛔ Verify Phone Change OTP (متوقف)",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -1156,7 +1227,7 @@
 								"verify-otp"
 							]
 						},
-						"description": "**POST** `/api/v1/contractor/auth/profile/phone/verify-otp` — **Form-Data**\n\nيتحقق من الرمز، ويُتيح إرسال نفس رقم الجوال بطلب `profile/update` بعدها لمدة 15 دقيقة. بدون هالخطوة، `profile/update` يرفض أي تغيير برقم الجوال (`phone_verification_required`).",
+						"description": "⛔ متوقف: رقم الجوال لا يُغيَّر من التطبيق، ويُغيَّر من لوحة الإدارة فقط. هذا المسار يرجّع دائماً 403 مع error = phone_change_not_allowed. باقٍ حتى تحصل نسخ التطبيق القديمة على رسالة واضحة. على تطبيق الموبايل إخفاء خيار تغيير الرقم وعرضه للقراءة فقط.",
 						"body": {
 							"mode": "formdata",
 							"formdata": [
@@ -1700,6 +1771,41 @@
 					}
 				},
 				{
+					"name": "Financial — New Year Dues",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/financial/dues?year=",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"financial",
+								"dues"
+							],
+							"query": [
+								{
+									"key": "year",
+									"value": "",
+									"description": "اختياري — سنة وحدة (مثلاً 2026). بدونه: السنة الحالية وما بعدها"
+								}
+							]
+						},
+						"description": "GET /api/v1/contractor/financial/dues — ذمم السنوات الجديدة بس (بدون year: السنة الحالية وما بعدها؛ مع year: هالسنة بس)، الأقدم أولاً.\n\n**الاستجابة:** `items.year` (المطلوبة أو null)، `items.from_year`، `items.total_jod` / `paid_jod` / `remaining_jod`، و`items.dues[]` بنفس شكل كرت الذمة بـ`contractor/financial` (`reference_number`، `description`، الخصم، `is_under_review`، `pending_payment` مع `receipt_image_url`).\n\n**معاينة الإشعار المرفوع:** `GET contractor/payments/{payment}` بـ`pending_payment.id`.\n\n**الرقم المرجعي (لكل شاشات المقاول):** `pending_payment.reference_number` وتحويلات `pending_dues_payments` و`GET contractor/payments/{id}` بترجّع رقم الحوالة اللي كتبه المقاول، وإلا رقم الذمة/الغرامة المربوطة (`INV-…`/`PEN-…`)، وإلا رقم العملية `TRX-…` — ما بيرجع null. كروت الغرامات `penalties[]` صار فيها `reference_number` بصيغة `PEN-<سنة>-<رقم>`."
+					}
+				},
+				{
 					"name": "Renewal Eligibility",
 					"request": {
 						"method": "GET",
@@ -1913,6 +2019,56 @@
 							]
 						},
 						"description": "**GET** `/api/v1/contractor/tenders`\n\nيرجع `is_bookmarked` لكل عطاء حسب مفضلة المقاول صاحب التوكن.\n\n**حالات العطاء (`status`):** `open` (مفتوحة) / `closed` (مغلقة) / `cancelled` (ملغية).\n\n**فلاتر إضافية:** `created_from`/`created_to` (تاريخ نشر العطاء)، `bookmarked=1` (العطاءات المهتم بها فقط — يتطلب توكن مقاول)، `deadline_from`/`deadline_to` (تاريخ نهاية العطاء)، `states[]=new,updated,closing_soon` (حالة العطاء)، `category`، `search`، `per_page`."
+					}
+				},
+				{
+					"name": "Tender Categories",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{contractor_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/contractor/tenders/categories",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"contractor",
+								"tenders",
+								"categories"
+							]
+						},
+						"description": "**GET** `/api/v1/contractor/tenders/categories`\n\nالتصنيفات الفعّالة (مرتّبة بـ `sort_order`) لفلتر شاشة العطاءات — كل عنصر فيه `open_tenders_count` (status=open وغير مؤرشفة) و `active_tenders_count` (غير مؤرشفة فقط).\n\nاستخدم `id` أو `name` (نفسه `value`) كقيمة `category`/`category_id` في `GET /contractor/tenders`.\n\n**النجاح 200:**\n```json\n{\n  \"items\": [\n    { \"id\": 1, \"name\": \"طرق\", \"value\": \"طرق\", \"image_url\": \"https://...\", \"sort_order\": 1, \"open_tenders_count\": 3, \"active_tenders_count\": 5 }\n  ]\n}\n```"
+					}
+				},
+				{
+					"name": "Tender Categories (Public)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/tender-categories-public",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"tender-categories-public"
+							]
+						},
+						"description": "**GET** `/api/v1/tender-categories-public` — *عام*\n\nالتصنيفات الفعّالة فقط، بدون مصادقة وبدون عدّادات — لفلتر العطاءات في الموقع/الصفحات العامة.\n\n**النجاح 200:**\n```json\n{\n  \"items\": [\n    { \"id\": 1, \"name\": \"طرق\", \"image_url\": \"https://...\" }\n  ]\n}\n```"
 					}
 				},
 				{
@@ -2925,7 +3081,7 @@
 								"{{event_id}}"
 							]
 						},
-						"description": "GET /api/v1/contractor/events/{id}"
+						"description": "GET /api/v1/contractor/events/{id}\n\n**أعلام العرض:** `show_location` — اعرض سطر \"مكان الانعقاد\" (وجاهي/مختلط ومعبّأ)؛ `show_stream_url` — اعرض سطر \"رابط البث المباشر\" (أونلاين/مختلط)، وقبل يوم الفعالية `stream_url` بيكون null فالسطر بيعرض \"سيتم تفعيل الرابط يوم الفعالية\". الفعالية الوجاهية `show_stream_url = false` فالسطر بينخفى. نفس الأعلام بـ`GET contractor/events`."
 					}
 				},
 				{
