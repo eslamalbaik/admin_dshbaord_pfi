@@ -127,7 +127,11 @@ class PaymentController extends Controller
         ]);
         $payment->update(['transaction_number' => Payment::generateTransactionNumber($payment)]);
 
-        $reviewers = User::whereIn('role', ['accountant', 'admin'])->get();
+        // المحاسبون والأدمن + المشرفون الذين عندهم صلاحية عرض سجل المدفوعات.
+        $reviewers = User::whereIn('role', ['accountant', 'admin'])->get()
+            ->merge(User::supervisors()->get()->filter(
+                fn (User $user) => $user->hasDashboardPermission('finance.payments.view')
+            ));
         if ($reviewers->isNotEmpty()) {
             Notification::send($reviewers, new PaymentSubmittedNotification($payment));
         }

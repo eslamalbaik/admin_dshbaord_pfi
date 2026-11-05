@@ -196,7 +196,7 @@ function handleIncoming(notification: Record<string, any>) {
   pushToast(notification)
 }
 
-const REALTIME_ROLES = ['admin', 'accountant']
+const REALTIME_ROLES = ['admin', 'accountant', 'supervisor']
 
 // Module-level (not per-call) so the watcher and its Echo subscription are ever
 // registered once per browser tab, even if the composable gets invoked more than
