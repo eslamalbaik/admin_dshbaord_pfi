@@ -108,10 +108,10 @@ class DiscountPreviewAndActive95ScenarioTest extends TestCase
     }
 
     /**
-     * #6: الذمم 160 + 480 = 640؛ انسدّ 608 (95% بالضبط) والمتبقي 32 ← "فعّالة"
-     * بصفحة الأرصدة وقائمة المقاولين والتطبيق، سواء حالته بالنظام "فعّال" أو "منتهي".
+     * من 2026-10-12 قاعدة الـ95% انلغت: الحالة من تاريخ انتهاء العضوية بس. سدّد 95% (608 من 640) بدون
+     * عضوية سارية ← "منتهية"، ونفس الذمم مع عضوية لسا ما انتهت ← "فعّالة". الباقي بيضل عليه بالرصيد.
      */
-    public function test_exactly_95_percent_paid_shows_active_everywhere(): void
+    public function test_95_percent_paid_status_follows_expiry_date_only(): void
     {
         foreach (['active', 'expired'] as $status) {
             $c = $this->contractor($status);
@@ -122,12 +122,15 @@ class DiscountPreviewAndActive95ScenarioTest extends TestCase
 
             $this->getJson('/api/v1/dashboard/balances?search=9565_g')->assertOk()
                 ->assertJsonPath('items.0.net_jod', -32)
-                ->assertJsonPath('items.0.status', 'active');
+                ->assertJsonPath('items.0.status', 'expired');
+
+            \App\Models\Membership::create(['contractor_id' => $c->id, 'type' => 'renewal', 'status' => 'active',
+                'expires_at' => now()->addMonth()]);
+
+            $this->getJson('/api/v1/dashboard/balances?search=9565_g')->assertJsonPath('items.0.status', 'active');
             $this->getJson('/api/v1/contractors?search=9565_g')->assertJsonPath('items.0.membership_status', 'active');
 
             $summary = $this->getJson("/api/v1/dashboard/balances/{$c->id}/statement")->assertOk()->json('items.summary');
-            $this->assertEquals(640, $summary['total_obligations_jod']);
-            $this->assertEquals(608, $summary['total_paid_jod']);
             $this->assertEquals(32, $summary['amount_due_jod']);
 
             Sanctum::actingAs($c, ['*']);

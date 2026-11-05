@@ -231,9 +231,11 @@ class QaContractorScenariosTest extends TestCase
 
     public function test_M05_app_subscription_status_matches_the_dashboard(): void
     {
+        // الحالة من تاريخ انتهاء العضوية بس (2026-10-12): عضوية سارية وعليه ذمم ← فعّالة، وبدون عضوية ← منتهية
         $paid  = $this->contractor('972_g');
+        $this->due($paid, 500);
+        \App\Models\Membership::create(['contractor_id' => $paid->id, 'type' => 'new', 'status' => 'active', 'expires_at' => now()->addMonth()]);
         $owing = $this->contractor('973_g');
-        $this->due($owing, 500);
 
         foreach ([$paid, $owing] as $c) {
             $this->assertSame($this->adminRow($c)['status'], $this->balance($c)['subscription_status']);
@@ -242,11 +244,12 @@ class QaContractorScenariosTest extends TestCase
         $this->assertSame('expired', $this->balance($owing)['subscription_status']);
     }
 
-    public function test_M06_membership_certificate_is_not_blocked_for_a_95_percent_payer(): void
+    public function test_M06_membership_certificate_is_not_blocked_while_membership_has_not_expired(): void
     {
         $c = $this->contractor('974_g');
         $d = $this->due($c, 640);
         $d->update(['paid_jod' => 608, 'status' => 'partially_paid']);
+        \App\Models\Membership::create(['contractor_id' => $c->id, 'type' => 'new', 'status' => 'active', 'expires_at' => now()->addMonth()]);
         $this->assertSame('active', $this->balance($c)['subscription_status']);
 
         Sanctum::actingAs($c, ['*']);

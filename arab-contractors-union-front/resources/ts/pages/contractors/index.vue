@@ -224,7 +224,7 @@ const statusUpdating = ref<number | null>(null)
 // NotificationHelper (الإعلانات لـ active فقط، تذكيرات الذمم/التجديد لـ active+suspended)،
 // ContractorRequirements::renewalBlockers (suspended يمنع التجديد)،
 // MembershipRenewalService (الموافقة على تجديد ترجّع pending/expired لـ active بس مش suspended)،
-// ContractorBalanceController::membershipStatus (active بتنعرض حسب الرصيد).
+// ContractorBalanceController::membershipStatus (active/expired بتنعرض حسب تاريخ انتهاء العضوية).
 const statusConfirm = ref<{ contractor: any; status: string } | null>(null)
 
 type StatusImpact = { text: string; level: 'warning' | 'info' | 'success' }
@@ -232,7 +232,7 @@ type StatusImpact = { text: string; level: 'warning' | 'info' | 'success' }
 const statusImpacts = (from: string, to: string): StatusImpact[] => {
   const list: StatusImpact[] = []
   if (to === 'active') {
-    list.push({ level: 'info', text: 'حالة العضوية المعروضة رح تصير حسب الرصيد: إذا عليه ذمم بتظهر "منتهية"، وإذا ما عليه بتظهر "فعّالة".' })
+    list.push({ level: 'info', text: 'حالة العضوية المعروضة رح تصير حسب تاريخ انتهاء العضوية بس: قبله "فعّالة" وبعده (أو بدون تاريخ) "منتهية". لتغييرها عدّل التاريخ من ملف المقاول.' })
     list.push({ level: 'success', text: 'رح توصله إشعارات الإعلانات وتذكيرات الذمم والتجديد، وبينحسب بعدد الأعضاء بالموقع.' })
     if (from === 'suspended')
       list.push({ level: 'success', text: 'بيرتفع منع تجديد العضوية من التطبيق.' })
@@ -255,7 +255,10 @@ const statusImpacts = (from: string, to: string): StatusImpact[] => {
   }
 
   list.push({ level: 'info', text: 'الرسوم السنوية التلقائية (كل 1/1) بتضل تنولّد له بكل الحالات، إلا إذا عنده عضوية مدفوعة بتغطي السنة.' })
-  list.push({ level: 'info', text: 'الحالة رح تنعرض كما هي ("' + getStatusLabel(to) + '") بدل ما تنحسب من الرصيد.' })
+  if (to === 'expired')
+    list.push({ level: 'info', text: 'الحالة المعروضة بتضل تنحسب من تاريخ انتهاء العضوية: إذا التاريخ لسا ما فات بتضل "فعّالة". لإنهائها عدّل التاريخ من ملف المقاول.' })
+  else
+    list.push({ level: 'info', text: 'الحالة رح تنعرض كما هي ("' + getStatusLabel(to) + '") بدل ما تنحسب من تاريخ انتهاء العضوية.' })
   list.push({ level: 'info', text: 'هالتغيير ما بيقفل دخوله للتطبيق. لقفل الدخول استخدم "تجميد الحساب".' })
   return list
 }
@@ -953,6 +956,10 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
             تغيير حالة <strong>{{ statusConfirm.contractor.name }}</strong>
             من <VChip size="x-small" label :color="getStatusColor(statusConfirm.contractor.status)">{{ getStatusLabel(statusConfirm.contractor.status) }}</VChip>
             إلى <VChip size="x-small" label :color="getStatusColor(statusConfirm.status)">{{ getStatusLabel(statusConfirm.status) }}</VChip>
+            <div class="text-caption text-medium-emphasis mt-1">
+              هاي الحالة الإدارية. العضوية المعروضة حالياً "{{ getStatusLabel(statusConfirm.contractor.membership_status ?? statusConfirm.contractor.status) }}"،
+              وتاريخ انتهائها: {{ statusConfirm.contractor.membership_expires_at ?? 'غير محدد' }}.
+            </div>
           </div>
           <div class="text-body-2 font-weight-medium mb-2">شو رح يصير بعد التغيير:</div>
           <div v-for="(impact, i) in statusConfirmImpacts" :key="i" class="d-flex align-start gap-2 mb-2">

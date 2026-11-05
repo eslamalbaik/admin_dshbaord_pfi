@@ -227,10 +227,11 @@ class CertificateRequestTest extends TestCase
     }
 
     /**
-     * بلاغ 2026-10-10: مقاول "فعّال" بالتطبيق وصفحة الأرصدة، ما عليه ذمم وملفه مكتمل، بس آخر
-     * سجل عضوية إله منتهي (أو ما إله سجل) — كان ينمنع بـ"لا يوجد اشتراك عضوية نشط".
+     * بلاغ 2026-10-10: مقاول "فعّال" بالتطبيق وصفحة الأرصدة وملفه مكتمل، بس آخر سجل عضوية إله
+     * منتهي — كان ينمنع بـ"لا يوجد اشتراك عضوية نشط". من 2026-10-12 "فعّال" يعني عضوية فعّالة
+     * تاريخ انتهائها لسا ما فات، فالسجل المنتهي القديم ما لازم يأثر.
      */
-    public function test_membership_certificate_allowed_when_displayed_status_is_active_without_active_membership_row(): void
+    public function test_membership_certificate_allowed_when_displayed_status_is_active_despite_old_expired_row(): void
     {
         $contractor = $this->createContractor($this->completeProfile());
         Membership::create([
@@ -238,6 +239,12 @@ class CertificateRequestTest extends TestCase
             'type'          => 'renewal',
             'status'        => 'expired',
             'expires_at'    => now()->subYear()->endOfYear(),
+        ]);
+        Membership::create([
+            'contractor_id' => $contractor->id,
+            'type'          => 'renewal',
+            'status'        => 'active',
+            'expires_at'    => now()->endOfYear(),
         ]);
         Sanctum::actingAs($contractor->fresh(), ['*']);
 
@@ -255,9 +262,15 @@ class CertificateRequestTest extends TestCase
             ->assertStatus(201);
     }
 
-    public function test_classification_certificate_allowed_when_displayed_status_is_active_without_membership_row(): void
+    public function test_classification_certificate_allowed_when_membership_not_yet_expired(): void
     {
         $contractor = $this->createContractor($this->completeProfile());
+        Membership::create([
+            'contractor_id' => $contractor->id,
+            'type'          => 'new',
+            'status'        => 'active',
+            'expires_at'    => now()->addMonth(),
+        ]);
         Sanctum::actingAs($contractor, ['*']);
 
         $this->postJson('/api/v1/contractor/certificate-requests', ['type' => 'classification'])

@@ -67,7 +67,8 @@ class ContractorBalanceAdjustmentTest extends TestCase
         $this->assertEquals(25, $log->meta['after']['net_jod']);
     }
 
-    public function test_increase_settles_open_dues_and_status_follows_balance(): void
+    /** تسوية الذمم ما بتغيّر حالة العضوية — هاي بتنحسب من تاريخ الانتهاء بس (قرار 2026-10-12) */
+    public function test_increase_settles_open_dues_without_touching_status(): void
     {
         $c = $this->contractor();
         $due = ContractorDue::create([
@@ -80,7 +81,7 @@ class ContractorBalanceAdjustmentTest extends TestCase
             'mode' => 'increase', 'amount' => 100, 'reason' => 'تسوية متفق عليها',
         ])->assertOk()
             ->assertJsonPath('items.adjustment.status_before', 'expired')
-            ->assertJsonPath('items.adjustment.status_after', 'active');
+            ->assertJsonPath('items.adjustment.status_after', 'expired');
 
         $this->assertEquals(0, $this->net($c));
         $this->assertSame('paid', $due->fresh()->status);

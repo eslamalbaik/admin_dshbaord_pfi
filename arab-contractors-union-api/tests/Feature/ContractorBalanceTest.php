@@ -146,7 +146,8 @@ class ContractorBalanceTest extends TestCase
             ->assertOk()->assertJsonCount(0, 'items');
     }
 
-    public function test_contractor_with_nothing_on_record_is_settled(): void
+    /** بدون أي عضوية مسجّلة ما في تاريخ انتهاء ← "منتهية"، حتى لو رصيده صفر */
+    public function test_contractor_with_nothing_on_record_is_settled_but_expired(): void
     {
         Sanctum::actingAs($this->contractor('943_g'), ['*']);
 
@@ -154,82 +155,96 @@ class ContractorBalanceTest extends TestCase
             ->assertOk()
             ->assertJsonPath('items.net_jod', 0)
             ->assertJsonPath('items.position', 'settled')
-            ->assertJsonPath('items.subscription_status', 'active')
-            ->assertJsonPath('items.subscription_status_label', 'فعّالة');
+            ->assertJsonPath('items.subscription_status', 'expired')
+            ->assertJsonPath('items.subscription_status_label', 'منتهية');
     }
 
-    /** الحالة حسب الرصيد بس: عضوية قديمة منتهية بدون ذمم = "فعّالة"، وعليه ذمم = "منتهية" */
-    public function test_admin_screen_status_follows_balance_not_old_expiry(): void
+    /** الحالة حسب تاريخ انتهاء العضوية بس (قرار 2026-10-12): الرصيد والذمم ما بيأثروا */
+    public function test_admin_screen_status_follows_expiry_only(): void
     {
-        $expired = $this->contractor('944_g');
-        $this->seedLedger($expired);
+        $endedWithCredit = $this->contractor('944_g');
         Membership::create([
-            'contractor_id' => $expired->id, 'type' => 'renewal', 'status' => 'active',
-            'starts_at' => now()->subYear()->startOfYear(), 'expires_at' => now()->subYear()->endOfYear(),
-        ]);
-
-        $current = $this->contractor('945_g');
-        Membership::create([
-            'contractor_id' => $current->id, 'type' => 'renewal', 'status' => 'active',
-            'starts_at' => now()->startOfYear(), 'expires_at' => now()->endOfYear(),
-        ]);
-
-        $noMembership = $this->contractor('946_g');
-
-        $endedNoDues = $this->contractor('952_g'); // متل "شركة عياد": عضوية 2025 منتهية، ورصيدها له
-        Membership::create([
-            'contractor_id' => $endedNoDues->id, 'type' => 'renewal', 'status' => 'active',
+            'contractor_id' => $endedWithCredit->id, 'type' => 'renewal', 'status' => 'active',
             'starts_at' => now()->subYear()->startOfYear(), 'expires_at' => now()->subYear()->endOfYear(),
         ]);
         ContractorCredit::create([
-            'contractor_id' => $endedNoDues->id, 'amount_jod' => 4400, 'used_jod' => 0, 'description' => 'رصيد',
+            'contractor_id' => $endedWithCredit->id, 'amount_jod' => 4400, 'used_jod' => 0, 'description' => 'رصيد',
         ]);
+
+        $currentButOwes = $this->contractor('945_g');
+        $this->seedLedger($currentButOwes);
+        Membership::create([
+            'contractor_id' => $currentButOwes->id, 'type' => 'renewal', 'status' => 'active',
+            'starts_at' => now()->startOfYear(), 'expires_at' => now()->addMonth(),
+        ]);
+
+        $this->contractor('946_g'); // بدون عضوية
 
         Sanctum::actingAs(User::factory()->create(['role' => 'admin']), ['*']);
 
         $this->getJson('/api/v1/dashboard/balances?search=944_g')->assertOk()->assertJsonPath('items.0.status', 'expired');
         $this->getJson('/api/v1/dashboard/balances?search=945_g')->assertOk()->assertJsonPath('items.0.status', 'active');
-        $this->getJson('/api/v1/dashboard/balances?search=946_g')->assertOk()->assertJsonPath('items.0.status', 'active');
-        $this->getJson('/api/v1/dashboard/balances?search=952_g')->assertOk()->assertJsonPath('items.0.status', 'active');
+        $this->getJson('/api/v1/dashboard/balances?search=946_g')->assertOk()->assertJsonPath('items.0.status', 'expired');
     }
 
-    /** عضويته سارية بس عليه رسوم (صافي سالب) بينعرض "منتهية" مش "فعّالة" */
-    public function test_admin_screen_shows_expired_when_contractor_owes(): void
+    /** أبعد تاريخ انتهاء هو المعتمد، واليوم نفسه لسا "فعّالة" */
+    public function test_latest_expiry_wins_and_today_counts_as_active(): void
     {
-        $owes = $this->contractor('947_g');
-        $this->seedLedger($owes); // صافي -35
+        $today = $this->contractor('947_g');
         Membership::create([
-            'contractor_id' => $owes->id, 'type' => 'renewal', 'status' => 'active',
-            'starts_at' => now()->startOfYear(), 'expires_at' => now()->endOfYear(),
+            'contractor_id' => $today->id, 'type' => 'new', 'status' => 'active',
+            'expires_at' => now()->subYear(),
+        ]);
+        Membership::create([
+            'contractor_id' => $today->id, 'type' => 'renewal', 'status' => 'active',
+            'expires_at' => now()->toDateString(),
         ]);
 
-        $noMembershipOwes = $this->contractor('948_g');
-        ContractorDue::create([
-            'contractor_id' => $noMembershipOwes->id, 'description' => 'رسوم 2026', 'year' => 2026,
-            'amount_jod' => 300, 'paid_jod' => 0, 'status' => 'unpaid',
+        $yesterday = $this->contractor('948_g');
+        Membership::create([
+            'contractor_id' => $yesterday->id, 'type' => 'new', 'status' => 'active',
+            'expires_at' => now()->subDay()->toDateString(),
         ]);
 
-        $pendingOwes = Contractor::create([
-            'name' => 'شركة معلّقة', 'membership_number' => '949_g', 'status' => 'pending', 'is_frozen' => false,
+        // عضوية مرفوضة ما بتنحسب مهما كان تاريخها
+        Membership::create([
+            'contractor_id' => $yesterday->id, 'type' => 'renewal', 'status' => 'rejected',
+            'expires_at' => now()->addYear(),
         ]);
-        $this->seedLedger($pendingOwes);
 
         Sanctum::actingAs(User::factory()->create(['role' => 'admin']), ['*']);
 
-        $this->getJson('/api/v1/dashboard/balances?search=947_g')->assertOk()->assertJsonPath('items.0.status', 'expired');
-        $this->getJson('/api/v1/dashboard/balances?search=948_g')->assertOk()->assertJsonPath('items.0.status', 'expired');
-        $this->getJson('/api/v1/dashboard/balances?search=949_g')->assertOk()->assertJsonPath('items.0.status', 'pending');
+        $this->getJson('/api/v1/dashboard/balances?search=947_g')->assertJsonPath('items.0.status', 'active');
+        $this->getJson('/api/v1/dashboard/balances?search=948_g')->assertJsonPath('items.0.status', 'expired');
+    }
+
+    /** "معلّق" و"موقوف" إداريين بينعرضوا كما هم حتى لو تاريخ الانتهاء لسا ما فات */
+    public function test_pending_and_suspended_are_shown_as_is(): void
+    {
+        foreach (['949_g' => 'pending', '953_g' => 'suspended'] as $number => $status) {
+            $c = Contractor::create([
+                'name' => "شركة {$number}", 'membership_number' => $number, 'status' => $status, 'is_frozen' => false,
+            ]);
+            Membership::create([
+                'contractor_id' => $c->id, 'type' => 'new', 'status' => 'active', 'expires_at' => now()->addYear(),
+            ]);
+        }
+
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']), ['*']);
+
+        $this->getJson('/api/v1/dashboard/balances?search=949_g')->assertJsonPath('items.0.status', 'pending');
+        $this->getJson('/api/v1/dashboard/balances?search=953_g')->assertJsonPath('items.0.status', 'suspended');
     }
 
     /** صفحة المقاولين بتعرض نفس "حالة العضوية" تبع صفحة الأرصدة، مش حالة الحساب الإدارية */
     public function test_contractors_list_shows_same_membership_status_as_balances(): void
     {
         $owes = $this->contractor('950_g');
-        $this->seedLedger($owes); // صافي سالب
+        $this->seedLedger($owes); // بدون عضوية
         $paid = $this->contractor('951_g');
         Membership::create([
             'contractor_id' => $paid->id, 'type' => 'renewal', 'status' => 'active',
-            'starts_at' => now()->startOfYear(), 'expires_at' => now()->endOfYear(),
+            'starts_at' => now()->startOfYear(), 'expires_at' => now()->addMonth(),
         ]);
 
         Sanctum::actingAs(User::factory()->create(['role' => 'admin']), ['*']);
@@ -240,42 +255,9 @@ class ContractorBalanceTest extends TestCase
                 ->assertJsonPath('items.0.membership_status', $expected)
                 ->assertJsonPath('items.0.status', 'active');
         }
-    }
 
-    /**
-     * سدّد 95% أو أكثر من مجموع ذممه ← فعّالة رغم الباقي البسيط (حالة 9565_g: 830 من 840).
-     * أقل من 95% ← منتهية. وبالحالتين الباقي بيضل عليه بالرصيد.
-     */
-    public function test_paying_95_percent_of_obligations_shows_active(): void
-    {
-        $almost = $this->contractor('9565_g');
-        ContractorDue::create([
-            'contractor_id' => $almost->id, 'description' => 'رسوم 2025', 'year' => 2025,
-            'amount_jod' => 400, 'paid_jod' => 400, 'status' => 'paid',
-        ]);
-        ContractorDue::create([
-            'contractor_id' => $almost->id, 'description' => 'رسوم 2026', 'year' => 2026,
-            'amount_jod' => 440, 'paid_jod' => 430, 'status' => 'partially_paid',
-        ]);
-
-        $short = $this->contractor('9566_g');
-        ContractorDue::create([
-            'contractor_id' => $short->id, 'description' => 'رسوم 2026', 'year' => 2026,
-            'amount_jod' => 100, 'paid_jod' => 94, 'status' => 'partially_paid',
-        ]);
-
-        Sanctum::actingAs(User::factory()->create(['role' => 'admin']), ['*']);
-
-        $this->getJson('/api/v1/dashboard/balances?search=9565_g')->assertOk()
-            ->assertJsonPath('items.0.status', 'active')
-            ->assertJsonPath('items.0.net_jod', -10);
-        $this->getJson('/api/v1/contractors?search=9565_g')->assertJsonPath('items.0.membership_status', 'active');
-        $this->getJson('/api/v1/dashboard/balances?search=9566_g')->assertJsonPath('items.0.status', 'expired');
-
-        Sanctum::actingAs($almost, ['*']);
-        $this->getJson('/api/v1/contractor/balance')->assertOk()
-            ->assertJsonPath('items.subscription_status', 'active')
-            ->assertJsonPath('items.amount_due_jod', 10);
+        $this->getJson('/api/v1/contractors?search=951_g')
+            ->assertJsonPath('items.0.membership_expires_at', now()->addMonth()->toDateString());
     }
 
     public function test_requires_authentication(): void

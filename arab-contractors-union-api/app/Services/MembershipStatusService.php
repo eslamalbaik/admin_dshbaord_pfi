@@ -17,14 +17,12 @@ class MembershipStatusService
      */
     public function getSubscriptionStatus(Contractor $contractor): array
     {
-        $membership   = $contractor->activeMembership;
-        $isPaidActive = $membership && $membership->expires_at && $membership->expires_at->isFuture();
+        // العضوية الفعّالة صاحبة أبعد تاريخ انتهاء — نفس التاريخ اللي بتنحسب منه الحالة بالداشبورد
+        $membership = $contractor->memberships()->where('status', 'active')
+            ->orderByDesc('expires_at')->orderByDesc('id')->first();
 
-        $badge = match (true) {
-            $isPaidActive                                                                  => 'active',
-            $membership && $membership->expires_at && $membership->expires_at->isPast()    => 'expired',
-            default                                                                         => $contractor->status,
-        };
+        // الحالة من تاريخ انتهاء العضوية بس، بنفس حسبة الداشبورد وصفحة الأرصدة وبوابة الشهادة
+        $badge = app(\App\Http\Controllers\Api\ContractorBalanceController::class)->statusFor($contractor->id);
 
         $blockers = ContractorRequirements::renewalBlockers($contractor);
 
