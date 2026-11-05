@@ -1,0 +1,3788 @@
+{
+  "openapi": "3.1.2",
+  "info": {
+    "title": "PCU Contractor Auth API",
+    "version": "1.0.0",
+    "description": "Arab Contractors Union API — contractor portal + admin dashboard endpoints."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/api"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Contractor Auth"
+    }
+  ],
+  "security": [
+    {
+      "http": []
+    }
+  ],
+  "paths": {
+    "/v1/contractor/auth/countries": {
+      "get": {
+        "operationId": "contractorRegister.countries",
+        "description": "Countries and dial codes for the register / forgot-password screens. Public.",
+        "summary": "Supported phone countries",
+        "tags": [
+          "Contractor Auth"
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "تم جلب الدول المدعومة بنجاح."
+                    },
+                    "status_code": {
+                      "type": "integer",
+                      "const": 200
+                    },
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "default_code": {
+                          "type": "string",
+                          "const": "970"
+                        },
+                        "countries": {
+                          "type": "array",
+                          "items": {}
+                        }
+                      },
+                      "required": [
+                        "default_code",
+                        "countries"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "status_code",
+                    "items"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/v1/contractor/auth/login": {
+      "post": {
+        "operationId": "contractorAuth.login",
+        "description": "Login by membership_number + password. Returns a Bearer token valid 60 days (a single active session; older tokens are revoked). Error keys: no_membership, invalid_credentials, plus the loginEligibility keys.",
+        "summary": "Login",
+        "tags": [
+          "Contractor Auth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "boolean"
+                        },
+                        "message": {
+                          "type": "string",
+                          "const": "تم تسجيل الدخول بنجاح."
+                        },
+                        "status_code": {
+                          "type": "integer",
+                          "const": 200
+                        },
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "token": {
+                              "type": "string"
+                            },
+                            "token_type": {
+                              "type": "string",
+                              "const": "Bearer"
+                            },
+                            "user": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "membership_number": {
+                                  "type": "string"
+                                },
+                                "commercial_register": {
+                                  "type": "string"
+                                },
+                                "license_number": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "logo_url": {
+                                  "type": "null"
+                                },
+                                "authorized_person": {
+                                  "type": "string"
+                                },
+                                "authorized_person_id_number": {
+                                  "type": "string"
+                                },
+                                "authorized_person_phone": {
+                                  "type": "string"
+                                },
+                                "authorized_person_whatsapp": {
+                                  "type": "string"
+                                },
+                                "classification_label": {
+                                  "type": "string"
+                                },
+                                "email": {
+                                  "type": "string"
+                                },
+                                "phone": {
+                                  "type": "string"
+                                },
+                                "country_code": {
+                                  "type": "string"
+                                },
+                                "phone_international": {
+                                  "type": "string"
+                                },
+                                "governorate": {
+                                  "type": [
+                                    "object",
+                                    "null"
+                                  ],
+                                  "description": "المحافظة والمدينة كأوبجكت id + name (البيانات القديمة النصية تُرجَع بـ id = null)",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "name"
+                                  ]
+                                },
+                                "city": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "string"
+                                        },
+                                        "name": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "id",
+                                        "name"
+                                      ]
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "name"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "status": {
+                                  "type": "string"
+                                },
+                                "is_frozen": {
+                                  "type": "string"
+                                },
+                                "profile_completed": {
+                                  "type": "string"
+                                },
+                                "last_login_at": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "membership": {
+                                  "type": [
+                                    "object",
+                                    "null"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "type": "string"
+                                    },
+                                    "status": {
+                                      "type": "string"
+                                    },
+                                    "expires_at": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
+                                    "is_expired": {
+                                      "type": [
+                                        "string",
+                                        "boolean"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "type",
+                                    "status",
+                                    "expires_at",
+                                    "is_expired"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "membership_number",
+                                "commercial_register",
+                                "license_number",
+                                "name",
+                                "logo_url",
+                                "authorized_person",
+                                "authorized_person_id_number",
+                                "authorized_person_phone",
+                                "authorized_person_whatsapp",
+                                "classification_label",
+                                "email",
+                                "phone",
+                                "country_code",
+                                "phone_international",
+                                "governorate",
+                                "city",
+                                "status",
+                                "is_frozen",
+                                "profile_completed",
+                                "last_login_at",
+                                "membership"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "token",
+                            "token_type",
+                            "user"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "message",
+                        "status_code",
+                        "items"
+                      ]
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "بيانات الاعتماد غير صحيحة"
+                    },
+                    "status_code": {
+                      "type": "integer",
+                      "const": 401
+                    },
+                    "error": {
+                      "type": "string",
+                      "const": "invalid_credentials"
+                    },
+                    "errors": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "status_code",
+                    "error",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "لا توجد لديك عضوية في الاتحاد"
+                    },
+                    "status_code": {
+                      "type": "integer",
+                      "const": 404
+                    },
+                    "error": {
+                      "type": "string",
+                      "const": "no_membership"
+                    },
+                    "errors": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "status_code",
+                    "error",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          }
+        },
+        "security": []
+      }
+    },
+    "/v1/contractor/auth/verify-identity": {
+      "post": {
+        "operationId": "contractorRegister.verifyIdentity",
+        "description": "Looks the contractor up by phone (+ country_code, default 970) and sends a 6-digit OTP. Requires terms_accepted. Error keys: contractor_not_found, no_membership_number, account_inactive, already_registered, otp_cooldown, invalid_phone.",
+        "summary": "Register step 1: verify phone and send OTP",
+        "tags": [
+          "Contractor Auth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "description": "Mobile number. Accepted with or without the leading 0, Arabic-Indic digits allowed, or full international (\"+201001234567\" / \"00201001234567\" — then country_code is ignored). Must match the length of the chosen country (see GET countries).",
+                    "examples": [
+                      "599123456"
+                    ]
+                  },
+                  "country_code": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Country dial code WITHOUT \"+\", one of the `code` values returned by GET countries (970, 972, 20, 962, 966, 971, 974, 965, 973, 968, 961, 963, 964, 90). Defaults to 970 when omitted. 970 and 972 are interchangeable for Palestinian numbers.",
+                    "examples": [
+                      "970"
+                    ],
+                    "maxLength": 6
+                  },
+                  "terms_accepted": {
+                    "enum": [
+                      "yes",
+                      "on",
+                      "1",
+                      1,
+                      "true",
+                      true
+                    ]
+                  }
+                },
+                "required": [
+                  "phone",
+                  "terms_accepted"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "تم التحقق من رقم الجوال، تم إرسال رمز التحقق إليه."
+                    },
+                    "status_code": {
+                      "type": "integer",
+                      "const": 200
+                    },
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "authorized_person": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "type": "string"
+                        },
+                        "country_code": {
+                          "type": "string"
+                        },
+                        "phone_international": {
+                          "type": "string"
+                        },
+                        "commercial_register": {
+                          "type": "string"
+                        },
+                        "membership_number": {
+                          "type": "string"
+                        },
+                        "has_password": {
+                          "type": "boolean"
+                        },
+                        "otp_required": {
+                          "type": "boolean"
+                        },
+                        "expires_in": {
+                          "type": "integer",
+                          "const": 35
+                        },
+                        "otp_preview": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "authorized_person",
+                        "phone",
+                        "country_code",
+                        "phone_international",
+                        "commercial_register",
+                        "membership_number",
+                        "has_password",
+                        "otp_required",
+                        "expires_in",
+                        "otp_preview"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "status_code",
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "حسابك مجمّد. تواصل مع الاتحاد لمزيد من المعلومات."
+                    },
+                    "status_code": {
+                      "type": "integer",
+                      "const": 403
+                    },
+                    "error": {
+                      "type": "string",
+                      "const": "account_inactive"
+                    },
+                    "errors": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "status_code",
+                    "error",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "لا يوجد حساب مرتبط برقم الجوال المُدخل."
+                    },
+                    "status_code": {
+                      "type": "integer",
+                      "const": 404
+                    },
+                    "error": {
+                      "type": "string",
+                      "const": "contractor_not_found"
+                    },
+                    "errors": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "status_code",
+                    "error",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          },
+          "429": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer",
+                      "const": 429
+                    },
+                    "error": {
+                      "type": "string",
+                      "const": "otp_cooldown"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "properties": {
+                        "expires_in": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "expires_in"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "status_code",
+                    "error",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/v1/contractor/auth/verify-otp": {
+      "post": {
+        "operationId": "contractorRegister.verifyOtp",
+        "description": "Confirms the OTP and marks the phone verified. Error keys: invalid_otp, contractor_not_found, account_inactive.",
+        "summary": "Register step 2: verify the OTP",
+        "tags": [
+          "Contractor Auth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "description": "Mobile number. Accepted with or without the leading 0, Arabic-Indic digits allowed, or full international (\"+201001234567\" / \"00201001234567\" — then country_code is ignored). Must match the length of the chosen country (see GET countries).",
+                    "examples": [
+                      "599123456"
+                    ]
+                  },
+                  "country_code": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Country dial code WITHOUT \"+\", one of the `code` values returned by GET countries (970, 972, 20, 962, 966, 971, 974, 965, 973, 968, 961, 963, 964, 90). Defaults to 970 when omitted. 970 and 972 are interchangeable for Palestinian numbers.",
+                    "examples": [
+                      "970"
+                    ],
+                    "maxLength": 6
+                  },
+                  "otp": {
+                    "type": "string",
+                    "minLength": 6,
+                    "maxLength": 6
+                  }
+                },
+                "required": [
+                  "phone",
+                  "otp"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "enum": [
+                        "تم تفعيل رقم جوالك بنجاح. يمكنك الآن تسجيل الدخول.",
+                        "تم تفعيل رقم جوالك بنجاح. أدخل كلمة مرور لإكمال التسجيل."
+                      ]
+                    },
+                    "status_code": {
+                      "type": "integer",
+                      "const": 200
+                    },
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "authorized_person": {
+                          "type": "string"
+                        },
+                        "commercial_register": {
+                          "type": "string"
+                        },
+                        "membership_number": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "type": "string"
+                        },
+                        "country_code": {
+                          "type": "string"
+                        },
+                        "phone_international": {
+                          "type": "string"
+                        },
+                        "phone_verified": {
+                          "type": "boolean"
+                        },
+                        "has_password": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "authorized_person",
+                        "commercial_register",
+                        "membership_number",
+                        "phone",
+                        "country_code",
+                        "phone_international",
+                        "phone_verified",
+                        "has_password"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "status_code",
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "حسابك مجمّد. تواصل مع الاتحاد لمزيد من المعلومات."
+                    },
+                    "status_code": {
+                      "type": "integer",
+                      "const": 403
+                    },
+                    "error": {
+                      "type": "string",
+                      "const": "account_inactive"
+                    },
+                    "errors": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "status_code",
+                    "error",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "لا يوجد حساب مرتبط برقم الجوال المُدخل."
+                    },
+                    "status_code": {
+                      "type": "integer",
+                      "const": 404
+                    },
+                    "error": {
+                      "type": "string",
+                      "const": "contractor_not_found"
+                    },
+                    "errors": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "status_code",
+                    "error",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          }
+        },
+        "security": []
+      }
+    },
+    "/v1/contractor/auth/resend-otp": {
+      "post": {
+        "operationId": "contractorRegister.resendOtp",
+        "description": "Sends a new OTP while the phone is not yet verified. Error keys: already_verified, otp_cooldown.",
+        "summary": "Resend the register OTP",
+        "tags": [
+          "Contractor Auth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "description": "Mobile number. Accepted with or without the leading 0, Arabic-Indic digits allowed, or full international (\"+201001234567\" / \"00201001234567\" — then country_code is ignored). Must match the length of the chosen country (see GET countries).",
+                    "examples": [
+                      "599123456"
+                    ]
+                  },
+                  "country_code": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Country dial code WITHOUT \"+\", one of the `code` values returned by GET countries (970, 972, 20, 962, 966, 971, 974, 965, 973, 968, 961, 963, 964, 90). Defaults to 970 when omitted. 970 and 972 are interchangeable for Palestinian numbers.",
+                    "examples": [
+                      "970"
+                    ],
+                    "maxLength": 6
+                  }
+                },
+                "required": [
+                  "phone"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "تم إرسال رمز تحقق جديد إلى رقم جوالك."
+                    },
+                    "status_code": {
+                      "type": "integer",
+                      "const": 200
+                    },
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "phone": {
+                          "type": "string"
+                        },
+                        "country_code": {
+                          "type": "string"
+                        },
+                        "phone_international": {
+                          "type": "string"
+                        },
+                        "otp_required": {
+                          "type": "boolean"
+                        },
+                        "expires_in": {
+                          "type": "integer",
+                          "const": 35
+                        },
+                        "otp_preview": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "phone",
+                        "country_code",
+                        "phone_international",
+                        "otp_required",
+                        "expires_in",
+                        "otp_preview"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "status_code",
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "حسابك مجمّد. تواصل مع الاتحاد لمزيد من المعلومات."
+                    },
+                    "status_code": {
+                      "type": "integer",
+                      "const": 403
+                    },
+                    "error": {
+                      "type": "string",
+                      "const": "account_inactive"
+                    },
+                    "errors": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "status_code",
+                    "error",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "لا يوجد حساب مرتبط برقم الجوال المُدخل."
+                    },
+                    "status_code": {
+                      "type": "integer",
+                      "const": 404
+                    },
+                    "error": {
+                      "type": "string",
+                      "const": "contractor_not_found"
+                    },
+                    "errors": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "status_code",
+                    "error",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          },
+          "429": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer",
+                      "const": 429
+                    },
+                    "error": {
+                      "type": "string",
+                      "const": "otp_cooldown"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "properties": {
+                        "expires_in": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "expires_in"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "status_code",
+                    "error",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/v1/contractor/auth/set-password": {
+      "post": {
+        "operationId": "contractorRegister.setPassword",
+        "description": "Requires a verified phone. Sets the password and returns a Bearer token (valid 60 days) so the user is logged in immediately. Error keys: phone_not_verified, already_registered, password_mismatch.",
+        "summary": "Register step 3: set password",
+        "tags": [
+          "Contractor Auth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "description": "Mobile number. Accepted with or without the leading 0, Arabic-Indic digits allowed, or full international (\"+201001234567\" / \"00201001234567\" — then country_code is ignored). Must match the length of the chosen country (see GET countries).",
+                    "examples": [
+                      "599123456"
+                    ]
+                  },
+                  "country_code": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Country dial code WITHOUT \"+\", one of the `code` values returned by GET countries (970, 972, 20, 962, 966, 971, 974, 965, 973, 968, 961, 963, 964, 90). Defaults to 970 when omitted. 970 and 972 are interchangeable for Palestinian numbers.",
+                    "examples": [
+                      "970"
+                    ],
+                    "maxLength": 6
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8
+                  },
+                  "password_confirmation": {
+                    "type": "string"
+                  },
+                  "fcm_token": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "phone",
+                  "password",
+                  "password_confirmation"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "تم تسجيل حسابك وتسجيل الدخول بنجاح."
+                    },
+                    "status_code": {
+                      "type": "integer",
+                      "const": 200
+                    },
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "token": {
+                          "type": "string"
+                        },
+                        "token_type": {
+                          "type": "string",
+                          "const": "Bearer"
+                        },
+                        "user": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "membership_number": {
+                              "type": "string"
+                            },
+                            "commercial_register": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "authorized_person": {
+                              "type": "string"
+                            },
+                            "phone": {
+                              "type": "string"
+                            },
+                            "country_code": {
+                              "type": "string"
+                            },
+                            "phone_international": {
+                              "type": "string"
+                            },
+                            "classification": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "membership_number",
+                            "commercial_register",
+                            "name",
+                            "authorized_person",
+                            "phone",
+                            "country_code",
+                            "phone_international",
+                            "classification"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "token",
+                        "token_type",
+                        "user"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "status_code",
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "حسابك مجمّد. تواصل مع الاتحاد لمزيد من المعلومات."
+                    },
+                    "status_code": {
+                      "type": "integer",
+                      "const": 403
+                    },
+                    "error": {
+                      "type": "string",
+                      "const": "account_inactive"
+                    },
+                    "errors": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "status_code",
+                    "error",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "لا يوجد حساب مرتبط برقم الجوال المُدخل."
+                    },
+                    "status_code": {
+                      "type": "integer",
+                      "const": 404
+                    },
+                    "error": {
+                      "type": "string",
+                      "const": "contractor_not_found"
+                    },
+                    "errors": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "status_code",
+                    "error",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          }
+        },
+        "security": []
+      }
+    },
+    "/v1/contractor/auth/forgot-password/send-otp": {
+      "post": {
+        "operationId": "contractorRegister.forgotPasswordSendOtp",
+        "description": "Sends a reset OTP to the registered phone. Not restricted by membership status, only by is_frozen. Error keys: contractor_not_found, account_inactive, otp_cooldown.",
+        "summary": "Forgot password step 1: send OTP",
+        "tags": [
+          "Contractor Auth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "description": "Mobile number. Accepted with or without the leading 0, Arabic-Indic digits allowed, or full international (\"+201001234567\" / \"00201001234567\" — then country_code is ignored). Must match the length of the chosen country (see GET countries).",
+                    "examples": [
+                      "599123456"
+                    ]
+                  },
+                  "country_code": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Country dial code WITHOUT \"+\", one of the `code` values returned by GET countries (970, 972, 20, 962, 966, 971, 974, 965, 973, 968, 961, 963, 964, 90). Defaults to 970 when omitted. 970 and 972 are interchangeable for Palestinian numbers.",
+                    "examples": [
+                      "970"
+                    ],
+                    "maxLength": 6
+                  }
+                },
+                "required": [
+                  "phone"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "تم إرسال رمز التحقق إلى رقم الجوال المسجل بنجاح."
+                    },
+                    "status_code": {
+                      "type": "integer",
+                      "const": 200
+                    },
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "membership_number": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "type": "string"
+                        },
+                        "country_code": {
+                          "type": "string"
+                        },
+                        "phone_international": {
+                          "type": "string"
+                        },
+                        "expires_in": {
+                          "type": "integer",
+                          "const": 35
+                        },
+                        "otp_preview": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "membership_number",
+                        "phone",
+                        "country_code",
+                        "phone_international",
+                        "expires_in",
+                        "otp_preview"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "status_code",
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "حسابك مجمّد. تواصل مع الاتحاد لمزيد من المعلومات."
+                    },
+                    "status_code": {
+                      "type": "integer",
+                      "const": 403
+                    },
+                    "error": {
+                      "type": "string",
+                      "const": "account_inactive"
+                    },
+                    "errors": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "status_code",
+                    "error",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "لا يوجد حساب مرتبط برقم الجوال المُدخل."
+                    },
+                    "status_code": {
+                      "type": "integer",
+                      "const": 404
+                    },
+                    "error": {
+                      "type": "string",
+                      "const": "contractor_not_found"
+                    },
+                    "errors": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "status_code",
+                    "error",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          },
+          "429": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer",
+                      "const": 429
+                    },
+                    "error": {
+                      "type": "string",
+                      "const": "otp_cooldown"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "properties": {
+                        "expires_in": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "expires_in"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "status_code",
+                    "error",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/v1/contractor/auth/forgot-password/reset": {
+      "post": {
+        "operationId": "contractorRegister.forgotPasswordReset",
+        "description": "Verifies the OTP, sets the new password (password_confirmation required) and returns a fresh Bearer token. Error keys: invalid_otp, account_inactive.",
+        "summary": "Forgot password step 2: reset password",
+        "tags": [
+          "Contractor Auth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "description": "Mobile number. Accepted with or without the leading 0, Arabic-Indic digits allowed, or full international (\"+201001234567\" / \"00201001234567\" — then country_code is ignored). Must match the length of the chosen country (see GET countries).",
+                    "examples": [
+                      "599123456"
+                    ]
+                  },
+                  "country_code": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Country dial code WITHOUT \"+\", one of the `code` values returned by GET countries (970, 972, 20, 962, 966, 971, 974, 965, 973, 968, 961, 963, 964, 90). Defaults to 970 when omitted. 970 and 972 are interchangeable for Palestinian numbers.",
+                    "examples": [
+                      "970"
+                    ],
+                    "maxLength": 6
+                  },
+                  "otp": {
+                    "type": "string",
+                    "minLength": 6,
+                    "maxLength": 6
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8
+                  },
+                  "password_confirmation": {
+                    "type": "string",
+                    "minLength": 8
+                  }
+                },
+                "required": [
+                  "phone",
+                  "otp",
+                  "password",
+                  "password_confirmation"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "تم استعادة وتغيير كلمة المرور بنجاح وتسجيل دخولك."
+                    },
+                    "status_code": {
+                      "type": "integer",
+                      "const": 200
+                    },
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "token": {
+                          "type": "string"
+                        },
+                        "token_type": {
+                          "type": "string",
+                          "const": "Bearer"
+                        },
+                        "user": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "membership_number": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "authorized_person": {
+                              "type": "string"
+                            },
+                            "phone": {
+                              "type": "string"
+                            },
+                            "country_code": {
+                              "type": "string"
+                            },
+                            "phone_international": {
+                              "type": "string"
+                            },
+                            "classification": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "membership_number",
+                            "name",
+                            "authorized_person",
+                            "phone",
+                            "country_code",
+                            "phone_international",
+                            "classification"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "token",
+                        "token_type",
+                        "user"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "status_code",
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "حسابك مجمّد. تواصل مع الاتحاد لمزيد من المعلومات."
+                    },
+                    "status_code": {
+                      "type": "integer",
+                      "const": 403
+                    },
+                    "error": {
+                      "type": "string",
+                      "const": "account_inactive"
+                    },
+                    "errors": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "status_code",
+                    "error",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "const": "لا يوجد حساب مرتبط برقم الجوال المُدخل."
+                    },
+                    "status_code": {
+                      "type": "integer",
+                      "const": 404
+                    },
+                    "error": {
+                      "type": "string",
+                      "const": "contractor_not_found"
+                    },
+                    "errors": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "status_code",
+                    "error",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          }
+        },
+        "security": []
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "http": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "AdminIssueMembershipCertificateRequest": {
+        "type": "object",
+        "properties": {
+          "contractor_id": {
+            "type": "integer"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 255
+          },
+          "decision_number": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100
+          },
+          "decision_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "contractor_id"
+        ],
+        "title": "AdminIssueMembershipCertificateRequest"
+      },
+      "Announcement": {
+        "type": "array",
+        "prefixItems": [
+          {
+            "type": "string",
+            "enum": [
+              "scheduled",
+              "published",
+              "archived",
+              "draft"
+            ]
+          }
+        ],
+        "minItems": 1,
+        "maxItems": 1,
+        "title": "Announcement"
+      },
+      "AnnouncementCategory": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 0,
+        "maxItems": 0,
+        "title": "AnnouncementCategory"
+      },
+      "ApplyDiscountBulkRequest": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "ids",
+              "criteria"
+            ]
+          },
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 200
+          },
+          "criteria": {
+            "type": "object",
+            "properties": {
+              "year": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1990,
+                "maximum": 2100
+              },
+              "status": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "بدون حصر بالحالة الذمم المسدَّدة بتنشمل (والفرق بيرجع رصيد)؛ فلتر \"paid\" لحاله مش مدعوم.",
+                "enum": [
+                  "unpaid",
+                  "partially_paid",
+                  null
+                ]
+              },
+              "source": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "legacy_import",
+                  "manual",
+                  "fee_engine",
+                  null
+                ]
+              },
+              "contractor_ids": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "type": "integer"
+                },
+                "maxItems": 200
+              }
+            }
+          },
+          "discount_type": {
+            "type": "string",
+            "enum": [
+              "percent",
+              "fixed"
+            ]
+          },
+          "discount_value": {
+            "type": "number",
+            "description": "نسبة الخصم بين 0.01 و100 — لا سالب ولا أكثر من 100%",
+            "minimum": 0.01,
+            "maximum": 100
+          },
+          "discount_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 255
+          },
+          "dry_run": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "mode",
+          "discount_type",
+          "discount_value"
+        ],
+        "title": "ApplyDiscountBulkRequest"
+      },
+      "ApplyDiscountRequest": {
+        "type": "object",
+        "properties": {
+          "discount_type": {
+            "type": "string",
+            "enum": [
+              "percent",
+              "fixed"
+            ]
+          },
+          "discount_value": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 100
+          },
+          "discount_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 255
+          }
+        },
+        "required": [
+          "discount_type",
+          "discount_value"
+        ],
+        "title": "ApplyDiscountRequest"
+      },
+      "BulkDestroyCertificateRequestsRequest": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 1,
+            "maxItems": 200
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "BulkDestroyCertificateRequestsRequest"
+      },
+      "CertificateRequestResource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "contractor_id": {
+            "type": "string"
+          },
+          "contractor": {
+            "type": "string"
+          },
+          "membership_number": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "type_label": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "status_label": {
+            "type": "string"
+          },
+          "awaiting_payment_confirmation": {
+            "type": "boolean",
+            "description": "الطلب قُدِّم بانتظار اعتماد دفعة الرسوم (TASK-17 #5) — اللوحة تحتاج معرفة ذلك\nلتوضّح للأدمن لماذا الموافقة والإصدار موقوفان، بدل أن يكتشفه عبر 422."
+          },
+          "pending_payment": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "transaction_number": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "string"
+              },
+              "currency": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "submitted_at": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "transaction_number",
+              "amount",
+              "currency",
+              "status",
+              "submitted_at"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          },
+          "attachment_url": {
+            "type": "string"
+          },
+          "reject_reason": {
+            "type": "string"
+          },
+          "certificate_url": {
+            "type": "string",
+            "description": "المقاول بياخد الرابط المتتبَّع (فتحه بيتسجّل)، واللوحة الرابط المباشر"
+          },
+          "request_date": {
+            "type": "string"
+          },
+          "issue_date": {
+            "type": "string"
+          },
+          "reviewed_by": {
+            "type": "string"
+          },
+          "certificate_address": {
+            "type": "string",
+            "description": "بيانات شهادة العضوية المُدخلة عند الموافقة/الإصدار (العنوان ورقم وتاريخ القرار)"
+          },
+          "decision_number": {
+            "type": "string"
+          },
+          "decision_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "viewed_at": {
+            "type": "string"
+          },
+          "last_viewed_at": {
+            "type": "string"
+          },
+          "views_count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "contractor_id",
+          "contractor",
+          "membership_number",
+          "type",
+          "type_label",
+          "status",
+          "status_label",
+          "awaiting_payment_confirmation",
+          "pending_payment",
+          "notes",
+          "attachment_url",
+          "reject_reason",
+          "certificate_url",
+          "request_date",
+          "issue_date",
+          "reviewed_by",
+          "certificate_address",
+          "decision_number",
+          "decision_date"
+        ],
+        "title": "CertificateRequestResource"
+      },
+      "ChangePasswordRequest": {
+        "type": "object",
+        "properties": {
+          "current_password": {
+            "type": "string"
+          },
+          "new_password": {
+            "type": "string",
+            "minLength": 8
+          },
+          "new_password_confirmation": {
+            "type": "string",
+            "minLength": 8
+          }
+        },
+        "required": [
+          "current_password",
+          "new_password",
+          "new_password_confirmation"
+        ],
+        "title": "ChangePasswordRequest"
+      },
+      "ChangePaymentStatusRequest": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "paid",
+              "rejected"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "exchange_rate": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0.0001,
+            "maximum": 1000
+          },
+          "receipt_image": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "binary",
+            "contentMediaType": "application/octet-stream",
+            "description": "Maximum file size: 5120 kilobytes."
+          }
+        },
+        "required": [
+          "status",
+          "reason"
+        ],
+        "title": "ChangePaymentStatusRequest"
+      },
+      "City": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 0,
+        "maxItems": 0,
+        "title": "City"
+      },
+      "ConfirmPaymentRequest": {
+        "type": "object",
+        "properties": {
+          "exchange_rate": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0.0001,
+            "maximum": 1000
+          },
+          "receipt_image": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "binary",
+            "contentMediaType": "application/octet-stream",
+            "description": "Maximum file size: 5120 kilobytes."
+          }
+        },
+        "title": "ConfirmPaymentRequest"
+      },
+      "ContractorDueResource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "contractor_id": {
+            "type": "string"
+          },
+          "contractor": {
+            "type": "string"
+          },
+          "membership_number": {
+            "type": "string"
+          },
+          "year": {
+            "type": "string"
+          },
+          "period": {
+            "type": "string"
+          },
+          "reference_number": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "amount_jod": {
+            "type": "string"
+          },
+          "paid_jod": {
+            "type": "string"
+          },
+          "remaining_jod": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "status_label": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "due_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          },
+          "created_by": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "discount_type": {
+            "type": "string"
+          },
+          "discount_value": {
+            "type": "string"
+          },
+          "discount_amount_jod": {
+            "type": "string"
+          },
+          "discount_reason": {
+            "type": "string"
+          },
+          "discount_label": {
+            "type": "string"
+          },
+          "original_amount_jod": {
+            "type": "string"
+          },
+          "fee_breakdown": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "contractor_id",
+          "contractor",
+          "membership_number",
+          "year",
+          "period",
+          "reference_number",
+          "description",
+          "amount_jod",
+          "paid_jod",
+          "remaining_jod",
+          "status",
+          "status_label",
+          "source",
+          "due_date",
+          "notes",
+          "created_by",
+          "created_at",
+          "discount_type",
+          "discount_value",
+          "discount_amount_jod",
+          "discount_reason",
+          "discount_label",
+          "original_amount_jod",
+          "fee_breakdown"
+        ],
+        "title": "ContractorDueResource"
+      },
+      "ContractorField": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 0,
+        "maxItems": 0,
+        "title": "ContractorField"
+      },
+      "ContractorGrade": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 0,
+        "maxItems": 0,
+        "title": "ContractorGrade"
+      },
+      "ContractorSpecialization": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 0,
+        "maxItems": 0,
+        "title": "ContractorSpecialization"
+      },
+      "Equipment": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 0,
+        "maxItems": 0,
+        "title": "Equipment"
+      },
+      "EquipmentBlockedDate": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 0,
+        "maxItems": 0,
+        "title": "EquipmentBlockedDate"
+      },
+      "EquipmentImage": {
+        "type": "array",
+        "prefixItems": [
+          {
+            "type": "string"
+          }
+        ],
+        "minItems": 1,
+        "maxItems": 1,
+        "title": "EquipmentImage"
+      },
+      "EquipmentPackage": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 0,
+        "maxItems": 0,
+        "title": "EquipmentPackage"
+      },
+      "EquipmentReport": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 0,
+        "maxItems": 0,
+        "title": "EquipmentReport"
+      },
+      "EquipmentReservation": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 0,
+        "maxItems": 0,
+        "title": "EquipmentReservation"
+      },
+      "EquipmentType": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 0,
+        "maxItems": 0,
+        "title": "EquipmentType"
+      },
+      "ExchangeRate": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 0,
+        "maxItems": 0,
+        "title": "ExchangeRate"
+      },
+      "GenerateFeeBulkRequest": {
+        "type": "object",
+        "properties": {
+          "year": {
+            "type": "integer",
+            "minimum": 1990,
+            "maximum": 2100
+          },
+          "contractor_ids": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "integer"
+            }
+          },
+          "dry_run": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "year"
+        ],
+        "title": "GenerateFeeBulkRequest"
+      },
+      "GenerateFeeRequest": {
+        "type": "object",
+        "properties": {
+          "year": {
+            "type": "integer",
+            "minimum": 1990,
+            "maximum": 2100
+          },
+          "discount_type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "percent",
+              "fixed",
+              null
+            ]
+          },
+          "discount_value": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0.01,
+            "maximum": 100
+          },
+          "discount_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 255
+          }
+        },
+        "required": [
+          "year"
+        ],
+        "title": "GenerateFeeRequest"
+      },
+      "Governorate": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 0,
+        "maxItems": 0,
+        "title": "Governorate"
+      },
+      "ImportContractorDuesRequest": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "contentMediaType": "application/octet-stream",
+            "description": "Maximum file size: 10240 kilobytes."
+          },
+          "dry_run": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "force": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "create_missing": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "ImportContractorDuesRequest"
+      },
+      "IssueCertificateRequestRequest": {
+        "type": "object",
+        "properties": {
+          "certificate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "binary",
+            "contentMediaType": "application/octet-stream",
+            "description": "اختياري: بدونه شهادة العضوية بتتولّد تلقائياً (CertificateRequestController::issue)"
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "10 MB\nبيانات الشهادة المولَّدة تلقائياً — فارغها بيرجع لقيم الموافقة ثم لملف المقاول",
+            "maxLength": 255
+          },
+          "decision_number": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100
+          },
+          "decision_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          }
+        },
+        "title": "IssueCertificateRequestRequest"
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "membership_number": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "fcm_token": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "device_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "membership_number",
+          "password"
+        ],
+        "title": "LoginRequest"
+      },
+      "Notification": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 0,
+        "maxItems": 0,
+        "title": "Notification"
+      },
+      "NotificationResource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 0,
+            "maxItems": 0
+          },
+          "read_at": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "data",
+          "read_at",
+          "created_at"
+        ],
+        "title": "NotificationResource"
+      },
+      "PayContractorDueRequest": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "currency": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "JOD",
+              "ILS",
+              "USD",
+              null
+            ]
+          },
+          "exchange_rate": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0.0001,
+            "maximum": 1000
+          },
+          "method": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "cash",
+              "bank_transfer",
+              "cheque",
+              null
+            ]
+          },
+          "reference_number": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "amount"
+        ],
+        "title": "PayContractorDueRequest"
+      },
+      "PaymentResource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "transaction_number": {
+            "type": "string"
+          },
+          "contractor": {
+            "type": "string"
+          },
+          "contractor_id": {
+            "type": "string"
+          },
+          "contractor_membership_number": {
+            "description": "الحذف الناعم بيلحق \"_deleted_{id}\" بالرقم لتحريره — نعرض الرقم الأصلي",
+            "type": [
+              "null",
+              "array",
+              "string",
+              "object"
+            ]
+          },
+          "contractor_deleted": {
+            "type": "boolean"
+          },
+          "membership_id": {
+            "type": "string"
+          },
+          "equipment_package_id": {
+            "type": "string"
+          },
+          "contractor_due_id": {
+            "type": "string"
+          },
+          "penalty_id": {
+            "type": "string"
+          },
+          "bank_account_id": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "JOD"
+                ]
+              }
+            ]
+          },
+          "exchange_rate": {
+            "type": "string"
+          },
+          "amount_jod": {
+            "type": "string"
+          },
+          "rate_source": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "type_label": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "description": "عنوان الكرت بالتطبيق — جاهز للعرض (شوف Payment::getTitleAttribute)"
+          },
+          "status": {
+            "type": "string"
+          },
+          "status_label": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "reference_number": {
+            "type": "string",
+            "description": "للمقاول: رقم بديل لما ما يكون كتب رقم حوالة (Payment::display_reference_number)"
+          },
+          "receipt_image_url": {
+            "type": "string"
+          },
+          "receipt_pdf_url": {
+            "type": "string"
+          },
+          "rejection_reason": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "submitted_at": {
+            "type": "string"
+          },
+          "confirmed_at": {
+            "type": "string"
+          },
+          "paid_at": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "last_status_change": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "آخر \"تغيير حالة\" يدوي مع سببه (بيظهر بتلميح على شارة الحالة بسجل المدفوعات)",
+            "properties": {
+              "from_status": {
+                "type": "string"
+              },
+              "to_status": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "changed_by": {
+                "type": "string"
+              },
+              "changed_at": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "from_status",
+              "to_status",
+              "reason",
+              "changed_by",
+              "changed_at"
+            ]
+          },
+          "status_change_blocker": {
+            "type": "string",
+            "description": "ليش ما بينفع ترجيع دفعة مؤكَّدة (null = مسموح)، عشان القائمة تعطّل الخيار وتشرح"
+          }
+        },
+        "required": [
+          "id",
+          "transaction_number",
+          "contractor",
+          "contractor_id",
+          "contractor_membership_number",
+          "contractor_deleted",
+          "membership_id",
+          "equipment_package_id",
+          "contractor_due_id",
+          "penalty_id",
+          "bank_account_id",
+          "amount",
+          "currency",
+          "exchange_rate",
+          "amount_jod",
+          "rate_source",
+          "type",
+          "type_label",
+          "title",
+          "status",
+          "status_label",
+          "method",
+          "reference_number",
+          "receipt_image_url",
+          "receipt_pdf_url",
+          "rejection_reason",
+          "notes",
+          "submitted_at",
+          "confirmed_at",
+          "paid_at",
+          "created_at"
+        ],
+        "title": "PaymentResource"
+      },
+      "RegenerateCertificateRequestRequest": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 255
+          },
+          "decision_number": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100
+          },
+          "decision_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          }
+        },
+        "title": "RegenerateCertificateRequestRequest"
+      },
+      "RejectCertificateRequestRequest": {
+        "type": "object",
+        "properties": {
+          "reject_reason": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "reject_reason"
+        ],
+        "title": "RejectCertificateRequestRequest"
+      },
+      "RejectPaymentRequest": {
+        "type": "object",
+        "properties": {
+          "rejection_reason": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "rejection_reason"
+        ],
+        "title": "RejectPaymentRequest"
+      },
+      "Setting": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 0,
+        "maxItems": 0,
+        "title": "Setting"
+      },
+      "SettleContractorDueRequest": {
+        "type": "object",
+        "properties": {
+          "amount_jod": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0.01
+          },
+          "payment_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          }
+        },
+        "title": "SettleContractorDueRequest"
+      },
+      "StoreCertificateRequestRequest": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "membership",
+              "good_standing",
+              "classification",
+              "experience"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "attachment": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "binary",
+            "contentMediaType": "application/octet-stream",
+            "description": "Maximum file size: 5120 kilobytes."
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "StoreCertificateRequestRequest"
+      },
+      "StoreContractorDueRequest": {
+        "type": "object",
+        "properties": {
+          "contractor_id": {
+            "type": "integer"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "amount_jod": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 99999999
+          },
+          "year": {
+            "type": "integer",
+            "description": "السنة وتاريخ الاستحقاق إلزاميان: الذمة تظهر للمقاول بتاريخ استحقاقها، وبدونه لا تُحسب متأخّرة أبداً.",
+            "minimum": 1990,
+            "maximum": 2100
+          },
+          "period": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 50
+          },
+          "due_kind": {
+            "type": "string",
+            "description": "الذمة الجديدة تاريخها من بكرة وما بعد، والقديمة تاريخها اليوم أو قبله (Trello #13).\nالقديمة قرار واعٍ بسبب مكتوب لا تاريخاً ماضياً مرَّ بالخطأ (TASK-17 #7).",
+            "enum": [
+              "old",
+              "new"
+            ]
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "allow_backdate": {
+            "type": "boolean"
+          },
+          "backdate_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 255
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "contractor_id",
+          "description",
+          "amount_jod",
+          "year",
+          "due_kind",
+          "due_date"
+        ],
+        "title": "StoreContractorDueRequest"
+      },
+      "StoreManualPaymentRequest": {
+        "type": "object",
+        "description": "إضافة دفعة يدوياً من شاشة \"سجل المدفوعات\" نيابةً عن المقاول — تُسجَّل مؤكَّدة\r\nمباشرة وتوزَّع على أقدم الذمم (نفس منطق DuesPaymentService).",
+        "properties": {
+          "contractor_id": {
+            "type": "integer"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "currency": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "JOD",
+              "ILS",
+              "USD",
+              null
+            ]
+          },
+          "exchange_rate": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0.0001,
+            "maximum": 1000
+          },
+          "method": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "cash",
+              "bank_transfer",
+              "cheque",
+              null
+            ]
+          },
+          "reference_number": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1000
+          },
+          "receipt_image": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "binary",
+            "contentMediaType": "application/octet-stream",
+            "description": "الحوالة البنكية لازم يرافقها إشعار — النقد والشيك اختياري"
+          }
+        },
+        "required": [
+          "contractor_id",
+          "amount"
+        ],
+        "title": "StoreManualPaymentRequest"
+      },
+      "StorePaymentRequest": {
+        "type": "object",
+        "properties": {
+          "contractor_id": {
+            "type": "integer"
+          },
+          "membership_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "currency": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "JOD",
+              "ILS",
+              "USD",
+              null
+            ]
+          },
+          "exchange_rate": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0.0001,
+            "maximum": 1000
+          },
+          "type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "pending",
+              "paid",
+              "refunded",
+              "failed",
+              "rejected",
+              null
+            ]
+          },
+          "method": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "contractor_id",
+          "amount"
+        ],
+        "title": "StorePaymentRequest"
+      },
+      "SubmitTransferRequest": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "minimum": 1
+          },
+          "currency": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "JOD",
+              "ILS",
+              "USD",
+              null
+            ]
+          },
+          "receipt_image": {
+            "type": "string",
+            "format": "binary",
+            "contentMediaType": "application/octet-stream",
+            "description": "Maximum file size: 5120 kilobytes."
+          },
+          "bank_account_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "membership_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "equipment_package_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "contractor_due_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "الذمة اللي انضغط عليها \"ادفع الآن\" — بتفرض type=dues_payment"
+          },
+          "penalty_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "الغرامة اللي انضغط عليها \"ادفع الآن\" — بتفرض type=penalty_payment"
+          },
+          "reference_number": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "سداد ذمة / رسوم اشتراك / دفع غرامة / دفعة مقدمة (+ اشتراك باقة المعدات)؛ غير هيك بيتجاهل",
+            "enum": [
+              "dues_payment",
+              "membership_fee",
+              "penalty_payment",
+              "advance_payment",
+              "equipment_subscription",
+              null
+            ]
+          }
+        },
+        "required": [
+          "amount",
+          "receipt_image"
+        ],
+        "title": "SubmitTransferRequest"
+      },
+      "TenderCategory": {
+        "type": "array",
+        "prefixItems": [
+          {
+            "type": "null"
+          }
+        ],
+        "minItems": 1,
+        "maxItems": 1,
+        "title": "TenderCategory"
+      },
+      "Term": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 0,
+        "maxItems": 0,
+        "title": "Term"
+      },
+      "UpdateContractorDueRequest": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "amount_jod": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 99999999
+          },
+          "year": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1990,
+            "maximum": 2100
+          },
+          "period": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 50
+          },
+          "due_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          }
+        },
+        "title": "UpdateContractorDueRequest"
+      },
+      "UpdateFullProfileRequest": {
+        "type": "object",
+        "properties": {
+          "established_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "حقول مقفلة عن قصد ولا تظهر هنا إطلاقاً — تعديلها صلاحية لوحة الأدمن فقط:\nname, membership_number, commercial_register, owner_name, authorized_person,\nauthorized_person_id_number, authorized_person_phone, authorized_person_whatsapp,\npartners, specialties, classification. ‼ classification و specialties تحديداً محذوفان لأنهما مُدخَلا\nMembershipFeeCalculator نفسه (يقرأ $contractor->specialties) ويغذّيان توليد\nالشهادات، فكان قبولهما هنا يعني أن المقاول يستطيع من التطبيق تخفيض تصنيفه\nبنفسه فيُخفّض الرسم المحتسَب عليه، وتغيير الدرجة المطبوعة على شهادته — بلا\nمراجعة ولا أثر. إعادتهما هنا تُعيد فتح الثغرة."
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "email"
+          },
+          "governorate_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "city_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fax": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Text fields",
+            "maxLength": 50
+          },
+          "district": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100
+          },
+          "building": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100
+          },
+          "floor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 50
+          },
+          "capital": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100
+          },
+          "registration_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "legal_form": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100
+          },
+          "company_purposes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "license_number": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "فريد مثل لوحة الأدمن — بدونه كان الرقم المكرر يصل لقيد الـ unique في قاعدة\nالبيانات فيرجع التطبيق \"حدث خطأ غير متوقع\" (500) بدل رسالة واضحة.",
+            "maxLength": 100
+          },
+          "cr_file": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "binary",
+            "contentMediaType": "application/octet-stream",
+            "description": "Files — كل المستندات قابلة للرفع/الاستبدال المباشر، بما فيها partners_ids رغم\nأن حقل partners النصي نفسه مقفل."
+          },
+          "id_file": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "binary",
+            "contentMediaType": "application/octet-stream",
+            "description": "Maximum file size: 12288 kilobytes."
+          },
+          "lease_or_ownership_contract": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "binary",
+            "contentMediaType": "application/octet-stream",
+            "description": "Maximum file size: 12288 kilobytes."
+          },
+          "company_approval_letter": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "binary",
+            "contentMediaType": "application/octet-stream",
+            "description": "Maximum file size: 12288 kilobytes."
+          },
+          "municipal_license": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "binary",
+            "contentMediaType": "application/octet-stream",
+            "description": "Maximum file size: 12288 kilobytes."
+          },
+          "company_register": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "binary",
+            "contentMediaType": "application/octet-stream",
+            "description": "Maximum file size: 12288 kilobytes."
+          },
+          "articles_of_association": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "binary",
+            "contentMediaType": "application/octet-stream",
+            "description": "Maximum file size: 12288 kilobytes."
+          },
+          "internal_bylaws": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "binary",
+            "contentMediaType": "application/octet-stream",
+            "description": "Maximum file size: 12288 kilobytes."
+          },
+          "bank_dealing_letter": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "binary",
+            "contentMediaType": "application/octet-stream",
+            "description": "Maximum file size: 12288 kilobytes."
+          },
+          "secretary_contract": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "binary",
+            "contentMediaType": "application/octet-stream",
+            "description": "Maximum file size: 12288 kilobytes."
+          },
+          "full_time_engineer_certificate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "binary",
+            "contentMediaType": "application/octet-stream",
+            "description": "Maximum file size: 12288 kilobytes."
+          },
+          "accountant_certificate_or_contract": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "binary",
+            "contentMediaType": "application/octet-stream",
+            "description": "Maximum file size: 12288 kilobytes."
+          },
+          "partners_ids": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "binary",
+            "contentMediaType": "application/octet-stream",
+            "description": "Maximum file size: 12288 kilobytes."
+          },
+          "authorization_letter": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "binary",
+            "contentMediaType": "application/octet-stream",
+            "description": "Maximum file size: 12288 kilobytes."
+          },
+          "authorized_signature": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "binary",
+            "contentMediaType": "application/octet-stream",
+            "description": "Maximum file size: 12288 kilobytes."
+          }
+        },
+        "title": "UpdateFullProfileRequest"
+      },
+      "UpdateProfileRequest": {
+        "type": "object",
+        "properties": {
+          "governorate_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "اسم الشركة لا يُعدَّل مباشرة — فقط عبر طلب تعديل اسم شركة تُوافق عليه الإدارة"
+          },
+          "city_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fcm_token": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "title": "UpdateProfileRequest"
+      },
+      "UploadReceiptImageRequest": {
+        "type": "object",
+        "properties": {
+          "receipt_image": {
+            "type": "string",
+            "format": "binary",
+            "contentMediaType": "application/octet-stream",
+            "description": "Maximum file size: 5120 kilobytes."
+          }
+        },
+        "required": [
+          "receipt_image"
+        ],
+        "title": "UploadReceiptImageRequest"
+      }
+    },
+    "responses": {
+      "ValidationException": {
+        "description": "Validation error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "description": "Errors overview."
+                },
+                "errors": {
+                  "type": "object",
+                  "description": "A detailed description of each field that failed validation.",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "required": [
+                "message",
+                "errors"
+              ]
+            }
+          }
+        }
+      },
+      "AuthenticationException": {
+        "description": "Unauthenticated",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "description": "Error overview."
+                }
+              },
+              "required": [
+                "message"
+              ]
+            }
+          }
+        }
+      },
+      "ModelNotFoundException": {
+        "description": "Not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "description": "Error overview."
+                }
+              },
+              "required": [
+                "message"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

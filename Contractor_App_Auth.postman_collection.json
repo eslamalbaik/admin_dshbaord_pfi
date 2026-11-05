@@ -1,0 +1,555 @@
+{
+	"info": {
+		"name": "Contractor App API — Auth",
+		"_postman_id": "arab-contractors-union-contractor-app-auth-2026",
+		"description": "Auth only: login, countries, register (verify identity -> verify OTP -> set password, resend OTP), forgot password (send OTP -> reset), change password, logout.\n\nPhone numbers carry a country_code (no +, default 970); GET countries lists the supported codes. Staging: https://api.pcuorg.cloud/api/v1",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "https://api.pcuorg.cloud/api/v1",
+			"type": "string"
+		},
+		{
+			"key": "base_url_production",
+			"value": "https://api-production.pcuorg.cloud/api/v1",
+			"type": "string"
+		},
+		{
+			"key": "contractor_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "membership_number",
+			"value": "928_g",
+			"type": "string",
+			"description": "رقم عضوية اليوزر الاختباري (هيكلية جديدة)"
+		},
+		{
+			"key": "password",
+			"value": "Test@12345",
+			"type": "string",
+			"description": "كلمة مرور اليوزر الاختباري"
+		},
+		{
+			"key": "phone",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "country_code",
+			"value": "970"
+		}
+	],
+	"item": [
+		{
+			"name": "Login",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"if (pm.response.code === 200) {",
+							"  const json = pm.response.json();",
+							"  pm.collectionVariables.set('contractor_token', json.items.token);",
+							"  pm.collectionVariables.set('contractor_id', json.items.user.id);",
+							"  console.log('✅ Contractor token saved');",
+							"}"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "membership_number",
+							"value": "{{membership_number}}",
+							"type": "text",
+							"description": "رقم العضوية المعتمد (1-927 قديم أو 928_g فما فوق)"
+						},
+						{
+							"key": "password",
+							"value": "{{password}}",
+							"type": "text"
+						},
+						{
+							"key": "fcm_token",
+							"value": "fcm_test_token_12345",
+							"type": "text",
+							"description": "اختياري — للإشعارات",
+							"disabled": true
+						},
+						{
+							"key": "device_name",
+							"value": "Postman",
+							"type": "text",
+							"description": "اختياري",
+							"disabled": true
+						}
+					]
+				},
+				"url": {
+					"raw": "{{base_url}}/contractor/auth/login",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"contractor",
+						"auth",
+						"login"
+					]
+				},
+				"description": "**POST** `/api/v1/contractor/auth/login` — **Form-Data**\n\nتسجيل الدخول برقم العضوية وكلمة المرور.\n\n**الاستجابة خفيفة (Lite):** بيانات أساسية + العضوية فقط — بدون الملفات والعمارة والطابق ورأس المال. البيانات الكاملة عبر **Get Profile**.\n\n| الحالة | الكود | الرسالة |\n|---|---|---|\n| رقم غير موجود | 404 | لا توجد لديك عضوية في الاتحاد |\n| كلمة مرور خاطئة | 401 | بيانات الاعتماد غير صحيحة |\n| حساب مجمد | 403 | account_frozen |\n| حساب معلق | 403 | account_suspended |\n| جوال غير مفعّل | 403 | phone_not_verified |"
+			}
+		},
+		{
+			"name": "Countries — الدول المدعومة لرقم الجوال",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/contractor/auth/countries",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"contractor",
+						"auth",
+						"countries"
+					]
+				},
+				"description": "عام (بدون توكن). يرجّع الدول المدعومة لرقم الجوال في شاشات التسجيل واستعادة كلمة المرور.\n\nitems.default_code = \"970\"، و items.countries[] لكل دولة: iso، code (بدون +، هذا ما يُرسل كـ country_code)، dial_code (+970)، name_ar، name_en، flag، min_length/max_length (طول الرقم بدون صفر البداية)، example، is_default.\n\nphone يُقبل بصفر البداية أو بدونه، وبالأرقام العربية. الرقم نفسه في دولة أخرى لا يطابق. 970 و972 متبادلان للأرقام الفلسطينية. رقم غير صالح للدولة → 422 error=invalid_phone.\n\nاستجابات التسجيل واستعادة كلمة المرور صارت ترجع أيضاً country_code و phone_international (+201001234567)."
+			},
+			"response": []
+		},
+		{
+			"name": "Register — 1) Verify Identity",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "phone",
+							"value": "{{phone}}",
+							"type": "text",
+							"description": "رقم جوال المقاول"
+						},
+						{
+							"key": "country_code",
+							"value": "{{country_code}}",
+							"type": "text",
+							"description": "اختياري — رمز الدولة بدون + (مثل 970، 20، 962). الافتراضي 970 (فلسطين). القائمة من GET contractor/auth/countries. يُتجاهل إذا أُرسل phone بصيغة دولية (+201001234567)."
+						},
+						{
+							"key": "terms_accepted",
+							"value": "1",
+							"type": "text",
+							"description": "مطلوب — الموافقة على الشروط والأحكام وسياسة الخصوصية (1 = موافق)"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{base_url}}/contractor/auth/verify-identity",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"contractor",
+						"auth",
+						"verify-identity"
+					]
+				},
+				"description": "**POST** `/api/v1/contractor/auth/verify-identity`\n\nشاشة التسجيل — الخطوة 1: التحقق من رقم الجوال وإرسال رمز التحقق إليه.\n\n**⚠️ تحديث:** يتطلب الآن حقل `terms_accepted` = `1` (الموافقة على الشروط والأحكام وسياسة الخصوصية). عند أول تسجيل يُحفظ وقت الموافقة في `terms_accepted_at`.\n\n**⚠️ تحديث جديد:** لا يكفي وجود رقم الجوال بالداتابيز — لازم يكون عند المقاول `membership_number` مسجّل مسبقاً (من الاستيراد القديم أو إدخال الأدمن). لو رقم الجوال موجود لكن بدون رقم عضوية مربوط → `422 no_membership_number`. هالفحص داخلي فقط، ما بيتطلب أي حقل إضافي بالـ request.\n\n- إذا كان الجوال مسجّلاً وله رقم عضوية تعود بياناته العامة (اسم الشركة، المفوض، السجل التجاري، رقم العضوية) مع `has_password` ويُرسل OTP (يظهر تجريبياً في `otp_preview`).\n- **`expires_in`**: 35 ثانية — مدة الانتظار قبل طلب رمز جديد (للعدّاد الزمني في التطبيق).\n- إذا طُلب رمز جديد قبل انتهاء الـ 35 ثانية → `429 otp_cooldown` مع `expires_in` بالثواني المتبقية.\n- إذا كان مسجّلاً ومفعّلاً بالفعل تعود `422 already_registered`.\n- إذا لم يكن موجوداً تعود `404 contractor_not_found`.\n\n**Form-Data**\n\n| الحقل | مطلوب | الوصف |\n|---|---|---|\n| phone | ✅ | رقم جوال المقاول |\n| terms_accepted | ✅ | 1 = موافق على الشروط والأحكام |\n\n**استجابة النجاح تحتوي:**\n```json\n{\n  \"id\": 1,\n  \"name\": \"...\",\n  \"phone\": \"...\",\n  \"otp_required\": true,\n  \"otp_preview\": 123456,\n  \"expires_in\": 35\n}\n```\n\n**أخطاء محتملة:**\n\n| كود | error | السبب |\n|---|---|---|\n| 404 | contractor_not_found | لا يوجد حساب برقم الجوال هذا |\n| 422 | no_membership_number | الحساب موجود لكن بدون رقم عضوية مربوط |\n| 422 | already_registered | مسجّل ومفعّل مسبقاً |\n| 403 | account_inactive | الحساب مجمّد/موقوف |\n| 429 | otp_cooldown | لسا داخل فترة انتظار 35 ثانية |"
+			}
+		},
+		{
+			"name": "Register — 2) Verify OTP",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "phone",
+							"value": "{{phone}}",
+							"type": "text"
+						},
+						{
+							"key": "country_code",
+							"value": "{{country_code}}",
+							"type": "text",
+							"description": "اختياري — رمز الدولة بدون + (مثل 970، 20، 962). الافتراضي 970 (فلسطين). القائمة من GET contractor/auth/countries. يُتجاهل إذا أُرسل phone بصيغة دولية (+201001234567)."
+						},
+						{
+							"key": "otp",
+							"value": "123456",
+							"type": "text",
+							"description": "رمز التحقق — يجب أن يكون 6 أرقام بالضبط"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{base_url}}/contractor/auth/verify-otp",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"contractor",
+						"auth",
+						"verify-otp"
+					]
+				},
+				"description": "**POST** `/api/v1/contractor/auth/verify-otp`\n\nشاشة التسجيل — الخطوة 2: تفعيل رقم الجوال بالرمز المرسل.\n\n**⚠️ تحديث:** الرمز يجب أن يكون **6 أرقام بالضبط** (`size:6`). أي طول آخر يُرفض بخطأ تحقق `422`.\n\nبعد النجاح: إذا لم يكن للمقاول كلمة مرور بعد، ينتقل لشاشة تعيين كلمة المرور. إذا كانت موجودة، ينتقل لشاشة تسجيل الدخول.\n\nالرمز صالح 10 دقائق. رمز خاطئ/منتهي → `422 invalid_otp`.\n\n**Form-Data**"
+			},
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"const json = pm.response.json();",
+							"if (pm.response.code === 200 && json.items && json.items.token) {",
+							"  pm.collectionVariables.set('contractor_token', json.items.token);",
+							"  console.log('✅ Token saved from this response');",
+							"}"
+						]
+					}
+				}
+			]
+		},
+		{
+			"name": "Register — 3) Set Password",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "phone",
+							"value": "{{phone}}",
+							"type": "text"
+						},
+						{
+							"key": "country_code",
+							"value": "{{country_code}}",
+							"type": "text",
+							"description": "اختياري — رمز الدولة بدون + (مثل 970، 20، 962). الافتراضي 970 (فلسطين). القائمة من GET contractor/auth/countries. يُتجاهل إذا أُرسل phone بصيغة دولية (+201001234567)."
+						},
+						{
+							"key": "password",
+							"value": "{{password}}",
+							"type": "text"
+						},
+						{
+							"key": "password_confirmation",
+							"value": "{{password}}",
+							"type": "text"
+						},
+						{
+							"key": "fcm_token",
+							"value": "",
+							"type": "text",
+							"disabled": true,
+							"description": "Firebase Cloud Messaging token for push notifications (optional)"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{base_url}}/contractor/auth/set-password",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"contractor",
+						"auth",
+						"set-password"
+					]
+				},
+				"description": "**POST** `/api/v1/contractor/auth/set-password`\n\nشاشة التسجيل — الخطوة 3 (بعد تفعيل الجوال): تعيين كلمة المرور وتسجيل الدخول مباشرة (يعود التوكن).\n\n- يتطلب أن يكون الجوال مفعّلاً مسبقاً عبر verify-otp، وإلا `422 phone_not_verified`.\n- إذا كان للحساب كلمة مرور بالفعل → `422 already_registered`.\n- **⚠️ تحديث جديد:** نفس فحص `verify-identity` — لازم يكون عند المقاول `membership_number` مسجّل، غير هيك `422 no_membership_number`. لا حقل إضافي مطلوب بالـ request.\n- بعد النجاح ترجع بيانات العضوية الحقيقية (membership_number/commercial_register/trade/classification) من سجل المقاول — لو طلعت null تأكد إنه المقاول فعلاً معبّى هالحقول بالداتابيز.\n- **تحديث:** `fcm_token` اختياري ويُستخدم لتسجيل جهاز المقاول لاستقبال إشعارات فورية. لو تم تمريره يتم حفظه مباشرة (لا تنتظر طلب منفصل).\n\n**Form-Data**"
+			},
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"const json = pm.response.json();",
+							"if (pm.response.code === 200 && json.items && json.items.token) {",
+							"  pm.collectionVariables.set('contractor_token', json.items.token);",
+							"  console.log('✅ Token saved from this response');",
+							"}"
+						]
+					}
+				}
+			]
+		},
+		{
+			"name": "Register — Resend OTP",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "phone",
+							"value": "{{phone}}",
+							"type": "text"
+						},
+						{
+							"key": "country_code",
+							"value": "{{country_code}}",
+							"type": "text",
+							"description": "اختياري — رمز الدولة بدون + (مثل 970، 20، 962). الافتراضي 970 (فلسطين). القائمة من GET contractor/auth/countries. يُتجاهل إذا أُرسل phone بصيغة دولية (+201001234567)."
+						}
+					]
+				},
+				"url": {
+					"raw": "{{base_url}}/contractor/auth/resend-otp",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"contractor",
+						"auth",
+						"resend-otp"
+					]
+				},
+				"description": "**POST** `/api/v1/contractor/auth/resend-otp`\n\nإعادة إرسال رمز التحقق لحساب غير مفعّل.\n\n**⚠️ تحديث:**\n- يوجد **فترة انتظار 35 ثانية** بين كل طلب إعادة إرسال. إذا طُلب قبل انتهاء المدة → `429 otp_cooldown` مع `expires_in` بالثواني المتبقية.\n- الاستجابة تحتوي `expires_in: 35` لمزامنة العدّاد الزمني في التطبيق.\n\nإذا كان الحساب مفعّلاً مسبقاً → `422 already_verified`.\n\n**Form-Data**"
+			}
+		},
+		{
+			"name": "Forgot Password — 1) Send OTP",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "phone",
+							"value": "{{phone}}",
+							"type": "text",
+							"description": "رقم جوال المقاول المسجّل (بدل رقم العضوية والسجل التجاري)"
+						},
+						{
+							"key": "country_code",
+							"value": "{{country_code}}",
+							"type": "text",
+							"description": "اختياري — رمز الدولة بدون + (مثل 970، 20، 962). الافتراضي 970 (فلسطين). القائمة من GET contractor/auth/countries. يُتجاهل إذا أُرسل phone بصيغة دولية (+201001234567)."
+						}
+					]
+				},
+				"url": {
+					"raw": "{{base_url}}/contractor/auth/forgot-password/send-otp",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"contractor",
+						"auth",
+						"forgot-password",
+						"send-otp"
+					]
+				},
+				"description": "**POST** `/api/v1/contractor/auth/forgot-password/send-otp` — **Form-Data**\n\nإرسال رمز التحقق (OTP) لاستعادة كلمة المرور — **بالتعريف عبر رقم الجوال فقط**.\n\nمتاح لأي مقاول مسجّل غير مجمّد — **لا يُشترط وجود عضوية فعّالة** (مطابق لتسجيل الدخول؛ إثبات ملكية الجوال عبر الـ OTP كافٍ). الرمز يُرجَع في `otp_preview` (للتجربة) وصالح 10 دقائق.\n\n**⚠️ تحديث:**\n- **أُزيل شرط العضوية الفعّالة** — كان يُرجع `403 membership_inactive` ويقفل الميزة على أغلب المقاولين (عضويتهم تُدار عبر contractors.status لا عبر جدول memberships).\n- يوجد **فترة انتظار 35 ثانية** بين كل طلب إرسال OTP. إذا طُلب قبل انتهاء المدة → `429 otp_cooldown` مع `expires_in` بالثواني المتبقية.\n- الاستجابة تحتوي `expires_in: 35` لمزامنة العدّاد الزمني في التطبيق.\n\n| الحالة | الكود | error |\n|---|---|---|\n| لا يوجد حساب بهذا الجوال | 404 | contractor_not_found |\n| حساب مجمّد | 403 | account_inactive |\n| طلب قبل انتهاء فترة الانتظار | 429 | otp_cooldown |"
+			}
+		},
+		{
+			"name": "Forgot Password — 2) Reset",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "phone",
+							"value": "{{phone}}",
+							"type": "text",
+							"description": "رقم جوال المقاول المسجّل"
+						},
+						{
+							"key": "country_code",
+							"value": "{{country_code}}",
+							"type": "text",
+							"description": "اختياري — رمز الدولة بدون + (مثل 970، 20، 962). الافتراضي 970 (فلسطين). القائمة من GET contractor/auth/countries. يُتجاهل إذا أُرسل phone بصيغة دولية (+201001234567)."
+						},
+						{
+							"key": "otp",
+							"value": "123456",
+							"type": "text",
+							"description": "الرمز من الخطوة 1 (otp_preview) — يجب أن يكون 6 أرقام بالضبط"
+						},
+						{
+							"key": "password",
+							"value": "NewSecret@2026",
+							"type": "text",
+							"description": "كلمة المرور الجديدة (≥ 8)"
+						},
+						{
+							"key": "password_confirmation",
+							"value": "NewSecret@2026",
+							"type": "text",
+							"description": "تأكيد كلمة المرور"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{base_url}}/contractor/auth/forgot-password/reset",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"contractor",
+						"auth",
+						"forgot-password",
+						"reset"
+					]
+				},
+				"description": "**POST** `/api/v1/contractor/auth/forgot-password/reset` — **Form-Data**\n\nتعيين كلمة مرور جديدة بعد التحقق من OTP — **بالتعريف عبر رقم الجوال**. عند النجاح يُرجِع توكن دخول مباشر.\n\nمتاح لأي مقاول مسجّل غير مجمّد — **لا يُشترط وجود عضوية فعّالة** (مطابق لتسجيل الدخول).\n\n**⚠️ تحديث:** الرمز يجب أن يكون **6 أرقام بالضبط** (`size:6`).\n\n| الحالة | الكود | error |\n|---|---|---|\n| لا يوجد حساب بهذا الجوال | 404 | contractor_not_found |\n| حساب مجمّد | 403 | account_inactive |\n| رمز خاطئ/منتهٍ | 422 | invalid_otp |\n| كلمة المرور < 8 أو غير مطابقة | 422 | (validation) |"
+			},
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"if (pm.response.code === 200) {",
+							"  const json = pm.response.json();",
+							"  pm.collectionVariables.set('contractor_token', json.items.token);",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			]
+		},
+		{
+			"name": "Change Password",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer {{contractor_token}}"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "current_password",
+							"value": "{{password}}",
+							"type": "text"
+						},
+						{
+							"key": "new_password",
+							"value": "NewPass@2026",
+							"type": "text"
+						},
+						{
+							"key": "new_password_confirmation",
+							"value": "NewPass@2026",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{base_url}}/contractor/auth/change-password",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"contractor",
+						"auth",
+						"change-password"
+					]
+				},
+				"description": "**POST** `/api/v1/contractor/auth/change-password`\n\nبعد النجاح يُلغى التوكن القديم ويُرجع توكن جديد تلقائياً\n\n**Form-Data**"
+			}
+		},
+		{
+			"name": "Logout",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer {{contractor_token}}"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/contractor/auth/logout",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"contractor",
+						"auth",
+						"logout"
+					]
+				},
+				"description": "**POST** `/api/v1/contractor/auth/logout`"
+			}
+		}
+	]
+}

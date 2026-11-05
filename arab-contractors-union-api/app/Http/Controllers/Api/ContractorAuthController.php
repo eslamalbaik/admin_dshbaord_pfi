@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\Group;
 use App\Http\Requests\Contractor\ChangePasswordRequest;
 use App\Http\Requests\Contractor\LoginRequest;
 use App\Http\Requests\Contractor\UpdateFullProfileRequest;
@@ -37,6 +39,8 @@ class ContractorAuthController extends Controller
     //  POST /api/contractor/auth/login
     //  الحقول: identifier (email أو phone) + password + fcm_token (اختياري)
     // ─────────────────────────────────────────────────────────────────────────
+    #[Group("Contractor Auth", weight: 2)]
+    #[Endpoint(title: "Login", description: "Login by membership_number + password. Returns a Bearer token valid 60 days (a single active session; older tokens are revoked). Error keys: no_membership, invalid_credentials, plus the loginEligibility keys.")]
     public function login(LoginRequest $request)
     {
         $contractor = Contractor::where('membership_number', \App\Rules\MembershipNumber::normalize($request->membership_number))->first();

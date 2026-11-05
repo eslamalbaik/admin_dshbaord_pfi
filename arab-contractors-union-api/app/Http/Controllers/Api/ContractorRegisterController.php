@@ -10,6 +10,8 @@ use App\Models\User;
 use App\Notifications\ContractorActivatedNotification;
 use App\Services\OtpService;
 use App\Support\PhoneCountries;
+use Dedoc\Scramble\Attributes\Endpoint;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
@@ -27,10 +29,20 @@ class ContractorRegisterController extends Controller
     //  POST /api/v1/contractor/auth/verify-identity
     //  الخطوة 1: التحقق من رقم الجوال وإرسال رمز التحقق إليه
     // ─────────────────────────────────────────────────────────────────────────
+    #[Group("Contractor Auth", weight: 3)]
+    #[Endpoint(title: "Register step 1: verify phone and send OTP", description: "Looks the contractor up by phone (+ country_code, default 970) and sends a 6-digit OTP. Requires terms_accepted. Error keys: contractor_not_found, no_membership_number, account_inactive, already_registered, otp_cooldown, invalid_phone.")]
     public function verifyIdentity(Request $request)
     {
         $request->validate([
+            /**
+             * Mobile number. Accepted with or without the leading 0, Arabic-Indic digits allowed, or full international ("+201001234567" / "00201001234567" — then country_code is ignored). Must match the length of the chosen country (see GET countries).
+             * @example 599123456
+             */
             'phone'          => 'required|string',
+            /**
+             * Country dial code WITHOUT "+", one of the `code` values returned by GET countries (970, 972, 20, 962, 966, 971, 974, 965, 973, 968, 961, 963, 964, 90). Defaults to 970 when omitted. 970 and 972 are interchangeable for Palestinian numbers.
+             * @example 970
+             */
             'country_code'   => 'nullable|string|max:6',
             'terms_accepted' => 'required|accepted',
         ]);
@@ -98,10 +110,20 @@ class ContractorRegisterController extends Controller
     //  POST /api/v1/contractor/auth/verify-otp
     //  الخطوة 2: تفعيل رقم الجوال بعد إدخال رمز التحقق
     // ─────────────────────────────────────────────────────────────────────────
+    #[Group("Contractor Auth", weight: 4)]
+    #[Endpoint(title: "Register step 2: verify the OTP", description: "Confirms the OTP and marks the phone verified. Error keys: invalid_otp, contractor_not_found, account_inactive.")]
     public function verifyOtp(Request $request)
     {
         $request->validate([
+            /**
+             * Mobile number. Accepted with or without the leading 0, Arabic-Indic digits allowed, or full international ("+201001234567" / "00201001234567" — then country_code is ignored). Must match the length of the chosen country (see GET countries).
+             * @example 599123456
+             */
             'phone'        => 'required|string',
+            /**
+             * Country dial code WITHOUT "+", one of the `code` values returned by GET countries (970, 972, 20, 962, 966, 971, 974, 965, 973, 968, 961, 963, 964, 90). Defaults to 970 when omitted. 970 and 972 are interchangeable for Palestinian numbers.
+             * @example 970
+             */
             'country_code' => 'nullable|string|max:6',
             'otp'          => 'required|string|size:6',
         ]);
@@ -148,10 +170,20 @@ class ContractorRegisterController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
     //  POST /api/v1/contractor/auth/resend-otp
     // ─────────────────────────────────────────────────────────────────────────
+    #[Group("Contractor Auth", weight: 5)]
+    #[Endpoint(title: "Resend the register OTP", description: "Sends a new OTP while the phone is not yet verified. Error keys: already_verified, otp_cooldown.")]
     public function resendOtp(Request $request)
     {
         $request->validate([
+            /**
+             * Mobile number. Accepted with or without the leading 0, Arabic-Indic digits allowed, or full international ("+201001234567" / "00201001234567" — then country_code is ignored). Must match the length of the chosen country (see GET countries).
+             * @example 599123456
+             */
             'phone'        => 'required|string',
+            /**
+             * Country dial code WITHOUT "+", one of the `code` values returned by GET countries (970, 972, 20, 962, 966, 971, 974, 965, 973, 968, 961, 963, 964, 90). Defaults to 970 when omitted. 970 and 972 are interchangeable for Palestinian numbers.
+             * @example 970
+             */
             'country_code' => 'nullable|string|max:6',
         ]);
 
@@ -204,10 +236,20 @@ class ContractorRegisterController extends Controller
     //  POST /api/v1/contractor/auth/set-password
     //  الخطوة 3: تعيين كلمة المرور بعد تفعيل رقم الجوال — يُنشئ الجلسة مباشرة
     // ─────────────────────────────────────────────────────────────────────────
+    #[Group("Contractor Auth", weight: 6)]
+    #[Endpoint(title: "Register step 3: set password", description: "Requires a verified phone. Sets the password and returns a Bearer token (valid 60 days) so the user is logged in immediately. Error keys: phone_not_verified, already_registered, password_mismatch.")]
     public function setPassword(Request $request)
     {
         $request->validate([
+            /**
+             * Mobile number. Accepted with or without the leading 0, Arabic-Indic digits allowed, or full international ("+201001234567" / "00201001234567" — then country_code is ignored). Must match the length of the chosen country (see GET countries).
+             * @example 599123456
+             */
             'phone'                 => 'required|string',
+            /**
+             * Country dial code WITHOUT "+", one of the `code` values returned by GET countries (970, 972, 20, 962, 966, 971, 974, 965, 973, 968, 961, 963, 964, 90). Defaults to 970 when omitted. 970 and 972 are interchangeable for Palestinian numbers.
+             * @example 970
+             */
             'country_code'          => 'nullable|string|max:6',
             'password'              => 'required|string|min:8',
             'password_confirmation' => 'required|string',
@@ -286,10 +328,20 @@ class ContractorRegisterController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
     //  POST /api/v1/contractor/auth/forgot-password/send-otp
     // ─────────────────────────────────────────────────────────────────────────
+    #[Group("Contractor Auth", weight: 7)]
+    #[Endpoint(title: "Forgot password step 1: send OTP", description: "Sends a reset OTP to the registered phone. Not restricted by membership status, only by is_frozen. Error keys: contractor_not_found, account_inactive, otp_cooldown.")]
     public function forgotPasswordSendOtp(Request $request)
     {
         $request->validate([
+            /**
+             * Mobile number. Accepted with or without the leading 0, Arabic-Indic digits allowed, or full international ("+201001234567" / "00201001234567" — then country_code is ignored). Must match the length of the chosen country (see GET countries).
+             * @example 599123456
+             */
             'phone'        => 'required|string',
+            /**
+             * Country dial code WITHOUT "+", one of the `code` values returned by GET countries (970, 972, 20, 962, 966, 971, 974, 965, 973, 968, 961, 963, 964, 90). Defaults to 970 when omitted. 970 and 972 are interchangeable for Palestinian numbers.
+             * @example 970
+             */
             'country_code' => 'nullable|string|max:6',
         ]);
 
@@ -343,10 +395,20 @@ class ContractorRegisterController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
     //  POST /api/v1/contractor/auth/forgot-password/reset
     // ─────────────────────────────────────────────────────────────────────────
+    #[Group("Contractor Auth", weight: 8)]
+    #[Endpoint(title: "Forgot password step 2: reset password", description: "Verifies the OTP, sets the new password (password_confirmation required) and returns a fresh Bearer token. Error keys: invalid_otp, account_inactive.")]
     public function forgotPasswordReset(Request $request)
     {
         $request->validate([
+            /**
+             * Mobile number. Accepted with or without the leading 0, Arabic-Indic digits allowed, or full international ("+201001234567" / "00201001234567" — then country_code is ignored). Must match the length of the chosen country (see GET countries).
+             * @example 599123456
+             */
             'phone'        => 'required|string',
+            /**
+             * Country dial code WITHOUT "+", one of the `code` values returned by GET countries (970, 972, 20, 962, 966, 971, 974, 965, 973, 968, 961, 963, 964, 90). Defaults to 970 when omitted. 970 and 972 are interchangeable for Palestinian numbers.
+             * @example 970
+             */
             'country_code' => 'nullable|string|max:6',
             'otp'          => 'required|string|size:6',
             'password'     => 'required|string|min:8|confirmed',
@@ -410,6 +472,8 @@ class ContractorRegisterController extends Controller
     //  GET /api/v1/contractor/auth/countries
     //  الدول المدعومة لرقم الجوال — تعرضها شاشات التسجيل واستعادة كلمة المرور
     // ─────────────────────────────────────────────────────────────────────────
+    #[Group("Contractor Auth", weight: 1)]
+    #[Endpoint(title: "Supported phone countries", description: "Countries and dial codes for the register / forgot-password screens. Public.")]
     public function countries()
     {
         return $this->success([
