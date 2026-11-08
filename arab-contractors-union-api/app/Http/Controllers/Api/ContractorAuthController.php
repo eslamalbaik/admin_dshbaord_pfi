@@ -46,9 +46,9 @@ class ContractorAuthController extends Controller
         $contractor = Contractor::where('membership_number', \App\Rules\MembershipNumber::normalize($identifier))->first();
 
         if (! $contractor && \App\Support\PhoneNumber::looksLikeMobile($identifier)) {
-            // جوال المفوض: الرقم المعتمد للدخول. ممكن نفس المفوض يكون مسجّل لأكثر من شركة،
-            // فبنحدد الشركة بكلمة السر؛ إذا انطبقت على أكثر من شركة بنطلب رقم العضوية.
-            $candidates = Contractor::where('authorized_person_phone', \App\Support\PhoneNumber::normalize($identifier))->get();
+            // جوال الحساب أو جوال المفوض (نفس اللي بتدوّر فيه استعادة كلمة السر). ممكن نفس الرقم
+            // يكون لأكثر من شركة، فبنحدد الشركة بكلمة السر؛ إذا انطبقت على أكثر من شركة بنطلب رقم العضوية.
+            $candidates = Contractor::loginPhoneCandidates($identifier);
 
             if ($candidates->isEmpty()) {
                 return $this->error(ApiMessages::AUTHORIZED_PHONE_NOT_FOUND, 404, null, 'authorized_phone_not_found');

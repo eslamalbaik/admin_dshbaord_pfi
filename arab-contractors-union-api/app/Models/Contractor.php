@@ -332,7 +332,7 @@ class Contractor extends Authenticatable
             return null;
         }
 
-        $contractor = self::where('phone', $phone)->first();
+        $contractor = self::whereIn('phone', self::accountPhoneForms($phone))->first();
         if ($contractor) {
             return $contractor;
         }
@@ -348,6 +348,39 @@ class Contractor extends Authenticatable
             ->get();
 
         return $candidates->count() === 1 ? $candidates->first() : null;
+    }
+
+    /**
+     * المقاولين اللي ممكن يدخلوا برقم الجوال هاد: جوال الحساب أو جوال المفوض بالتوقيع، نفس
+     * اللي بتدوّر فيه استعادة كلمة السر — وإلا بيقدر يسترجع كلمة السر برقم ما بيقدر يدخل فيه.
+     */
+    public static function loginPhoneCandidates(string $phone)
+    {
+        $normalized = \App\Support\PhoneNumber::normalize($phone);
+
+        return self::where(function ($q) use ($phone, $normalized) {
+            $q->whereIn('phone', self::accountPhoneForms($phone));
+            if ($normalized) {
+                $q->orWhere('authorized_person_phone', $normalized);
+            }
+        })->get();
+    }
+
+    /**
+     * جوال الحساب (contractors.phone) مش موحَّد الصيغة — قديماً 592860416 وحديثاً 0592860416 —
+     * فبنطابق المُدخل بكل صيغه: كما كُتب، والموحَّد، وبدون الصفر.
+     *
+     * @return string[]
+     */
+    private static function accountPhoneForms(string $phone): array
+    {
+        $normalized = (string) \App\Support\PhoneNumber::normalize($phone);
+
+        return array_values(array_unique(array_filter([
+            trim($phone),
+            $normalized,
+            ltrim($normalized, '0'),
+        ])));
     }
 
     /** فتح حساب على التطبيق = أكمل التحقق من الهوية وضبط كلمة مرور (نفس شرط تسجيل الدخول). */
