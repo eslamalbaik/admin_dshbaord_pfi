@@ -44,6 +44,31 @@ class HotSmsSenderTest extends TestCase
         $this->assertFalse((new HotSmsSender('t', 'PCU'))->send('+970599123456', 'x'));
     }
 
+    /** HotSMS يرجّع 200 حتى مع الخطأ — الرمز بنص الرد هو اللي بيحدد */
+    public function test_v1_error_code_with_http_200_counts_as_failure(): void
+    {
+        foreach (['1000', '2000', '6000', '15000'] as $code) {
+            Http::fake(['hotsms.ps/*' => Http::response($code, 200)]);
+            $this->assertFalse((new HotSmsSender('t', 'PCU'))->send('+970599123456', 'x'), $code);
+        }
+    }
+
+    public function test_v1_success_with_message_id(): void
+    {
+        Http::fake(['hotsms.ps/*' => Http::response("1001_5e9257a242406\n", 200)]);
+
+        $this->assertTrue((new HotSmsSender('t', 'PCU'))->send('+970599123456', 'x'));
+    }
+
+    public function test_v1_defaults_to_utf8_type_for_arabic(): void
+    {
+        Http::fake(['hotsms.ps/*' => Http::response('1001', 200)]);
+
+        (new HotSmsSender('t', 'PCU'))->send('+970599123456', 'رمز التحقق');
+
+        Http::assertSent(fn (Request $request) => $request['type'] === '2');
+    }
+
     public function test_v2_posts_with_bearer_token(): void
     {
         Http::fake(['hotsms.ps/*' => Http::response(['status' => true], 200)]);

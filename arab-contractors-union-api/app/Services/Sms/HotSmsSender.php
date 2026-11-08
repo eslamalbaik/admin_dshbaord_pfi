@@ -19,11 +19,23 @@ class HotSmsSender implements SmsSenderInterface
 
     private const V2_URL = 'https://hotsms.ps/api/rest/v2/messages/send';
 
+    /** رموز أخطاء v1 من توثيق HotSMS — تُكتب بسجل sms لتشخيص سبب الرفض. */
+    private const V1_ERRORS = [
+        '1000'  => 'لا يوجد رصيد كافٍ',
+        '2000'  => 'خطأ في التفويض (api_token غير صحيح)',
+        '3000'  => 'خطأ في نوع الرسالة (type)',
+        '4000'  => 'أحد المدخلات المطلوبة غير موجود',
+        '5000'  => 'رقم المحمول غير مدعوم',
+        '6000'  => 'اسم المرسل غير معرّف على الحساب',
+        '10000' => 'IP السيرفر غير مفوّض للإرسال من هذا الحساب',
+        '15000' => 'الإرسال عبر API غير مفعّل من أدوات الأمان بالحساب',
+    ];
+
     public function __construct(
         private readonly string $apiToken,
         private readonly string $sender,
         private readonly string $apiVersion = 'v1',
-        private readonly string $messageType = '0',
+        private readonly string $messageType = '2',
     ) {
     }
 
@@ -52,16 +64,21 @@ class HotSmsSender implements SmsSenderInterface
             return false;
         }
 
-        // v1 بلا توثيق منشور لرموز الرد — نعتمد حالة HTTP ونسجّل الرد الخام كما هو
-        // لمراجعته بعد أول إرسال فعلي. v2 يُرجع JSON فيه status.
+        // v1 يرجّع نصاً: 1001 (أو 1001_<message id>) = أُرسلت، وأي رمز آخر خطأ (راجع V1_ERRORS).
+        // v2 يُرجع JSON فيه status.
+        $body = trim($response->body());
         $sent = $this->apiVersion === 'v2'
             ? (bool) ($response->json('status') ?? false)
-            : $response->successful();
+            : $response->successful() && preg_match('/^1001(_|$)/', $body) === 1;
 
         $context = [
             'api' => $this->apiVersion, 'phone' => $phone, 'mobile' => $mobile,
-            'http_status' => $response->status(), 'response' => mb_substr($response->body(), 0, 500),
+            'http_status' => $response->status(), 'response' => mb_substr($body, 0, 500),
         ];
+
+        if (! $sent && $this->apiVersion !== 'v2') {
+            $context['reason'] = self::V1_ERRORS[$body] ?? 'رد غير معروف من HotSMS';
+        }
 
         if (! $sent) {
             Log::channel('sms')->error('HotSMS send failed', $context);
