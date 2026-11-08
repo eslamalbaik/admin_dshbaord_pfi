@@ -5,8 +5,10 @@ namespace App\Services;
 use App\Models\CertificateRequest;
 use App\Models\Contractor;
 use App\Support\ContractorLookups;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Mpdf\Mpdf;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 /**
  * توليد PDF شهادة العضوية (REQ-02) بمحرّك mPDF — بديل مسار LibreOffice.
@@ -14,26 +16,33 @@ use Mpdf\Mpdf;
  * لماذا mPDF وليس تحويل DOCX عبر LibreOffice:
  *   سيرفر cPanel الإنتاجي لا يحوي soffice ولا تُمكن إضافته بلا صلاحيات root،
  *   فمسار DOCX→PDF يفشل هناك حتماً. mPDF حزمة PHP خالصة داخل vendor/.
- *   قياساً: 68 م.ب و11 ثانية مقابل 293 م.ب و24 ثانية لكل شهادة.
  *
- * الترويسة الرسمية:
- *   الأصول مستخرَجة من قالب "ترويسة الاتحاد" (resources/certificate-assets).
- *   الترويسة والتذييل بعرض الورقة كاملاً (210mm، بلا هوامش) كما في قالب Word، فتُرسم
- *   بإحداثيات مطلقة لا عبر SetHTMLHeader/Footer اللذين يحصرانهما داخل الهوامش.
- *   الشعار الباهت بالخلفية علامة مائية بنفس مقاسه في القالب.
+ * التصميم (2026-11-08):
+ *   الخلفية membership-certificate-template.pdf هي ملف المصمم ("شهادة عضوية 3"،
+ *   Illustrator) نفسه بعد حذف كل ما يتغيّر من شهادة لأخرى. يبقى فيها: الترويسة
+ *   والتذييل والعلامة المائية، عنوان "شهادة عضوية" وزخرفته، سطر "يشهد اتحاد…"،
+ *   شريط رأس الجدول، الختم وخط التوقيع. الباقي يُكتب فوقها بإحداثيات مقيسة من
+ *   الملف الأصلي (pt × 25.4/72 = mm).
+ *
+ *   خطوط التصميم (DIN Next LT Arabic وzain-mob) تجارية وغير متوفرة لدينا، فاستُعمل
+ *   أقرب بديل مجاني: IBM Plex Sans Arabic مكان DIN، وZain (Google Fonts) مكان zain.
+ *   لو توفرت الخطوط الأصلية يكفي تبديل الملفات في تعريف fontdata أدناه.
  *
  * ملاحظة: التوليد يستغرق ثوانيَ عدة، فلا يجوز استدعاؤه داخل طلب HTTP متزامن.
  */
 class MembershipCertificatePdfService
 {
-    /** ارتفاع الترويسة والتذييل بالمليمتر — نسبة أبعاد الصورتين (1241×286 و2040×259) على عرض 210mm */
-    private const HEADER_HEIGHT_MM = 48.4;
-    private const FOOTER_HEIGHT_MM = 26.7;
+    private const NAVY = '#2D398D';
+    private const INK  = '#231F20';
 
     /**
-     * @param  bool  $preview  يكتب في certificates/preview بدل مسار الشهادة الرسمي.
-     *                         بدونه، أي توليد اختباري يدهس شهادة صادرة تحمل نفس الرقم.
+     * جدول التخصصات: أعلاه ثابت تحت شريط الرأس المرسوم بالقالب، وارتفاع الصف بالتصميم
+     * يتسع لثمانية صفوف قبل منطقة التوقيع. بعد الثمانية يُصغَّر الصف والخط معاً.
      */
+    private const TABLE_TOP_MM    = 130.4;
+    private const ROW_HEIGHT_PT   = 31.46;
+    private const TABLE_BODY_PT   = 262;
+
     /**
      * بيانات الشهادة كما هي مسجّلة بملف المقاول — اللي بتنطبع لما ما في overrides.
      * سجل المحددات الهامة بيقارن فيها أي بيانات مُدخلة يدوياً عند الإصدار.
@@ -53,12 +62,12 @@ class MembershipCertificatePdfService
      * "سارية المفعول حتى" الافتراضية على شهادة العضوية: انتهاء آخر عضوية للمقاول (31/12 من سنة العضوية)،
      * وإلا 31/12 من السنة الحالية. الإدخال اليدوي بيغلب عليها.
      */
-    public static function validUntil(Contractor $contractor): \Illuminate\Support\Carbon
+    public static function validUntil(Contractor $contractor): Carbon
     {
         $last = $contractor->memberships()->whereNotNull('expires_at')->latest('expires_at')->value('expires_at');
 
         return $last
-            ? \Illuminate\Support\Carbon::parse($last)->startOfDay()
+            ? Carbon::parse($last)->startOfDay()
             : now()->endOfYear()->startOfDay();
     }
 
@@ -72,309 +81,246 @@ class MembershipCertificatePdfService
     }
 
     /**
-     * خطوات تصغير الشهادة من الأكبر للأصغر. الحلقة بتبدأ دايماً من أكبر خط وبتنزل خطوة كل ما
-     * طلعت صفحتين (كل رسم أقل من ثانية): خطوط الجدول أصغر، ثم كاحتياط أخير تصغير المتن والختم كله.
-     *
-     * @return list<array{font: float, pad: float, scale: float, seal: float}>
+     * @param  bool  $preview  يكتب في certificates/preview بدل مسار الشهادة الرسمي.
+     *                         بدونه، أي توليد اختباري يدهس شهادة صادرة تحمل نفس الرقم.
      */
-    public static function layoutSteps(): array
-    {
-        // [خط الجدول, حشوة الخلية] بالـpt
-        $table = [
-            [16, 2.5], [14, 2], [12, 1.5], [11, 1.2], [10, 1], [9, 0.8], [8.5, 0.5], [8, 0.45],
-            [7.5, 0.4], [6.5, 0.3], [5.5, 0.2], [5, 0.2], [4.5, 0.1], [4, 0.1],
-        ];
-
-        $steps = [];
-        foreach ($table as [$font, $pad]) {
-            $steps[] = ['font' => $font, 'pad' => $pad, 'scale' => 1.0, 'seal' => 1.0];
-        }
-        // احتياط أخير: تصغير المتن كله تدريجياً مع أصغر جدول
-        foreach ([0.9, 0.8, 0.7, 0.6, 0.5] as $k) {
-            $steps[] = ['font' => 4, 'pad' => 0.1, 'scale' => $k, 'seal' => $k];
-        }
-
-        return $steps;
-    }
-
     public function generate(CertificateRequest $certRequest, array $overrides = [], bool $preview = false): string
     {
         $contractor = $certRequest->contractor;
-        $membership = $contractor->activeMembership;
+        $defaults   = self::recordFields($contractor);
 
-        // الرقم المرجعي الداخلي (أعلى الشهادة) مبني على رقم الطلب — منفصل عن الرقم التسلسلي
+        $rows = [];
+        foreach (ContractorLookups::buildFieldsTree($contractor->specialties) as $field) {
+            foreach ($field['specializations'] as $spec) {
+                // التصميم يكتب الدرجة بصيغتها المختصرة ("أولى أ") لا بمسمّى العرض في اللوحة
+                $rows[] = [$field['field_name'], $spec['spec_name'], $spec['grade'] ?? $spec['grade_label'] ?? '—'];
+            }
+        }
+
+        // الرقم المرجعي الداخلي (اسم الملف) مبني على رقم الطلب — منفصل عن الرقم التسلسلي
         $reference = 'MC-' . str_pad((string) $certRequest->id, 6, '0', STR_PAD_LEFT);
-        // الرقم التسلسلي الفريد (أسفل الشهادة): يتولّد مرة واحدة ويبقى ثابتاً عند إعادة الإصدار. المعاينة ما بتحجز رقماً.
+        // الرقم التسلسلي الفريد (تحت الـQR): يتولّد مرة واحدة ويبقى ثابتاً عند إعادة الإصدار. المعاينة ما بتحجز رقماً.
         $serial = $preview
             ? ($certRequest->serial_number ?: '----')
             : $certRequest->ensureSerialNumber();
-        $verifyUrl = self::verificationUrl($serial);
-        // صيغ التواريخ مطابقة للقالب: الترويسة d-m-Y، ومتن الشهادة d/m/Y
-        $issuedAt = now()->format('d-m-Y');
 
-        $defaults = self::recordFields($contractor);
-
-        $decisionDate   = $overrides['decision_date'] ?? ($defaults['decision_date'] ?? '—');
-        // اللوحة بتبعت التاريخ من حقل type=date بصيغة Y-m-d، والمتن بيطبعه d/m/Y
-        if (preg_match('/^\d{4}-\d{2}-\d{2}/', $decisionDate)) {
-            $decisionDate = \Illuminate\Support\Carbon::parse($decisionDate)->format('d/m/Y');
-        }
-        $decisionNumber = $overrides['decision_number'] ?? ($defaults['decision_number'] ?? '—');
-        $validUntilDate = isset($overrides['valid_until'])
-            ? \Illuminate\Support\Carbon::parse($overrides['valid_until'])
+        $validUntil = isset($overrides['valid_until'])
+            ? Carbon::parse($overrides['valid_until'])
             : self::validUntil($contractor);
-        $validUntil = $validUntilDate->format('d/m/Y');
         // نفس التاريخ المطبوع بيرجع للتطبيق (expiry_date) — بينحفظ مع update() الإصدار
-        $certRequest->valid_until = $validUntilDate->toDateString();
+        $certRequest->valid_until = $validUntil->toDateString();
 
-        $address = $overrides['address'] ?? ($defaults['address'] ?? '—');
-
-        // القالب الأصلي لا يكتب "شركة/" ثابتة — نتجنّب تكرارها لو كان الاسم حاملاً لها
-        $companyLabel = str_contains($contractor->name, 'شركة')
-            ? $contractor->name
-            : "شركة/ {$contractor->name}";
-
-        $specialtiesRows = '';
-        foreach (ContractorLookups::buildFieldsTree($contractor->specialties) as $field) {
-            foreach ($field['specializations'] as $spec) {
-                // القالب المعتمد يكتب الدرجة بصيغتها المختصرة ("أولى أ") لا بمسمّى
-                // العرض في اللوحة ("الدرجة الأولى (1)")، فنقدّم القيمة الخام.
-                $grade = $spec['grade'] ?? $spec['grade_label'] ?? '—';
-                $specialtiesRows .= '<tr>'
-                    . '<td>' . e($field['field_name']) . '</td>'
-                    . '<td>' . e($spec['spec_name']) . '</td>'
-                    . '<td>' . e($grade) . '</td>'
-                    . '</tr>';
-            }
-        }
-        if ($specialtiesRows === '') {
-            $specialtiesRows = '<tr><td colspan="3" style="text-align:center;color:#888;">لا يوجد تخصصات مسجّلة</td></tr>';
-        }
-
-        // الشهادة يجب أن تبقى صفحة واحدة مهما كان عدد التخصصات. كتلة التوقيع (الختم + الأسماء)
-        // لا تقبل التقسيم في mPDF، فإن لم يتبقَّ لها ارتفاع كافٍ قفزت لصفحة ثانية بالكامل.
-        // لذلك: نبدأ بأكبر خط، نولّد ونعدّ الصفحات، وإن زادت عن صفحة نجرّب الخطوة الأصغر التالية —
-        // فالنتيجة صفحة واحدة دائماً بأكبر خط بيوسع. (الختم والتوقيع صاروا بالتذييل، فما بيقفزوا.)
-        $layoutSteps = self::layoutSteps();
-
-
-        $presidentName   = \App\Models\Setting::get('union_president_name', 'المهندس/ سهيل هاشم السقا');
-        $presidentTitle1 = \App\Models\Setting::get('union_president_title1', 'نقيب المقاولين الفلسطينيين');
-        $presidentTitle2 = \App\Models\Setting::get('union_president_title2', 'النائب الأول لرئيس الاتحاد');
-
-        $assets       = resource_path('certificate-assets');
-        $headerImg    = $assets . DIRECTORY_SEPARATOR . 'letterhead-header.png';
-        $footerImg    = $assets . DIRECTORY_SEPARATOR . 'letterhead-footer.png';
-        $watermarkImg = $assets . DIRECTORY_SEPARATOR . 'letterhead-watermark.png';
-        $sealImg      = $assets . DIRECTORY_SEPARATOR . 'union-seal.png';
-        $headerH      = self::HEADER_HEIGHT_MM;
-        $footerH      = self::FOOTER_HEIGHT_MM;
-
-        $tempDir = storage_path('app/mpdf-tmp');
-        if (! is_dir($tempDir)) {
-            mkdir($tempDir, 0775, true);
-        }
-        // QR التحقق كملف SVG مؤقت (يُحذف بعد التوليد)؛ الرابط المختصر مطبوع تحته نصاً
-        $verifyPageUrl = e(config('app.certificate_verify_url'));
-        $qrFile = $tempDir . DIRECTORY_SEPARATOR . "qr-{$reference}-" . uniqid() . '.svg';
-        file_put_contents($qrFile, \SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(300)->margin(0)
-            ->errorCorrection('M')->color(0, 0, 0)->generate($verifyUrl));
-        $serialEsc = e($serial);
-
-        $companyLabelEsc  = e($companyLabel);
-        $addressEsc       = e($address);
-
-        // القالب يكتب "184/غ" — لاحقة غزة. الترقيم الجديد ({n}_g) يحملها أصلاً،
-        // فإلحاق "/غ" به يكرّرها ("932_g/غ")، لذا تُضاف للترقيم القديم فقط.
-        $membershipNumber = e($contractor->membership_number);
-        if (! str_ends_with(strtolower($contractor->membership_number ?? ''), '_g')) {
-            $membershipNumber .= '/غ';
-        } else {
-            // "1004_g" جوّا سطر عربي بينقلب لـ "g_1004" بدون عزل الاتجاه، زي الرقم التسلسلي فوق
-            $membershipNumber = '<span dir="ltr">' . $membershipNumber . '</span>';
-        }
-
-        foreach ($layoutSteps as $stepIndex => $step) {
-            [$tableFontPt, $tableCellPad] = [$step['font'] . 'pt', $step['pad'] . 'pt'];
-            $k   = $step['scale'];
-            $pt  = fn (float $v) => round($v * $k, 2) . 'pt';
-            $f   = [
-                'body' => $pt(17), 'title' => $pt(26), 'intro' => $pt(21), 'company' => $pt(25),
-                'line' => $pt(17), 'classified' => $pt(16), 'validity' => $pt(16), 'sign' => $pt(13),
-                'gapS' => $pt(6), 'gapM' => $pt(10),
-            ];
-            // سطر التوقيع: الأعمدة الثلاثة بارتفاع متقارب (~34mm بالحجم الطبيعي) — الختم 152×128px،
-            // الـQR ‏85px + ثلاثة أسطر، والاسم وصفتاه + فراغ التوقيع اليدوي
-            $sealW   = (int) round(152 * $step['seal']);
-            $sealH   = (int) round(128 * $step['seal']);
-            $qrPx    = (int) round(85 * $step['seal']);
-            $signGap = round(16 * $step['seal'], 1) . 'mm';
-
-            // أحجام الخطوط والألوان والمحاذاة أدناه منقولة حرفياً من قالب Word المعتمد
-            // (w:sz بأنصاف النقاط ÷ 2 = pt). أي تعديل هنا يخرج الشهادة عن مطابقة الأصل.
-            $html = <<<HTML
-<style>
-  body { font-family: calibri; direction: rtl; color: #000; font-size: {$f['body']}; }
-  /* العنوان واسم الشركة بكحلي هوية الاتحاد — نفس لون "اتحاد المقاولين الفلسطينيين" بالترويسة */
-  .title {
-    font-family: ptboldheading; text-align: center; color: #2E3192;
-    font-size: {$f['title']}; font-weight: bold; margin: 2pt 0 {$f['gapM']} 0;
-  }
-  .line { margin: 0 0 {$f['gapS']} 0; line-height: 1.4; font-weight: bold; }
-  .intro { font-family: timesnewroman; font-size: {$f['intro']}; font-weight: bold; }
-  .company { font-family: ptboldheading; font-size: {$f['company']}; font-weight: bold; color: #2E3192; }
-  .addr { font-size: {$f['line']}; font-weight: bold; }
-  .member-no { font-size: {$f['line']}; font-weight: bold; }
-  .classified { font-size: {$f['classified']}; font-weight: bold; }
-  .decision { font-size: {$f['line']}; font-weight: bold; }
-  /* الجدول بعرض المتن كاملاً، فطرفاه محاذيان للنص يميناً ويساراً.
-     لا نستخدم width:auto — يكسر تدفّق mPDF ويدفع بقية المحتوى لصفحات إضافية. */
-  table.data-table { width: 100%; border-collapse: collapse; margin: {$f['gapM']} 0; }
-  table.data-table th, table.data-table td {
-    border: 0.5pt solid #000; padding: {$tableCellPad};
-    font-size: {$tableFontPt}; text-align: center; font-weight: normal; line-height: 1.2;
-  }
-  table.data-table th { background-color: #8C8C8C; }
-  table.data-table td { font-family: arial; }
-  .validity { font-size: {$f['validity']}; font-weight: bold; margin-top: {$f['gapM']}; line-height: 1.4; }
-  /* الأعمدة الثلاثة تبدأ من خط علوي واحد */
-  .sign-block { width: 100%; margin: {$f['gapS']} 0 0 0; }
-  .sign-block td { vertical-align: top; }
-  .seal-cell { text-align: center; }
-  .sign-text { text-align: center; font-weight: bold; line-height: 1.35; }
-  .sign-name { color: #2E3192; font-size: {$pt(15)}; }
-  .sign-title1 { font-size: {$pt(14)}; }
-  .sign-title2 { font-size: {$pt(11)}; }
-  .sign-space { height: {$signGap}; }
-  /* خانة التحقق يمين الصفحة: QR والرقم التسلسلي ورابط التحقق، بالأسود وبلا إطارات */
-  .verify-cell { text-align: center; color: #000; font-size: {$pt(8)}; line-height: 1.3; }
-  .verify-ref { font-size: {$pt(10)}; font-weight: bold; }
-</style>
-
-<div class="title">شهادة عضـــــــــوية</div>
-
-<div class="line"><span class="intro">يـــــــــشهد اتحــــــــاد المقـــــــاولين الفلــــــــسطينيين بأن</span></div>
-<div class="line"><span class="company">{$companyLabelEsc}</span></div>
-<div class="line addr">وعنوانــــها / {$addressEsc}</div>
-<div class="line member-no">عضوا في الاتحاد تحت رقم {$membershipNumber}</div>
-<div class="line">
-  <span class="classified">ومصنفة فـــي المجــالات والتخصــصات التاليــة بمـوجب قـرار لـجنة التصنيف الوطنية</span>
-  <span class="decision">رقم ({$decisionNumber}) بتاريخ : {$decisionDate}م</span>
-</div>
-
-<table class="data-table">
-  <thead>
-    <tr><th>المجال</th><th>التخصص</th><th>الدرجة</th></tr>
-  </thead>
-  <tbody>{$specialtiesRows}</tbody>
-</table>
-
-<div class="validity">
-  هذه الشهادة سارية المفعول حتى تاريخ {$validUntil}م وبعدها تعتبر لاغيه.
-</div>
-
-<!-- في جدول RTL أول خلية تُرسم يميناً: التحقق يميناً، الختم بالوسط، والتوقيع يساراً.
-     الرقم التسلسلي بـspan LTR معزول فالنسخ من الـPDF بيطلع بالترتيب الصحيح. -->
-<table class="sign-block" autosize="1">
-  <tr>
-    <td width="30%" class="verify-cell">
-      <img src="{$qrFile}" width="{$qrPx}" height="{$qrPx}"><br>
-      الرقم التسلسلي: <span class="verify-ref" dir="ltr">{$serialEsc}</span><br>
-      امسح الرمز للتحقق من صحة الشهادة<br>
-      <span dir="ltr">{$verifyPageUrl}</span>
-    </td>
-    <td width="32%" class="seal-cell">
-      <img src="{$sealImg}" width="{$sealW}" height="{$sealH}">
-    </td>
-    <td width="38%" class="sign-text">
-      <span class="sign-name">{$presidentName}</span><br>
-      <span class="sign-title1">{$presidentTitle1}</span><br>
-      <span class="sign-title2">{$presidentTitle2}</span>
-      <div class="sign-space"></div>
-    </td>
-  </tr>
-</table>
-
-HTML;
-
-            // خطوط القالب المعتمد نفسها، مشحونة من resources/certificate-assets/fonts
-            // لتُطابق الشهادة الأصل بصرياً على أي سيرفر بلا خطوط نظام.
-            // ملاحظة: Amiri وNoto Naskh الموجودان بنفس المجلد غير مستعملين — كلاهما يحوي
-            // GPOS Lookup Type 5 Format 3 غير المدعوم في محلّل OTL بـ mPDF فيرمي FontException.
-            $defaultConfig     = (new \Mpdf\Config\ConfigVariables)->getDefaults();
-            $defaultFontConfig = (new \Mpdf\Config\FontVariables)->getDefaults();
-
-            $mpdf = new Mpdf([
-                'mode'          => 'utf-8',
-                'format'        => 'A4',
-                'orientation'   => 'P',
-                'margin_left'   => 15,
-                'margin_right'  => 15,
-                // الترويسة والتذييل ملتصقان بحافة الورقة؛ الهامشان يحجزان مساحتهما للمتن
-                'margin_top'    => $headerH + 4,
-                'margin_bottom' => $footerH + 2,
-                'tempDir'       => $tempDir,
-
-                'fontDir'  => array_merge($defaultConfig['fontDir'], [$assets . DIRECTORY_SEPARATOR . 'fonts']),
-                'fontdata' => $defaultFontConfig['fontdata'] + [
-                    'ptboldheading' => ['R' => 'PTBoldHeading.ttf', 'useOTL' => 0xFF],
-                    'timesnewroman' => ['R' => 'TimesNewRoman.ttf', 'B' => 'TimesNewRoman-Bold.ttf', 'useOTL' => 0xFF],
-                    'arial'         => ['R' => 'Arial.ttf', 'useOTL' => 0xFF],
-                    'calibri'       => ['R' => 'Calibri.ttf', 'B' => 'Calibri-Bold.ttf', 'useOTL' => 0xFF],
-                ],
-                'default_font'  => 'calibri',
-            ]);
-
-            $mpdf->SetDirectionality('rtl');
-            // autoLangToFont يبدّل الخط تلقائياً حسب السكربت المكتشَف فيتجاوز xbriyaz
-            // المحدَّد في CSS. نعطّله؛ ربط الحروف العربية يبقى سليماً لأنه من useOTL
-            // المسجَّل أصلاً في تعريف xbriyaz لا من هذا الخيار.
-            $mpdf->autoScriptToLang = false;
-            $mpdf->autoLangToFont   = false;
-
-            // الشعار الباهت بوسط الصفحة خلف المتن، بمقاسه في قالب Word (123×100mm).
-            // الصورة باهتة أصلاً، فلا شفافية إضافية.
-            $mpdf->SetWatermarkImage($watermarkImg, 1, [123, 100], 'P');
-            $mpdf->showWatermarkImage = true;
-            $mpdf->watermarkImgBehind = true;
-
-            $mpdf->WriteHTML($html);
-
-            // عدد الصفحات بعد الرسم — صفحة واحدة = خلصنا. آخر خطوة بتنقبل كما هي.
-            if (count($mpdf->pages) <= 1 || $stepIndex === array_key_last($layoutSteps)) {
-                break;
-            }
-        }
-
-        // الترويسة والتذييل بعرض الورقة كاملاً تُرسم بإحداثيات مطلقة بعد المتن — الهوامش تبقيه
-        // بعيداً عنهما. SetHTMLHeader/Footer يحصرانهما داخل الهوامش، وAddPage قبل WriteHTML
-        // يدفع المتن لصفحة ثانية. التذييل تحت الهامش السفلي، فبدون إيقاف القفز التلقائي
-        // يفتح صفحة ثانية فارغة. constrain=false: بدونه mPDF يصغّر الصورة لعرض المتن (180mm).
-        $mpdf->SetAutoPageBreak(false);
-        $mpdf->Image($headerImg, 0, 0, 210, $headerH, '', '', true, false);
-        $mpdf->Image($footerImg, 0, 297 - $footerH, 210, $footerH, '', '', true, false);
-
-        // الترويسة تطبع "الرقم: ....." و"التاريخ: ....." بنفسها؛ القيمة تُكتب فوق النقاط
-        // بخلفية بيضاء تغطيها. المواضع مقيسة من بكسلات النقاط بصورة الترويسة (× 210/1241):
-        // نقاط الرقم 27–44.5mm، نقاط التاريخ 155.7–173mm، وكلاهما على ارتفاع 39.6–42mm.
-        $mpdf->SetFillColor(255, 255, 255);
-        $mpdf->SetTextColor(0, 32, 96);
-        $mpdf->SetFont('calibri', 'B', 10);
-        $mpdf->SetXY(26.5, 38);
-        $mpdf->Cell(18.5, 5.5, $reference, 0, 0, 'C', true);
-        $mpdf->SetXY(155, 38);
-        $mpdf->Cell(18.5, 5.5, $issuedAt, 0, 0, 'C', true);
-
-        // قفل تعديل/نسخ المحتوى بكلمة سر مالك — بدون كلمة سر مستخدم، فالملف يُفتح ويُطبع بحرية
-        $mpdf->SetProtection(['print', 'copy'], '', config('app.certificate_pdf_owner_password'));
+        $pdf = $this->render([
+            'serial'           => $serial,
+            'issued_at'        => now(),
+            'company'          => $contractor->name,
+            'membership_number' => $contractor->membership_number,
+            'address'          => $overrides['address'] ?? ($defaults['address'] ?? '—'),
+            'decision_number'  => $overrides['decision_number'] ?? ($defaults['decision_number'] ?? '—'),
+            'decision_date'    => $overrides['decision_date'] ?? $defaults['decision_date'],
+            'valid_until'      => $validUntil,
+            'rows'             => $rows,
+            'verify_url'       => self::verificationUrl($serial),
+            'president_name'   => \App\Models\Setting::get('union_president_name', 'المهندس/ سهيل هاشم السقا'),
+            'president_title1' => \App\Models\Setting::get('union_president_title1', 'نقيب المقاولين الفلسطينيين'),
+            'president_title2' => \App\Models\Setting::get('union_president_title2', 'النائب الأول لرئيس الاتحاد'),
+        ]);
 
         $path = $preview
             ? "certificates/preview/{$reference}.pdf"
             : "certificates/membership/{$reference}.pdf";
 
-        Storage::disk('public')->put($path, $mpdf->Output('', 'S'));
-        @unlink($qrFile);
+        Storage::disk('public')->put($path, $pdf);
 
         return $path;
+    }
+
+    /**
+     * يرسم الشهادة ويرجع بايتات الـPDF. مفصول عن generate() ليُختبر بلا قاعدة بيانات.
+     *
+     * @param  array{serial: string, issued_at: \DateTimeInterface, company: string, membership_number: ?string,
+     *               address: string, decision_number: string, decision_date: mixed, valid_until: mixed,
+     *               rows: list<array{0: string, 1: string, 2: string}>, verify_url: string,
+     *               president_name: string, president_title1: string, president_title2: string}  $d
+     */
+    public function render(array $d): string
+    {
+        $assets  = resource_path('certificate-assets');
+        $tempDir = storage_path('app/mpdf-tmp');
+        if (! is_dir($tempDir)) {
+            mkdir($tempDir, 0775, true);
+        }
+
+        $defaultConfig     = (new \Mpdf\Config\ConfigVariables)->getDefaults();
+        $defaultFontConfig = (new \Mpdf\Config\FontVariables)->getDefaults();
+
+        $mpdf = new Mpdf([
+            'mode'          => 'utf-8',
+            'format'        => 'A4',
+            'orientation'   => 'P',
+            // حدود الجدول بالتصميم: من 49pt إلى 543pt عن يسار الورقة — mPDF يعكس الهامشين في RTL، فـmargin_left هو الهامش الأيمن فعلياً
+            'margin_left'   => 18.34,
+            'margin_right'  => 17.17,
+            'margin_top'    => self::TABLE_TOP_MM,
+            'margin_bottom' => 20,
+            'tempDir'       => $tempDir,
+
+            'fontDir'  => array_merge($defaultConfig['fontDir'], [$assets . DIRECTORY_SEPARATOR . 'fonts']),
+            'fontdata' => $defaultFontConfig['fontdata'] + [
+                // بديل DIN Next LT Arabic Regular/Bold
+                'plex'       => ['R' => 'IBMPlexSansArabic-Regular.ttf', 'B' => 'IBMPlexSansArabic-Bold.ttf', 'useOTL' => 0xFF],
+                // بديل DIN Next LT Arabic Medium
+                'plexmedium' => ['R' => 'IBMPlexSansArabic-Medium.ttf', 'B' => 'IBMPlexSansArabic-Bold.ttf', 'useOTL' => 0xFF],
+                // بديل zain-mob (اسم الشركة)
+                'zainblack'  => ['R' => 'Zain-Black.ttf', 'useOTL' => 0xFF],
+            ],
+            'default_font'  => 'plex',
+        ]);
+
+        $mpdf->SetDirectionality('rtl');
+        // autoLangToFont يبدّل الخط تلقائياً حسب السكربت المكتشَف فيتجاوز الخط المحدَّد في CSS
+        $mpdf->autoScriptToLang = false;
+        $mpdf->autoLangToFont   = false;
+        $mpdf->SetDocTemplate($assets . DIRECTORY_SEPARATOR . 'membership-certificate-template.pdf', true);
+
+        $e = fn ($v) => e((string) $v);
+
+        // ── جدول التخصصات + سطر الصلاحية: بالتدفق الطبيعي من أعلى الهامش ──────
+        $count  = max(count($d['rows']), 1);
+        $rowPt  = min(self::ROW_HEIGHT_PT, self::TABLE_BODY_PT / $count);
+        $cellPt = round(min(16, $rowPt * 0.51), 1);
+        $gradePt = round(min(15, $rowPt * 0.48), 1);
+
+        $body = '';
+        foreach ($d['rows'] as $i => [$fieldName, $specName, $grade]) {
+            // التصميم يظلّل الصفوف الزوجية بلون بنفسجي فاتح شفاف (27%) فوق العلامة المائية
+            $bg = $i % 2 ? 'background-color: rgba(201, 204, 225, 0.27);' : '';
+            $body .= "<tr style=\"{$bg}\">"
+                . '<td class="c-field">' . $e($fieldName) . '</td>'
+                . '<td class="c-spec">' . $e($specName) . '</td>'
+                . '<td class="c-grade">' . $e($grade) . '</td>'
+                . '</tr>';
+        }
+        if ($body === '') {
+            $body = '<tr><td colspan="3" style="text-align:center;color:#888;">لا يوجد تخصصات مسجّلة</td></tr>';
+        }
+
+        $validUntil = $this->ymd($d['valid_until']);
+        $ink  = self::INK;
+
+        $mpdf->WriteHTML(<<<HTML
+<style>
+  body { font-family: plex; direction: rtl; color: {$ink}; }
+  table.spec { width: 100%; border-collapse: collapse; }
+  table.spec td {
+    height: {$rowPt}pt; padding: 0 18pt 0 4pt; vertical-align: middle;
+    font-family: plexmedium; font-size: {$cellPt}pt; text-align: right;
+    border: 0.75pt solid #D9DADA;
+  }
+  /* أعمدة التصميم: المجال 165pt، الاختصاص 229pt، الدرجة 100pt */
+  table.spec td.c-field { width: 33.4%; }
+  table.spec td.c-spec { width: 46.4%; }
+  table.spec td.c-grade { width: 20.2%; font-size: {$gradePt}pt; padding-right: 33pt; }
+  .validity { text-align: center; font-size: 13pt; margin-top: 6pt; }
+</style>
+<table class="spec" autosize="1">{$body}</table>
+<div class="validity">هذه الشهادة سارية المفعول حتى تاريخ <b>{$validUntil}م</b> وبعدها تعتبر لاغية.</div>
+HTML);
+
+        // ── العناصر الثابتة الموضع فوق الجدول وتحته ───────────────────────────
+        $mpdf->SetAutoPageBreak(false);
+
+        $navy = self::NAVY;
+
+        // التاريخ بجانب "التاريخ:" المطبوعة بالترويسة
+        $mpdf->WriteFixedPosHTML(
+            "<div style=\"font-family: plexmedium; font-size: 11pt; color: {$navy}; text-align: right;\" dir=\"ltr\">"
+            . $this->ymd($d['issued_at']) . '</div>',
+            150, 36.4, 40.3, 6
+        );
+
+        // اسم الشركة — overflow=auto يصغّر الخط لو الاسم أطول من سطر
+        $company = str_contains($d['company'], 'شركة') ? $d['company'] : "شركة/ {$d['company']}";
+        $mpdf->WriteFixedPosHTML(
+            "<div style=\"font-family: zainblack; font-size: 31pt; color: {$navy}; text-align: center;\">"
+            . $e($company) . '</div>',
+            17.3, 85.5, 174.3, 15, 'auto'
+        );
+
+        // "184/غ" — لاحقة غزة. الترقيم الجديد ({n}_g) يحملها أصلاً، فتُضاف للقديم فقط
+        $number = (string) $d['membership_number'];
+        $number = str_ends_with(strtolower($number), '_g')
+            ? '<span dir="ltr">' . $e($number) . '</span>'
+            : $e($number) . '/غ';
+        $mpdf->WriteFixedPosHTML(
+            "<div style=\"font-family: plexmedium; font-size: 14.1pt; text-align: center;\">"
+            . "عضـواً في الاتحاد تحت رقم <b>{$number}</b>"
+            . "<span style=\"color: #9E9E9E;\">&nbsp; | &nbsp;</span>"
+            . 'وعنوانها: <b>' . $e($d['address']) . '</b></div>',
+            17.3, 100.2, 174.3, 9, 'auto'
+        );
+
+        $mpdf->WriteFixedPosHTML(
+            '<div style="font-size: 11.3pt; text-align: center;">'
+            . 'ومصنفة في المجالات والاختصاصات التالية بموجب قرار لجنة التصنيف الوطنية رقم '
+            . '(<span style="font-family: plexmedium;">' . $e($d['decision_number']) . '</span>)، بتاريخ: '
+            . '<span style="font-family: plexmedium;">' . $this->ymd($d['decision_date']) . 'م</span></div>',
+            15, 110.2, 180, 8, 'auto'
+        );
+
+        // التوقيع فوق الخط المرسوم بالقالب (200–394pt)
+        $mpdf->WriteFixedPosHTML(
+            '<div style="text-align: center; line-height: 1.55;">'
+            . "<div style=\"font-family: plexmedium; font-size: 13.2pt; color: {$navy};\">" . $e($d['president_name']) . '</div>'
+            . '<div style="font-size: 10.7pt;">' . $e($d['president_title1']) . '</div>'
+            . '<div style="font-size: 10.4pt;">' . $e($d['president_title2']) . '</div>'
+            . '</div>',
+            65, 252.8, 79.5, 24, 'auto'
+        );
+
+        // QR التحقق — من simple-qrcode المثبّتة أصلاً، لا <barcode> الخاص بـmPDF
+        // الذي يتطلّب حزمة mpdf/qrcode غير المثبّتة. ملف SVG مؤقت يُحذف بعد التوليد.
+        $qrFile = $tempDir . DIRECTORY_SEPARATOR . 'qr-' . $d['serial'] . '-' . uniqid() . '.svg';
+        file_put_contents($qrFile, QrCode::format('svg')->size(300)->margin(0)->errorCorrection('M')
+            ->color(0, 0, 0)->generate($d['verify_url']));
+        $mpdf->Image($qrFile, 20.3, 239.4, 22, 22, 'svg', '', true, false);
+        $mpdf->WriteFixedPosHTML(
+            '<div style="text-align: center; line-height: 1.2;">'
+            . '<div style="font-size: 9.5pt;" dir="ltr">' . $e($d['serial']) . '</div>'
+            . '<div style="font-size: 7pt;">الرقم التسلسلي للشهادة</div>'
+            . '<div style="font-size: 7pt;">امسح الرمز للتحقق من صحة الشهادة</div>'
+            // ليس بالتصميم، لكنه الطريق الوحيد للتحقق بالرقم التسلسلي بلا ماسح QR
+            . '<div style="font-size: 7pt;" dir="ltr">' . $e(config('app.certificate_verify_url')) . '</div>'
+            . '</div>',
+            11.3, 261.8, 40, 15
+        );
+
+        // قفل تعديل/نسخ المحتوى بكلمة سر مالك — بدون كلمة سر مستخدم، فالملف يُفتح ويُطبع بحرية
+        $mpdf->SetProtection(['print', 'copy'], '', config('app.certificate_pdf_owner_password'));
+
+        $output = $mpdf->Output('', 'S');
+        @unlink($qrFile);
+
+        return $output;
+    }
+
+    /** التصميم يكتب التواريخ Y/m/d. المدخلات: Carbon، أو d/m/Y من recordFields، أو Y-m-d من حقل date باللوحة */
+    private function ymd(mixed $date): string
+    {
+        if ($date instanceof \DateTimeInterface) {
+            return $date->format('Y/m/d');
+        }
+        if (! is_string($date) || trim($date) === '' || $date === '—') {
+            return '—';
+        }
+        if (preg_match('#^(\d{1,2})/(\d{1,2})/(\d{4})$#', trim($date), $m)) {
+            return sprintf('%04d/%02d/%02d', $m[3], $m[2], $m[1]);
+        }
+
+        try {
+            return Carbon::parse($date)->format('Y/m/d');
+        } catch (\Throwable) {
+            return e($date);
+        }
     }
 }
