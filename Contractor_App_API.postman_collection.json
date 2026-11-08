@@ -198,6 +198,30 @@
 			"name": "🔐 Auth",
 			"item": [
 				{
+					"name": "Country Codes — الدول المدعومة لرقم الجوال",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/app/country-codes",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"app",
+								"country-codes"
+							]
+						},
+						"description": "عام (بدون توكن). الدول المفعّلة لخانات الجوال بشاشات التسجيل واستعادة كلمة المرور وتسجيل الدخول — الإدارة بتتحكم فيها من اللوحة.\n\nitems[]: id، name، iso_code، dial_code (بدون +، مثل 970)، flag_url، min_digits/max_digits (طول الرقم بدون الصفر)، starts_with، sort، is_default.\nالدولة الافتراضية (is_default = true) فلسطين، وبتيجي أول القائمة.\n\nإرسال الرقم: فلسطين بأي صيغة (0599123456 أو 599123456 أو +970599123456). باقي الدول بالمقدمة الدولية: +962791234567 — يعني \"+\" + dial_code + الرقم بدون الصفر."
+					},
+					"response": []
+				},
+				{
 					"name": "Login",
 					"event": [
 						{
