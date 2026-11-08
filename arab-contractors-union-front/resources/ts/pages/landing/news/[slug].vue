@@ -217,7 +217,7 @@ onMounted(async () => {
 
 .hero-overlay {
   position: absolute;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
   background: linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.3) 100%);
 }
 

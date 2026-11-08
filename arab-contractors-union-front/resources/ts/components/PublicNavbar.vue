@@ -299,7 +299,9 @@ onMounted(() => {
 
 div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
 
-.pub-header { display: contents; }
+/* A real positioned box (not display: contents) so the whole header stays above the heroes
+   pulled up under it by --pub-nav-h — older Chrome builds left it painted underneath them. */
+.pub-header { position: relative; z-index: 200; width: 100%; flex-shrink: 0; }
 
 .pub-container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
 
@@ -322,7 +324,8 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
    Its height is --pub-nav-h in layouts/landing.vue — keep them in sync (page heroes slide up under it). */
 .pub-navbar {
   position: relative; z-index: 200; width: 100%;
-  background: rgba(255, 255, 255, .97); backdrop-filter: blur(10px);
+  /* opaque, no backdrop-filter: older Chrome / GPU drivers can drop a blurred bar entirely */
+  background: #fff;
   border-bottom: 1px solid #eceef3;
   box-shadow: 0 2px 12px rgba(0, 0, 80, .05);
   transition: box-shadow .3s, background .3s;
@@ -363,7 +366,7 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
 .router-link-exact-active.pub-nav-link { font-weight: 700; }
 /* orange bar on the bottom edge of the header under the current page */
 .router-link-exact-active.pub-nav-link::after {
-  content: ''; position: absolute; bottom: 0; inset-inline: 0; height: 4px; border-radius: 4px 4px 0 0; background: #d67a00;
+  content: ''; position: absolute; bottom: 0; right: 0; left: 0; height: 4px; border-radius: 4px 4px 0 0; background: #d67a00;
 }
 .pub-member-pill {
   display: inline-flex; align-items: center; gap: .5rem; background: #e3f6e8; color: #11903a;

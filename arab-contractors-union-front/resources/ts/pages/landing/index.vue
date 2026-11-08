@@ -530,9 +530,9 @@ onMounted(() => {
   position: relative; overflow: hidden;
   min-height: 642px; border-radius: 0 0 44px 44px; display: flex; align-items: center;
 }
-.hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: left center; }
+.hero-img { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: left center; }
 .hero-shade {
-  position: absolute; inset: 0;
+  position: absolute; top: 0; right: 0; bottom: 0; left: 0;
   background: linear-gradient(to left, rgba(16, 16, 120, .92) 0%, rgba(30, 30, 150, .78) 45%, rgba(40, 40, 160, .35) 75%, rgba(40, 40, 160, .15) 100%);
 }
 .hero-inner { position: relative; z-index: 1; width: 100%; padding-top: calc(var(--pub-nav-h, 114px) + 40px); padding-bottom: 64px; color: #fff; }
@@ -630,7 +630,7 @@ onMounted(() => {
 .tender-card { border: 1px solid #dfe2ea; border-radius: 14px; overflow: hidden; background: #fff; display: flex; flex-direction: column; }
 .tender-img { position: relative; height: 198px; }
 .tender-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.tender-img::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, .78) 100%); }
+.tender-img::after { content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, .78) 100%); }
 .status {
   position: absolute; top: 24px; right: 16px; z-index: 1; display: inline-flex; align-items: center; gap: 6px;
   color: #fff; font-size: 13px; font-weight: 700; border-radius: 6px; padding: 4px 10px;
@@ -662,8 +662,8 @@ onMounted(() => {
 
 /* ══ DIRECTORY ══ */
 .directory { position: relative; overflow: hidden; border-radius: 30px; margin: 140px 0 0; text-align: center; color: #fff; }
-.directory-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.directory-shade { position: absolute; inset: 0; background: linear-gradient(100deg, rgba(40, 40, 160, .86) 0%, rgba(20, 20, 130, .93) 35%, rgba(30, 30, 140, .9) 70%, rgba(130, 80, 60, .8) 100%); }
+.directory-img { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+.directory-shade { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: linear-gradient(100deg, rgba(40, 40, 160, .86) 0%, rgba(20, 20, 130, .93) 35%, rgba(30, 30, 140, .9) 70%, rgba(130, 80, 60, .8) 100%); }
 .directory-inner { position: relative; padding: 40px 24px 40px; display: flex; flex-direction: column; align-items: center; }
 .directory h2 { font-size: clamp(24px, 2.4vw, 32px); font-weight: 800; margin-bottom: 18px; color: #fff; }
 .directory p { max-width: 760px; font-size: clamp(15px, 1.3vw, 18px); font-weight: 700; line-height: 1.9; color: rgba(255, 255, 255, .88); margin-bottom: 26px; }

@@ -332,7 +332,7 @@ onMounted(() => {
 .vp-hero-glow { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .45; pointer-events: none; }
 .vp-hero-glow--a { width: 340px; height: 340px; background: #3949ab; top: -120px; inset-inline-start: -80px; }
 .vp-hero-glow--b { width: 280px; height: 280px; background: var(--gold); opacity: .18; bottom: -140px; inset-inline-end: 8%; }
-.vp-hero::before { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .5;
+.vp-hero::before { content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; opacity: .5;
   background-image: radial-gradient(rgba(255,255,255,.14) 1px, transparent 1px); background-size: 26px 26px;
   -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 85%); mask-image: linear-gradient(180deg, #000 0%, transparent 85%); }
 .vp-hero-inner { position: relative; z-index: 1; text-align: center; display: flex; flex-direction: column; align-items: center; }

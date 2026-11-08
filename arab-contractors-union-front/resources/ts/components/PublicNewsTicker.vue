@@ -72,7 +72,7 @@ const duration = computed(() => {
 }
 /* subtle diagonal sheen like a broadcast lower-third */
 .nt::before {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
+  content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none;
   background: repeating-linear-gradient(-60deg, rgba(255, 255, 255, .035) 0 14px, transparent 14px 28px);
 }
 
