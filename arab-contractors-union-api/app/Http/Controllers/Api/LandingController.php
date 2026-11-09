@@ -88,6 +88,67 @@ class LandingController extends Controller
         return $this->success($items);
     }
 
+    /** سجلات تجريبية ما بتظهر بالدليل العام. */
+    private const HIDDEN_FROM_DIRECTORY = ['936_g'];
+
+    /** رابط دليل الإنتاج العام للبيئات التجريبية (DIRECTORY_SOURCE_URL، أو تلقائياً على api.pcuorg.cloud)؛ null = قاعدة هالبيئة. */
+    private function directorySource(Request $request): ?string
+    {
+        $url = env('DIRECTORY_SOURCE_URL') ?: ($request->getHost() === 'api.pcuorg.cloud' ? 'https://api-production.pcuorg.cloud' : null);
+
+        return $url ? rtrim($url, '/') : null;
+    }
+
+    /**
+     * دليل الإنتاج العام (اسم، رقم عضوية، مدينة، حالة، مجالات ودرجات — بدون أي بيانات خاصة)، بنجلبه
+     * كامل مرة كل 10 دقائق وبنفلتر محلياً. الإنتاج ما فيه كودات الاختصاصات، فالاختصاص بيفلتر على مجاله.
+     */
+    private function remoteDirectory(string $source, array $f)
+    {
+        $all = Cache::remember('directory_remote_' . md5($source), 600, function () use ($source) {
+            $items = [];
+            for ($p = 1; $p <= 40; $p++) {
+                $r = \Illuminate\Support\Facades\Http::timeout(15)->get("$source/api/v1/contractors-directory", ['per_page' => 24, 'page' => $p]);
+                if (! $r->ok()) {
+                    break;
+                }
+                $items = array_merge($items, $r->json('items') ?? []);
+                if ($p >= (int) $r->json('meta.last_page', 1)) {
+                    break;
+                }
+            }
+
+            return $items;
+        });
+
+        $fieldCode = $f['field'] ?? null;
+        if ($fieldCode === null && $f['spec'] !== null) {
+            foreach (ContractorLookups::fieldSpecializationsMap() as $code => $specs) {
+                if (in_array($f['spec'], $specs, true)) {
+                    $fieldCode = (int) $code;
+                    break;
+                }
+            }
+        }
+        $fieldName = $fieldCode !== null ? ContractorLookups::fieldName($fieldCode) : null;
+        $gradeLabel = $f['grade'] !== '' ? (ContractorLookups::specialtyGradeLabels()[$f['grade']] ?? $f['grade']) : null;
+        $q = $f['search'];
+
+        $items = collect($all)
+            ->reject(fn ($m) => in_array($m['membership_number'] ?? '', self::HIDDEN_FROM_DIRECTORY, true))
+            ->filter(fn ($m) => $f['status'] === '' || ($m['membership_status'] ?? '') === $f['status'])
+            ->filter(fn ($m) => $fieldName === null || collect($m['fields'] ?? [])->contains(fn ($x) => ($x['name'] ?? '') === $fieldName))
+            ->filter(fn ($m) => $gradeLabel === null || collect($m['fields'] ?? [])->contains(fn ($x) => in_array($gradeLabel, $x['grades'] ?? [], true)))
+            ->filter(fn ($m) => $q === '' || str_contains($m['name'] ?? '', $q)
+                || in_array($m['membership_number'] ?? '', [$q, MembershipNumber::normalize($q)], true))
+            ->map(fn ($m) => $m + ['logo_url' => null, 'member_since' => null, 'specializations' => []])
+            ->values();
+
+        return $this->paginated(new LengthAwarePaginator(
+            $items->forPage($f['page'], $f['perPage'])->values()->all(), $items->count(), $f['perPage'], $f['page'],
+        ));
+    }
+
     /**
      * GET /api/v1/contractors-directory?search=&status=&field=&specialization=&grade=&per_page=&page=
      * دليل شركات المقاولات (الصفحة الرئيسية + صفحة "أعضاء الاتحاد") — بيانات عامة فقط
@@ -109,8 +170,14 @@ class LandingController extends Controller
         $spec    = $request->filled('specialization') ? (int) $request->query('specialization') : null;
         $grade   = trim((string) $request->query('grade', ''));
 
+        // بيئة الستيجنغ قاعدتها تجريبية: بنعرض فيها دليل الإنتاج العام (قراءة فقط) بدل شركاتها التجريبية.
+        if ($source = $this->directorySource($request)) {
+            return $this->remoteDirectory($source, compact('search', 'perPage', 'page', 'status', 'field', 'spec', 'grade'));
+        }
+
         $query = Contractor::query()
             ->whereIn('status', ['active', 'expired', 'suspended'])
+            ->whereNotIn('membership_number', self::HIDDEN_FROM_DIRECTORY)
             ->select(['id', 'name', 'membership_number', 'city', 'status', 'specialties', 'logo', 'registration_date', 'created_at']);
 
         if ($search !== '') {
