@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Menu, X, ChevronDown, LayoutDashboard, User, LogOut, Bell, Mail, Phone, MapPin } from 'lucide-vue-next'
 import api from '@/plugins/axios'
+import PublicLoginButton from '@/components/PublicLoginButton.vue'
 import axios from 'axios'
 
 const BASE = import.meta.env.VITE_API_BASE_URL ?? ''
@@ -225,9 +226,7 @@ onMounted(() => {
         </div>
 
         <div class="pub-nb-actions">
-          <button v-if="!localProfile" class="pub-btn-register" @click="handleRegisterClick">
-            دخول المقاول
-          </button>
+          <PublicLoginButton v-if="!localProfile" class="pub-btn-register" @click="handleRegisterClick" />
           <span v-if="localProfile?.status === 'active'" class="pub-member-pill"><i />عضوية سارية</span>
           <div v-if="localProfile" class="pub-nb-notif" @click.stop="toggleNotifDropdown">
             <Bell :size="24" fill="currentColor" />
@@ -291,9 +290,7 @@ onMounted(() => {
           </div>
         </template>
         <div class="pub-mob-actions">
-          <button v-if="!localProfile" class="pub-btn-register pub-mob-cta" @click="handleRegisterClick(); mobileOpen = false">
-            دخول المقاول
-          </button>
+          <PublicLoginButton v-if="!localProfile" class="pub-btn-register pub-mob-cta" @click="handleRegisterClick(); mobileOpen = false" />
           <div v-else class="pub-mob-user-wrap">
             <div class="pub-mob-user">
               <div class="pub-nb-avatar">{{ initials(localProfile.name) }}</div>
@@ -455,12 +452,12 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
   display: flex; align-items: center; justify-content: center; gap: .5rem;
   background: #00006e;
   color: #fff; border: none; border-radius: 10px;
-  min-height: 44px; padding: .6rem 1.6rem; font-size: .92rem; font-weight: 700;
+  min-height: 44px; padding: .45rem 1.3rem .45rem 1.5rem; font-size: .92rem; font-weight: 700;
   cursor: pointer; font-family: 'Tajawal', sans-serif; white-space: nowrap;
   flex-shrink: 0; text-decoration: none;
   transition: all .25s; box-shadow: 0 4px 14px rgba(13,27,75,.25);
 }
-.pub-btn-register:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(13,27,75,.3); }
+.pub-btn-register:hover { background: #000090; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(13,27,75,.3); }
 
 .pub-hamburger { display: none; background: none; border: none; cursor: pointer; padding: 4px; color: #374151; flex-shrink: 0; margin-inline-start: auto; }
 
