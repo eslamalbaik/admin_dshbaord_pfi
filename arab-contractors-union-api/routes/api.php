@@ -246,6 +246,11 @@ Route::prefix('v1')->group(function () {
         ->middleware('throttle:60,1');
     Route::get('contractors-directory', [\App\Http\Controllers\Api\LandingController::class, 'directory'])
         ->middleware('throttle:60,1');
+    // فيديوهات الصفحة العامة (فيديو شرح تسجيل الدخول): عدد المشاهدات + تسجيل مشاهدة
+    Route::get('site-videos/{key}', [\App\Http\Controllers\Api\SiteVideoController::class, 'show'])
+        ->middleware('throttle:60,1');
+    Route::post('site-videos/{key}/view', [\App\Http\Controllers\Api\SiteVideoController::class, 'view'])
+        ->middleware('throttle:10,1');
 
     // --------------------------------------------------------
     //  Maintenance Mode — Public

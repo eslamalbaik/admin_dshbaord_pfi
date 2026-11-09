@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import api from '@/plugins/axios'
 import PublicNewsTicker from '@/components/PublicNewsTicker.vue'
+import LoginGuideVideoDialog from '@/components/LoginGuideVideoDialog.vue'
 import { MotionDirective } from '@vueuse/motion'
 import { vHoverCard } from '@/utils/hoverCard'
 import {
@@ -15,6 +16,18 @@ definePage({
 })
 
 const router = useRouter()
+const route = useRoute()
+
+// ─── فيديو "كيف تسجّل دخولك" (نافذة منبثقة) ──────────────────────────────────
+// الرابط اللي بينسخه الزائر /landing?video=login بيفتح الصفحة والنافذة مفتوحة
+const loginVideoOpen = ref(route.query.video === 'login')
+watch(() => route.query.video, v => { if (v === 'login') loginVideoOpen.value = true })
+watch(loginVideoOpen, open => {
+  if (!open && route.query.video) {
+    const { video: _video, ...rest } = route.query
+    router.replace({ query: rest })
+  }
+})
 
 // ─── Scroll animations (@vueuse/motion) ──────────────────────────────────────
 // v-reveal: يطلع العنصر من تحت مع fade أول ما يبين بالشاشة (مرة وحدة). :delay للتتابع بين الكروت.
@@ -244,9 +257,9 @@ onMounted(() => {
           <RouterLink to="/landing/members" class="hero-btn hero-btn-solid">
             استكشف دليل المقاولين <ChevronLeft :size="18" />
           </RouterLink>
-          <RouterLink to="/contractor/register" class="hero-btn hero-btn-ghost">
-            <span class="play"><Play :size="14" fill="currentColor" /></span> كيف تنضم للاتحاد
-          </RouterLink>
+          <button type="button" class="hero-btn hero-btn-ghost" @click="loginVideoOpen = true">
+            <span class="play"><Play :size="14" fill="currentColor" /></span> كيف تسجّل دخولك
+          </button>
         </div>
       </div>
     </section>
@@ -459,6 +472,8 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <LoginGuideVideoDialog v-model="loginVideoOpen" />
   </div>
 </template>
 
@@ -552,7 +567,7 @@ onMounted(() => {
 }
 .hero-btn-solid { background: #fff; color: var(--navy); padding-inline: 26px 30px; min-width: 250px; justify-content: space-between; }
 .hero-btn-solid:hover { transform: translateY(-1px); }
-.hero-btn-ghost { color: #fff; border: 1px solid rgba(255, 255, 255, .7); background: rgba(255, 255, 255, .08); }
+.hero-btn-ghost { cursor: pointer; font-family: inherit; color: #fff; border: 1px solid rgba(255, 255, 255, .7); background: rgba(255, 255, 255, .08); }
 .hero-btn-ghost:hover { background: rgba(255, 255, 255, .16); }
 .play { width: 28px; height: 28px; border-radius: 50%; background: var(--yellow); color: var(--navy); display: grid; place-items: center; }
 
