@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import { ClipboardList, Award, FileText, Scale, GraduationCap, Handshake, ChartBar, Megaphone, ChevronLeft, Check } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
@@ -75,6 +76,7 @@ const services = [
         <h1 class="page-hero-title">خدمات الاتحاد</h1>
         <p class="page-hero-desc">منظومة متكاملة من الخدمات المهنية لدعم شركات المقاولات في جميع مراحل عملها</p>
       </div>
+      <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
 
     <section class="pub-section">

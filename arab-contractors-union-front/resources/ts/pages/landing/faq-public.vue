@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import { ref } from 'vue'
 import { ChevronDown, HelpCircle, Search } from 'lucide-vue-next'
 
@@ -99,6 +100,7 @@ function toggle(id: number) { openId.value = openId.value === id ? null : id }
         <h1 class="page-hero-title">الأسئلة الشائعة</h1>
         <p class="page-hero-desc">إجابات على أكثر الأسئلة شيوعاً حول الاتحاد وخدماته</p>
       </div>
+      <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
 
     <section class="pub-section">

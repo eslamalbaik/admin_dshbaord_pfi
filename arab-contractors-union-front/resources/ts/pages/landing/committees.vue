@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import { MapPin, Phone, Mail, Users, Building2 } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
@@ -39,6 +40,7 @@ const committees = [
         <h1 class="page-hero-title">اللجان والفروع</h1>
         <p class="page-hero-desc">شبكة فروع تغطي جميع المحافظات الفلسطينية ولجان متخصصة لخدمة القطاع</p>
       </div>
+      <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
 
     <!-- Committees -->

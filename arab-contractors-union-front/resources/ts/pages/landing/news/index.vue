@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import { ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/plugins/axios'
@@ -97,6 +98,7 @@ onMounted(fetchNews)
         <h1 class="page-title">الأخبار والإعلانات</h1>
         <p class="page-desc">تابع آخر أخبار الاتحاد والمستجدات في قطاع المقاولات الفلسطيني</p>
       </div>
+      <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
 
     <!-- Filters -->

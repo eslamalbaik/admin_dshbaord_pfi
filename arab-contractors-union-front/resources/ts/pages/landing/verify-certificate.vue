@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '@/plugins/axios'
@@ -153,6 +154,7 @@ onMounted(() => {
         <h1 class="vp-title">التحقق من شهادة العضوية</h1>
         <p class="vp-sub">تأكد خلال ثوانٍ من أن الشهادة صادرة فعلاً عن اتحاد المقاولين الفلسطينيين وما زالت سارية.</p>
       </div>
+      <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </header>
 
     <main class="pub-cont vp-main">

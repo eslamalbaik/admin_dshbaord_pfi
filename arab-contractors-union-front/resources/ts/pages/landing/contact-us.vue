@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { PUBLIC_SOCIAL_LINKS } from '@/utils/publicSocialLinks'
+import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import { ref } from 'vue'
 import { MapPin, Phone, Mail, Clock, Send, CheckCircle } from 'lucide-vue-next'
 
@@ -37,6 +39,7 @@ const inquiryTypes = ['استفسار عام','الانضمام والعضوية
         <h1 class="page-hero-title">تواصل معنا</h1>
         <p class="page-hero-desc">نحن هنا للإجابة على استفساراتك وتقديم الدعم اللازم — تواصل معنا بأي طريقة تناسبك</p>
       </div>
+      <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
 
     <section class="pub-section">
@@ -60,12 +63,9 @@ const inquiryTypes = ['استفسار عام','الانضمام والعضوية
 
           <!-- Social -->
           <div class="social-section">
-            <p class="social-title">تابعنا على</p>
+            <p class="social-title">تابعونا على</p>
             <div class="social-btns">
-              <a href="#" class="social-btn fb" aria-label="Facebook">Facebook</a>
-              <a href="#" class="social-btn tw" aria-label="Twitter">Twitter / X</a>
-              <a href="#" class="social-btn ln" aria-label="LinkedIn">LinkedIn</a>
-              <a href="https://wa.me/970200000000" class="social-btn wa" aria-label="WhatsApp">WhatsApp</a>
+              <a v-for="s in PUBLIC_SOCIAL_LINKS" :key="s.key" :href="s.href" target="_blank" rel="noopener noreferrer" class="social-btn" :class="s.key" :aria-label="s.label">{{ s.label }}</a>
             </div>
           </div>
         </div>
@@ -166,10 +166,9 @@ const inquiryTypes = ['استفسار عام','الانضمام والعضوية
 .social-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: .85rem; font-weight: 700; color: #6b7280; margin-bottom: .875rem; }
 .social-btns { display: flex; gap: .5rem; flex-wrap: wrap; }
 .social-btn { display: flex; align-items: center; border-radius: 9px; padding: .5rem 1rem; font-size: .78rem; font-weight: 700; text-decoration: none; border: 1.5px solid; transition: all .2s; }
-.social-btn.fb { background: #e7f0fd; color: #1877f2; border-color: #1877f2; }
-.social-btn.tw { background: #f5f8fa; color: #1da1f2; border-color: #1da1f2; }
-.social-btn.ln { background: #e8f4fb; color: #0077b5; border-color: #0077b5; }
-.social-btn.wa { background: #e8f8f0; color: #25d366; border-color: #25d366; }
+.social-btn.facebook { background: #e7f0fd; color: #1877f2; border-color: #1877f2; }
+.social-btn.instagram { background: #fdeef6; color: #c13584; border-color: #c13584; }
+.social-btn.whatsapp { background: #e8f8f0; color: #25d366; border-color: #25d366; }
 .social-btn:hover { opacity: .8; transform: translateY(-1px); }
 
 .contact-form-wrap { background: #f9fafb; border: 1.5px solid #e5e7eb; border-radius: 20px; padding: 2.5rem; }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import { ref, watch, onMounted } from 'vue'
 import api from '@/plugins/axios'
 import { Search, Inbox, Play, Images } from 'lucide-vue-next'
@@ -93,6 +94,7 @@ onMounted(fetchEvents)
         <h1 class="page-title">الفعاليات</h1>
         <p class="page-desc">تابع فعاليات ومناسبات الاتحاد القادمة والسابقة</p>
       </div>
+      <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
 
     <!-- Filters -->
