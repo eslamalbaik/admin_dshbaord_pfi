@@ -76,7 +76,7 @@ const services = [
         <h1 class="page-hero-title">خدمات الاتحاد</h1>
         <p class="page-hero-desc">منظومة متكاملة من الخدمات المهنية لدعم شركات المقاولات في جميع مراحل عملها</p>
       </div>
-      <div class="pub-cont"><PublicSocialFollow /></div>
+      <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
 
     <section class="pub-section">

@@ -51,7 +51,7 @@ const achievements = [
         <h1 class="page-hero-title">عن الاتحاد</h1>
         <p class="page-hero-desc">تعرّف على اتحاد المقاولين الفلسطينيين — تاريخه، رسالته، ورؤيته</p>
       </div>
-      <div class="pub-cont"><PublicSocialFollow /></div>
+      <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
 
     <!-- Overview -->

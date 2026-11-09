@@ -36,7 +36,7 @@ const levelBg: Record<string,string> = { مبتدئ:'#e8f5e9', متوسط:'#fff8
           <div class="hs-item"><span class="hs-num">٤٠+</span><span class="hs-lbl">مدرب معتمد</span></div>
         </div>
       </div>
-      <div class="pub-cont"><PublicSocialFollow /></div>
+      <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
 
     <!-- Courses -->

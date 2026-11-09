@@ -61,7 +61,7 @@ const filtered = computed(() =>
         <h1 class="page-hero-title">أعضاء الاتحاد</h1>
         <p class="page-hero-desc">دليل شركات المقاولات الأعضاء في اتحاد المقاولين الفلسطينيين — يمكنك البحث والتصفية</p>
       </div>
-      <div class="pub-cont"><PublicSocialFollow /></div>
+      <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
 
     <section class="pub-section">

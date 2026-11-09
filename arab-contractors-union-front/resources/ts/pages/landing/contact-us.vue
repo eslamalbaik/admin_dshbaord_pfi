@@ -39,7 +39,7 @@ const inquiryTypes = ['استفسار عام','الانضمام والعضوية
         <h1 class="page-hero-title">تواصل معنا</h1>
         <p class="page-hero-desc">نحن هنا للإجابة على استفساراتك وتقديم الدعم اللازم — تواصل معنا بأي طريقة تناسبك</p>
       </div>
-      <div class="pub-cont"><PublicSocialFollow /></div>
+      <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
 
     <section class="pub-section">

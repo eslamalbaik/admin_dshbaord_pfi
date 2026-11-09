@@ -32,7 +32,7 @@ const sections = computed(() => data.value ?? [])
         <h1 class="page-hero-title">الشروط والأحكام</h1>
         <p class="page-hero-desc">آخر تحديث: ١ يناير ٢٠٢٤</p>
       </div>
-      <div class="pub-cont"><PublicSocialFollow /></div>
+      <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
 
     <section class="legal-section">

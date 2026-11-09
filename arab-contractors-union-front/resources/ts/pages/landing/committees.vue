@@ -40,7 +40,7 @@ const committees = [
         <h1 class="page-hero-title">اللجان والفروع</h1>
         <p class="page-hero-desc">شبكة فروع تغطي جميع المحافظات الفلسطينية ولجان متخصصة لخدمة القطاع</p>
       </div>
-      <div class="pub-cont"><PublicSocialFollow /></div>
+      <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
 
     <!-- Committees -->

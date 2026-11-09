@@ -49,7 +49,7 @@ const filteredFiles = computed(() => {
         <h1 class="page-hero-title">مكتبة الملفات والنماذج</h1>
         <p class="page-hero-desc">مكتبة رقمية شاملة تضم النماذج والاستمارات والأدلة والتقارير والتعاميم</p>
       </div>
-      <div class="pub-cont"><PublicSocialFollow /></div>
+      <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
 
     <section class="pub-section">

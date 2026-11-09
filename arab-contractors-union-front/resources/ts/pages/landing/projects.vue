@@ -41,7 +41,7 @@ const filtered = computed(() => activeTab.value === 'all' ? items : items.filter
         <h1 class="page-hero-title">المشاريع والمعارض</h1>
         <p class="page-hero-desc">أبرز المشاريع الوطنية والمعارض والمؤتمرات والمبادرات التي يشارك فيها الاتحاد</p>
       </div>
-      <div class="pub-cont"><PublicSocialFollow /></div>
+      <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
 
     <section class="pub-section">

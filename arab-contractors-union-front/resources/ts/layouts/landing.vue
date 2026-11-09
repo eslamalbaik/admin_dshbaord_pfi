@@ -79,8 +79,8 @@ import PublicFooter from '@/components/PublicFooter.vue'
 .lp-layout .lp-page .vp-hero::before { display: none; }
 .lp-layout .lp-page .page-hero-shapes,
 .lp-layout .lp-page .vp-hero-glow { display: none; }
-.lp-layout .lp-page .page-hero { padding-bottom: 2.5rem; }
-.lp-layout .lp-page .page-header { padding-bottom: 2.5rem; }
+.lp-layout .lp-page .page-hero { padding-bottom: 3rem; min-height: calc(var(--pub-nav-h, 125px) + 250px); }
+.lp-layout .lp-page .page-header { padding-bottom: 3rem; min-height: calc(var(--pub-nav-h, 125px) + 250px); }
 .lp-layout .lp-page .vp-hero { padding-bottom: 5.5rem; }
 /* titles on the news/events header were navy-on-light */
 .lp-layout .lp-page .page-header .page-title { color: #fff; text-shadow: 0 3px 18px rgba(0, 0, 40, .45); }
@@ -96,6 +96,17 @@ import PublicFooter from '@/components/PublicFooter.vue'
       linear-gradient(180deg, rgba(0, 0, 80, .9) 0%, rgba(0, 0, 110, .8) 60%, rgba(0, 0, 80, .75) 100%),
       url('/images/landing/inner-hero-sm.webp');
     background-position: 62% center;
+  }
+}
+
+/* follow-us block: opposite the page title (left in RTL) on wide screens, below the title otherwise */
+.lp-layout .lp-page .pub-follow-slot { position: relative; z-index: 2; max-width: 1240px; margin: 1.75rem auto 0; padding: 0 1.5rem; }
+@media (min-width: 1001px) {
+  .lp-layout .lp-page .page-hero > .pub-follow-slot,
+  .lp-layout .lp-page .page-header > .pub-follow-slot,
+  .lp-layout .lp-page .vp-hero > .pub-follow-slot {
+    position: absolute; inset-inline: 0; top: var(--pub-nav-h, 125px); bottom: 0; margin: 0 auto; width: 100%;
+    display: flex; align-items: center; justify-content: flex-end; pointer-events: none;
   }
 }
 </style>

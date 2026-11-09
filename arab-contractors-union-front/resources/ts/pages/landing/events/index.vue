@@ -94,7 +94,7 @@ onMounted(fetchEvents)
         <h1 class="page-title">الفعاليات</h1>
         <p class="page-desc">تابع فعاليات ومناسبات الاتحاد القادمة والسابقة</p>
       </div>
-      <div class="container"><PublicSocialFollow /></div>
+      <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
 
     <!-- Filters -->

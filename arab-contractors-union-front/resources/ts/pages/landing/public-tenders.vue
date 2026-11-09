@@ -193,7 +193,7 @@ function openTender(t: Tender) {
         <h1 class="page-hero-title">العطاءات</h1>
         <p class="page-hero-desc">أحدث العطاءات الحكومية المتاحة للشركات الأعضاء في الاتحاد</p>
       </div>
-      <div class="pub-cont"><PublicSocialFollow /></div>
+      <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
 
     <section class="pub-section">

@@ -43,7 +43,7 @@ const filteredDocs = computed(() => docs.filter(d => d.cat === activecat.value))
         <h1 class="page-hero-title">التشريعات والأنظمة</h1>
         <p class="page-hero-desc">القوانين والأنظمة وعقود الفيديك والأدلة الإرشادية المتعلقة بقطاع المقاولات</p>
       </div>
-      <div class="pub-cont"><PublicSocialFollow /></div>
+      <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
 
     <section class="pub-section">

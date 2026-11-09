@@ -79,7 +79,7 @@ const colors = ['#1a237e','#c62828','#2e7d32','#e65100','#6a1b9a','#00695c','#02
         <h1 class="page-hero-title">مجلس الإدارة</h1>
         <p class="page-hero-desc">تعرّف على أعضاء مجلس إدارة اتحاد المقاولين الفلسطينيين المنتخبين لقيادة القطاع</p>
       </div>
-      <div class="pub-cont"><PublicSocialFollow /></div>
+      <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
 
     <!-- Board Members -->
