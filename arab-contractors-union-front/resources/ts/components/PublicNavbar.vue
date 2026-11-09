@@ -200,11 +200,16 @@ onMounted(() => {
             <button v-else class="pub-nav-link pub-nav-btn">
               {{ l.label }} <ChevronDown :size="13" class="pub-nav-chevron" :class="{ open: openDropdown === l.label }" />
             </button>
-            <div v-if="l.children && openDropdown === l.label" class="pub-dropdown">
-              <RouterLink v-for="c in l.children" :key="c.href" :to="c.href" class="pub-dd-link" @click="openDropdown = null">
-                {{ c.label }}
-              </RouterLink>
-            </div>
+            <Transition name="pub-dd">
+              <div v-if="l.children && openDropdown === l.label" class="pub-dropdown pub-dd-stagger">
+                <RouterLink
+                  v-for="(c, i) in l.children" :key="c.href" :to="c.href" class="pub-dd-link"
+                  :style="{ '--i': i }" @click="openDropdown = null"
+                >
+                  {{ c.label }}
+                </RouterLink>
+              </div>
+            </Transition>
           </div>
         </div>
 
@@ -254,16 +259,24 @@ onMounted(() => {
       </div>
 
       <!-- Mobile Menu -->
+      <Transition name="pub-mob">
       <div v-if="mobileOpen" class="pub-mobile-menu">
         <template v-for="l in navLinks" :key="l.label">
           <RouterLink v-if="!l.children" :to="l.href" class="pub-mob-link" @click="mobileOpen = false">{{ l.label }}</RouterLink>
           <div v-else class="pub-mob-group">
-            <button class="pub-mob-link pub-mob-group-btn" @click="toggleDropdown(l.label)">
+            <button class="pub-mob-link pub-mob-group-btn" @click.stop="toggleDropdown(l.label)">
               {{ l.label }} <ChevronDown :size="14" :class="{ 'rotate-180': openDropdown === l.label }" style="transition:transform .2s" />
             </button>
-            <div v-if="openDropdown === l.label" class="pub-mob-sub">
-              <RouterLink v-for="c in l.children" :key="c.href" :to="c.href" class="pub-mob-sub-link" @click="mobileOpen = false">{{ c.label }}</RouterLink>
-            </div>
+            <Transition name="pub-mob-sub">
+              <div v-if="openDropdown === l.label" class="pub-mob-sub">
+                <div class="pub-mob-sub-inner">
+                  <RouterLink
+                    v-for="(c, i) in l.children" :key="c.href" :to="c.href" class="pub-mob-sub-link"
+                    :style="{ '--i': i }" @click="mobileOpen = false"
+                  >{{ c.label }}</RouterLink>
+                </div>
+              </div>
+            </Transition>
           </div>
         </template>
         <div class="pub-mob-actions">
@@ -287,6 +300,7 @@ onMounted(() => {
           </div>
         </div>
       </div>
+      </Transition>
       </div>
     </nav>
   </div>
@@ -383,8 +397,22 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
   box-shadow: 0 16px 40px rgba(0,0,80,.12);
   z-index: 300;
   animation: pub-dd-in .18s ease-out;
+  transform-origin: top right;
 }
 @keyframes pub-dd-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+/* Header sub-menus (عن الاتحاد / الخدمات / المركز الإعلامي): the panel unfolds, then its links
+   slide in one after another instead of the whole list popping up at once. */
+.pub-dd-stagger { animation: none; }
+.pub-dd-enter-active { transition: opacity .22s ease-out, transform .26s cubic-bezier(.2, .8, .3, 1); }
+.pub-dd-leave-active { transition: opacity .15s ease-in, transform .15s ease-in; }
+.pub-dd-enter-from { opacity: 0; transform: translateY(-10px) scale(.97); }
+.pub-dd-leave-to { opacity: 0; transform: translateY(-6px) scale(.98); }
+.pub-dd-stagger .pub-dd-link {
+  animation: pub-dd-item-in .32s cubic-bezier(.2, .8, .3, 1) both;
+  animation-delay: calc(60ms + var(--i, 0) * 55ms);
+}
+@keyframes pub-dd-item-in { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
 .pub-dd-link {
   display: block; padding: .7rem 1rem; color: #5b6474; font-size: .95rem;
   font-weight: 500; text-decoration: none; border-radius: 10px;
@@ -419,7 +447,20 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
   font-family: 'Tajawal', sans-serif; width: 100%; text-align: right;
 }
 .pub-mob-link:hover { background: #e8eaf6; color: #1a237e; }
-.pub-mob-sub { padding-inline-start: 1rem; display: flex; flex-direction: column; gap: .15rem; margin-bottom: .25rem; }
+/* grid 0fr → 1fr lets the sub-list grow to its real height smoothly (no fixed max-height) */
+.pub-mob-sub { display: grid; grid-template-rows: 1fr; margin-bottom: .25rem; }
+.pub-mob-sub-inner { min-height: 0; overflow: hidden; padding-inline-start: 1rem; display: flex; flex-direction: column; gap: .15rem; }
+.pub-mob-sub-enter-active { transition: grid-template-rows .3s cubic-bezier(.2, .8, .3, 1), opacity .25s ease-out, margin .3s; }
+.pub-mob-sub-leave-active { transition: grid-template-rows .22s ease-in, opacity .18s ease-in, margin .22s; }
+.pub-mob-sub-enter-from, .pub-mob-sub-leave-to { grid-template-rows: 0fr; opacity: 0; margin-bottom: 0; }
+.pub-mob-sub-enter-active .pub-mob-sub-link {
+  animation: pub-mob-item-in .3s cubic-bezier(.2, .8, .3, 1) both;
+  animation-delay: calc(50ms + var(--i, 0) * 50ms);
+}
+@keyframes pub-mob-item-in { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+.pub-mob-enter-active { transition: opacity .22s ease-out, transform .25s cubic-bezier(.2, .8, .3, 1); }
+.pub-mob-leave-active { transition: opacity .15s ease-in, transform .15s ease-in; }
+.pub-mob-enter-from, .pub-mob-leave-to { opacity: 0; transform: translateY(-8px); }
 .pub-mob-sub-link { padding: .45rem .875rem; color: #6b7280; font-size: .84rem; text-decoration: none; border-radius: 7px; font-weight: 600; }
 .pub-mob-sub-link:hover { background: #e8eaf6; color: #1a237e; }
 .pub-mob-cta { width: 100%; justify-content: center; margin-top: .75rem; border-radius: 9px; padding: .65rem 1.5rem; }
@@ -461,6 +502,13 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
 .pub-mob-user-wrap { margin-top: .5rem; border-top: 1px dashed #e5e7eb; padding-top: .5rem; display: flex; flex-direction: column; gap: .15rem; }
 .pub-mob-user { display: flex; align-items: center; gap: .75rem; padding: .5rem .875rem; }
 .pub-mob-user .pub-nb-name { max-width: none; flex: 1; font-size: .88rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pub-dd-enter-active, .pub-dd-leave-active,
+  .pub-mob-sub-enter-active, .pub-mob-sub-leave-active,
+  .pub-mob-enter-active, .pub-mob-leave-active { transition: none; }
+  .pub-dd-stagger .pub-dd-link, .pub-mob-sub-enter-active .pub-mob-sub-link { animation: none; }
+}
 
 @media (max-width: 1100px) {
   .pub-container { padding: 0 16px; }
