@@ -2,7 +2,7 @@
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import api from '@/plugins/axios'
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { Search, Award, Filter, ChevronLeft, Building2, X, Hash, CalendarDays, MapPin, Layers } from 'lucide-vue-next'
+import { Search, Award, Filter, ChevronLeft, ChevronUp, Building2, X, Hash, CalendarDays, MapPin, Layers, CircleCheck, HardHat, Route, Droplets, Zap, Wrench, Factory } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
@@ -96,6 +96,17 @@ function groupFields(m: Member): FieldGroup[] {
 
 // نافذة بيانات تصنيف الشركة — من نفس بيانات الدليل العام، بدون أي طلب إضافي
 const selected = ref<Member | null>(null)
+// أيقونة لكل مجال حسب اسمه (أبنية، طرق، مياه، كهرباء...) والباقي مفتاح
+function fieldIcon(name: string) {
+  if (/أبني|ابني|مبان|إنشاء|انشاء/.test(name)) return HardHat
+  if (/طرق|مواصلات|جسور/.test(name)) return Route
+  if (/مياه|صرف|ري/.test(name)) return Droplets
+  if (/كهرب|طاقة/.test(name)) return Zap
+  if (/صناع|ميكانيك/.test(name)) return Factory
+
+  return Wrench
+}
+
 const selectedGroups = computed(() => (selected.value ? groupFields(selected.value) : []))
 
 function openMember(m: Member) {
@@ -268,50 +279,66 @@ onMounted(async () => {
         <div v-if="selected" class="mm-overlay" dir="rtl" @click.self="closeMember">
           <div class="mm-dialog" role="dialog" aria-modal="true" :aria-label="`بيانات تصنيف ${selected.name}`">
             <div class="mm-head">
-              <span class="mm-icon" aria-hidden="true"><Building2 :size="30" :stroke-width="1.7" /></span>
+              <div class="mm-head-photo" aria-hidden="true" />
+              <svg class="mm-head-swoosh" viewBox="0 0 400 60" preserveAspectRatio="none" aria-hidden="true">
+                <path d="M0 60 L0 18 C 90 30, 190 46, 400 60 Z" fill="#f9a825" />
+                <path d="M0 60 L0 30 C 110 40, 230 52, 400 60 Z" fill="#fbc02d" opacity=".55" />
+              </svg>
+              <span class="mm-icon" aria-hidden="true"><Building2 :size="34" :stroke-width="1.6" /></span>
               <div class="mm-head-text">
                 <h2 class="mm-title">{{ selected.name }}</h2>
-                <span class="member-status" :class="statusClass(selected.membership_status)">{{ selected.status_label }}</span>
+                <span class="mm-status" :class="statusClass(selected.membership_status)">
+                  <CircleCheck v-if="selected.membership_status === 'active'" :size="15" />
+                  {{ selected.status_label }}
+                </span>
               </div>
-              <button type="button" class="mm-close" aria-label="إغلاق" @click="closeMember"><X :size="20" /></button>
+              <button type="button" class="mm-close" aria-label="إغلاق" @click="closeMember"><X :size="22" :stroke-width="2.5" /></button>
             </div>
 
             <div class="mm-body">
               <div class="mm-info">
                 <div class="mm-info-item">
-                  <Hash :size="16" />
+                  <span class="mm-info-ico"><Hash :size="20" :stroke-width="2.4" /></span>
                   <div><span class="mm-lbl">رقم العضوية</span><span class="mm-val">{{ selected.membership_number }}</span></div>
                 </div>
                 <div v-if="selected.member_since" class="mm-info-item">
-                  <CalendarDays :size="16" />
-                  <div><span class="mm-lbl">عضو منذ</span><span class="mm-val">{{ selected.member_since }}</span></div>
+                  <span class="mm-info-ico"><CalendarDays :size="20" :stroke-width="2.2" /></span>
+                  <div><span class="mm-lbl">تاريخ المنح</span><span class="mm-val">{{ selected.member_since }}</span></div>
                 </div>
                 <div v-if="selected.city" class="mm-info-item">
-                  <MapPin :size="16" />
+                  <span class="mm-info-ico"><MapPin :size="20" :stroke-width="2.2" /></span>
                   <div><span class="mm-lbl">المدينة</span><span class="mm-val">{{ selected.city }}</span></div>
                 </div>
               </div>
 
-              <h3 class="mm-sec-title"><Layers :size="17" /> التصنيف: المجالات والاختصاصات</h3>
+              <h3 class="mm-sec-title"><Layers :size="22" /> <span>التصنيف: المجالات والاختصاصات</span></h3>
               <div v-if="selectedGroups.length" class="mm-fields">
                 <div v-for="(f, i) in selectedGroups" :key="i" class="mm-field">
                   <div class="mm-field-head">
+                    <span class="mm-field-ico"><component :is="fieldIcon(f.name)" :size="22" :stroke-width="2.2" /></span>
                     <span class="mm-field-name">{{ f.name }}</span>
                     <span v-if="!f.specs.length" class="mm-grades">
-                      <span v-for="g in f.grades" :key="g" class="member-class"><Award :size="11" /> {{ g }}</span>
+                      <span v-for="g in f.grades" :key="g" class="mm-grade"><ChevronUp :size="14" :stroke-width="3" /> {{ g }}</span>
                     </span>
                   </div>
                   <ul v-if="f.specs.length" class="mm-specs">
                     <li v-for="(s, j) in f.specs" :key="j" class="mm-spec">
                       <span class="mm-spec-name">{{ s.name }}</span>
-                      <span v-if="s.grade" class="member-class"><Award :size="11" /> {{ s.grade }}</span>
-                      <span v-else class="mm-muted-sm">بدون درجة</span>
+                      <span v-if="s.grade" class="mm-grade"><ChevronUp :size="14" :stroke-width="3" /> {{ s.grade }}</span>
+                      <span v-else class="mm-grade none">دون درجة</span>
                     </li>
                   </ul>
                 </div>
               </div>
               <p v-else class="mm-muted">لا يوجد تصنيف مسجّل</p>
             </div>
+
+            <svg class="mm-skyline" viewBox="0 0 600 70" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+              <g fill="#c5cae9">
+                <rect x="40" y="57" width="14" height="13" rx="1" /><rect x="57" y="60" width="22" height="10" rx="1" /><rect x="81" y="58" width="18" height="12" rx="1" /><rect x="102" y="53" width="18" height="17" rx="1" /><rect x="124" y="54" width="12" height="16" rx="1" /><rect x="138" y="30" width="16" height="40" rx="1" /><rect x="156" y="51" width="12" height="19" rx="1" /><rect x="172" y="53" width="16" height="17" rx="1" /><rect x="192" y="42" width="10" height="28" rx="1" /><rect x="206" y="53" width="22" height="17" rx="1" /><rect x="232" y="31" width="18" height="39" rx="1" /><rect x="252" y="54" width="12" height="16" rx="1" /><rect x="268" y="38" width="12" height="32" rx="1" /><rect x="283" y="22" width="12" height="48" rx="1" /><rect x="297" y="37" width="18" height="33" rx="1" /><rect x="319" y="45" width="22" height="25" rx="1" /><rect x="343" y="44" width="18" height="26" rx="1" /><rect x="364" y="52" width="10" height="18" rx="1" /><rect x="378" y="43" width="10" height="27" rx="1" /><rect x="391" y="22" width="22" height="48" rx="1" /><rect x="416" y="27" width="14" height="43" rx="1" /><rect x="434" y="33" width="16" height="37" rx="1" /><rect x="453" y="45" width="12" height="25" rx="1" /><rect x="469" y="51" width="12" height="19" rx="1" /><rect x="485" y="23" width="14" height="47" rx="1" /><rect x="502" y="45" width="14" height="25" rx="1" /><rect x="519" y="60" width="18" height="10" rx="1" /><rect x="539" y="46" width="18" height="24" rx="1" /><rect x="559" y="57" width="14" height="13" rx="1" />
+                <g stroke="#c5cae9" stroke-width="2" fill="none"><path d="M210 70 V10 M204 12 H262 M256 12 V26" /><path d="M392 70 V6 M386 8 H436 M430 8 V22" /></g>
+              </g>
+            </svg>
           </div>
         </div>
       </Transition>
@@ -375,35 +402,46 @@ onMounted(async () => {
 .load-more:disabled { opacity: .6; cursor: default; }
 
 /* نافذة بيانات التصنيف */
-.mm-overlay { position: fixed; inset: 0; z-index: 2000; background: rgba(13,27,75,.55); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; padding: 1rem; font-family: 'Tajawal', 'Cairo', sans-serif; direction: rtl; }
-.mm-dialog { background: #fff; width: 100%; max-width: 620px; max-height: calc(100vh - 2rem); max-height: calc(100dvh - 2rem); border-radius: 18px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 60px rgba(13,27,75,.35); }
-.mm-head { display: flex; align-items: center; gap: 1rem; padding: 1.25rem 1.5rem; background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); border-bottom: 3px solid #f9a825; }
-.mm-icon { width: 58px; height: 58px; border-radius: 16px; background: rgba(255,255,255,.1); color: #f9a825; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: inset 0 0 0 2px rgba(249,168,37,.35); }
-.mm-head-text { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: .45rem; }
-.mm-title { font-size: 1.12rem; font-weight: 800; color: #fff; line-height: 1.5; overflow-wrap: anywhere; }
-.mm-close { flex-shrink: 0; align-self: flex-start; width: 36px; height: 36px; border-radius: 10px; border: none; background: rgba(255,255,255,.12); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .2s; }
+.mm-overlay { position: fixed; inset: 0; z-index: 2000; background: rgba(13,27,75,.55); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 1rem; font-family: 'Tajawal', 'Cairo', sans-serif; direction: rtl; }
+.mm-dialog { position: relative; background: linear-gradient(180deg, #fff 0%, #fff 70%, #f4f5fd 100%); width: 100%; max-width: 680px; max-height: calc(100vh - 2rem); max-height: calc(100dvh - 2rem); border-radius: 22px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 30px 70px rgba(13,27,75,.4); }
+.mm-head { position: relative; display: flex; align-items: center; gap: 1.1rem; padding: 1.5rem 1.6rem 1.75rem; background: linear-gradient(120deg, #0d1b4b 0%, #1a237e 55%, #1f2c8f 100%); overflow: hidden; flex-shrink: 0; }
+.mm-head-photo { position: absolute; top: 0; bottom: 0; left: 0; width: 55%; background: url('/images/landing/inner-hero-sm.webp') 100% 20% / 240% auto no-repeat; opacity: .42; mix-blend-mode: luminosity; -webkit-mask-image: linear-gradient(90deg, #000 30%, transparent 100%); mask-image: linear-gradient(90deg, #000 30%, transparent 100%); }
+.mm-head-swoosh { position: absolute; left: 0; bottom: 0; width: 42%; height: 34px; }
+.mm-head > :not(.mm-head-photo):not(.mm-head-swoosh) { position: relative; z-index: 1; }
+.mm-icon { width: 72px; height: 72px; border-radius: 18px; background: rgba(13,27,75,.55); color: #f9a825; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 2px solid rgba(249,168,37,.75); }
+.mm-head-text { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: .6rem; }
+.mm-title { font-size: 1.2rem; font-weight: 800; color: #fff; line-height: 1.6; overflow-wrap: anywhere; }
+.mm-status { display: inline-flex; align-items: center; gap: .35rem; font-size: .8rem; font-weight: 800; border-radius: 50px; padding: .3rem .85rem; background: #e8f5e9; color: #2e7d32; }
+.mm-status.active svg { color: #fff; fill: #2e7d32; }
+.mm-status.expired { background: #fce4ec; color: #c62828; }
+.mm-status.suspended { background: #fff8e1; color: #e65100; }
+.mm-close { flex-shrink: 0; align-self: flex-start; width: 46px; height: 46px; border-radius: 50%; border: none; background: rgba(13,27,75,.6); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .2s, color .2s; }
 .mm-close:hover { background: #f9a825; color: #0d1b4b; }
-.mm-body { padding: 1.25rem 1.5rem 1.5rem; overflow-y: auto; overflow-x: hidden; }
-.mm-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .75rem; margin-bottom: 1.4rem; }
-.mm-info-item { display: flex; align-items: center; gap: .6rem; min-width: 0; background: #f9fafb; border: 1px solid #eef0f4; border-radius: 12px; padding: .7rem .85rem; color: #1a237e; }
+.mm-body { position: relative; z-index: 1; padding: 1.4rem 1.6rem 4.5rem; overflow-y: auto; overflow-x: hidden; }
+.mm-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1rem; margin-bottom: 1.6rem; }
+.mm-info-item { display: flex; align-items: center; gap: .85rem; min-width: 0; background: #f8f9fe; border: 1.5px solid #e6e9f5; border-radius: 14px; padding: .85rem 1rem; }
+.mm-info-ico { width: 46px; height: 46px; border-radius: 50%; background: #e8ecfb; color: #1a237e; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .mm-info-item > div { display: flex; flex-direction: column; min-width: 0; }
-.mm-lbl { font-size: .72rem; color: #6b7280; }
-.mm-val { font-size: .9rem; font-weight: 700; color: #0d1b3e; overflow-wrap: anywhere; }
-.mm-sec-title { display: flex; align-items: center; gap: .45rem; font-size: .95rem; font-weight: 800; color: #1a237e; margin: 0 0 .75rem; }
-.mm-sec-title svg { color: #f9a825; }
-.mm-fields { display: flex; flex-direction: column; gap: .75rem; }
-.mm-field { border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; }
-.mm-field-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem; padding: .65rem .9rem; background: #e8eaf6; border-right: 4px solid #f9a825; }
-.mm-field-name { font-size: .9rem; font-weight: 800; color: #1a237e; overflow-wrap: anywhere; min-width: 0; }
-.mm-grades { display: flex; flex-wrap: wrap; gap: .35rem; }
+.mm-lbl { font-size: .8rem; color: #4b5563; }
+.mm-val { font-size: 1.15rem; font-weight: 800; color: #0d1b3e; overflow-wrap: anywhere; }
+.mm-sec-title { display: flex; align-items: center; gap: .55rem; font-size: 1.1rem; font-weight: 800; color: #0d1b3e; margin: 0 0 1rem; }
+.mm-sec-title svg { color: #f9a825; flex-shrink: 0; }
+.mm-sec-title::after { content: ''; flex: 1; height: 2px; background: #f9a825; margin-right: .75rem; border-radius: 2px; }
+.mm-fields { display: flex; flex-direction: column; gap: 1rem; }
+.mm-field { border: 1.5px solid #e3e7f5; border-radius: 14px; overflow: hidden; background: #fff; }
+.mm-field-head { display: flex; align-items: center; flex-wrap: wrap; gap: .85rem; padding: 0 0 0 1rem; background: #e8ecfb; min-height: 52px; }
+.mm-field-ico { width: 54px; align-self: stretch; min-height: 52px; background: #d3dbf8; color: #1a237e; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.mm-field-name { flex: 1; font-size: 1.02rem; font-weight: 800; color: #0d1b3e; overflow-wrap: anywhere; min-width: 0; padding: .6rem 0; }
+.mm-grades { display: flex; flex-wrap: wrap; gap: .4rem; }
 .mm-specs { list-style: none; }
-.mm-spec { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .55rem .9rem .55rem .9rem; padding-right: 1.6rem; border-top: 1px solid #f0f1f4; position: relative; }
-.mm-spec::before { content: ''; position: absolute; right: .9rem; top: 50%; width: 6px; height: 6px; border-radius: 50%; background: #c5cae9; transform: translateY(-50%); }
-.mm-spec:nth-child(even) { background: #fafbff; }
-.mm-spec-name { font-size: .85rem; color: #374151; overflow-wrap: anywhere; min-width: 0; }
-.mm-spec .member-class { flex-shrink: 0; }
-.mm-muted-sm { font-size: .74rem; color: #9ca3af; flex-shrink: 0; }
-.mm-muted { font-size: .82rem; color: #9ca3af; margin-bottom: 1.25rem; }
+.mm-spec { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .6rem 1rem .6rem 1rem; padding-right: 2.6rem; position: relative; }
+.mm-spec + .mm-spec { border-top: 1px solid #eef0f6; }
+.mm-spec::before { content: ''; position: absolute; right: 1.5rem; top: 50%; width: 7px; height: 7px; border-radius: 50%; background: #1a237e; transform: translateY(-50%); }
+.mm-spec-name { font-size: .95rem; color: #1f2937; overflow-wrap: anywhere; min-width: 0; }
+.mm-grade { display: inline-flex; align-items: center; justify-content: center; gap: .3rem; flex-shrink: 0; min-width: 104px; font-size: .85rem; font-weight: 800; color: #1a237e; background: #fff; border: 1.5px solid #1a237e; border-radius: 50px; padding: .3rem .9rem; white-space: nowrap; }
+.mm-grade.none { color: #6b7280; border-color: #d1d5db; background: #f9fafb; font-weight: 600; }
+.mm-muted { font-size: .85rem; color: #9ca3af; margin-bottom: 1.25rem; }
+.mm-skyline { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 60px; opacity: .4; pointer-events: none; z-index: 0; }
 .mm-fade-enter-active, .mm-fade-leave-active { transition: opacity .2s; }
 .mm-fade-enter-active .mm-dialog, .mm-fade-leave-active .mm-dialog { transition: transform .2s; }
 .mm-fade-enter-from, .mm-fade-leave-to { opacity: 0; }
@@ -426,9 +464,24 @@ onMounted(async () => {
   .filters-row { flex-direction: column; }
   .filter-sel, .filter-reset { width: 100%; justify-content: center; }
   .mm-overlay { align-items: flex-end; padding: 0; }
-  .mm-dialog { max-width: none; border-radius: 18px 18px 0 0; max-height: 92vh; max-height: 92dvh; }
-  .mm-head { padding: 1rem 1.1rem; }
-  .mm-body { padding: 1rem 1.1rem 1.25rem; }
-  .mm-icon { width: 48px; height: 48px; }
+  .mm-dialog { max-width: none; border-radius: 20px 20px 0 0; max-height: 92vh; max-height: 92dvh; }
+  .mm-head { padding: 1.1rem 1rem 1.4rem; gap: .75rem; }
+  .mm-head-photo { width: 80%; }
+  .mm-title { font-size: 1rem; }
+  .mm-icon { width: 54px; height: 54px; border-radius: 14px; }
+  .mm-icon svg { width: 26px; height: 26px; }
+  .mm-close { width: 38px; height: 38px; }
+  .mm-body { padding: 1rem 1rem 4rem; }
+  .mm-info { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
+  .mm-info-item { padding: .7rem; gap: .55rem; }
+  .mm-info-ico { width: 38px; height: 38px; }
+  .mm-val { font-size: 1rem; }
+  .mm-sec-title { font-size: .98rem; }
+  .mm-field-ico { width: 46px; }
+  .mm-field-name { font-size: .92rem; }
+  .mm-spec { padding: .55rem .75rem; padding-right: 2.1rem; gap: .6rem; }
+  .mm-spec::before { right: 1.15rem; }
+  .mm-spec-name { font-size: .88rem; }
+  .mm-grade { min-width: 84px; font-size: .78rem; padding: .25rem .6rem; }
 }
 </style>
