@@ -6,7 +6,14 @@ import PublicFooter from '@/components/PublicFooter.vue'
 <template>
   <div dir="rtl" class="lp-layout">
     <PublicNavbar />
-    <RouterView />
+    <!-- each public page fades/slides in when navigating from the header (off for reduced motion) -->
+    <RouterView v-slot="{ Component, route }">
+      <Transition name="lp-page" mode="out-in">
+        <div :key="route.path" class="lp-page">
+          <component :is="Component" />
+        </div>
+      </Transition>
+    </RouterView>
     <PublicFooter />
   </div>
 </template>
@@ -25,6 +32,16 @@ import PublicFooter from '@/components/PublicFooter.vue'
 }
 @media (max-width: 1100px) {
   .lp-layout { --pub-nav-h: 103px; }
+}
+
+/* page wrapper keeps one element root for the transition, whatever the page renders */
+.lp-page { display: flex; flex-direction: column; flex: 1 0 auto; }
+.lp-page-enter-active { transition: opacity .38s ease-out, transform .45s cubic-bezier(.2, .8, .3, 1); }
+.lp-page-leave-active { transition: opacity .14s ease-in, transform .14s ease-in; }
+.lp-page-enter-from { opacity: 0; transform: translateY(18px); }
+.lp-page-leave-to { opacity: 0; transform: translateY(-6px); }
+@media (prefers-reduced-motion: reduce) {
+  .lp-page-enter-active, .lp-page-leave-active { transition: none; }
 }
 </style>
 
