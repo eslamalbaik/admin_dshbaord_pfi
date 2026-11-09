@@ -237,7 +237,7 @@ onMounted(() => {
           <span class="accent">المقاولات</span> الوطنية
         </h1>
         <p v-enter :delay="240" class="hero-desc">
-          نقدم منظومة خدمات الكترونية وتصنيفية متكاملة لجميع المقاولين المسجلين لضمان كفاءة التنفيذ والارتقاء بالقورة الانتاجية
+          نقدم منظومة خدمات الكترونية وتصنيفية متكاملة لجميع المقاولين المسجلين لضمان كفاءة التنفيذ والارتقاء بالقوة الانتاجية
         </p>
         <div v-enter :delay="360" class="hero-actions">
           <RouterLink to="/landing/members" class="hero-btn hero-btn-solid">

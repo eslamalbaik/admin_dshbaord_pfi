@@ -187,7 +187,7 @@ onMounted(() => {
       <div class="pub-container"><div class="pub-nb-inner">
         <RouterLink to="/landing" class="pub-brand">
           <img src="/logo.png" alt="اتحاد المقاولين الفلسطينيين" class="pub-brand-logo" />
-          <span class="pub-brand-name">اتحاد المقاولين الفلسطينيين<small>Palestinian Contractor Union</small></span>
+          <span class="pub-brand-name">اتحاد المقاولين الفلسطينيين<small>Palestinian Contractors Union</small></span>
         </RouterLink>
 
         <div class="pub-nav-links">
