@@ -679,7 +679,8 @@ const deleteEvent = async () => {
                   :rules="[v => !!v || 'مطلوب لأن نوع الحضور وجاهي أو وجاهي + أونلاين']"
                 />
               </VCol>
-              <VCol v-show="form.event_format !== 'onsite'" cols="12" md="6">
+              <!-- رابط Zoom بس لما نوع الحضور أونلاين أو وجاهي + أونلاين — بدون نوع حضور ما في داعي يظهر (بند 21) -->
+              <VCol v-show="form.event_format === 'online' || form.event_format === 'hybrid'" cols="12" md="6">
                 <VTextField
                   v-model="form.stream_url"
                   label="رابط البث المباشر (Zoom)"
