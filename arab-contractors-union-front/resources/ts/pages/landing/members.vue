@@ -2,7 +2,7 @@
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import api from '@/plugins/axios'
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { Search, Award, Filter, ChevronLeft, Building2, X, Hash, CalendarDays, MapPin, BadgeCheck, Layers } from 'lucide-vue-next'
+import { Search, Award, Filter, ChevronLeft, Building2, X, Hash, CalendarDays, MapPin, Layers } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
@@ -15,7 +15,7 @@ interface Member {
   member_since: number | null
   membership_status: 'active' | 'expired' | 'suspended'
   status_label: string
-  fields: { name: string; grades: string[] }[]
+  fields: { name: string; grades: string[]; specializations?: { name: string; grade: string | null }[] }[]
   specializations: { name: string; grade: string | null }[]
 }
 
@@ -60,8 +60,43 @@ const statusClass = (s: string) => (s === 'active' ? 'active' : s === 'suspended
 
 const cardGrades = (m: Member) => [...new Set(m.fields.flatMap(f => f.grades))]
 
+interface FieldGroup { name: string; grades: string[]; specs: { name: string; grade: string | null }[] }
+
+// الاختصاصات فرع من المجالات: نجمّع كل اختصاص تحت مجاله.
+// إن رجّع الـ API الاختصاصات داخل المجال نستخدمها، وإلا نطابقها مع شجرة المجالات من /filters.
+function groupFields(m: Member): FieldGroup[] {
+  if (m.fields.some(f => Array.isArray(f.specializations)))
+    return m.fields.map(f => ({ name: f.name, grades: f.grades, specs: f.specializations ?? [] }))
+
+  const left = [...m.specializations]
+  const groups: FieldGroup[] = m.fields.map(f => {
+    const opt = fieldOptions.value.find(o => o.label === f.name)
+    const labels = new Set(opt?.specializations.map(s => s.label) ?? [])
+    const specs: FieldGroup['specs'] = []
+
+    for (let i = 0; i < left.length;) {
+      if (labels.has(left[i].name))
+        specs.push(...left.splice(i, 1))
+      else
+        i++
+    }
+
+    return { name: f.name, grades: f.grades, specs }
+  })
+
+  if (left.length) {
+    if (groups.length === 1)
+      groups[0].specs.push(...left)
+    else
+      groups.push({ name: 'اختصاصات أخرى', grades: [], specs: left })
+  }
+
+  return groups
+}
+
 // نافذة بيانات تصنيف الشركة — من نفس بيانات الدليل العام، بدون أي طلب إضافي
 const selected = ref<Member | null>(null)
+const selectedGroups = computed(() => (selected.value ? groupFields(selected.value) : []))
 
 function openMember(m: Member) {
   selected.value = m
@@ -257,31 +292,25 @@ onMounted(async () => {
                 </div>
               </div>
 
-              <h3 class="mm-sec-title"><Layers :size="17" /> المجالات والدرجات</h3>
-              <div v-if="selected.fields.length" class="mm-fields">
-                <div v-for="(f, i) in selected.fields" :key="i" class="mm-field">
-                  <span class="mm-field-name">{{ f.name }}</span>
-                  <span class="mm-grades">
-                    <span v-for="g in f.grades" :key="g" class="member-class"><Award :size="11" /> {{ g }}</span>
-                    <span v-if="!f.grades.length" class="mm-muted">بدون درجة</span>
-                  </span>
+              <h3 class="mm-sec-title"><Layers :size="17" /> التصنيف: المجالات والاختصاصات</h3>
+              <div v-if="selectedGroups.length" class="mm-fields">
+                <div v-for="(f, i) in selectedGroups" :key="i" class="mm-field">
+                  <div class="mm-field-head">
+                    <span class="mm-field-name">{{ f.name }}</span>
+                    <span v-if="!f.specs.length" class="mm-grades">
+                      <span v-for="g in f.grades" :key="g" class="member-class"><Award :size="11" /> {{ g }}</span>
+                    </span>
+                  </div>
+                  <ul v-if="f.specs.length" class="mm-specs">
+                    <li v-for="(s, j) in f.specs" :key="j" class="mm-spec">
+                      <span class="mm-spec-name">{{ s.name }}</span>
+                      <span v-if="s.grade" class="member-class"><Award :size="11" /> {{ s.grade }}</span>
+                      <span v-else class="mm-muted-sm">بدون درجة</span>
+                    </li>
+                  </ul>
                 </div>
               </div>
-              <p v-else class="mm-muted">لا توجد مجالات مسجّلة</p>
-
-              <h3 class="mm-sec-title"><BadgeCheck :size="17" /> الاختصاصات</h3>
-              <div v-if="selected.specializations.length" class="mm-table-wrap">
-                <table class="mm-table">
-                  <thead><tr><th>الاختصاص</th><th>الدرجة</th></tr></thead>
-                  <tbody>
-                    <tr v-for="(s, i) in selected.specializations" :key="i">
-                      <td>{{ s.name }}</td>
-                      <td>{{ s.grade || '—' }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <p v-else class="mm-muted">لا توجد اختصاصات مسجّلة</p>
+              <p v-else class="mm-muted">لا يوجد تصنيف مسجّل</p>
             </div>
           </div>
         </div>
@@ -362,17 +391,18 @@ onMounted(async () => {
 .mm-val { font-size: .9rem; font-weight: 700; color: #0d1b3e; overflow-wrap: anywhere; }
 .mm-sec-title { display: flex; align-items: center; gap: .45rem; font-size: .95rem; font-weight: 800; color: #1a237e; margin: 0 0 .75rem; }
 .mm-sec-title svg { color: #f9a825; }
-.mm-fields { display: flex; flex-direction: column; gap: .55rem; margin-bottom: 1.4rem; }
-.mm-field { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem; border: 1px solid #e5e7eb; border-radius: 12px; padding: .65rem .85rem; }
-.mm-field-name { font-size: .88rem; font-weight: 700; color: #374151; overflow-wrap: anywhere; min-width: 0; }
+.mm-fields { display: flex; flex-direction: column; gap: .75rem; }
+.mm-field { border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; }
+.mm-field-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem; padding: .65rem .9rem; background: #e8eaf6; border-right: 4px solid #f9a825; }
+.mm-field-name { font-size: .9rem; font-weight: 800; color: #1a237e; overflow-wrap: anywhere; min-width: 0; }
 .mm-grades { display: flex; flex-wrap: wrap; gap: .35rem; }
-.mm-table-wrap { border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; }
-.mm-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: .85rem; }
-.mm-table th { background: #e8eaf6; color: #1a237e; font-weight: 800; text-align: right; padding: .6rem .85rem; }
-.mm-table th:last-child, .mm-table td:last-child { width: 34%; }
-.mm-table td { padding: .6rem .85rem; border-top: 1px solid #f0f1f4; color: #374151; overflow-wrap: anywhere; vertical-align: top; }
-.mm-table tbody tr:nth-child(even) td { background: #fafbff; }
-.mm-table td:last-child { font-weight: 700; color: #1a237e; }
+.mm-specs { list-style: none; }
+.mm-spec { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .55rem .9rem .55rem .9rem; padding-right: 1.6rem; border-top: 1px solid #f0f1f4; position: relative; }
+.mm-spec::before { content: ''; position: absolute; right: .9rem; top: 50%; width: 6px; height: 6px; border-radius: 50%; background: #c5cae9; transform: translateY(-50%); }
+.mm-spec:nth-child(even) { background: #fafbff; }
+.mm-spec-name { font-size: .85rem; color: #374151; overflow-wrap: anywhere; min-width: 0; }
+.mm-spec .member-class { flex-shrink: 0; }
+.mm-muted-sm { font-size: .74rem; color: #9ca3af; flex-shrink: 0; }
 .mm-muted { font-size: .82rem; color: #9ca3af; margin-bottom: 1.25rem; }
 .mm-fade-enter-active, .mm-fade-leave-active { transition: opacity .2s; }
 .mm-fade-enter-active .mm-dialog, .mm-fade-leave-active .mm-dialog { transition: transform .2s; }
