@@ -242,6 +242,8 @@ Route::prefix('v1')->group(function () {
     // --------------------------------------------------------
     Route::get('landing/home', [\App\Http\Controllers\Api\LandingController::class, 'home']);
     // دليل شركات المقاولات المعتمدة (بحث عام بالاسم أو رقم العضوية)
+    Route::get('contractors-directory/filters', [\App\Http\Controllers\Api\LandingController::class, 'directoryFilters'])
+        ->middleware('throttle:60,1');
     Route::get('contractors-directory', [\App\Http\Controllers\Api\LandingController::class, 'directory'])
         ->middleware('throttle:60,1');
 
