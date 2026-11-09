@@ -53,4 +53,49 @@ import PublicFooter from '@/components/PublicFooter.vue'
 .lp-layout .v-btn {
   font-family: 'Tajawal', 'Cairo', sans-serif !important;
 }
+
+/* ── Shared inner-page hero: construction photo + navy/orange overlay (every public inner page) ──
+   Pages keep their own markup/typography; this only swaps the background, so it must out-rank their scoped rules. */
+.lp-layout .lp-page .page-hero,
+.lp-layout .lp-page .page-header,
+.lp-layout .lp-page .vp-hero {
+  position: relative; overflow: hidden; isolation: isolate;
+  background-color: #000068;
+  background-image:
+    linear-gradient(260deg, rgba(0, 0, 80, .94) 0%, rgba(0, 0, 110, .84) 42%, rgba(0, 0, 110, .5) 75%, rgba(0, 0, 80, .4) 100%),
+    url('/images/landing/inner-hero.webp');
+  background-size: cover; background-position: center 38%; background-repeat: no-repeat;
+  border-bottom: 0;
+  text-align: start;
+}
+/* orange accent line along the bottom edge, like the brand's yellow/orange rule */
+.lp-layout .lp-page .page-hero::after,
+.lp-layout .lp-page .page-header::after,
+.lp-layout .lp-page .vp-hero::after {
+  content: ''; position: absolute; inset-inline: 0; bottom: 0; height: 4px; z-index: 3; pointer-events: none;
+  background: linear-gradient(90deg, #f5a623 0%, #d67a00 40%, rgba(214, 122, 0, 0) 100%);
+}
+.lp-layout .lp-page .page-hero::before,
+.lp-layout .lp-page .vp-hero::before { display: none; }
+.lp-layout .lp-page .page-hero-shapes,
+.lp-layout .lp-page .vp-hero-glow { display: none; }
+.lp-layout .lp-page .page-hero { padding-bottom: 2.5rem; }
+.lp-layout .lp-page .page-header { padding-bottom: 2.5rem; }
+.lp-layout .lp-page .vp-hero { padding-bottom: 5.5rem; }
+/* titles on the news/events header were navy-on-light */
+.lp-layout .lp-page .page-header .page-title { color: #fff; text-shadow: 0 3px 18px rgba(0, 0, 40, .45); }
+.lp-layout .lp-page .page-header .page-desc { color: rgba(255, 255, 255, .86); margin-inline: 0; max-width: 600px; }
+.lp-layout .lp-page .vp-hero-inner { text-align: start; align-items: flex-start; }
+.lp-layout .lp-page .vp-crumb { justify-content: flex-start; }
+.lp-layout .lp-page .vp-sub { margin-inline: 0; }
+@media (max-width: 760px) {
+  .lp-layout .lp-page .page-hero,
+  .lp-layout .lp-page .page-header,
+  .lp-layout .lp-page .vp-hero {
+    background-image:
+      linear-gradient(180deg, rgba(0, 0, 80, .9) 0%, rgba(0, 0, 110, .8) 60%, rgba(0, 0, 80, .75) 100%),
+      url('/images/landing/inner-hero-sm.webp');
+    background-position: 62% center;
+  }
+}
 </style>

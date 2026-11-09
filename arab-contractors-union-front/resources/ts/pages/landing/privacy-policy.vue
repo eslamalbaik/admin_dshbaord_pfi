@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import { computed } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import axios from 'axios'
@@ -31,6 +32,7 @@ const sections = computed(() => data.value ?? [])
         <h1 class="page-hero-title">سياسة الخصوصية</h1>
         <p class="page-hero-desc">آخر تحديث: ١ يناير ٢٠٢٤</p>
       </div>
+      <div class="pub-cont"><PublicSocialFollow /></div>
     </div>
 
     <section class="legal-section">

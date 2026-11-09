@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import { ref, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Search, Calendar, ChevronLeft, Filter, ExternalLink, FileText } from 'lucide-vue-next'
@@ -192,6 +193,7 @@ function openTender(t: Tender) {
         <h1 class="page-hero-title">العطاءات</h1>
         <p class="page-hero-desc">أحدث العطاءات الحكومية المتاحة للشركات الأعضاء في الاتحاد</p>
       </div>
+      <div class="pub-cont"><PublicSocialFollow /></div>
     </div>
 
     <section class="pub-section">

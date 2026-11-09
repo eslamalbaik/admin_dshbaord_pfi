@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import { ref, computed } from 'vue'
 import { Search, Download, FileText, Clock, Eye } from 'lucide-vue-next'
 
@@ -48,6 +49,7 @@ const filteredFiles = computed(() => {
         <h1 class="page-hero-title">مكتبة الملفات والنماذج</h1>
         <p class="page-hero-desc">مكتبة رقمية شاملة تضم النماذج والاستمارات والأدلة والتقارير والتعاميم</p>
       </div>
+      <div class="pub-cont"><PublicSocialFollow /></div>
     </div>
 
     <section class="pub-section">

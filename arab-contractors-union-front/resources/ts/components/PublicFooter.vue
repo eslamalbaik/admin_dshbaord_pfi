@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import PublicSocialIcon from '@/components/PublicSocialIcon.vue'
+import { PUBLIC_SOCIAL_LINKS } from '@/utils/publicSocialLinks'
 import { ref } from 'vue'
 import { Clock, Mail, MapPin, Phone } from 'lucide-vue-next'
 
@@ -47,17 +49,8 @@ const branch = ref<keyof typeof branches>('gaza')
           الممثل الرسمي لقطاع المقاولات في فلسطين منذ أكثر من ثلاثة عقود، نعمل على تطوير القطاع وحماية حقوق الأعضاء.
         </p>
         <div class="pub-footer-social">
-          <a href="#" class="pub-fsoc" aria-label="Facebook">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" /></svg>
-          </a>
-          <a href="#" class="pub-fsoc" aria-label="Instagram">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r=".8" fill="currentColor" /></svg>
-          </a>
-          <a href="#" class="pub-fsoc" aria-label="LinkedIn">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 9h4v11H4zM6 4.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM11 9h3.8v1.6c.6-1 1.8-1.9 3.6-1.9 3.4 0 3.6 2.2 3.6 5V20h-4v-5.3c0-1.3 0-2.9-1.8-2.9S14 13.2 14 14.6V20h-3z" /></svg>
-          </a>
-          <a href="#" class="pub-fsoc" aria-label="X">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.8 3h3.1l-6.8 7.7L22 21h-6.2l-4.9-6.3L5.3 21H2.2l7.2-8.3L2 3h6.3l4.4 5.8zm-1.1 16.2h1.7L7.4 4.7H5.6z" /></svg>
+          <a v-for="s in PUBLIC_SOCIAL_LINKS" :key="s.key" :href="s.href" target="_blank" rel="noopener noreferrer" class="pub-fsoc" :aria-label="s.label">
+            <PublicSocialIcon :name="s.key" :size="20" />
           </a>
         </div>
       </div>

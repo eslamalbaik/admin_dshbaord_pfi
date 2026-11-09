@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import { Check, Star, Lightbulb, Shield, Users, Target, Award, Globe, TrendingUp } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
@@ -50,6 +51,7 @@ const achievements = [
         <h1 class="page-hero-title">عن الاتحاد</h1>
         <p class="page-hero-desc">تعرّف على اتحاد المقاولين الفلسطينيين — تاريخه، رسالته، ورؤيته</p>
       </div>
+      <div class="pub-cont"><PublicSocialFollow /></div>
     </div>
 
     <!-- Overview -->

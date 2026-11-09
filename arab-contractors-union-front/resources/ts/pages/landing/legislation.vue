@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import { FileText, Download, ExternalLink, Calendar } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
@@ -42,6 +43,7 @@ const filteredDocs = computed(() => docs.filter(d => d.cat === activecat.value))
         <h1 class="page-hero-title">التشريعات والأنظمة</h1>
         <p class="page-hero-desc">القوانين والأنظمة وعقود الفيديك والأدلة الإرشادية المتعلقة بقطاع المقاولات</p>
       </div>
+      <div class="pub-cont"><PublicSocialFollow /></div>
     </div>
 
     <section class="pub-section">

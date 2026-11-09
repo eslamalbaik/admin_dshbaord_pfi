@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import PublicSocialIcon from '@/components/PublicSocialIcon.vue'
+import { PUBLIC_SOCIAL_LINKS } from '@/utils/publicSocialLinks'
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Menu, X, ChevronDown, LayoutDashboard, User, LogOut, Bell, Mail, Phone, MapPin } from 'lucide-vue-next'
@@ -177,19 +179,9 @@ onMounted(() => {
         <a :href="`mailto:${contact.email}`" class="pub-tb-item"><Mail :size="15" /><span>{{ contact.email }}</span></a>
         <a :href="`tel:${contact.phone}`" class="pub-tb-item"><Phone :size="15" /><span dir="ltr">{{ contact.phone }}</span></a>
         <span class="pub-tb-item pub-tb-address"><MapPin :size="15" /><span>{{ contact.address }}</span></span>
-        <!-- same icons as PublicFooter.vue; real profile URLs still pending (href="#") -->
         <div class="pub-tb-social">
-          <a href="#" class="pub-tb-soc" aria-label="Facebook">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" /></svg>
-          </a>
-          <a href="#" class="pub-tb-soc" aria-label="Instagram">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r=".8" fill="currentColor" /></svg>
-          </a>
-          <a href="#" class="pub-tb-soc" aria-label="LinkedIn">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 9h4v11H4zM6 4.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM11 9h3.8v1.6c.6-1 1.8-1.9 3.6-1.9 3.4 0 3.6 2.2 3.6 5V20h-4v-5.3c0-1.3 0-2.9-1.8-2.9S14 13.2 14 14.6V20h-3z" /></svg>
-          </a>
-          <a href="#" class="pub-tb-soc" aria-label="X">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.8 3h3.1l-6.8 7.7L22 21h-6.2l-4.9-6.3L5.3 21H2.2l7.2-8.3L2 3h6.3l4.4 5.8zm-1.1 16.2h1.7L7.4 4.7H5.6z" /></svg>
+          <a v-for="s in PUBLIC_SOCIAL_LINKS" :key="s.key" :href="s.href" target="_blank" rel="noopener noreferrer" class="pub-tb-soc" :aria-label="s.label">
+            <PublicSocialIcon :name="s.key" :size="15" />
           </a>
         </div>
       </div>

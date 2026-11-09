@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import { ref, computed } from 'vue'
 import { Building2, Calendar, MapPin, Eye, Filter } from 'lucide-vue-next'
 
@@ -40,6 +41,7 @@ const filtered = computed(() => activeTab.value === 'all' ? items : items.filter
         <h1 class="page-hero-title">المشاريع والمعارض</h1>
         <p class="page-hero-desc">أبرز المشاريع الوطنية والمعارض والمؤتمرات والمبادرات التي يشارك فيها الاتحاد</p>
       </div>
+      <div class="pub-cont"><PublicSocialFollow /></div>
     </div>
 
     <section class="pub-section">

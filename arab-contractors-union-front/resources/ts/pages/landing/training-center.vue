@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import { GraduationCap, Clock, Users, Calendar, ChevronLeft, ShieldCheck, ChartBar, FileText, BookOpen } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
@@ -35,6 +36,7 @@ const levelBg: Record<string,string> = { مبتدئ:'#e8f5e9', متوسط:'#fff8
           <div class="hs-item"><span class="hs-num">٤٠+</span><span class="hs-lbl">مدرب معتمد</span></div>
         </div>
       </div>
+      <div class="pub-cont"><PublicSocialFollow /></div>
     </div>
 
     <!-- Courses -->
