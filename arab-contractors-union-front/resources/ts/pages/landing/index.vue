@@ -84,7 +84,7 @@ const stats = computed(() => [
 
 // ─── Tenders ─────────────────────────────────────────────────────────────────
 interface TenderCard { id: number | null; title: string; desc: string; category: string; image: string; closingSoon: boolean; deadline: string }
-// صورة العطاءات الأساسية — بتظهر لكل عطاء بغض النظر عن صورة تصنيفه (طلب المالك)
+// صورة العطاء = صورة تصنيفه الحالية من لوحة التحكم (category_image)، و/tenders.webp فقط لو التصنيف بلا صورة
 const TENDER_PLACEHOLDER = '/tenders.webp'
 const sampleTender = (closingSoon: boolean): TenderCard => ({
   id: null,
@@ -209,7 +209,7 @@ async function loadTenders() {
         title: t.title,
         desc: plainText(t.description, 140),
         category: t.category || 'عطاء عام',
-        image: TENDER_PLACEHOLDER,
+        image: t.category_image || TENDER_PLACEHOLDER,
         closingSoon: !!t.closing_soon,
         deadline: fmtDate(t.deadline),
       }))
