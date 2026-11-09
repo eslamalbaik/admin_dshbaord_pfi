@@ -342,7 +342,6 @@ onMounted(fetchNews)
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1.5rem;
-  perspective: 1400px;
 }
 
 .news-card {

@@ -626,7 +626,7 @@ onMounted(() => {
 .stat-orange .stat-icon { background: var(--orange-soft); color: var(--orange); }
 
 /* ══ CARDS ══ */
-.cards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; perspective: 1400px; }
+.cards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
 
 .tender-card { border: 1px solid #dfe2ea; border-radius: 14px; overflow: hidden; background: #fff; display: flex; flex-direction: column; }
 .tender-img { position: relative; height: 198px; }
