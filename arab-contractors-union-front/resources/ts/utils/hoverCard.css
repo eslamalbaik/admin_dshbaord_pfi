@@ -1,0 +1,142 @@
+/*
+ * حركة hover لكروت العطاءات والأخبار (الصفحة الرئيسية + صفحة الأخبار + صفحة العطاءات).
+ * الألوان من هوية الاتحاد: كحلي #00006e وبرتقالي #f5a623 / #d67a00.
+ * بنستخدم translate / rotate / scale المستقلة (مش transform) عشان ما نتعارك مع
+ * حركة الظهور v-reveal اللي بتكتب transform على نفس العنصر.
+ *
+ * عناصر اختيارية جوّا الكرت:
+ *   .hc-media  : حاوية الصورة (زوم + لمعة بتقطع الصورة)
+ *   .hc-title  : العنوان (بيصير كحلي)
+ *   .hc-arrow  : سهم "اقرأ المزيد / عرض التفاصيل" (بيتقدم لقدام)
+ */
+
+@property --hc-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.hc {
+  --hc-ease: cubic-bezier(.22, 1, .36, 1);
+  position: relative;
+  isolation: isolate;
+  transform-style: preserve-3d;
+  transition:
+    translate .55s var(--hc-ease),
+    rotate .55s var(--hc-ease),
+    scale .55s var(--hc-ease),
+    box-shadow .55s var(--hc-ease),
+    border-color .4s ease;
+}
+
+/* إطار متدرّج كحلي/برتقالي بيلف حوالين الكرت */
+.hc::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--hc-angle),
+    #00006e 0deg,
+    #f5a623 70deg,
+    #d67a00 110deg,
+    rgba(0, 0, 110, .15) 180deg,
+    rgba(0, 0, 110, .15) 260deg,
+    #00006e 360deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity .45s ease;
+  pointer-events: none;
+}
+
+/* ضوء برتقالي ناعم بيلحق الماوس */
+.hc::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: inherit;
+  background: radial-gradient(380px circle at var(--mx, 50%) var(--my, 30%), rgba(245, 166, 35, .14), transparent 55%);
+  opacity: 0;
+  transition: opacity .45s ease;
+  pointer-events: none;
+}
+
+.hc .hc-media {
+  position: relative;
+  overflow: hidden;
+}
+
+.hc .hc-media img {
+  transition: scale .9s var(--hc-ease), filter .6s ease;
+}
+
+/* لمعة بيضاء بتقطع الصورة مرة وحدة عند الدخول */
+.hc .hc-media::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, .5) 47%, rgba(255, 245, 225, .25) 53%, transparent 68%);
+  translate: 110% 0;
+  pointer-events: none;
+}
+
+.hc .hc-title { transition: color .35s ease; }
+.hc .hc-arrow { transition: translate .45s var(--hc-ease); }
+
+@media (hover: hover) and (pointer: fine) {
+  .hc:hover {
+    translate: 0 -10px;
+    rotate: var(--hc-rot, 0 0 1 0deg);
+    scale: 1.015;
+    border-color: transparent !important;
+    box-shadow:
+      0 28px 50px -18px rgba(0, 0, 110, .38),
+      0 10px 22px -10px rgba(214, 122, 0, .3);
+    z-index: 2;
+  }
+
+  .hc:hover::before {
+    opacity: 1;
+    animation: hc-spin 3.2s linear infinite;
+  }
+
+  .hc:hover::after { opacity: 1; }
+
+  .hc:hover .hc-media img {
+    scale: 1.09;
+    filter: saturate(1.15) contrast(1.04);
+  }
+
+  .hc:hover .hc-media::before {
+    translate: -110% 0;
+    transition: translate 1s var(--hc-ease);
+  }
+
+  .hc:hover .hc-title { color: #00006e; }
+  .hc:hover .hc-arrow { translate: -6px 0; }
+}
+
+@keyframes hc-spin {
+  to { --hc-angle: 360deg; }
+}
+
+/* اللي مفعّل تقليل الحركة: بس ظل وإطار ثابت، بدون رفع/ميلان/لمعة/زوم */
+@media (prefers-reduced-motion: reduce) {
+  .hc,
+  .hc .hc-media img,
+  .hc .hc-arrow { transition: box-shadow .2s ease, border-color .2s ease; }
+
+  .hc:hover { translate: none !important; rotate: none !important; scale: none !important; }
+  .hc:hover::before { animation: none !important; }
+  .hc:hover .hc-media img { scale: none !important; }
+  .hc .hc-media::before { display: none; }
+  .hc:hover .hc-arrow { translate: none; }
+}

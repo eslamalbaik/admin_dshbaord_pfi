@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import api from '@/plugins/axios'
 import PublicNewsTicker from '@/components/PublicNewsTicker.vue'
 import { MotionDirective } from '@vueuse/motion'
+import { vHoverCard } from '@/utils/hoverCard'
 import {
   ArrowLeft, Award, Bookmark, Building2, CalendarDays, ChevronLeft, ChevronRight, Clock, FileSignature,
   FileText, Hourglass, Loader2, MapPin, Play, Search, SearchX, ShieldCheck, UserCheck,
@@ -317,8 +318,8 @@ onMounted(() => {
         </div>
 
         <div class="cards-grid">
-          <article v-for="(t, i) in visibleTenders" :key="`${t.id}-${i}`" v-reveal :delay="i * 120" class="tender-card">
-            <div class="tender-img">
+          <article v-for="(t, i) in visibleTenders" :key="`${t.id}-${i}`" v-reveal v-hover-card :delay="i * 120" class="tender-card">
+            <div class="tender-img hc-media">
               <img :src="t.image" :alt="t.title" loading="lazy">
               <span v-if="t.closingSoon" class="status status-soon"><Hourglass :size="13" /> قريب الاغلاق</span>
               <span v-else class="status status-open"><i />مفتوح لتقديم</span>
@@ -326,13 +327,13 @@ onMounted(() => {
               <span class="tender-cat">{{ t.category }}</span>
             </div>
             <div class="tender-body">
-              <h3>{{ t.title }}</h3>
+              <h3 class="hc-title">{{ t.title }}</h3>
               <p class="clamp-2">{{ t.desc }}</p>
               <div class="deadline" :class="{ soon: t.closingSoon }">
                 <span class="deadline-label"><Clock :size="18" /> {{ t.closingSoon ? 'ينتهي قريبا :' : 'الموعد النهائي :' }}</span>
                 <span class="deadline-date">{{ t.deadline }}</span>
               </div>
-              <button class="btn-navy tender-btn" @click="openTender(t)">عرض التفاصيل <ChevronLeft :size="18" /></button>
+              <button class="btn-navy tender-btn" @click="openTender(t)">عرض التفاصيل <ChevronLeft :size="18" class="hc-arrow" /></button>
             </div>
           </article>
         </div>
@@ -406,13 +407,13 @@ onMounted(() => {
         </div>
 
         <div class="cards-grid">
-          <article v-for="(n, i) in visibleNews" :key="n.key" v-reveal :delay="i * 120" class="news-card">
-            <img :src="n.image" :alt="n.title" class="news-img" loading="lazy">
+          <article v-for="(n, i) in visibleNews" :key="n.key" v-reveal v-hover-card :delay="i * 120" class="news-card">
+            <div class="hc-media"><img :src="n.image" :alt="n.title" class="news-img" loading="lazy"></div>
             <div class="news-body">
               <span v-if="n.date" class="news-date">{{ n.date }}</span>
-              <h3>{{ n.title }}</h3>
+              <h3 class="hc-title">{{ n.title }}</h3>
               <p class="clamp-2">{{ n.excerpt }}</p>
-              <RouterLink :to="n.to" class="read-more">أقرأ المزيد <ArrowLeft :size="16" /></RouterLink>
+              <RouterLink :to="n.to" class="read-more">أقرأ المزيد <ArrowLeft :size="16" class="hc-arrow" /></RouterLink>
             </div>
           </article>
         </div>
@@ -625,7 +626,7 @@ onMounted(() => {
 .stat-orange .stat-icon { background: var(--orange-soft); color: var(--orange); }
 
 /* ══ CARDS ══ */
-.cards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.cards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; perspective: 1400px; }
 
 .tender-card { border: 1px solid #dfe2ea; border-radius: 14px; overflow: hidden; background: #fff; display: flex; flex-direction: column; }
 .tender-img { position: relative; height: 198px; }

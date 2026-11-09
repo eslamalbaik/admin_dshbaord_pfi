@@ -2,6 +2,7 @@
 import { ref, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Search, Calendar, ChevronLeft, Filter, ExternalLink, FileText } from 'lucide-vue-next'
+import { vHoverCard } from '@/utils/hoverCard'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
@@ -274,11 +275,12 @@ function openTender(t: Tender) {
           <div
             v-for="t in tenders"
             :key="t.id"
+            v-hover-card="{ tilt: 1.5 }"
             class="tender-card"
             :style="`--tc:${colorFor(t.id)}`"
           >
             <div class="tender-color-bar" />
-            <div class="tender-thumb">
+            <div class="tender-thumb hc-media">
               <img :src="TENDER_IMAGE" :alt="t.title" loading="lazy">
             </div>
             <div class="tender-body">
@@ -294,7 +296,7 @@ function openTender(t: Tender) {
                     <span class="tender-status" :class="statusClass[t.status]">{{ statusLabel[t.status] ?? t.status }}</span>
                     <span v-if="t.closing_soon" class="tender-status status-closing">ينتهي قريباً</span>
                   </div>
-                  <h3 class="tender-title">{{ t.title }}</h3>
+                  <h3 class="tender-title hc-title">{{ t.title }}</h3>
                 </div>
               </div>
               <div class="tender-info">
@@ -308,7 +310,7 @@ function openTender(t: Tender) {
               :style="`background:${colorFor(t.id)}`"
               @click="openTender(t)"
             >
-              عرض التفاصيل <ChevronLeft :size="14" />
+              عرض التفاصيل <ChevronLeft :size="14" class="hc-arrow" />
             </button>
           </div>
         </div>
@@ -362,9 +364,8 @@ function openTender(t: Tender) {
 .filter-reset:hover { background: #1a237e; color: #fff; }
 .results-count { font-size: .85rem; color: #9ca3af; margin-bottom: 1.25rem; }
 
-.tenders-list { display: flex; flex-direction: column; gap: 1.25rem; }
-.tender-card { display: flex; gap: 1.5rem; align-items: center; background: #fff; border: 1.5px solid #e5e7eb; border-radius: 16px; overflow: hidden; transition: all .25s; }
-.tender-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,.1); transform: translateY(-3px); border-color: #c5cae9; }
+.tenders-list { display: flex; flex-direction: column; gap: 1.25rem; perspective: 2000px; }
+.tender-card { display: flex; gap: 1.5rem; align-items: center; background: #fff; border: 1.5px solid #e5e7eb; border-radius: 16px; overflow: hidden; }
 .tender-color-bar { width: 6px; background: var(--tc); flex-shrink: 0; align-self: stretch; }
 .tender-body { flex: 1; min-width: 0; padding: 1.25rem 0; }
 .tender-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: .875rem; }
