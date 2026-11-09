@@ -277,7 +277,7 @@ function openTender(t: Tender) {
           <div
             v-for="t in tenders"
             :key="t.id"
-            v-hover-card="{ tilt: 1.5 }"
+            v-hover-card
             class="tender-card"
             :style="`--tc:${colorFor(t.id)}`"
           >
@@ -366,7 +366,7 @@ function openTender(t: Tender) {
 .filter-reset:hover { background: #1a237e; color: #fff; }
 .results-count { font-size: .85rem; color: #9ca3af; margin-bottom: 1.25rem; }
 
-.tenders-list { display: flex; flex-direction: column; gap: 1.25rem; perspective: 2000px; }
+.tenders-list { display: flex; flex-direction: column; gap: 1.25rem; }
 .tender-card { display: flex; gap: 1.5rem; align-items: center; background: #fff; border: 1.5px solid #e5e7eb; border-radius: 16px; overflow: hidden; }
 .tender-color-bar { width: 6px; background: var(--tc); flex-shrink: 0; align-self: stretch; }
 .tender-body { flex: 1; min-width: 0; padding: 1.25rem 0; }
