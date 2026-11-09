@@ -143,8 +143,13 @@ class SupportTicketController extends Controller
      */
     public function myTickets(Request $request)
     {
+        $request->validate([
+            'status' => 'nullable|in:' . implode(',', array_keys(SupportTicket::STATUS_LABELS)),
+        ]);
+
         $paginator = SupportTicket::with(['repliedBy:id,name', 'messages'])
             ->where('contractor_id', $request->user()->id)
+            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
             ->latest()
             ->paginate($request->integer('per_page', 15))
             ->through(fn ($t) => $this->format($t));
