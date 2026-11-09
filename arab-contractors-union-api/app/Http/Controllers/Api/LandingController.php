@@ -112,10 +112,35 @@ class LandingController extends Controller
             });
         }
 
-        $page = $query->orderByRaw("status = 'active' desc")->orderBy('name')->paginate($perPage);
-
         // نفس "حالة العضوية" المعروضة بصفحة الأرصدة وقائمة المقاولين
         $balances = app(ContractorBalanceController::class);
+
+        // فلتر الاختصاص (المجال): نفلتر بـ PHP لأن specialties عمود JSON وبدون ربط بجدول
+        $fieldId = $request->query('field_id');
+        if ($fieldId !== null && $fieldId !== '') {
+            $ids = (clone $query)->get(['id', 'specialties'])
+                ->filter(fn (Contractor $c) => collect($c->specialties ?? [])
+                    ->contains(fn ($s) => (string) ($s['field_lk_type'] ?? '') === (string) $fieldId))
+                ->pluck('id');
+            $query->whereIn('id', $ids);
+        }
+
+        // فلتر الحالة (فعّالة / منتهية / موقوفة) على الحالة المعروضة لا الخام
+        $statusFilter = $request->query('status');
+        if (in_array($statusFilter, ['active', 'expired', 'suspended'], true)) {
+            $derived = DB::query()->fromSub($balances->balancesQuery(), 'b')->get()->keyBy('id');
+            $ids = (clone $query)->get(['id', 'status'])
+                ->filter(function (Contractor $c) use ($derived, $balances, $statusFilter) {
+                    $st = $c->status === 'suspended' || ! isset($derived[$c->id])
+                        ? $c->status
+                        : $balances->membershipStatus($derived[$c->id]);
+                    return $st === $statusFilter;
+                })->pluck('id');
+            $query->whereIn('id', $ids);
+        }
+
+        $page = $query->orderByRaw("status = 'active' desc")->orderBy('name')->paginate($perPage);
+
         $rows = DB::query()->fromSub($balances->balancesQuery(), 'b')
             ->whereIn('id', $page->getCollection()->pluck('id'))->get()->keyBy('id');
 

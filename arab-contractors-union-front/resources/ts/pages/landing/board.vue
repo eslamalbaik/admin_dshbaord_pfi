@@ -1,74 +1,67 @@
 <script setup lang="ts">
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
-import { Mail, Phone, MapPin } from 'lucide-vue-next'
+import { Building2 } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
+// المصدر: التقرير الإداري لاتحاد المقاولين (المحافظات الجنوبية) وكشف أعضاء مجلس الإدارة
 const boardMembers = [
   {
-    name: 'م. محمد أحمد الشيخ',
-    position: 'رئيس الاتحاد',
-    bio: 'مهندس مدني بخبرة تزيد على ٣٠ عاماً في قطاع المقاولات، ترأّس عدة مشاريع بنية تحتية وطنية كبرى.',
-    city: 'رام الله', phone: '+970 59 000 0001', email: 'president@pcu.ps',
-    initial: 'م',
+    name: 'م. سهيل هاشم السقا',
+    position: 'نقيب المقاولين الفلسطينيين — المحافظات الجنوبية',
+    subPosition: 'النائب الأول لرئيس الاتحاد في فلسطين',
+    company: 'شركة سكلز اند كواليتي للانشاءات',
+    bio: 'رئيس مجلس إدارة شركة سكلز اند كواليتي للانشاءات ونقيب المقاولين الفلسطينيين.',
+    photo: '/images/board/saqqa.jpg',
   },
   {
-    name: 'م. سميرة خالد النمر',
-    position: 'نائب الرئيس',
-    bio: 'خبرة واسعة في إدارة مشاريع الإسكان وإعادة الإعمار، عضو في عدة هيئات هندسية دولية.',
-    city: 'نابلس', phone: '+970 59 000 0002', email: 'vp@pcu.ps',
-    initial: 'س',
+    name: 'م. هاشم عرفة سكيك',
+    position: 'أمين سر الاتحاد العام',
+    company: 'شركة بالكون للتجارة والمقاولات',
+    bio: 'رئيس مجلس إدارة شركة بالكون ورئيس مجلس إدارة شركة إمكانات، وعضو مجلس بلدي لبلدية غزة.',
+    photo: '/images/board/sakik.jpg',
   },
   {
-    name: 'م. يوسف عمر الريماوي',
-    position: 'الأمين العام',
-    bio: 'متخصص في إدارة المنظمات المهنية وله تجربة طويلة في تطوير أنظمة تصنيف المقاولين.',
-    city: 'رام الله', phone: '+970 59 000 0003', email: 'secretary@pcu.ps',
-    initial: 'ي',
-  },
-  {
-    name: 'م. إبراهيم سالم الجعبري',
+    name: 'حسين محمد شنن',
     position: 'أمين الصندوق',
-    bio: 'خبير في الإدارة المالية وتمويل مشاريع البنية التحتية، شارك في إعداد الخطط المالية للاتحاد.',
-    city: 'الخليل', phone: '+970 59 000 0004', email: 'treasurer@pcu.ps',
-    initial: 'إ',
+    company: 'شركة أبناء شنن للمقاولات',
+    bio: 'رئيس مجلس إدارة أبناء شنن ورئيس مجلس إدارة مجموعة شنن.',
+    photo: '/images/board/shanan.jpg',
   },
   {
-    name: 'م. رنا فارس حمدان',
-    position: 'عضو مجلس',
-    bio: 'رائدة في قطاع مقاولات الطاقة المتجددة والبنية التحتية الخضراء في فلسطين.',
-    city: 'جنين', phone: '+970 59 000 0005', email: 'board1@pcu.ps',
-    initial: 'ر',
+    name: 'عبد الحكيم إسماعيل',
+    position: 'عضو مجلس إدارة',
+    company: 'شركة عبد الحكيم إسماعيل',
+    bio: 'عضو مجلس إدارة جمعية رجال الأعمال ورئيس مجلس إدارة شركة عبد الحكيم.',
+    photo: '/images/board/ismail.jpg',
   },
   {
-    name: 'م. طارق نضال القاسم',
-    position: 'عضو مجلس',
-    bio: 'خبرة في مجال الطرق والجسور، أشرف على تنفيذ عشرات المشاريع الحيوية في الضفة الغربية.',
-    city: 'طولكرم', phone: '+970 59 000 0006', email: 'board2@pcu.ps',
-    initial: 'ط',
+    name: 'م. عارف محمود أبو عودة',
+    position: 'عضو مجلس إدارة',
+    company: 'شركة التأسيس للتجارة والمقاولات العامة',
+    bio: 'رئيس مجلس إدارة شركة التأسيس ورئيس مجلس إدارة شركة أرض الوفاق.',
+    photo: '/images/board/abu-oda.jpg',
   },
   {
-    name: 'م. ليلى حسن أبو عمر',
-    position: 'عضو مجلس',
-    bio: 'متخصصة في قطاع المياه والصرف الصحي، وشاركت في تصميم وتنفيذ مشاريع مياه حيوية.',
-    city: 'بيت لحم', phone: '+970 59 000 0007', email: 'board3@pcu.ps',
-    initial: 'ل',
+    name: 'محروس سلمان أبو رجيلة',
+    position: 'عضو مجلس إدارة',
+    company: 'شركة الرحاب للمقاولات العامة',
+    bio: 'رئيس مجلس إدارة شركة الرحاب.',
+    photo: '/images/board/abu-rajila.jpg',
   },
   {
-    name: 'م. وليد كمال ذياب',
-    position: 'عضو مجلس',
-    bio: 'خبير في إدارة مشاريع الكهرباء والاتصالات، ويمثّل قطاع الخليل في مجلس الإدارة.',
-    city: 'الخليل', phone: '+970 59 000 0008', email: 'board4@pcu.ps',
-    initial: 'و',
+    name: 'عماد عبد الله أبو مطر',
+    position: 'عضو مجلس إدارة',
+    company: 'شركة زهرة الوادي للتجارة والمقاولات',
+    bio: 'رئيس مجلس إدارة شركة زهرة الوادي.',
+    photo: '/images/board/abu-matar.jpg',
   },
 ]
-
-const colors = ['#1a237e','#c62828','#2e7d32','#e65100','#6a1b9a','#00695c','#0277bd','#558b2f']
 </script>
 
 <template>
   <div dir="rtl" class="pub-page">
-    
+
     <!-- Hero -->
     <div class="page-hero">
       <div class="page-hero-shapes"><div class="ph-s ph-s1" /><div class="ph-s ph-s2" /></div>
@@ -77,48 +70,41 @@ const colors = ['#1a237e','#c62828','#2e7d32','#e65100','#6a1b9a','#00695c','#02
           <RouterLink to="/landing">الرئيسية</RouterLink><span>/</span><span>مجلس الإدارة</span>
         </div>
         <h1 class="page-hero-title">مجلس الإدارة</h1>
-        <p class="page-hero-desc">تعرّف على أعضاء مجلس إدارة اتحاد المقاولين الفلسطينيين المنتخبين لقيادة القطاع</p>
+        <p class="page-hero-desc">مجلس إدارة اتحاد المقاولين الفلسطينيين — المحافظات الجنوبية (الدورة الانتخابية الثانية عشرة 2023 – 2025)</p>
       </div>
       <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
 
-    <!-- Board Members -->
     <section class="pub-section">
       <div class="pub-cont">
-        <!-- President highlight -->
+        <!-- النقيب -->
         <div class="president-card">
-          <div class="pres-avatar" :style="`background:${colors[0]}`">{{ boardMembers[0].initial }}</div>
+          <img :src="boardMembers[0].photo" :alt="boardMembers[0].name" class="pres-avatar">
           <div class="pres-body">
-            <div class="pub-sec-label" style="margin-bottom:.5rem">رئيس الاتحاد</div>
+            <div class="pub-sec-label" style="margin-bottom:.5rem">{{ boardMembers[0].position }}</div>
             <h2 class="pres-name">{{ boardMembers[0].name }}</h2>
+            <p class="pres-sub">{{ boardMembers[0].subPosition }}</p>
             <p class="pres-bio">{{ boardMembers[0].bio }}</p>
             <div class="pres-contacts">
-              <a :href="`tel:${boardMembers[0].phone}`" class="pres-contact"><Phone :size="14" /> {{ boardMembers[0].phone }}</a>
-              <a :href="`mailto:${boardMembers[0].email}`" class="pres-contact"><Mail :size="14" /> {{ boardMembers[0].email }}</a>
-              <span class="pres-contact"><MapPin :size="14" /> {{ boardMembers[0].city }}</span>
+              <span class="pres-contact"><Building2 :size="14" /> {{ boardMembers[0].company }}</span>
             </div>
           </div>
         </div>
 
-        <!-- Other members -->
         <h3 class="board-section-title">أعضاء مجلس الإدارة</h3>
         <div class="board-grid">
-          <div v-for="(m, i) in boardMembers.slice(1)" :key="m.name" class="board-card">
-            <div class="board-avatar" :style="`background:${colors[(i+1)%colors.length]}`">{{ m.initial }}</div>
+          <div v-for="m in boardMembers.slice(1)" :key="m.name" class="board-card">
+            <img :src="m.photo" :alt="m.name" class="board-avatar">
             <div class="board-position">{{ m.position }}</div>
             <h3 class="board-name">{{ m.name }}</h3>
             <p class="board-bio">{{ m.bio }}</p>
-            <div class="board-city"><MapPin :size="12" /> {{ m.city }}</div>
-            <div class="board-contacts">
-              <a :href="`tel:${m.phone}`" class="board-contact-btn phone"><Phone :size="13" /></a>
-              <a :href="`mailto:${m.email}`" class="board-contact-btn mail"><Mail :size="13" /></a>
-            </div>
+            <div class="board-city"><Building2 :size="12" /> {{ m.company }}</div>
           </div>
         </div>
       </div>
     </section>
 
-      </div>
+  </div>
 </template>
 
 <style scoped>
@@ -142,7 +128,8 @@ const colors = ['#1a237e','#c62828','#2e7d32','#e65100','#6a1b9a','#00695c','#02
 
 /* President Card */
 .president-card { display: flex; gap: 2.5rem; align-items: flex-start; background: linear-gradient(145deg, #e8eaf6, #f5f7ff); border: 2px solid #c5cae9; border-right: 6px solid #1a237e; border-radius: 20px; padding: 2.5rem; margin-bottom: 3.5rem; }
-.pres-avatar { width: 110px; height: 110px; border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center; font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 2.5rem; font-weight: 900; flex-shrink: 0; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
+.pres-avatar { width: 150px; height: 150px; border-radius: 50%; object-fit: cover; object-position: top; flex-shrink: 0; box-shadow: 0 8px 24px rgba(0,0,0,.2); border: 4px solid #fff; }
+.pres-sub { font-size: .95rem; color: #1a237e; font-weight: 700; margin-bottom: .6rem; }
 .pres-name { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 1.5rem; font-weight: 900; color: #0d1b3e; margin-bottom: .75rem; }
 .pres-bio { font-size: .95rem; color: #4b5563; line-height: 1.85; margin-bottom: 1.25rem; }
 .pres-contacts { display: flex; gap: 1rem; flex-wrap: wrap; }
@@ -151,10 +138,10 @@ const colors = ['#1a237e','#c62828','#2e7d32','#e65100','#6a1b9a','#00695c','#02
 
 /* Board Grid */
 .board-section-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 1.25rem; font-weight: 800; color: #0d1b3e; margin-bottom: 2rem; padding-bottom: .75rem; border-bottom: 2px solid #e5e7eb; }
-.board-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; }
+.board-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
 .board-card { background: #fff; border: 1.5px solid #e5e7eb; border-radius: 18px; padding: 2rem 1.5rem; text-align: center; transition: all .3s; }
 .board-card:hover { box-shadow: 0 12px 32px rgba(13,27,75,.1); transform: translateY(-5px); border-color: #c5cae9; }
-.board-avatar { width: 76px; height: 76px; border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center; font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 1.75rem; font-weight: 900; margin: 0 auto 1rem; box-shadow: 0 4px 16px rgba(0,0,0,.15); }
+.board-avatar { width: 104px; height: 104px; border-radius: 50%; object-fit: cover; object-position: top; display: block; margin: 0 auto 1rem; box-shadow: 0 4px 16px rgba(0,0,0,.15); border: 3px solid #fff; }
 .board-position { display: inline-block; background: #e8eaf6; color: #1a237e; border-radius: 50px; padding: .25rem .9rem; font-size: .76rem; font-weight: 700; margin-bottom: .65rem; }
 .board-name { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: .95rem; font-weight: 800; color: #0d1b3e; margin-bottom: .6rem; }
 .board-bio { font-size: .82rem; color: #6b7280; line-height: 1.75; margin-bottom: .875rem; }
@@ -165,7 +152,7 @@ const colors = ['#1a237e','#c62828','#2e7d32','#e65100','#6a1b9a','#00695c','#02
 .board-contact-btn.mail { background: #e8eaf6; color: #1a237e; border: 1.5px solid #9fa8da; }
 .board-contact-btn:hover { transform: scale(1.1); }
 
-@media (max-width: 1024px) { .board-grid { grid-template-columns: repeat(3,1fr); } }
+@media (max-width: 1024px) { .board-grid { grid-template-columns: repeat(2,1fr); } }
 @media (max-width: 768px) { .president-card { flex-direction: column; align-items: center; text-align: center; } .pres-contacts { justify-content: center; } .board-grid { grid-template-columns: repeat(2,1fr); } }
 @media (max-width: 480px) { .board-grid { grid-template-columns: 1fr; } }
 </style>

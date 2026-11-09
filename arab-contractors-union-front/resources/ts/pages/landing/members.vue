@@ -1,57 +1,84 @@
 <script setup lang="ts">
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
-import { ref, computed } from 'vue'
-import { Search, MapPin, Award, Filter, ChevronLeft } from 'lucide-vue-next'
+import api from '@/plugins/axios'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { Search, MapPin, Award, Filter } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
+interface DirectoryItem {
+  name: string
+  membership_number: string
+  city: string | null
+  membership_status: 'active' | 'expired' | 'suspended'
+  status_label: string
+  fields: { name: string; grades: string[] }[]
+}
+
 const searchQ = ref('')
-const filterCity = ref('')
-const filterClass = ref('')
+const filterField = ref('')
 const filterStatus = ref('')
 
-const cities = ['رام الله','نابلس','الخليل','بيت لحم','جنين','طولكرم','قلقيلية','أريحا','سلفيت','طوباس','القدس']
-const classes = ['A1','A2','B','C','D','E']
-const statuses = ['نشط','منتهي','معلق']
+const fieldOptions = ref<{ id: number; name: string }[]>([])
+const statuses = [
+  { value: 'active', label: 'فعّالة' },
+  { value: 'expired', label: 'منتهية' },
+  { value: 'suspended', label: 'موقوفة' },
+]
 
-const classLabel: Record<string,string> = { A1:'الأولى أ', A2:'الأولى ب', B:'الثانية', C:'الثالثة', D:'الرابعة', E:'الخامسة' }
-const classColors: Record<string,string> = { A1:'#1a237e', A2:'#0277bd', B:'#2e7d32', C:'#e65100', D:'#c62828', E:'#6a1b9a' }
-const classBg: Record<string,string> = { A1:'#e8eaf6', A2:'#e3f2fd', B:'#e8f5e9', C:'#fff8e1', D:'#fce4ec', E:'#f3e5f5' }
+const items = ref<DirectoryItem[]>([])
+const total = ref(0)
+const page = ref(1)
+const lastPage = ref(1)
+const loading = ref(false)
+let requestId = 0
+let timer: ReturnType<typeof setTimeout> | undefined
 
-const members = Array.from({ length: 40 }, (_, i) => {
-  const cityIdx = i % cities.length
-  const clsIdx = i % classes.length
-  return {
-    id: i + 1,
-    name: [
-      'شركة الخطيب للمقاولات','شركة النجار للإنشاءات','شركة البناء الحديث',
-      'شركة الوطن للمقاولات','شركة الأمل للبناء','شركة فلسطين للإنشاءات',
-      'شركة الريان للمقاولات','شركة الشروق للبناء','شركة القدس للإنشاءات',
-      'شركة الفجر للمقاولات',
-    ][i % 10] + ` ${i + 1}`,
-    city: cities[cityIdx],
-    classification: classes[clsIdx],
-    specialty: ['إنشاءات عامة','طرق وجسور','مياه وصرف صحي','كهرباء وطاقة','إسكان'][i % 5],
-    status: ['نشط','نشط','نشط','منتهي','معلق'][i % 5],
-    memberSince: `${2010 + (i % 14)}`,
-    initial: 'ش',
+async function load(p = 1) {
+  const id = ++requestId
+  loading.value = true
+  try {
+    const r = await api.get('/api/v1/contractors-directory', {
+      params: {
+        search: searchQ.value.trim() || undefined,
+        field_id: filterField.value || undefined,
+        status: filterStatus.value || undefined,
+        page: p,
+        per_page: 12,
+      },
+    })
+    if (id !== requestId) return
+    const list: DirectoryItem[] = r.data.items ?? []
+    items.value = p === 1 ? list : [...items.value, ...list]
+    total.value = r.data.meta?.total ?? items.value.length
+    page.value = r.data.meta?.current_page ?? p
+    lastPage.value = r.data.meta?.last_page ?? p
   }
-})
+  catch {
+    if (id === requestId) { items.value = []; total.value = 0 }
+  }
+  finally {
+    if (id === requestId) loading.value = false
+  }
+}
 
-const filtered = computed(() =>
-  members.filter(m => {
-    if (searchQ.value && !m.name.includes(searchQ.value) && !m.specialty.includes(searchQ.value)) return false
-    if (filterCity.value && m.city !== filterCity.value) return false
-    if (filterClass.value && m.classification !== filterClass.value) return false
-    if (filterStatus.value && m.status !== filterStatus.value) return false
-    return true
-  })
-)
+function reload() { clearTimeout(timer); timer = setTimeout(() => load(1), 300) }
+function reset() { searchQ.value = ''; filterField.value = ''; filterStatus.value = ''; load(1) }
+
+onMounted(async () => {
+  load(1)
+  try {
+    const r = await api.get('/api/v1/app/specialties-catalog')
+    fieldOptions.value = r.data.fields ?? []
+  }
+  catch { /* الفلتر يبقى فارغاً */ }
+})
+onBeforeUnmount(() => clearTimeout(timer))
 </script>
 
 <template>
   <div dir="rtl" class="pub-page">
-    
+
     <div class="page-hero">
       <div class="page-hero-shapes"><div class="ph-s ph-s1" /><div class="ph-s ph-s2" /></div>
       <div class="pub-cont page-hero-inner">
@@ -66,65 +93,64 @@ const filtered = computed(() =>
 
     <section class="pub-section">
       <div class="pub-cont">
-        <!-- Filters -->
         <div class="filters-bar">
           <div class="search-wrap">
             <Search :size="17" class="search-ico" />
-            <input v-model="searchQ" type="text" placeholder="ابحث باسم الشركة أو التخصص..." class="search-input" />
+            <input v-model="searchQ" type="text" placeholder="ابحث باسم الشركة أو رقم العضوية..." class="search-input" @input="reload" />
           </div>
           <div class="filters-row">
-            <select v-model="filterCity" class="filter-sel">
-              <option value="">كل المحافظات</option>
-              <option v-for="c in cities" :key="c" :value="c">{{ c }}</option>
+            <select v-model="filterField" class="filter-sel" @change="load(1)">
+              <option value="">كل الاختصاصات</option>
+              <option v-for="f in fieldOptions" :key="f.id" :value="f.id">{{ f.name }}</option>
             </select>
-            <select v-model="filterClass" class="filter-sel">
-              <option value="">كل الدرجات</option>
-              <option v-for="c in classes" :key="c" :value="c">{{ classLabel[c] }}</option>
-            </select>
-            <select v-model="filterStatus" class="filter-sel">
+            <select v-model="filterStatus" class="filter-sel" @change="load(1)">
               <option value="">كل الحالات</option>
-              <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
+              <option v-for="s in statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
             </select>
-            <button class="filter-reset" @click="searchQ='';filterCity='';filterClass='';filterStatus=''">
+            <button class="filter-reset" @click="reset">
               <Filter :size="14" /> إعادة تعيين
             </button>
           </div>
         </div>
 
-        <p class="results-count">عُثر على <strong>{{ filtered.length }}</strong> شركة</p>
+        <p class="results-count">عُثر على <strong>{{ total }}</strong> شركة</p>
 
         <div class="members-grid">
-          <div v-for="m in filtered" :key="m.id" class="member-card">
-            <div class="member-avatar">{{ m.initial }}</div>
+          <div v-for="m in items" :key="m.membership_number" class="member-card">
+            <div class="member-avatar">{{ m.name.replace(/^شركة\s*/, '').charAt(0) }}</div>
             <div class="member-body">
-              <h3 class="member-name">{{ m.name }}</h3>
+              <h3 class="member-name" :title="m.name">{{ m.name }}</h3>
               <div class="member-meta">
-                <span class="member-city"><MapPin :size="12" /> {{ m.city }}</span>
-                <span class="member-spec">{{ m.specialty }}</span>
+                <span v-if="m.city" class="member-city"><MapPin :size="12" /> {{ m.city }}</span>
+                <span class="member-spec">رقم العضوية {{ m.membership_number }}</span>
+              </div>
+              <div class="member-fields">
+                <span v-for="f in m.fields" :key="f.name" class="member-class">
+                  <Award :size="11" /> {{ f.name }}<template v-if="f.grades.length"> — {{ f.grades.join('، ') }}</template>
+                </span>
               </div>
               <div class="member-footer">
-                <span class="member-class" :style="`background:${classBg[m.classification]};color:${classColors[m.classification]};border-color:${classColors[m.classification]}`">
-                  <Award :size="11" /> {{ classLabel[m.classification] }}
+                <span class="member-status" :class="m.membership_status === 'active' ? 'active' : m.membership_status === 'suspended' ? 'suspended' : 'expired'">
+                  {{ m.membership_status === 'active' ? 'فعّالة' : m.status_label }}
                 </span>
-                <span class="member-status" :class="m.status === 'نشط' ? 'active' : m.status === 'معلق' ? 'suspended' : 'expired'">
-                  {{ m.status }}
-                </span>
-                <span class="member-since">منذ {{ m.memberSince }}</span>
               </div>
             </div>
-            <a href="#" class="member-link"><ChevronLeft :size="16" /></a>
           </div>
         </div>
 
-        <div v-if="!filtered.length" class="empty-state">
+        <div v-if="!loading && !items.length" class="empty-state">
           <Search :size="48" />
           <p>لا توجد نتائج مطابقة للبحث</p>
-          <button @click="searchQ='';filterCity='';filterClass='';filterStatus=''">إعادة تعيين الفلاتر</button>
+          <button @click="reset">إعادة تعيين الفلاتر</button>
+        </div>
+
+        <div v-if="page < lastPage" class="more-wrap">
+          <button class="more-btn" :disabled="loading" @click="load(page + 1)">{{ loading ? 'جارٍ التحميل...' : 'عرض المزيد' }}</button>
         </div>
       </div>
     </section>
 
-      </div>
+  </div>
 </template>
 
 <style scoped>
@@ -173,6 +199,11 @@ const filtered = computed(() =>
 .member-status.expired { background: #fce4ec; color: #c62828; }
 .member-status.suspended { background: #fff8e1; color: #e65100; }
 .member-since { font-size: .72rem; color: #9ca3af; }
+.member-fields { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .6rem; }
+.member-fields .member-class { background: #e8eaf6; color: #1a237e; border-color: #c5cae9; }
+.more-wrap { text-align: center; margin-top: 2rem; }
+.more-btn { background: #1a237e; color: #fff; border: none; border-radius: 9px; padding: .7rem 2rem; font-size: .9rem; cursor: pointer; font-family: 'Tajawal', sans-serif; }
+.more-btn:disabled { opacity: .6; cursor: default; }
 .member-link { position: absolute; top: 50%; left: 1rem; transform: translateY(-50%); color: #9ca3af; transition: color .2s; }
 .member-card:hover .member-link { color: #1a237e; }
 

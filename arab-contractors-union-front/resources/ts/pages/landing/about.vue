@@ -1,42 +1,52 @@
 <script setup lang="ts">
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
-import { Check, Star, Lightbulb, Shield, Users, Target, Award, Globe, TrendingUp } from 'lucide-vue-next'
+import { Check, Star, Target, Award, Shield, Users, Globe, Handshake, GraduationCap, Scale } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
-const timeline = [
-  { year: '١٩٩٤', event: 'تأسيس اتحاد المقاولين الفلسطينيين بعد اتفاقية أوسلو' },
-  { year: '١٩٩٨', event: 'الانضمام رسمياً لاتحاد المقاولين العرب' },
-  { year: '٢٠٠٣', event: 'افتتاح أول فروع محافظات خارج رام الله' },
-  { year: '٢٠٠٨', event: 'اعتماد نظام تصنيف المقاولين وفق معايير دولية' },
-  { year: '٢٠١٤', event: 'توسيع العضوية لتشمل ١١ محافظة فلسطينية' },
-  { year: '٢٠١٨', event: 'إطلاق البوابة الرقمية وخدمات الاتحاد الإلكترونية' },
-  { year: '٢٠٢٢', event: 'تجاوز عدد الأعضاء ١٢٠٠ شركة مقاولات' },
-  { year: '٢٠٢٤', event: 'إطلاق منظومة التدريب الإلكتروني وشهادات FIDIC' },
+// المصدر: التقرير الإداري لاتحاد المقاولين الفلسطينيين — المحافظات الجنوبية (الدورة الانتخابية الثانية عشرة)
+const goals = [
+  'تنظيم مهنة المقاولات في فلسطين من خلال وضع المعايير والضوابط اللازمة لضمان جودة العمل والمنافسة العادلة في السوق.',
+  'حماية حقوق ومصالح أعضائه أمام الجهات الرسمية وغير الرسمية، مما يضمن بيئة عمل مستقرة ومزدهرة.',
+  'رفع كفاءة المقاولين والعاملين في قطاع الإنشاءات عبر تقديم برامج تدريبية وتطويرية متقدمة.',
+  'تحسين بيئة العمل في قطاع المقاولات من خلال تعزيز معايير السلامة المهنية وضمان جودة التنفيذ.',
+  'تعزيز قنوات التواصل بين المقاولين والجهات ذات العلاقة، بما في ذلك الحكومة والمانحين والمجتمع المحلي.',
+  'تقديم خدمات الوساطة والمساعدة في حل النزاعات والمشكلات التي قد تنشأ بين المقاولين وأصحاب العمل.',
+  'المساهمة في دعم قطاع الإنشاءات كأحد المحركات الأساسية للاقتصاد الوطني الفلسطيني، من خلال تعزيز الاستثمارات والمشاريع الإنشائية.',
 ]
 
 const values = [
-  { icon: Shield,     title: 'النزاهة والشفافية',   desc: 'نتعامل بمنتهى الشفافية مع أعضائنا والجهات الرسمية', color: '#1a237e', bg: '#e8eaf6' },
-  { icon: Users,      title: 'الانتماء والوحدة',     desc: 'نحن صوت واحد موحّد يمثل جميع المقاولين الفلسطينيين', color: '#c62828', bg: '#fce4ec' },
-  { icon: Target,     title: 'الاحترافية والجودة',   desc: 'نسعى دائماً لرفع معايير الجودة في قطاع المقاولات', color: '#e65100', bg: '#fff8e1' },
-  { icon: Globe,      title: 'الانفتاح والشراكة',    desc: 'نبني شراكات استراتيجية مع المؤسسات المحلية والدولية', color: '#2e7d32', bg: '#e8f5e9' },
-  { icon: Lightbulb,  title: 'الابتكار والتطوير',    desc: 'نتبنى الحلول المبتكرة لتطوير بيئة المقاولات الفلسطينية', color: '#6a1b9a', bg: '#f3e5f5' },
-  { icon: TrendingUp, title: 'التنمية المستدامة',    desc: 'نسعى لبناء قطاع مقاولات متوازن ومستدام للأجيال القادمة', color: '#00695c', bg: '#e0f2f1' },
+  { icon: Shield,        title: 'النزاهة والشفافية',   desc: 'يلتزم الاتحاد بتطبيق أعلى معايير النزاهة والشفافية في جميع معاملاته وقراراته، مما يعزز الثقة والمصداقية لدى أعضائه وشركائه.', color: '#1a237e', bg: '#e8eaf6' },
+  { icon: Award,         title: 'الجودة والتميز',      desc: 'يسعى الاتحاد إلى تحقيق أعلى مستويات الجودة في قطاع المقاولات، من خلال تشجيع التميز والابتكار في تنفيذ المشاريع.', color: '#e65100', bg: '#fff8e1' },
+  { icon: Users,         title: 'المسؤولية المجتمعية', desc: 'يؤمن الاتحاد بدوره في دعم المجتمع الفلسطيني والمساهمة في التنمية المستدامة من خلال تنفيذ مشاريع تخدم الصالح العام.', color: '#c62828', bg: '#fce4ec' },
+  { icon: Handshake,     title: 'التعاون والشراكة',    desc: 'يعزز الاتحاد ثقافة التعاون والشراكة مع الجهات الحكومية والخاصة، بما يسهم في بناء بيئة عمل متكاملة ومثمرة.', color: '#2e7d32', bg: '#e8f5e9' },
+  { icon: GraduationCap, title: 'الاحترافية والمهنية', desc: 'يركز الاتحاد على رفع مستوى الاحترافية والمهنية بين أعضائه، من خلال توفير برامج تدريبية وتطويرية مستمرة.', color: '#6a1b9a', bg: '#f3e5f5' },
+  { icon: Scale,         title: 'العدالة والمساواة',   desc: 'يضمن الاتحاد تطبيق مبدأ العدالة والمساواة بين جميع أعضائه، مع توفير فرص متكافئة للجميع دون أي تمييز.', color: '#00695c', bg: '#e0f2f1' },
 ]
 
-const achievements = [
-  { num: '+١٢٠٠', label: 'شركة مقاولات عضو' },
-  { num: '+٥٠٠٠', label: 'مشروع منجز' },
-  { num: '٣٠+',   label: 'سنة خبرة' },
-  { num: '١١',     label: 'فرع ومحافظة' },
-  { num: '+١٥٠',  label: 'دورة تدريبية' },
-  { num: '+٢٥',   label: 'شراكة دولية' },
+const facts = [
+  { num: '١٩٩٤', label: 'سنة تأسيس الاتحاد' },
+  { num: '٧', label: 'أعضاء مجلس الإدارة' },
+  { num: '٩', label: 'لجان داخلية' },
+  { num: '٣', label: 'لجان خارجية' },
+]
+
+const committees = [
+  { name: 'لجنة التنسيب والتصنيف', chair: 'محروس أبو رجيلة', desc: 'بحث آليات تصنيف المقاولين وتنسيبهم وفق معايير واضحة تضمن العدالة والشفافية في منح التصنيفات.' },
+  { name: 'لجنة تنظيم المهنة والكوتة', chair: 'حسين شنن', desc: 'بحث آليات تنظيم قطاع المقاولات وتوزيع المشاريع وفق نظام الكوتة العادل بين المقاولين.' },
+  { name: 'لجنة التدريب والتطوير', chair: 'م. هاشم سكيك', desc: 'مناقشة البرامج التدريبية الخاصة بالمقاولين وموظفيهم وإعداد خطط لتطوير قدراتهم بما يتماشى مع متطلبات السوق.' },
+  { name: 'لجنة العلاقات العامة والدولية', chair: 'م. عارف أبو عودة', desc: 'تعزيز العلاقات مع الجهات المحلية والدولية وفتح آفاق التعاون مع المؤسسات المانحة والشركاء الدوليين لدعم قطاع المقاولات.' },
+  { name: 'اللجنة القانونية والعقود', chair: 'عماد أبو مطر', desc: 'دراسة عقود العمل التي تقوم المؤسسات بطرحها وتوفير آليات التحكيم لحل النزاعات بين المقاولين.' },
+  { name: 'لجنة فض النزاعات والشكاوى', chair: 'عماد أبو مطر', desc: 'دراسة الشكاوى المقدمة من المقاولين وأصحاب المشاريع وتقديم الحلول القانونية المناسبة لتسوية النزاعات.' },
+  { name: 'اللجنة الاجتماعية', chair: 'م. عارف أبو عودة', desc: 'تنفيذ زيارات اجتماعية دورية للمقاولين وأسرهم، وتقديم الدعم الطارئ خلال فترات الحرب والمحن.' },
+  { name: 'لجنة المعابر والحدود', chair: 'عبد الحكيم إسماعيل', desc: 'متابعة القضايا المتعلقة بدخول وخروج مواد البناء والتنسيق مع الجهات المختصة لتوفير التسهيلات اللازمة لقطاع المقاولات.' },
+  { name: 'لجنة الإرجاع الضريبي', chair: 'م. عارف أبو عودة', desc: 'تسهيل عملية استرداد الضرائب للمقاولين وفق القوانين المعمول بها، والتواصل مع الجهات الحكومية لحل المعوقات.' },
 ]
 </script>
 
 <template>
   <div dir="rtl" class="pub-page">
-    
+
     <!-- Page Hero -->
     <div class="page-hero">
       <div class="page-hero-shapes">
@@ -49,7 +59,7 @@ const achievements = [
           <span>عن الاتحاد</span>
         </div>
         <h1 class="page-hero-title">عن الاتحاد</h1>
-        <p class="page-hero-desc">تعرّف على اتحاد المقاولين الفلسطينيين — تاريخه، رسالته، ورؤيته</p>
+        <p class="page-hero-desc">تعرّف على اتحاد المقاولين الفلسطينيين — تعريفه، رؤيته، رسالته وأهدافه</p>
       </div>
       <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
@@ -58,26 +68,29 @@ const achievements = [
     <section class="pub-section">
       <div class="pub-cont about-two-col">
         <div class="about-text">
-          <div class="pub-sec-label">نبذة عامة</div>
-          <h2 class="pub-sec-h">الممثل الرسمي لقطاع المقاولات الفلسطيني</h2>
+          <div class="pub-sec-label">تعريف</div>
+          <h2 class="pub-sec-h">اتحاد المقاولين الفلسطينيين</h2>
           <p class="pub-para">
-            تأسّس اتحاد المقاولين الفلسطينيين عام ١٩٩٤ ليكون الجهة الرسمية الممثّلة لشركات المقاولات
-            في فلسطين، ويضم اليوم أكثر من ١٢٠٠ شركة موزعة في ١١ محافظة، تمثل الغالبية العظمى
-            من شركات المقاولات العاملة في الأراضي الفلسطينية.
+            اتحاد المقاولين الفلسطينيين (Palestinian Contractors Union) هو مؤسسة مهنية فلسطينية اقتصادية اجتماعية،
+            ممثلة بمجموع المقاولين المحليين والمصنفين في الاتحاد، ويهدف إلى تنظيم ممارستهم لمهنة المقاولات في فلسطين،
+            ويقوم بدور إيجابي في التنمية الاقتصادية الوطنية.
           </p>
           <p class="pub-para">
-            يتولى الاتحاد تصنيف الشركات وإصدار شهادات التصنيف المعتمدة، ويمثّل القطاع أمام
-            الجهات الحكومية والمؤسسات الدولية، ويعمل على تطوير البيئة التشريعية وبناء قدرات
-            المنتسبين عبر برامج تدريبية متخصصة.
+            ومنذ التوقيع على اتفاقية أوسلو وارتفاع سقف تطلعات الشعب الفلسطيني والنشاط الملحوظ الذي شهده قطاع الإنشاءات،
+            كانت الضرورة ملحة لتشكيل هيئة نقابية تمثل المقاولين الفلسطينيين وتعمل على النهوض بمهنة المقاولات وتنظيمها،
+            ونتيجة لتضافر الجهود المشتركة لكل من الأمانة العامة للاتحاد العام للمهندسين الفلسطينيين وعدد من المقاولين
+            الفلسطينيين من داخل الوطن وخارجه، فقد تم تأسيس اتحاد المقاولين الفلسطينيين بتاريخ 1/6/1994، كتتويج للاجتماع
+            الذي عقد في تونس في الفترة ما بين 30/5 – 1/6/1994، تحت رعاية سيادة رئيس دولة فلسطين الراحل ياسر عرفات،
+            على أن تكون مدينة القدس مركزاً رئيسياً للاتحاد، ويكون للاتحاد فرعان رئيسيان في الضفة الغربية وقطاع غزة،
+            كما يحق للاتحاد فتح مراكز وفروع في المدن الفلسطينية الأخرى بقرار من مجلس إدارة الاتحاد.
           </p>
-          <ul class="about-checklist">
-            <li v-for="item in ['جهة رسمية معتمدة من السلطة الوطنية الفلسطينية','عضو في اتحاد المقاولين العرب والدولي','شهادات تصنيف معترف بها دولياً من FIDIC','حضور في جميع المحافظات الفلسطينية']" :key="item">
-              <Check :size="15" class="chk-ico" /> {{ item }}
-            </li>
-          </ul>
+          <p class="pub-para">
+            يُعد اتحاد المقاولين الفلسطينيين جهةً رائدةً في تنظيم قطاع الإنشاءات ودعم مصالح المقاولين في فلسطين.
+          </p>
         </div>
         <div class="about-stats-panel">
-          <div v-for="a in achievements" :key="a.num" class="ach-card">
+          <img src="/images/landing/about-hq.jpg" alt="مقر اتحاد المقاولين الفلسطينيين في غزة" class="about-hq">
+          <div v-for="a in facts" :key="a.label" class="ach-card">
             <span class="ach-num">{{ a.num }}</span>
             <span class="ach-lbl">{{ a.label }}</span>
           </div>
@@ -90,35 +103,38 @@ const achievements = [
       <div class="pub-cont">
         <div class="pub-sec-header-c">
           <div class="pub-sec-label">الرؤية والرسالة</div>
-          <h2 class="pub-sec-h center">توجهاتنا الاستراتيجية</h2>
+          <h2 class="pub-sec-h center">رؤيتنا ورسالتنا</h2>
         </div>
-        <div class="vm-grid">
+        <div class="vm-grid vm-two">
           <div class="vm-card vm-vision">
             <div class="vm-icon"><Star :size="32" /></div>
-            <h3 class="vm-title">رؤيتنا</h3>
-            <p class="vm-desc">قطاع مقاولات فلسطيني متميز يرقى للمعايير الدولية في الجودة والاحترافية والاستدامة، ويُسهم في بناء الدولة الفلسطينية المستقلة وتطوير بنيتها التحتية.</p>
+            <h3 class="vm-title">الرؤية</h3>
+            <p class="vm-desc">اتحاد المقاولين الفلسطينيين المحرك الأساسي للنمو الاقتصادي والتنموي في فلسطين، ونموذجا يُحتذى به في الصمود والتميز والابتكار.</p>
           </div>
           <div class="vm-card vm-mission">
             <div class="vm-icon"><Target :size="32" /></div>
-            <h3 class="vm-title">رسالتنا</h3>
-            <p class="vm-desc">تمثيل قطاع المقاولات الفلسطيني وحماية مصالح أعضائه، وتطوير البيئة التشريعية والمهنية، وبناء القدرات وتعزيز الشراكات الاستراتيجية لخدمة القطاع والوطن.</p>
-          </div>
-          <div class="vm-card vm-goals">
-            <div class="vm-icon"><Award :size="32" /></div>
-            <h3 class="vm-title">أهدافنا</h3>
-            <ul class="vm-list">
-              <li>تنظيم قطاع المقاولات وتصنيف الشركات</li>
-              <li>حماية حقوق المقاولين ومتابعة مستحقاتهم</li>
-              <li>تطوير التشريعات والأنظمة الحاكمة للقطاع</li>
-              <li>بناء شراكات مع الجهات المانحة والدولية</li>
-            </ul>
+            <h3 class="vm-title">الرسالة</h3>
+            <p class="vm-desc">يسعى اتحاد المقاولين الفلسطينيين بالمحافظات الجنوبية إلى تنظيم مهنة المقاولات والارتقاء بها وتعزيز القدرة التنافسية للمقاول الفلسطيني، وذلك من خلال وضع الأطر القانونية والفنية المرتكزة على التميز والابتكار ونسج الشراكات المحلية والدولية من منصة واحدة، ملتزمين بالشفافية والاحترافية والتميز بكل عدالة ومساواة.</p>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Values -->
+    <!-- Goals -->
     <section class="pub-section">
+      <div class="pub-cont goals-wrap">
+        <div class="pub-sec-header-c">
+          <div class="pub-sec-label">الأهداف</div>
+          <h2 class="pub-sec-h center">أهداف الاتحاد</h2>
+        </div>
+        <ul class="about-checklist">
+          <li v-for="g in goals" :key="g"><Check :size="15" class="chk-ico" /> {{ g }}</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Values -->
+    <section class="pub-section bg-soft">
       <div class="pub-cont">
         <div class="pub-sec-header-c">
           <div class="pub-sec-label">القيم</div>
@@ -134,27 +150,24 @@ const achievements = [
       </div>
     </section>
 
-    <!-- Timeline -->
-    <section class="pub-section bg-soft">
+    <!-- Committees -->
+    <section class="pub-section">
       <div class="pub-cont">
         <div class="pub-sec-header-c">
-          <div class="pub-sec-label">التاريخ</div>
-          <h2 class="pub-sec-h center">مسيرة الاتحاد عبر الزمن</h2>
+          <div class="pub-sec-label">اللجان</div>
+          <h2 class="pub-sec-h center">اللجان الداخلية للاتحاد</h2>
         </div>
-        <div class="timeline">
-          <div v-for="(t, i) in timeline" :key="t.year" class="tl-item" :class="{ right: i % 2 === 0 }">
-            <div class="tl-dot" />
-            <div class="tl-card">
-              <span class="tl-year">{{ t.year }}</span>
-              <p class="tl-event">{{ t.event }}</p>
-            </div>
+        <div class="values-grid">
+          <div v-for="c in committees" :key="c.name" class="value-card" style="--vc:#1a237e;--vbg:#f5f7ff">
+            <h3 class="value-title">{{ c.name }}</h3>
+            <p class="value-desc">{{ c.desc }}</p>
+            <p class="chair"><Globe :size="13" /> رئيس اللجنة: {{ c.chair }}</p>
           </div>
-          <div class="tl-line" />
         </div>
       </div>
     </section>
 
-      </div>
+  </div>
 </template>
 
 <style scoped>
@@ -217,7 +230,12 @@ const achievements = [
 .value-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: .95rem; font-weight: 800; color: #0d1b3e; margin-bottom: .4rem; }
 .value-desc { font-size: .83rem; color: #6b7280; line-height: 1.75; }
 
-/* Timeline */
+/* extra */
+.about-hq { grid-column: 1 / -1; width: 100%; border-radius: 16px; object-fit: cover; max-height: 280px; }
+.vm-two { grid-template-columns: repeat(2, 1fr); }
+.goals-wrap { max-width: 900px; }
+.chair { display: flex; align-items: center; gap: .4rem; margin-top: .75rem; font-size: .8rem; font-weight: 700; color: #1a237e; }
+/* Timeline (unused) */
 .timeline { position: relative; max-width: 860px; margin: 0 auto; }
 .tl-line { position: absolute; top: 0; bottom: 0; right: 50%; width: 2px; background: linear-gradient(to bottom, #1a237e, #c5cae9); transform: translateX(50%); }
 .tl-item { display: flex; justify-content: flex-end; margin-bottom: 2rem; padding-inline-end: calc(50% + 1.5rem); position: relative; }
@@ -231,7 +249,7 @@ const achievements = [
 
 @media (max-width: 1024px) {
   .about-two-col { grid-template-columns: 1fr; gap: 2.5rem; }
-  .vm-grid { grid-template-columns: 1fr; }
+  .vm-grid, .vm-two { grid-template-columns: 1fr; }
 }
 @media (max-width: 768px) {
   .values-grid { grid-template-columns: 1fr 1fr; }
