@@ -65,8 +65,19 @@ function toggleDropdown(label: string) {
 }
 function closeDropdowns() { openDropdown.value = null; showUserMenu.value = false; showNotifDropdown.value = false }
 
-onMounted(() => document.addEventListener('click', closeDropdowns))
-onUnmounted(() => document.removeEventListener('click', closeDropdowns))
+// the white bar sticks to the top; a stronger shadow once the page has scrolled under it
+const scrolled = ref(false)
+function onScroll() { scrolled.value = window.scrollY > 40 }
+
+onMounted(() => {
+  document.addEventListener('click', closeDropdowns)
+  window.addEventListener('scroll', onScroll, { passive: true })
+  onScroll()
+})
+onUnmounted(() => {
+  document.removeEventListener('click', closeDropdowns)
+  window.removeEventListener('scroll', onScroll)
+})
 
 function toggleUserMenu() { showUserMenu.value = !showUserMenu.value }
 function goToDashboard() { showUserMenu.value = false; mobileOpen.value = false; router.push('/contractor/dashboard') }
@@ -158,7 +169,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="pub-header">
+  <div class="pub-header" :class="{ 'is-scrolled': scrolled }">
     <!-- Blue contact strip above the white navbar -->
     <div class="pub-topbar">
       <div class="pub-container pub-topbar-inner">
@@ -197,14 +208,14 @@ onMounted(() => {
             @click.stop="l.children ? toggleDropdown(l.label) : navigate(l.href)"
           >
             <RouterLink v-if="!l.children" :to="l.href" class="pub-nav-link">{{ l.label }}</RouterLink>
-            <button v-else class="pub-nav-link pub-nav-btn">
+            <button v-else class="pub-nav-link pub-nav-btn" :class="{ 'is-open': openDropdown === l.label }">
               {{ l.label }} <ChevronDown :size="13" class="pub-nav-chevron" :class="{ open: openDropdown === l.label }" />
             </button>
             <Transition name="pub-dd">
               <div v-if="l.children && openDropdown === l.label" class="pub-dropdown pub-dd-stagger">
                 <RouterLink
                   v-for="(c, i) in l.children" :key="c.href" :to="c.href" class="pub-dd-link"
-                  :style="{ '--i': i }" @click="openDropdown = null"
+                  :style="{ '--i': i }" @click.stop="openDropdown = null"
                 >
                   {{ c.label }}
                 </RouterLink>
@@ -315,7 +326,10 @@ div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
 
 /* A real positioned box (not display: contents) so the whole header stays above the heroes
    pulled up under it by --pub-nav-h — older Chrome builds left it painted underneath them. */
-.pub-header { position: relative; z-index: 200; width: 100%; flex-shrink: 0; }
+/* Sticky: the blue strip (40px / 34px) scrolls away, then the white bar stays pinned at the top.
+   Negative top = strip height, so only the navbar remains visible. */
+.pub-header { position: sticky; top: -40px; z-index: 200; width: 100%; flex-shrink: 0; }
+.pub-header.is-scrolled .pub-navbar { box-shadow: 0 6px 24px rgba(0, 0, 80, .1); }
 
 .pub-container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
 
@@ -378,10 +392,13 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
 .pub-nav-link { font-family: 'Tajawal', sans-serif; font-size: .92rem; color: #2b2f3a; }
 .pub-nav-link:hover, .router-link-exact-active.pub-nav-link { color: #00006e; }
 .router-link-exact-active.pub-nav-link { font-weight: 700; }
-/* orange bar on the bottom edge of the header under the current page */
-.router-link-exact-active.pub-nav-link::after {
+/* orange bar on the bottom edge of the header: grows in on hover / open menu, stays under the current page */
+.pub-nav-link::after {
   content: ''; position: absolute; bottom: 0; right: 0; left: 0; height: 4px; border-radius: 4px 4px 0 0; background: #d67a00;
+  transform: scaleX(0); transition: transform .3s cubic-bezier(.2, .8, .3, 1);
 }
+.pub-nav-link:hover::after, .pub-nav-btn.is-open::after, .router-link-exact-active.pub-nav-link::after { transform: scaleX(1); }
+.pub-nav-btn.is-open { color: #00006e; }
 .pub-member-pill {
   display: inline-flex; align-items: center; gap: .5rem; background: #e3f6e8; color: #11903a;
   border-radius: 14px; padding: .6rem 1.1rem; font-size: .95rem; font-weight: 600; white-space: nowrap;
@@ -403,7 +420,14 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
 
 /* Header sub-menus (عن الاتحاد / الخدمات / المركز الإعلامي): the panel unfolds, then its links
    slide in one after another instead of the whole list popping up at once. */
-.pub-dd-stagger { animation: none; }
+.pub-dd-stagger { animation: none; overflow: hidden; }
+.pub-dd-stagger::before {
+  content: ''; position: absolute; top: 0; right: 0; left: 0; height: 3px; background: linear-gradient(90deg, #f5a623, #d67a00);
+  transform-origin: right; animation: pub-dd-line .45s .05s cubic-bezier(.2, .8, .3, 1) both;
+}
+@keyframes pub-dd-line { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.pub-dd-stagger .pub-dd-link { position: relative; transition: background .2s, color .2s, padding .25s cubic-bezier(.2, .8, .3, 1); }
+.pub-dd-stagger .pub-dd-link:hover { padding-inline-start: 1.35rem; }
 .pub-dd-enter-active { transition: opacity .22s ease-out, transform .26s cubic-bezier(.2, .8, .3, 1); }
 .pub-dd-leave-active { transition: opacity .15s ease-in, transform .15s ease-in; }
 .pub-dd-enter-from { opacity: 0; transform: translateY(-10px) scale(.97); }
@@ -412,7 +436,11 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
   animation: pub-dd-item-in .32s cubic-bezier(.2, .8, .3, 1) both;
   animation-delay: calc(60ms + var(--i, 0) * 55ms);
 }
-@keyframes pub-dd-item-in { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+@keyframes pub-dd-item-in {
+  from { opacity: 0; transform: translateX(22px); }
+  60% { opacity: 1; transform: translateX(-3px); }
+  to { opacity: 1; transform: none; }
+}
 .pub-dd-link {
   display: block; padding: .7rem 1rem; color: #5b6474; font-size: .95rem;
   font-weight: 500; text-decoration: none; border-radius: 10px;
@@ -439,6 +467,7 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
 .pub-mobile-menu {
   padding: .75rem .5rem 1.25rem; border-top: 1px solid #e5e7eb;
   display: flex; flex-direction: column; gap: .2rem; background: transparent;
+  max-height: calc(100vh - 69px); max-height: calc(100dvh - 69px); overflow-y: auto; overscroll-behavior: contain;
 }
 .pub-mob-link {
   padding: .6rem .875rem; color: #374151; font-size: .9rem; font-weight: 600;
@@ -507,10 +536,12 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
   .pub-dd-enter-active, .pub-dd-leave-active,
   .pub-mob-sub-enter-active, .pub-mob-sub-leave-active,
   .pub-mob-enter-active, .pub-mob-leave-active { transition: none; }
-  .pub-dd-stagger .pub-dd-link, .pub-mob-sub-enter-active .pub-mob-sub-link { animation: none; }
+  .pub-dd-stagger .pub-dd-link, .pub-mob-sub-enter-active .pub-mob-sub-link, .pub-dd-stagger::before { animation: none; }
+  .pub-nav-link::after, .pub-dd-stagger .pub-dd-link { transition: none; }
 }
 
 @media (max-width: 1100px) {
+  .pub-header { top: -34px; }
   .pub-container { padding: 0 16px; }
   .pub-topbar-inner { height: 34px; gap: 1.1rem; font-size: .78rem; }
   .pub-nb-inner { height: 68px; }
