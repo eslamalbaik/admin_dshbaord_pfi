@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import api from '@/plugins/axios'
-import { ref, computed, watch, onMounted } from 'vue'
-import { Search, Award, Filter, ChevronLeft } from 'lucide-vue-next'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { Search, Award, Filter, ChevronLeft, Building2, X, Hash, CalendarDays, MapPin, BadgeCheck, Layers } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
@@ -58,6 +58,25 @@ const hasFilters = computed(() =>
 
 const statusClass = (s: string) => (s === 'active' ? 'active' : s === 'suspended' ? 'suspended' : 'expired')
 
+const cardGrades = (m: Member) => [...new Set(m.fields.flatMap(f => f.grades))]
+
+// نافذة بيانات تصنيف الشركة — من نفس بيانات الدليل العام، بدون أي طلب إضافي
+const selected = ref<Member | null>(null)
+
+function openMember(m: Member) {
+  selected.value = m
+  document.body.style.overflow = 'hidden'
+}
+
+function closeMember() {
+  selected.value = null
+  document.body.style.overflow = ''
+}
+
+function onKey(e: KeyboardEvent) {
+  if (e.key === 'Escape' && selected.value) closeMember()
+}
+
 async function load(p = 1) {
   const id = ++requestId
   loading.value = true
@@ -99,7 +118,13 @@ watch(filterField, () => {
 watch([filterStatus, filterField, filterSpec, filterGrade], () => load(1))
 watch(searchQ, () => { clearTimeout(timer); timer = setTimeout(() => load(1), 350) })
 
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKey)
+  document.body.style.overflow = ''
+})
+
 onMounted(async () => {
+  window.addEventListener('keydown', onKey)
   load(1)
   try {
     const r = await api.get('/api/v1/contractors-directory/filters')
@@ -159,30 +184,32 @@ onMounted(async () => {
         <p class="results-count">عُثر على <strong>{{ total }}</strong> شركة</p>
 
         <div class="members-grid">
-          <div v-for="m in members" :key="m.membership_number" class="member-card">
-            <div class="member-avatar">
-              <img v-if="m.logo_url" :src="m.logo_url" :alt="m.name" class="member-logo">
-              <template v-else>{{ m.name.charAt(0) }}</template>
-            </div>
-            <div class="member-body">
-              <h3 class="member-name" :title="m.name">{{ m.name }}</h3>
-              <div class="member-meta">
-                <span class="member-num">رقم العضوية: {{ m.membership_number }}</span>
-              </div>
-              <div v-if="m.specializations.length" class="member-specs">
-                <span v-for="(s, i) in m.specializations.slice(0, 3)" :key="i" class="member-spec">{{ s.name }}</span>
+          <button
+            v-for="m in members"
+            :key="m.membership_number"
+            type="button"
+            class="member-card"
+            :aria-label="`عرض بيانات تصنيف ${m.name}`"
+            @click="openMember(m)"
+          >
+            <span class="member-icon" aria-hidden="true"><Building2 :size="24" :stroke-width="1.8" /></span>
+            <span class="member-body">
+              <span class="member-name" :title="m.name">{{ m.name }}</span>
+              <span class="member-num">رقم العضوية: {{ m.membership_number }}</span>
+              <span v-if="m.specializations.length" class="member-specs">
+                <span v-for="(s, i) in m.specializations.slice(0, 3)" :key="i" class="member-spec" :title="s.name">{{ s.name }}</span>
                 <span v-if="m.specializations.length > 3" class="member-spec more">+{{ m.specializations.length - 3 }}</span>
-              </div>
-              <div class="member-footer">
-                <span v-for="g in [...new Set(m.fields.flatMap(f => f.grades))].slice(0, 2)" :key="g" class="member-class">
+              </span>
+              <span class="member-footer">
+                <span v-for="g in cardGrades(m).slice(0, 2)" :key="g" class="member-class">
                   <Award :size="11" /> {{ g }}
                 </span>
                 <span class="member-status" :class="statusClass(m.membership_status)">{{ m.status_label }}</span>
                 <span v-if="m.member_since" class="member-since">منذ {{ m.member_since }}</span>
-              </div>
-            </div>
-            <span class="member-link"><ChevronLeft :size="16" /></span>
-          </div>
+              </span>
+              <span class="member-more">عرض بيانات التصنيف <ChevronLeft :size="14" /></span>
+            </span>
+          </button>
         </div>
 
         <div v-if="loading && !members.length" class="empty-state"><p>جارٍ التحميل...</p></div>
@@ -200,6 +227,66 @@ onMounted(async () => {
         </div>
       </div>
     </section>
+
+    <Teleport to="body">
+      <Transition name="mm-fade">
+        <div v-if="selected" class="mm-overlay" dir="rtl" @click.self="closeMember">
+          <div class="mm-dialog" role="dialog" aria-modal="true" :aria-label="`بيانات تصنيف ${selected.name}`">
+            <div class="mm-head">
+              <span class="mm-icon" aria-hidden="true"><Building2 :size="30" :stroke-width="1.7" /></span>
+              <div class="mm-head-text">
+                <h2 class="mm-title">{{ selected.name }}</h2>
+                <span class="member-status" :class="statusClass(selected.membership_status)">{{ selected.status_label }}</span>
+              </div>
+              <button type="button" class="mm-close" aria-label="إغلاق" @click="closeMember"><X :size="20" /></button>
+            </div>
+
+            <div class="mm-body">
+              <div class="mm-info">
+                <div class="mm-info-item">
+                  <Hash :size="16" />
+                  <div><span class="mm-lbl">رقم العضوية</span><span class="mm-val">{{ selected.membership_number }}</span></div>
+                </div>
+                <div v-if="selected.member_since" class="mm-info-item">
+                  <CalendarDays :size="16" />
+                  <div><span class="mm-lbl">عضو منذ</span><span class="mm-val">{{ selected.member_since }}</span></div>
+                </div>
+                <div v-if="selected.city" class="mm-info-item">
+                  <MapPin :size="16" />
+                  <div><span class="mm-lbl">المدينة</span><span class="mm-val">{{ selected.city }}</span></div>
+                </div>
+              </div>
+
+              <h3 class="mm-sec-title"><Layers :size="17" /> المجالات والدرجات</h3>
+              <div v-if="selected.fields.length" class="mm-fields">
+                <div v-for="(f, i) in selected.fields" :key="i" class="mm-field">
+                  <span class="mm-field-name">{{ f.name }}</span>
+                  <span class="mm-grades">
+                    <span v-for="g in f.grades" :key="g" class="member-class"><Award :size="11" /> {{ g }}</span>
+                    <span v-if="!f.grades.length" class="mm-muted">بدون درجة</span>
+                  </span>
+                </div>
+              </div>
+              <p v-else class="mm-muted">لا توجد مجالات مسجّلة</p>
+
+              <h3 class="mm-sec-title"><BadgeCheck :size="17" /> الاختصاصات</h3>
+              <div v-if="selected.specializations.length" class="mm-table-wrap">
+                <table class="mm-table">
+                  <thead><tr><th>الاختصاص</th><th>الدرجة</th></tr></thead>
+                  <tbody>
+                    <tr v-for="(s, i) in selected.specializations" :key="i">
+                      <td>{{ s.name }}</td>
+                      <td>{{ s.grade || '—' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p v-else class="mm-muted">لا توجد اختصاصات مسجّلة</p>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -233,37 +320,85 @@ onMounted(async () => {
 .results-count { font-size: .88rem; color: #6b7280; margin-bottom: 1.5rem; }
 .results-count strong { color: #1a237e; }
 
-.members-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1.25rem; }
-.member-card { background: #fff; border: 1.5px solid #e5e7eb; border-radius: 14px; padding: 1.25rem; display: flex; align-items: flex-start; gap: 1rem; transition: all .25s; position: relative; }
-.member-card:hover { box-shadow: 0 8px 24px rgba(13,27,75,.1); border-color: #c5cae9; transform: translateY(-3px); }
-.member-avatar { width: 46px; height: 46px; border-radius: 12px; background: linear-gradient(135deg,#1a237e,#3949ab); color: #fff; display: flex; align-items: center; justify-content: center; font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 1.1rem; font-weight: 800; flex-shrink: 0; }
-.member-body { flex: 1; min-width: 0; }
-.member-name { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: .88rem; font-weight: 800; color: #0d1b3e; margin-bottom: .5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.member-meta { display: flex; gap: .65rem; margin-bottom: .6rem; }
-.member-city { display: flex; align-items: center; gap: .25rem; font-size: .76rem; color: #6b7280; }
-.member-logo { width: 100%; height: 100%; object-fit: contain; border-radius: 12px; background: #fff; }
-.member-num { font-size: .76rem; color: #6b7280; }
-.member-specs { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .6rem; }
-.member-spec.more { background: #e8eaf6; color: #1a237e; }
-.load-more-wrap { text-align: center; margin-top: 2rem; }
-.load-more { background: #1a237e; color: #fff; border: none; border-radius: 9px; padding: .7rem 2rem; font-size: .9rem; cursor: pointer; font-family: 'Tajawal', sans-serif; }
-.load-more:disabled { opacity: .6; cursor: default; }
-.member-spec { font-size: .76rem; color: #6b7280; background: #f3f4f6; border-radius: 50px; padding: .15rem .6rem; }
-.member-footer { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
-.member-class { display: flex; align-items: center; gap: .25rem; font-size: .72rem; font-weight: 700; border: 1px solid #1a237e; background: #e8eaf6; color: #1a237e; border-radius: 50px; padding: .15rem .6rem; }
-.member-status { font-size: .72rem; font-weight: 700; border-radius: 50px; padding: .15rem .6rem; }
+.members-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; }
+.member-card { min-width: 0; width: 100%; text-align: right; font: inherit; color: inherit; cursor: pointer; background: #fff; border: 1.5px solid #e5e7eb; border-radius: 14px; padding: 1.25rem; display: flex; align-items: flex-start; gap: 1rem; transition: box-shadow .25s, border-color .25s, transform .25s; position: relative; overflow: hidden; }
+.member-card::before { content: ''; position: absolute; top: 0; right: 0; width: 4px; height: 100%; background: linear-gradient(180deg, #f9a825, #1a237e); opacity: 0; transition: opacity .25s; }
+.member-card:hover, .member-card:focus-visible { box-shadow: 0 8px 24px rgba(13,27,75,.1); border-color: #c5cae9; transform: translateY(-3px); outline: none; }
+.member-card:hover::before, .member-card:focus-visible::before { opacity: 1; }
+.member-icon { width: 52px; height: 52px; border-radius: 14px; background: linear-gradient(135deg,#0d1b4b,#1a237e 55%,#3949ab); color: #f9a825; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: inset 0 0 0 2px rgba(249,168,37,.25); }
+.member-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .5rem; }
+.member-name { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: .95rem; font-weight: 800; color: #0d1b3e; line-height: 1.5; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.member-num { font-size: .76rem; color: #6b7280; overflow-wrap: anywhere; }
+.member-specs { display: flex; flex-wrap: wrap; gap: .35rem; min-width: 0; }
+.member-spec { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .74rem; color: #4b5563; background: #f3f4f6; border-radius: 50px; padding: .15rem .6rem; }
+.member-spec.more { background: #e8eaf6; color: #1a237e; flex-shrink: 0; }
+.member-footer { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; min-width: 0; }
+.member-class { display: inline-flex; align-items: center; gap: .25rem; max-width: 100%; font-size: .72rem; font-weight: 700; border: 1px solid #1a237e; background: #e8eaf6; color: #1a237e; border-radius: 50px; padding: .15rem .6rem; white-space: nowrap; }
+.member-status { display: inline-block; font-size: .72rem; font-weight: 700; border-radius: 50px; padding: .15rem .6rem; white-space: nowrap; }
 .member-status.active { background: #e8f5e9; color: #2e7d32; }
 .member-status.expired { background: #fce4ec; color: #c62828; }
 .member-status.suspended { background: #fff8e1; color: #e65100; }
-.member-since { font-size: .72rem; color: #9ca3af; }
-.member-link { position: absolute; top: 50%; left: 1rem; transform: translateY(-50%); color: #9ca3af; transition: color .2s; }
-.member-card:hover .member-link { color: #1a237e; }
+.member-since { font-size: .72rem; color: #9ca3af; white-space: nowrap; }
+.member-more { display: inline-flex; align-items: center; gap: .2rem; align-self: flex-start; margin-top: .15rem; font-size: .76rem; font-weight: 700; color: #1a237e; transition: color .2s, gap .2s; }
+.member-card:hover .member-more { color: #f9a825; gap: .45rem; }
+.load-more-wrap { text-align: center; margin-top: 2rem; }
+.load-more { background: #1a237e; color: #fff; border: none; border-radius: 9px; padding: .7rem 2rem; font-size: .9rem; cursor: pointer; font-family: 'Tajawal', sans-serif; }
+.load-more:disabled { opacity: .6; cursor: default; }
+
+/* نافذة بيانات التصنيف */
+.mm-overlay { position: fixed; inset: 0; z-index: 2000; background: rgba(13,27,75,.55); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; padding: 1rem; font-family: 'Tajawal', 'Cairo', sans-serif; direction: rtl; }
+.mm-dialog { background: #fff; width: 100%; max-width: 620px; max-height: calc(100vh - 2rem); max-height: calc(100dvh - 2rem); border-radius: 18px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 60px rgba(13,27,75,.35); }
+.mm-head { display: flex; align-items: center; gap: 1rem; padding: 1.25rem 1.5rem; background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); border-bottom: 3px solid #f9a825; }
+.mm-icon { width: 58px; height: 58px; border-radius: 16px; background: rgba(255,255,255,.1); color: #f9a825; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: inset 0 0 0 2px rgba(249,168,37,.35); }
+.mm-head-text { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: .45rem; }
+.mm-title { font-size: 1.12rem; font-weight: 800; color: #fff; line-height: 1.5; overflow-wrap: anywhere; }
+.mm-close { flex-shrink: 0; align-self: flex-start; width: 36px; height: 36px; border-radius: 10px; border: none; background: rgba(255,255,255,.12); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .2s; }
+.mm-close:hover { background: #f9a825; color: #0d1b4b; }
+.mm-body { padding: 1.25rem 1.5rem 1.5rem; overflow-y: auto; overflow-x: hidden; }
+.mm-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .75rem; margin-bottom: 1.4rem; }
+.mm-info-item { display: flex; align-items: center; gap: .6rem; min-width: 0; background: #f9fafb; border: 1px solid #eef0f4; border-radius: 12px; padding: .7rem .85rem; color: #1a237e; }
+.mm-info-item > div { display: flex; flex-direction: column; min-width: 0; }
+.mm-lbl { font-size: .72rem; color: #6b7280; }
+.mm-val { font-size: .9rem; font-weight: 700; color: #0d1b3e; overflow-wrap: anywhere; }
+.mm-sec-title { display: flex; align-items: center; gap: .45rem; font-size: .95rem; font-weight: 800; color: #1a237e; margin: 0 0 .75rem; }
+.mm-sec-title svg { color: #f9a825; }
+.mm-fields { display: flex; flex-direction: column; gap: .55rem; margin-bottom: 1.4rem; }
+.mm-field { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem; border: 1px solid #e5e7eb; border-radius: 12px; padding: .65rem .85rem; }
+.mm-field-name { font-size: .88rem; font-weight: 700; color: #374151; overflow-wrap: anywhere; min-width: 0; }
+.mm-grades { display: flex; flex-wrap: wrap; gap: .35rem; }
+.mm-table-wrap { border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; }
+.mm-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: .85rem; }
+.mm-table th { background: #e8eaf6; color: #1a237e; font-weight: 800; text-align: right; padding: .6rem .85rem; }
+.mm-table th:last-child, .mm-table td:last-child { width: 34%; }
+.mm-table td { padding: .6rem .85rem; border-top: 1px solid #f0f1f4; color: #374151; overflow-wrap: anywhere; vertical-align: top; }
+.mm-table tbody tr:nth-child(even) td { background: #fafbff; }
+.mm-table td:last-child { font-weight: 700; color: #1a237e; }
+.mm-muted { font-size: .82rem; color: #9ca3af; margin-bottom: 1.25rem; }
+.mm-fade-enter-active, .mm-fade-leave-active { transition: opacity .2s; }
+.mm-fade-enter-active .mm-dialog, .mm-fade-leave-active .mm-dialog { transition: transform .2s; }
+.mm-fade-enter-from, .mm-fade-leave-to { opacity: 0; }
+.mm-fade-enter-from .mm-dialog, .mm-fade-leave-to .mm-dialog { transform: translateY(14px) scale(.98); }
 
 .empty-state { text-align: center; padding: 4rem 2rem; color: #9ca3af; }
 .empty-state svg { margin-bottom: 1rem; }
 .empty-state p { font-size: 1rem; margin-bottom: 1.25rem; }
 .empty-state button { background: #1a237e; color: #fff; border: none; border-radius: 9px; padding: .65rem 1.5rem; font-size: .875rem; cursor: pointer; font-family: 'Tajawal', sans-serif; }
 
-@media (max-width: 900px) { .members-grid { grid-template-columns: repeat(2,1fr); } }
-@media (max-width: 540px) { .members-grid { grid-template-columns: 1fr; } .filters-row { flex-direction: column; } .filter-sel { width: 100%; } }
+.filter-sel { max-width: 100%; text-overflow: ellipsis; }
+.page-hero-desc, .page-hero-title { overflow-wrap: anywhere; }
+
+@media (max-width: 900px) { .members-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 540px) {
+  .pub-section { padding: 2.5rem 0; }
+  .pub-cont { padding: 0 1rem; }
+  .filters-bar { padding: 1rem; }
+  .members-grid { grid-template-columns: minmax(0, 1fr); }
+  .filters-row { flex-direction: column; }
+  .filter-sel, .filter-reset { width: 100%; justify-content: center; }
+  .mm-overlay { align-items: flex-end; padding: 0; }
+  .mm-dialog { max-width: none; border-radius: 18px 18px 0 0; max-height: 92vh; max-height: 92dvh; }
+  .mm-head { padding: 1rem 1.1rem; }
+  .mm-body { padding: 1rem 1.1rem 1.25rem; }
+  .mm-icon { width: 48px; height: 48px; }
+}
 </style>
