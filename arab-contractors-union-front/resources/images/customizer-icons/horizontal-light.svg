@@ -1,12 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="104" height="66" viewBox="0 0 104 66" fill="none">
-  <rect width="104" height="66" rx="4" fill="currentColor" fill-opacity="0.02"/>
-  <rect x="44.0068" y="19.6136" width="46.8212" height="17.6" rx="2" fill="currentColor" fill-opacity="0.08"/>
-  <rect x="14.9854" y="19.6136" width="22.1679" height="17.6" rx="2" fill="currentColor" fill-opacity="0.08"/>
-  <rect x="14.9854" y="42.4547" width="75.8413" height="17.6" rx="2" fill="currentColor" fill-opacity="0.08"/>
-  <rect x="14.9248" y="4.68896" width="74.1506" height="9.00999" rx="2" fill="currentColor" fill-opacity="0.08"/>
-  <rect x="20.0264" y="6.50403" width="6.00327" height="5.38019" rx="1" fill="currentColor" fill-opacity="0.3"/>
-  <rect x="33.877" y="7.96356" width="6.6372" height="2.46129" rx="1.23064" fill="currentColor" fill-opacity="0.3"/>
-  <rect x="48.3652" y="7.96356" width="6.6372" height="2.46129" rx="1.23064" fill="currentColor" fill-opacity="0.3"/>
-  <rect x="62.8506" y="7.96356" width="6.6372" height="2.46129" rx="1.23064" fill="currentColor" fill-opacity="0.3"/>
-  <rect x="77.3379" y="7.96356" width="6.6372" height="2.46129" rx="1.23064" fill="currentColor" fill-opacity="0.3"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="104" height="66" fill="none" viewBox="0 0 104 66"><rect width="104" height="66" fill="currentColor" fill-opacity=".02" rx="4"/><rect width="46.821" height="17.6" x="44.007" y="19.614" fill="currentColor" fill-opacity=".08" rx="2"/><rect width="22.168" height="17.6" x="14.985" y="19.614" fill="currentColor" fill-opacity=".08" rx="2"/><rect width="75.841" height="17.6" x="14.985" y="42.455" fill="currentColor" fill-opacity=".08" rx="2"/><rect width="74.151" height="9.01" x="14.925" y="4.689" fill="currentColor" fill-opacity=".08" rx="2"/><rect width="6.003" height="5.38" x="20.026" y="6.504" fill="currentColor" fill-opacity=".3" rx="1"/><rect width="6.637" height="2.461" x="33.877" y="7.964" fill="currentColor" fill-opacity=".3" rx="1.231"/><rect width="6.637" height="2.461" x="48.365" y="7.964" fill="currentColor" fill-opacity=".3" rx="1.231"/><rect width="6.637" height="2.461" x="62.851" y="7.964" fill="currentColor" fill-opacity=".3" rx="1.231"/><rect width="6.637" height="2.461" x="77.338" y="7.964" fill="currentColor" fill-opacity=".3" rx="1.231"/></svg>
