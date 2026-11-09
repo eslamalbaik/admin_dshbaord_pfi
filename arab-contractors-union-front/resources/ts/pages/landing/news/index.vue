@@ -3,6 +3,7 @@ import { ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/plugins/axios'
 import { Search, Inbox, Play, Images } from 'lucide-vue-next'
+import { vHoverCard } from '@/utils/hoverCard'
 
 definePage({
   meta: {
@@ -135,10 +136,11 @@ onMounted(fetchNews)
         <RouterLink
           v-for="item in news"
           :key="item.id"
+          v-hover-card
           :to="`/landing/news/${item.slug}`"
           class="news-card"
         >
-          <div class="news-img-wrap">
+          <div class="news-img-wrap hc-media">
             <img v-if="item.image" :src="item.image" :alt="item.title" class="news-img" />
             <div v-else class="news-img-placeholder">📰</div>
             <span v-if="item.video_url" class="news-video-badge"><Play :size="22" fill="white" /></span>
@@ -148,9 +150,9 @@ onMounted(fetchNews)
           </div>
           <div class="news-body">
             <p class="news-date">{{ formatDate(item.published_at) }}</p>
-            <h2 class="news-title">{{ item.title }}</h2>
+            <h2 class="news-title hc-title">{{ item.title }}</h2>
             <p v-if="item.excerpt" class="news-excerpt">{{ item.excerpt }}</p>
-            <span class="news-read-more">اقرأ المزيد ←</span>
+            <span class="news-read-more">اقرأ المزيد <span class="hc-arrow" style="display:inline-block">←</span></span>
           </div>
         </RouterLink>
       </div>
@@ -338,6 +340,7 @@ onMounted(fetchNews)
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1.5rem;
+  perspective: 1400px;
 }
 
 .news-card {
@@ -349,12 +352,6 @@ onMounted(fetchNews)
   color: inherit;
   display: flex;
   flex-direction: column;
-  transition: box-shadow 0.2s, transform 0.2s;
-}
-
-.news-card:hover {
-  box-shadow: 0 8px 30px rgba(26,35,126,0.1);
-  transform: translateY(-4px);
 }
 
 .news-img-wrap {
