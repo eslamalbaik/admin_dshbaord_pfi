@@ -9,7 +9,9 @@ definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false
 
 const BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 // صورة العطاءات الأساسية — نفس صورة كروت "أحدث العطاءات" بالرئيسية
+// صورة العطاء = صورة تصنيفه الحالية من لوحة التحكم، و/tenders.webp لو التصنيف بلا صورة
 const TENDER_IMAGE = '/tenders.webp'
+const tenderImage = (t: { category_image?: string | null }) => t.category_image || TENDER_IMAGE
 
 const route = useRoute()
 const router = useRouter()
@@ -26,6 +28,7 @@ interface Tender {
   title: string
   description: string | null
   category: string | null
+  category_image?: string | null
   deadline: string | null
   published_at: string | null
   status: 'open' | 'closed' | 'cancelled'
@@ -206,7 +209,7 @@ function openTender(t: Tender) {
           </div>
           <template v-else-if="selected">
             <div class="detail-img">
-              <img :src="TENDER_IMAGE" :alt="selected.title">
+              <img :src="tenderImage(selected)" :alt="selected.title">
             </div>
             <div class="detail-body">
               <div class="tender-meta-top">
@@ -283,7 +286,7 @@ function openTender(t: Tender) {
           >
             <div class="tender-color-bar" />
             <div class="tender-thumb hc-media">
-              <img :src="TENDER_IMAGE" :alt="t.title" loading="lazy">
+              <img :src="tenderImage(t)" :alt="t.title" loading="lazy">
             </div>
             <div class="tender-body">
               <div class="tender-top">
