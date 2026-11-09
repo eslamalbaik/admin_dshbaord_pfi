@@ -59,17 +59,36 @@ class ContractorDirectoryTest extends TestCase
             ->assertOk()->assertJsonCount(0, 'items');
     }
 
-    public function test_filter_by_field_and_status(): void
+    public function test_filters_by_status_and_specialization(): void
     {
-        $this->contractor('شركة الطرق', '911_g', 'active', ['specialties' => [['field_lk_type' => 5, 'specialization_lk_type' => 1, 'classification' => 'A']]]);
-        $this->contractor('شركة المباني', '912_g', 'active', ['specialties' => [['field_lk_type' => 6, 'specialization_lk_type' => 1, 'classification' => 'A']]]);
-        $this->contractor('شركة موقوفة', '913_g', 'suspended', ['specialties' => [['field_lk_type' => 5, 'specialization_lk_type' => 1, 'classification' => 'A']]]);
+        $this->contractor('شركة طرق', '911_g', 'active', ['specialties' => [
+            ['field_lk_type' => 20, 'specialization_lk_type' => 20, 'classification' => 'ثانية'],
+        ]]);
+        $this->contractor('شركة أبنية', '912_g', 'active', ['specialties' => [
+            ['field_lk_type' => 30, 'specialization_lk_type' => 60, 'classification' => 'ثالثة'],
+        ]]);
+        $this->contractor('شركة منتهية', '913_g', 'expired', ['specialties' => [
+            ['field_lk_type' => 20, 'specialization_lk_type' => 20, 'classification' => 'ثانية'],
+        ]]);
 
-        $this->getJson('/api/v1/contractors-directory?field_id=5')
-            ->assertOk()->assertJsonCount(2, 'items');
-        $this->getJson('/api/v1/contractors-directory?field_id=5&status=suspended')
-            ->assertOk()->assertJsonCount(1, 'items')->assertJsonPath('items.0.membership_number', '913_g');
+        $this->getJson('/api/v1/contractors-directory?specialization=20')
+            ->assertOk()->assertJsonPath('meta.total', 2);
+        $this->getJson('/api/v1/contractors-directory?field=30')
+            ->assertOk()->assertJsonCount(1, 'items')->assertJsonPath('items.0.name', 'شركة أبنية');
+        $this->getJson('/api/v1/contractors-directory?status=active&specialization=20')
+            ->assertOk()->assertJsonCount(1, 'items')->assertJsonPath('items.0.name', 'شركة طرق');
         $this->getJson('/api/v1/contractors-directory?status=expired')
-            ->assertOk()->assertJsonCount(0, 'items');
+            ->assertOk()->assertJsonCount(1, 'items')->assertJsonPath('items.0.name', 'شركة منتهية');
+
+        $item = $this->getJson('/api/v1/contractors-directory?field=30')->json('items.0');
+        $this->assertArrayNotHasKey('_field_ids', $item);
+        $this->assertArrayNotHasKey('phone', $item);
+    }
+
+    public function test_directory_filters_endpoint_lists_options(): void
+    {
+        $this->getJson('/api/v1/contractors-directory/filters')
+            ->assertOk()
+            ->assertJsonStructure(['items' => ['fields', 'grades', 'statuses']]);
     }
 }

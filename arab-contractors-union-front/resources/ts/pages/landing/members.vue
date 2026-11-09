@@ -1,38 +1,62 @@
 <script setup lang="ts">
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import api from '@/plugins/axios'
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { Search, MapPin, Award, Filter } from 'lucide-vue-next'
+import { ref, computed, watch, onMounted } from 'vue'
+import { Search, Award, Filter, ChevronLeft } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
-interface DirectoryItem {
+interface FieldOpt { value: number; label: string; specializations: { value: number; label: string }[] }
+interface Member {
   name: string
   membership_number: string
   city: string | null
+  logo_url: string | null
+  member_since: number | null
   membership_status: 'active' | 'expired' | 'suspended'
   status_label: string
   fields: { name: string; grades: string[] }[]
+  specializations: { name: string; grade: string | null }[]
 }
 
-const searchQ = ref('')
-const filterField = ref('')
-const filterStatus = ref('')
+const PER_PAGE = 24
 
-const fieldOptions = ref<{ id: number; name: string }[]>([])
-const statuses = [
+const searchQ = ref('')
+const filterStatus = ref('')
+const filterField = ref('')
+const filterSpec = ref('')
+const filterGrade = ref('')
+
+const fieldOptions = ref<FieldOpt[]>([])
+const gradeOptions = ref<{ value: string; label: string }[]>([])
+const statusOptions = ref<{ value: string; label: string }[]>([
   { value: 'active', label: 'فعّالة' },
   { value: 'expired', label: 'منتهية' },
   { value: 'suspended', label: 'موقوفة' },
-]
+])
 
-const items = ref<DirectoryItem[]>([])
+const members = ref<Member[]>([])
 const total = ref(0)
 const page = ref(1)
 const lastPage = ref(1)
 const loading = ref(false)
 let requestId = 0
 let timer: ReturnType<typeof setTimeout> | undefined
+
+// الاختصاصات المتاحة: تابعة للمجال المختار، أو كلها (بدون تكرار) إن لم يُختر مجال
+const specOptions = computed(() => {
+  const src = filterField.value
+    ? fieldOptions.value.filter(f => String(f.value) === filterField.value)
+    : fieldOptions.value
+  const seen = new Map<number, string>()
+  src.forEach(f => f.specializations.forEach(s => seen.set(s.value, s.label)))
+  return [...seen].map(([value, label]) => ({ value, label }))
+})
+
+const hasFilters = computed(() =>
+  !!(searchQ.value || filterStatus.value || filterField.value || filterSpec.value || filterGrade.value))
+
+const statusClass = (s: string) => (s === 'active' ? 'active' : s === 'suspended' ? 'suspended' : 'expired')
 
 async function load(p = 1) {
   const id = ++requestId
@@ -41,39 +65,50 @@ async function load(p = 1) {
     const r = await api.get('/api/v1/contractors-directory', {
       params: {
         search: searchQ.value.trim() || undefined,
-        field_id: filterField.value || undefined,
         status: filterStatus.value || undefined,
+        field: filterField.value || undefined,
+        specialization: filterSpec.value || undefined,
+        grade: filterGrade.value || undefined,
         page: p,
-        per_page: 12,
+        per_page: PER_PAGE,
       },
     })
     if (id !== requestId) return
-    const list: DirectoryItem[] = r.data.items ?? []
-    items.value = p === 1 ? list : [...items.value, ...list]
-    total.value = r.data.meta?.total ?? items.value.length
+    const items: Member[] = r.data.items ?? []
+    members.value = p === 1 ? items : [...members.value, ...items]
+    total.value = r.data.meta?.total ?? items.length
     page.value = r.data.meta?.current_page ?? p
     lastPage.value = r.data.meta?.last_page ?? p
   }
   catch {
-    if (id === requestId) { items.value = []; total.value = 0 }
+    if (id === requestId) { members.value = []; total.value = 0; lastPage.value = 1 }
   }
   finally {
     if (id === requestId) loading.value = false
   }
 }
 
-function reload() { clearTimeout(timer); timer = setTimeout(() => load(1), 300) }
-function reset() { searchQ.value = ''; filterField.value = ''; filterStatus.value = ''; load(1) }
+function reset() {
+  searchQ.value = ''; filterStatus.value = ''; filterField.value = ''; filterSpec.value = ''; filterGrade.value = ''
+}
+
+// تغيير المجال يصفّر الاختصاص إن لم يعد ضمنه
+watch(filterField, () => {
+  if (filterSpec.value && !specOptions.value.some(s => String(s.value) === filterSpec.value)) filterSpec.value = ''
+})
+watch([filterStatus, filterField, filterSpec, filterGrade], () => load(1))
+watch(searchQ, () => { clearTimeout(timer); timer = setTimeout(() => load(1), 350) })
 
 onMounted(async () => {
   load(1)
   try {
-    const r = await api.get('/api/v1/app/specialties-catalog')
-    fieldOptions.value = r.data.fields ?? []
+    const r = await api.get('/api/v1/contractors-directory/filters')
+    fieldOptions.value = r.data.items?.fields ?? []
+    gradeOptions.value = r.data.items?.grades ?? []
+    if (r.data.items?.statuses?.length) statusOptions.value = r.data.items.statuses
   }
-  catch { /* الفلتر يبقى فارغاً */ }
+  catch { /* الفلاتر اختيارية — القائمة تعمل بدونها */ }
 })
-onBeforeUnmount(() => clearTimeout(timer))
 </script>
 
 <template>
@@ -86,7 +121,7 @@ onBeforeUnmount(() => clearTimeout(timer))
           <RouterLink to="/landing">الرئيسية</RouterLink><span>/</span><span>أعضاء الاتحاد</span>
         </div>
         <h1 class="page-hero-title">أعضاء الاتحاد</h1>
-        <p class="page-hero-desc">دليل شركات المقاولات الأعضاء في اتحاد المقاولين الفلسطينيين — يمكنك البحث والتصفية</p>
+        <p class="page-hero-desc">دليل شركات المقاولات الأعضاء في اتحاد المقاولين — يمكنك البحث والتصفية حسب الحالة والاختصاص والدرجة</p>
       </div>
       <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
@@ -96,16 +131,24 @@ onBeforeUnmount(() => clearTimeout(timer))
         <div class="filters-bar">
           <div class="search-wrap">
             <Search :size="17" class="search-ico" />
-            <input v-model="searchQ" type="text" placeholder="ابحث باسم الشركة أو رقم العضوية..." class="search-input" @input="reload" />
+            <input v-model="searchQ" type="text" placeholder="ابحث باسم الشركة أو رقم العضوية..." class="search-input" />
           </div>
           <div class="filters-row">
-            <select v-model="filterField" class="filter-sel" @change="load(1)">
-              <option value="">كل الاختصاصات</option>
-              <option v-for="f in fieldOptions" :key="f.id" :value="f.id">{{ f.name }}</option>
-            </select>
-            <select v-model="filterStatus" class="filter-sel" @change="load(1)">
+            <select v-model="filterStatus" class="filter-sel">
               <option value="">كل الحالات</option>
-              <option v-for="s in statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
+              <option v-for="s in statusOptions" :key="s.value" :value="s.value">{{ s.label }}</option>
+            </select>
+            <select v-model="filterField" class="filter-sel">
+              <option value="">كل المجالات</option>
+              <option v-for="f in fieldOptions" :key="f.value" :value="String(f.value)">{{ f.label }}</option>
+            </select>
+            <select v-model="filterSpec" class="filter-sel">
+              <option value="">كل الاختصاصات</option>
+              <option v-for="s in specOptions" :key="s.value" :value="String(s.value)">{{ s.label }}</option>
+            </select>
+            <select v-model="filterGrade" class="filter-sel">
+              <option value="">كل الدرجات</option>
+              <option v-for="g in gradeOptions" :key="g.value" :value="g.value">{{ g.label }}</option>
             </select>
             <button class="filter-reset" @click="reset">
               <Filter :size="14" /> إعادة تعيين
@@ -116,40 +159,47 @@ onBeforeUnmount(() => clearTimeout(timer))
         <p class="results-count">عُثر على <strong>{{ total }}</strong> شركة</p>
 
         <div class="members-grid">
-          <div v-for="m in items" :key="m.membership_number" class="member-card">
-            <div class="member-avatar">{{ m.name.replace(/^شركة\s*/, '').charAt(0) }}</div>
+          <div v-for="m in members" :key="m.membership_number" class="member-card">
+            <div class="member-avatar">
+              <img v-if="m.logo_url" :src="m.logo_url" :alt="m.name" class="member-logo">
+              <template v-else>{{ m.name.charAt(0) }}</template>
+            </div>
             <div class="member-body">
               <h3 class="member-name" :title="m.name">{{ m.name }}</h3>
               <div class="member-meta">
-                <span v-if="m.city" class="member-city"><MapPin :size="12" /> {{ m.city }}</span>
-                <span class="member-spec">رقم العضوية {{ m.membership_number }}</span>
+                <span class="member-num">رقم العضوية: {{ m.membership_number }}</span>
               </div>
-              <div class="member-fields">
-                <span v-for="f in m.fields" :key="f.name" class="member-class">
-                  <Award :size="11" /> {{ f.name }}<template v-if="f.grades.length"> — {{ f.grades.join('، ') }}</template>
-                </span>
+              <div v-if="m.specializations.length" class="member-specs">
+                <span v-for="(s, i) in m.specializations.slice(0, 3)" :key="i" class="member-spec">{{ s.name }}</span>
+                <span v-if="m.specializations.length > 3" class="member-spec more">+{{ m.specializations.length - 3 }}</span>
               </div>
               <div class="member-footer">
-                <span class="member-status" :class="m.membership_status === 'active' ? 'active' : m.membership_status === 'suspended' ? 'suspended' : 'expired'">
-                  {{ m.membership_status === 'active' ? 'فعّالة' : m.status_label }}
+                <span v-for="g in [...new Set(m.fields.flatMap(f => f.grades))].slice(0, 2)" :key="g" class="member-class">
+                  <Award :size="11" /> {{ g }}
                 </span>
+                <span class="member-status" :class="statusClass(m.membership_status)">{{ m.status_label }}</span>
+                <span v-if="m.member_since" class="member-since">منذ {{ m.member_since }}</span>
               </div>
             </div>
+            <span class="member-link"><ChevronLeft :size="16" /></span>
           </div>
         </div>
 
-        <div v-if="!loading && !items.length" class="empty-state">
+        <div v-if="loading && !members.length" class="empty-state"><p>جارٍ التحميل...</p></div>
+
+        <div v-if="!loading && !members.length" class="empty-state">
           <Search :size="48" />
           <p>لا توجد نتائج مطابقة للبحث</p>
-          <button @click="reset">إعادة تعيين الفلاتر</button>
+          <button v-if="hasFilters" @click="reset">إعادة تعيين الفلاتر</button>
         </div>
 
-        <div v-if="page < lastPage" class="more-wrap">
-          <button class="more-btn" :disabled="loading" @click="load(page + 1)">{{ loading ? 'جارٍ التحميل...' : 'عرض المزيد' }}</button>
+        <div v-if="page < lastPage" class="load-more-wrap">
+          <button class="load-more" :disabled="loading" @click="load(page + 1)">
+            {{ loading ? 'جارٍ التحميل...' : 'عرض المزيد' }}
+          </button>
         </div>
       </div>
     </section>
-
   </div>
 </template>
 
@@ -191,19 +241,21 @@ onBeforeUnmount(() => clearTimeout(timer))
 .member-name { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: .88rem; font-weight: 800; color: #0d1b3e; margin-bottom: .5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .member-meta { display: flex; gap: .65rem; margin-bottom: .6rem; }
 .member-city { display: flex; align-items: center; gap: .25rem; font-size: .76rem; color: #6b7280; }
+.member-logo { width: 100%; height: 100%; object-fit: contain; border-radius: 12px; background: #fff; }
+.member-num { font-size: .76rem; color: #6b7280; }
+.member-specs { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .6rem; }
+.member-spec.more { background: #e8eaf6; color: #1a237e; }
+.load-more-wrap { text-align: center; margin-top: 2rem; }
+.load-more { background: #1a237e; color: #fff; border: none; border-radius: 9px; padding: .7rem 2rem; font-size: .9rem; cursor: pointer; font-family: 'Tajawal', sans-serif; }
+.load-more:disabled { opacity: .6; cursor: default; }
 .member-spec { font-size: .76rem; color: #6b7280; background: #f3f4f6; border-radius: 50px; padding: .15rem .6rem; }
 .member-footer { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
-.member-class { display: flex; align-items: center; gap: .25rem; font-size: .72rem; font-weight: 700; border: 1px solid; border-radius: 50px; padding: .15rem .6rem; }
+.member-class { display: flex; align-items: center; gap: .25rem; font-size: .72rem; font-weight: 700; border: 1px solid #1a237e; background: #e8eaf6; color: #1a237e; border-radius: 50px; padding: .15rem .6rem; }
 .member-status { font-size: .72rem; font-weight: 700; border-radius: 50px; padding: .15rem .6rem; }
 .member-status.active { background: #e8f5e9; color: #2e7d32; }
 .member-status.expired { background: #fce4ec; color: #c62828; }
 .member-status.suspended { background: #fff8e1; color: #e65100; }
 .member-since { font-size: .72rem; color: #9ca3af; }
-.member-fields { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .6rem; }
-.member-fields .member-class { background: #e8eaf6; color: #1a237e; border-color: #c5cae9; }
-.more-wrap { text-align: center; margin-top: 2rem; }
-.more-btn { background: #1a237e; color: #fff; border: none; border-radius: 9px; padding: .7rem 2rem; font-size: .9rem; cursor: pointer; font-family: 'Tajawal', sans-serif; }
-.more-btn:disabled { opacity: .6; cursor: default; }
 .member-link { position: absolute; top: 50%; left: 1rem; transform: translateY(-50%); color: #9ca3af; transition: color .2s; }
 .member-card:hover .member-link { color: #1a237e; }
 
