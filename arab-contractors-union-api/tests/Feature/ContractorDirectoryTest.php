@@ -91,4 +91,31 @@ class ContractorDirectoryTest extends TestCase
             ->assertOk()
             ->assertJsonStructure(['items' => ['fields', 'grades', 'statuses']]);
     }
+
+    public function test_hidden_test_record_is_not_listed(): void
+    {
+        $this->contractor('test', '936_g');
+        $this->contractor('شركة حقيقية', '937_g');
+
+        $this->getJson('/api/v1/contractors-directory')
+            ->assertOk()->assertJsonCount(1, 'items')->assertJsonPath('items.0.membership_number', '937_g');
+    }
+
+    public function test_staging_host_reads_production_public_directory(): void
+    {
+        \Illuminate\Support\Facades\Cache::flush();
+        \Illuminate\Support\Facades\Http::fake(['api-production.pcuorg.cloud/*' => \Illuminate\Support\Facades\Http::response([
+            'items' => [
+                ['name' => 'شركة إنتاج', 'membership_number' => '575_g', 'membership_status' => 'active', 'status_label' => 'عضوية سارية', 'city' => null, 'fields' => [['name' => 'طرق', 'grades' => ['الدرجة الثانية']]]],
+                ['name' => 'test', 'membership_number' => '936_g', 'membership_status' => 'active', 'status_label' => 'عضوية سارية', 'city' => null, 'fields' => []],
+            ],
+            'meta' => ['last_page' => 1],
+        ])]);
+        $this->contractor('شركة تجريبية', '2001_g');
+
+        $res = $this->withServerVariables(['HTTP_HOST' => 'api.pcuorg.cloud'])
+            ->getJson('http://api.pcuorg.cloud/api/v1/contractors-directory')->assertOk();
+
+        $res->assertJsonCount(1, 'items')->assertJsonPath('items.0.membership_number', '575_g');
+    }
 }
