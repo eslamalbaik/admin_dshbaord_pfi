@@ -56,6 +56,9 @@ return [
     'sms' => [
         'driver' => env('SMS_DRIVER', 'log'),
 
+        // رمز OTP ثابت للتجربة (مثلاً 123456 على الستيجنج) — يُتجاهَل دائماً في production
+        'fixed_otp' => env('OTP_FIXED_CODE'),
+
         'hotsms' => [
             'api_token' => env('HOTSMS_API_TOKEN'),
             'sender'    => env('HOTSMS_SENDER', 'PCU'),

@@ -294,6 +294,27 @@ class ContractorPhoneCountryTest extends TestCase
         $this->assertGreaterThan(1, count(array_unique($codes)), 'الرمز يجب ألا يكون ثابتاً');
     }
 
+    public function test_fixed_otp_code_is_used_outside_production(): void
+    {
+        config(['services.sms.fixed_otp' => '123456']);
+        $this->createContractor(['phone' => '591111111', 'phone_country_code' => '970']);
+
+        $this->postJson('/api/v1/contractor/auth/forgot-password/send-otp', ['phone' => '591111111'])
+            ->assertOk()
+            ->assertJsonPath('items.otp_preview', 123456);
+    }
+
+    public function test_fixed_otp_code_is_ignored_in_production(): void
+    {
+        config(['services.sms.fixed_otp' => '123456']);
+        $this->app['env'] = 'production';
+
+        $otp = $this->app->make(\App\Services\OtpService::class)
+            ->sendOtp('test', 1, '+970591111111', 'رمز التحقق: {otp}');
+
+        $this->assertNotSame(123456, $otp['otp']);
+    }
+
     public function test_failed_sms_returns_an_error_and_allows_retry(): void
     {
         $this->app->instance(SmsSenderInterface::class, new class implements SmsSenderInterface {
