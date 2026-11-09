@@ -219,6 +219,10 @@ class LandingController extends Controller
                 'fields'            => collect($tree)->map(fn ($f) => [
                     'name'   => $f['field_name'],
                     'grades' => collect($f['specializations'])->pluck('grade_label')->filter()->unique()->values(),
+                    // الاختصاصات فرع من المجال: كل اختصاص مع درجته تحت مجاله
+                    'specializations' => collect($f['specializations'])
+                        ->map(fn ($s) => ['name' => $s['spec_name'], 'grade' => $s['grade_label']])
+                        ->filter(fn ($s) => $s['name'] !== 'غير محدد')->values(),
                 ])->values(),
                 'specializations'   => collect($tree)->flatMap(fn ($f) => $f['specializations'])
                     ->map(fn ($s) => ['name' => $s['spec_name'], 'grade' => $s['grade_label']])
