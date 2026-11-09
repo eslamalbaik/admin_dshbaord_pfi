@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
-import { Building2 } from 'lucide-vue-next'
+import { Building2, Mail, Phone } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
@@ -13,6 +13,8 @@ const boardMembers = [
     company: 'شركة سكلز اند كواليتي للانشاءات',
     bio: 'رئيس مجلس إدارة شركة سكلز اند كواليتي للانشاءات ونقيب المقاولين الفلسطينيين.',
     photo: '/images/board/saqqa.jpg',
+    phone: '0599413071',
+    email: 'suhailalsaqqa@gmail.com',
   },
   {
     name: 'م. هاشم عرفة سكيك',
@@ -20,6 +22,8 @@ const boardMembers = [
     company: 'شركة بالكون للتجارة والمقاولات',
     bio: 'رئيس مجلس إدارة شركة بالكون ورئيس مجلس إدارة شركة إمكانات، وعضو مجلس بلدي لبلدية غزة.',
     photo: '/images/board/sakik.jpg',
+    phone: '0599745910',
+    email: 'palcon_2005@yahoo.com',
   },
   {
     name: 'حسين محمد شنن',
@@ -27,6 +31,8 @@ const boardMembers = [
     company: 'شركة أبناء شنن للمقاولات',
     bio: 'رئيس مجلس إدارة أبناء شنن ورئيس مجلس إدارة مجموعة شنن.',
     photo: '/images/board/shanan.jpg',
+    phone: '0594446665',
+    email: 'sons.4@hotmail.com',
   },
   {
     name: 'عبد الحكيم إسماعيل',
@@ -34,6 +40,8 @@ const boardMembers = [
     company: 'شركة عبد الحكيم إسماعيل',
     bio: 'عضو مجلس إدارة جمعية رجال الأعمال ورئيس مجلس إدارة شركة عبد الحكيم.',
     photo: '/images/board/ismail.jpg',
+    phone: '0599400590',
+    email: 'aico.pcu@gmail.com',
   },
   {
     name: 'م. عارف محمود أبو عودة',
@@ -41,6 +49,8 @@ const boardMembers = [
     company: 'شركة التأسيس للتجارة والمقاولات العامة',
     bio: 'رئيس مجلس إدارة شركة التأسيس ورئيس مجلس إدارة شركة أرض الوفاق.',
     photo: '/images/board/abu-oda.jpg',
+    phone: '0599407275',
+    email: 'altaasis.co@gmail.com',
   },
   {
     name: 'محروس سلمان أبو رجيلة',
@@ -48,6 +58,8 @@ const boardMembers = [
     company: 'شركة الرحاب للمقاولات العامة',
     bio: 'رئيس مجلس إدارة شركة الرحاب.',
     photo: '/images/board/abu-rajila.jpg',
+    phone: '0599440220',
+    email: 'mcomp@hotmail.com',
   },
   {
     name: 'عماد عبد الله أبو مطر',
@@ -55,6 +67,8 @@ const boardMembers = [
     company: 'شركة زهرة الوادي للتجارة والمقاولات',
     bio: 'رئيس مجلس إدارة شركة زهرة الوادي.',
     photo: '/images/board/abu-matar.jpg',
+    phone: '0599147766',
+    email: 'emadabumatar04@gmail.com',
   },
 ]
 </script>
@@ -87,6 +101,8 @@ const boardMembers = [
             <p class="pres-bio">{{ boardMembers[0].bio }}</p>
             <div class="pres-contacts">
               <span class="pres-contact"><Building2 :size="14" /> {{ boardMembers[0].company }}</span>
+              <a :href="`tel:${boardMembers[0].phone}`" class="pres-contact"><Phone :size="14" /> <span dir="ltr">{{ boardMembers[0].phone }}</span></a>
+              <a :href="`mailto:${boardMembers[0].email}`" class="pres-contact"><Mail :size="14" /> {{ boardMembers[0].email }}</a>
             </div>
           </div>
         </div>
@@ -99,6 +115,10 @@ const boardMembers = [
             <h3 class="board-name">{{ m.name }}</h3>
             <p class="board-bio">{{ m.bio }}</p>
             <div class="board-city"><Building2 :size="12" /> {{ m.company }}</div>
+            <div class="board-links">
+              <a :href="`tel:${m.phone}`" class="board-link"><Phone :size="13" /> <span dir="ltr">{{ m.phone }}</span></a>
+              <a :href="`mailto:${m.email}`" class="board-link"><Mail :size="13" /> {{ m.email }}</a>
+            </div>
           </div>
         </div>
       </div>
@@ -152,6 +172,9 @@ const boardMembers = [
 .board-contact-btn.mail { background: #e8eaf6; color: #1a237e; border: 1.5px solid #9fa8da; }
 .board-contact-btn:hover { transform: scale(1.1); }
 
+.board-links { display: flex; flex-direction: column; gap: .4rem; align-items: center; }
+.board-link { display: inline-flex; align-items: center; gap: .4rem; font-size: .8rem; font-weight: 600; color: #1a237e; text-decoration: none; word-break: break-all; }
+.board-link:hover { color: #f9a825; }
 @media (max-width: 1024px) { .board-grid { grid-template-columns: repeat(2,1fr); } }
 @media (max-width: 768px) { .president-card { flex-direction: column; align-items: center; text-align: center; } .pres-contacts { justify-content: center; } .board-grid { grid-template-columns: repeat(2,1fr); } }
 @media (max-width: 480px) { .board-grid { grid-template-columns: 1fr; } }
