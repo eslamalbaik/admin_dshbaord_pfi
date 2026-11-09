@@ -48,7 +48,7 @@ class OtpService
             throw new \App\Exceptions\OtpCooldownException($expiresIn);
         }
 
-        $otp = random_int(100000, 999999);
+        $otp = $this->fixedOtp() ?? random_int(100000, 999999);
 
         $message = str_replace('{otp}', (string) $otp, $smsMessage);
 
@@ -116,6 +116,20 @@ class OtpService
     public function forgetVerifiedResult(string $purpose, int $subjectId): void
     {
         Cache::forget($this->verifiedKey($purpose, $subjectId));
+    }
+
+    /**
+     * رمز ثابت من OTP_FIXED_CODE (6 أرقام) لبيئات التجربة فقط — production يبقى عشوائياً دائماً.
+     */
+    private function fixedOtp(): ?int
+    {
+        $fixed = (string) config('services.sms.fixed_otp');
+
+        if (app()->environment('production') || ! preg_match('/^\d{6}$/', $fixed)) {
+            return null;
+        }
+
+        return (int) $fixed;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
