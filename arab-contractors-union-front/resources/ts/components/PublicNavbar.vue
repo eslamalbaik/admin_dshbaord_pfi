@@ -34,7 +34,7 @@ const navLinks = [
     children: [
       { label: 'عن الاتحاد', href: '/landing/about' },
       { label: 'مجلس الإدارة', href: '/landing/board' },
-      { label: 'اللجان والفروع', href: '/landing/committees' },
+      { label: 'اللجان', href: '/landing/committees' },
       { label: 'أعضاء الاتحاد', href: '/landing/members' },
     ],
   },

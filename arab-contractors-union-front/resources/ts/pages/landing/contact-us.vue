@@ -48,7 +48,7 @@ const inquiryTypes = ['استفسار عام','الانضمام والعضوية
         <div class="contact-info">
           <div class="pub-sec-label">بياناتنا</div>
           <h2 class="info-title">كيف تصل إلينا؟</h2>
-          <p class="info-desc">مقرنا الرئيسي في رام الله مع فروع في ١١ محافظة فلسطينية. يمكنك زيارتنا أو التواصل معنا عبر أي من القنوات أدناه.</p>
+          <p class="info-desc">يمكنك زيارتنا أو التواصل معنا عبر أي من القنوات أدناه.</p>
 
           <div class="contact-details">
             <div v-for="c in contacts" :key="c.label" class="contact-item">
