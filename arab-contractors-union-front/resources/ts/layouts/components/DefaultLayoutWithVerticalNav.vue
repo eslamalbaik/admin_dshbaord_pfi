@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import { buildPcuNav } from '@/navigation/vertical/pcu'
+import { startProfileChangesBadge } from '@/composables/useProfileChangesBadge'
 import { useAuthStore } from '@/stores/authStore'
 
 // Components
@@ -16,6 +17,9 @@ import { VerticalNavLayout } from '@layouts'
 // القائمة بتتبنى من المستخدم الحالي (الدور + صلاحيات المشرف) وبتتحدث مع تغيّره
 const authStore = useAuthStore()
 const navItems = computed(() => buildPcuNav(authStore.user))
+
+// عدّاد طلبات تعديل الملفات بالقائمة
+watch(() => authStore.user, user => startProfileChangesBadge(user), { immediate: true })
 </script>
 
 <template>

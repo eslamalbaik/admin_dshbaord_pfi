@@ -58,7 +58,7 @@ class ContractorDocumentRemovalTest extends TestCase
         ], $extra);
     }
 
-    public function test_remove_documents_nulls_the_column_and_deletes_the_file(): void
+    public function test_remove_documents_nulls_the_column_and_archives_the_file(): void
     {
         $contractor = $this->createContractorWithDocuments();
         $crPath     = $contractor->cr_file;
@@ -72,7 +72,9 @@ class ContractorDocumentRemovalTest extends TestCase
         ]))->assertStatus(200);
 
         $this->assertNull($contractor->fresh()->cr_file);
-        Storage::disk('public')->assertMissing($crPath);
+        // منذ 2026-11-09 الملف ما بينحذف: بيضل أرشيف مربوط بسجل التغييرات
+        Storage::disk('public')->assertExists($crPath);
+        $this->assertDatabaseHas('contractor_field_history', ['contractor_id' => $contractor->id, 'field' => 'cr_file', 'old_value' => $crPath, 'new_value' => null, 'source' => 'dashboard']);
     }
 
     public function test_remove_documents_leaves_other_documents_untouched(): void
@@ -113,7 +115,7 @@ class ContractorDocumentRemovalTest extends TestCase
 
         $fresh = $contractor->fresh();
         $this->assertNull($fresh->id_file);
-        Storage::disk('public')->assertMissing($idPath);
+        Storage::disk('public')->assertExists($idPath); // مؤرشف لسجل التغييرات
         // بقية المستندات كما هي — الحذف محصور بما سُمّي صراحةً
         $this->assertNotNull($fresh->cr_file);
         $this->assertNotNull($fresh->municipal_license);

@@ -201,6 +201,10 @@ function onPublicRoute(): boolean {
 
 function handleIncoming(notification: Record<string, any>) {
   notificationPulse.value++
+
+  // طلب تعديل ملف جديد → حدّث عدّاد القائمة الجانبية فوراً
+  if (String(normalizeNotificationType(notification?.type) ?? '').startsWith('contractor_profile_changes'))
+    window.dispatchEvent(new Event('profile-changes:refresh'))
   if (onPublicRoute())
     return
   if (!notificationSoundMuted.value)

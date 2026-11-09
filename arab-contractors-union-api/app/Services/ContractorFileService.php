@@ -12,7 +12,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * خدمة ملفات المقاول — رفع، حذف، وتحميل الملفات المرفقة بالملف التعريفي.
  * مصدر واحد لقائمة الحقول ومساراتها (بدل التكرار في الكنترولر).
  *
- * تحسين أمني: الملف الجديد يُرفع أولاً ثم يُحذف القديم (upload-then-delete).
+ * المستندات القديمة ما بتنحذف عند الاستبدال — بتضل أرشيف لسجل التغييرات.
  */
 class ContractorFileService
 {
@@ -43,21 +43,14 @@ class ContractorFileService
 
     /**
      * يرفع الملفات المرفقة بالطلب ويُحدِّث مصفوفة $validated بالمسارات الجديدة.
-     * يحذف الملف القديم فقط بعد نجاح الرفع (upload-then-delete).
+     * القديم بيضل على القرص (أرشيف) — سجل التغييرات بيشاور عليه.
      */
     public function uploadProfileFiles(Request $request, array &$validated, Contractor $contractor): void
     {
         foreach (self::FILE_FIELDS as $field => $path) {
             if ($request->hasFile($field)) {
-                // 1. ارفع الجديد أولاً
-                $newPath = \App\Support\UploadLimits::storeDocument($request->file($field), $path);
-
-                // 2. تأكد من النجاح ثم احذف القديم
-                if ($newPath && $contractor->$field) {
-                    Storage::disk('public')->delete($contractor->$field);
-                }
-
-                $validated[$field] = $newPath;
+                // الملف القديم ما بينحذف: بيضل مؤرشف ومربوط بسجل التغييرات (contractor_field_history)
+                $validated[$field] = \App\Support\UploadLimits::storeDocument($request->file($field), $path);
             }
         }
     }

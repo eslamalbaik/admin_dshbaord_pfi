@@ -14,6 +14,8 @@ use App\Notifications\ContractorProfileUpdatedNotification;
 use App\Services\ContractorFileService;
 use App\Services\ContractorProfilePdfService;
 use App\Services\ContractorProfileService;
+use App\Services\ProfileChangeService;
+use App\Support\ProfileReview;
 use App\Support\ApiMessages;
 use App\Support\PhoneNumber;
 use Illuminate\Http\Request;
@@ -30,6 +32,7 @@ class ContractorAuthController extends Controller
         private ContractorProfileService    $profileService,
         private ContractorFileService       $fileService,
         private ContractorProfilePdfService $pdfService,
+        private ProfileChangeService        $profileChanges,
     ) {
     }
 
@@ -186,9 +189,22 @@ class ContractorAuthController extends Controller
         $validated = $request->validated();
         unset($validated['phone']);
 
+        // توكن الإشعارات خارج المراجعة دائماً — لو دخلها بتوقف إشعارات المقاول
+        if (array_key_exists('fcm_token', $validated)) {
+            $contractor->update(['fcm_token' => $validated['fcm_token']]);
+            unset($validated['fcm_token']);
+        }
+
         $before = $contractor->only(array_keys($validated));
 
         $this->profileService->applyLocation($validated, $contractor);
+
+        if (ProfileReview::enabled()) {
+            $result = $this->profileChanges->submit($contractor, $validated, $request);
+
+            return $this->reviewResponse($contractor, $result);
+        }
+
         $contractor->update($validated);
 
         $this->notifyAdminsOfProfileChange($contractor, $before, $validated);
@@ -317,6 +333,16 @@ class ContractorAuthController extends Controller
         $before = $contractor->only(array_keys($textFields));
 
         $this->profileService->applyLocation($validated, $contractor);
+
+        // مراجعة الإدارة (Maker-Checker): الحقول القانونية والمستندات بتستنى الاعتماد،
+        // بيانات التواصل بتنطبّق فوراً وبتنراجع بعدين — راجع ProfileChangeService
+        if (ProfileReview::enabled()) {
+            $text = collect($validated)->reject(fn ($v, $key) => $request->hasFile($key) || ProfileReview::isFile($key))->toArray();
+            $result = $this->profileChanges->submit($contractor, $text, $request);
+
+            return $this->reviewResponse($contractor, $result);
+        }
+
         $this->fileService->uploadProfileFiles($request, $validated, $contractor);
 
         $contractor->update($validated);
@@ -324,6 +350,58 @@ class ContractorAuthController extends Controller
         $this->notifyAdminsOfProfileChange($contractor, $before, $textFields);
 
         return $this->success($this->profileService->fullResource($contractor), 'تم تحديث الملف التعريفي والملفات المرفقة بنجاح.');
+    }
+
+    /**
+     * رد الحفظ لما المراجعة مفعّلة: نفس شكل الملف (القيم الرسمية) + applied_fields /
+     * pending_fields + profile_review، ورسالة بتقول شو انحفظ وشو راح للمراجعة. نفس كود
+     * 200 عن قصد حتى نسخ التطبيق القديمة ما تنكسر.
+     */
+    private function reviewResponse(Contractor $contractor, array $result)
+    {
+        $contractor->refresh()->load(['activeMembership', 'governorate', 'cityModel']);
+
+        return $this->success(array_merge($this->profileService->fullResource($contractor), [
+            'pending_review'   => (bool) $result['pending'],
+            'applied_fields'   => $result['applied'],
+            'pending_fields'   => $result['pending'],
+            'withdrawn_fields' => $result['withdrawn'],
+        ]), $this->profileChanges->message($result));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  GET    /api/v1/contractor/profile-changes          — تعديلاتي (المعلّق والمرفوض)
+    //  DELETE /api/v1/contractor/profile-changes          — سحب كل التعديلات المعلّقة
+    //  DELETE /api/v1/contractor/profile-changes/{id}     — سحب تعديل حقل واحد
+    //  POST   /api/v1/contractor/profile-changes/{id}/dismiss — إخفاء ملاحظة رفض بعد قراءتها
+    // ─────────────────────────────────────────────────────────────────────────
+    public function profileChanges(Request $request)
+    {
+        return $this->success($this->profileChanges->stateFor($request->user('contractor')), 'تم جلب تعديلات الملف التعريفي.');
+    }
+
+    public function withdrawProfileChanges(Request $request, ?int $id = null)
+    {
+        $contractor = $request->user('contractor');
+        $count = $this->profileChanges->withdraw($contractor, $id);
+
+        if ($id && ! $count) {
+            return $this->error('هذا التعديل لم يعد قيد المراجعة.', 404, null, 'profile_change_not_pending');
+        }
+
+        return $this->success($this->profileChanges->stateFor($contractor), $count ? 'تم سحب التعديل.' : 'لا توجد تعديلات معلّقة.');
+    }
+
+    public function dismissProfileChange(Request $request, int $id)
+    {
+        $contractor = $request->user('contractor');
+
+        \App\Models\ProfileChange::where('contractor_id', $contractor->id)
+            ->whereKey($id)
+            ->whereIn('status', [\App\Models\ProfileChange::STATUS_REJECTED, \App\Models\ProfileChange::STATUS_REVERTED])
+            ->update(['dismissed_at' => now()]);
+
+        return $this->success($this->profileChanges->stateFor($contractor), 'تم.');
     }
 
     /**

@@ -63,6 +63,9 @@ class AppServiceProvider extends ServiceProvider
 
         \App\Models\User::observe(\App\Observers\UserObserver::class);
 
+        // سجل تغييرات حقول المقاول (قبل/بعد/مين) من أي مصدر — صفحة «سجل التغييرات»
+        \App\Models\Contractor::observe(\App\Observers\ContractorFieldHistoryObserver::class);
+
         // جبر كسور رصيد المقاول لدينار صحيح بعد كل حركة مالية تمسّ الرصيد
         foreach ([\App\Models\ContractorDue::class, \App\Models\ContractorCredit::class, \App\Models\Payment::class, \App\Models\Penalty::class] as $model) {
             $model::observe(\App\Observers\BalanceRoundingObserver::class);

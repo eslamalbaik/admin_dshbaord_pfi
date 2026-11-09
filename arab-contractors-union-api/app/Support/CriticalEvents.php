@@ -17,12 +17,14 @@ class CriticalEvents
     public const CATEGORY_CERTIFICATE    = 'membership_certificate';
     public const CATEGORY_SUPERVISORS    = 'supervisors';
     public const CATEGORY_BALANCES       = 'balances';
+    public const CATEGORY_CONTRACTOR_DATA = 'contractor_data';
 
     public const CATEGORIES = [
         self::CATEGORY_MEMBERSHIP_FEE => 'رسوم العضوية',
         self::CATEGORY_CERTIFICATE    => 'إصدار شهادة العضوية',
         self::CATEGORY_SUPERVISORS    => 'المشرفون والصلاحيات',
         self::CATEGORY_BALANCES       => 'أرصدة المقاولين',
+        self::CATEGORY_CONTRACTOR_DATA => 'بيانات المقاولين',
     ];
 
     public const EVENTS = [
@@ -114,6 +116,11 @@ class CriticalEvents
             'category' => self::CATEGORY_SUPERVISORS,
             'fields'   => self::SUPERVISOR_FIELDS,
         ],
+        'settings.profile_review_toggled' => [
+            'label'    => 'تشغيل/إيقاف مراجعة تعديلات ملفات المقاولين',
+            'category' => self::CATEGORY_CONTRACTOR_DATA,
+            'fields'   => ['enabled' => 'المراجعة مفعّلة'],
+        ],
     ];
 
     /** أحداث حرجة دائماً (بغض النظر عن تفاصيلها) — الباقي حرج بشرط يحدده مكان التسجيل */
@@ -129,6 +136,7 @@ class CriticalEvents
         'supervisor.updated',
         'supervisor.status_changed',
         'supervisor.password_reset',
+        'settings.profile_review_toggled',
     ];
 
     private const CERTIFICATE_FIELDS = [
