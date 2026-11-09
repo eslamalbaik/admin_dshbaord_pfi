@@ -62,7 +62,7 @@ import PublicFooter from '@/components/PublicFooter.vue'
   position: relative; overflow: hidden; isolation: isolate;
   background-color: #000068;
   background-image:
-    linear-gradient(260deg, rgba(0, 0, 80, .94) 0%, rgba(0, 0, 110, .84) 42%, rgba(0, 0, 110, .5) 75%, rgba(0, 0, 80, .4) 100%),
+    linear-gradient(260deg, rgba(0, 0, 90, .8) 0%, rgba(0, 0, 120, .6) 42%, rgba(0, 0, 120, .28) 75%, rgba(0, 0, 90, .18) 100%),
     url('/images/landing/inner-hero.webp');
   background-size: cover; background-position: center 38%; background-repeat: no-repeat;
   border-bottom: 0;
@@ -93,7 +93,7 @@ import PublicFooter from '@/components/PublicFooter.vue'
   .lp-layout .lp-page .page-header,
   .lp-layout .lp-page .vp-hero {
     background-image:
-      linear-gradient(180deg, rgba(0, 0, 80, .9) 0%, rgba(0, 0, 110, .8) 60%, rgba(0, 0, 80, .75) 100%),
+      linear-gradient(180deg, rgba(0, 0, 90, .75) 0%, rgba(0, 0, 120, .55) 60%, rgba(0, 0, 90, .5) 100%),
       url('/images/landing/inner-hero-sm.webp');
     background-position: 62% center;
   }
