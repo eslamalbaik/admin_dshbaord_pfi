@@ -222,6 +222,11 @@ const governorates = ref<{ id: number; name: string; cities: { id: number; name:
 const editMode = ref(false)
 const isSaving = ref(false)
 const saveError = ref('')
+// مراجعة الاتحاد لتعديلات الملف: المعلّق والمرفوض (profile_review بالـ API)
+const profileReview = ref<any>(null)
+const saveNotice = ref('')
+const pendingList = computed(() => Object.values(profileReview.value?.pending_changes ?? {}) as any[])
+const rejectedList = computed(() => Object.values(profileReview.value?.rejected_changes ?? {}) as any[])
 const editForm = ref({
   authorized_person: '', authorized_person_id_number: '', authorized_person_phone: '',
   authorized_person_whatsapp: '', owner_name: '', email: '', phone: '', fax: '',
@@ -278,6 +283,7 @@ async function fetchProfile() {
     }
     docFields.forEach(f => { fileUrls.value[f.key] = items[`${f.key}_url`] ?? null })
     accountStatus.value = items.account_status ?? null
+    profileReview.value = items.profile_review ?? null
     profileDataComplete.value = items.profile_data_complete ?? true
     missingProfileFields.value = items.missing_profile_fields ?? []
     logoUrl.value = items.logo_url ?? null
@@ -387,6 +393,7 @@ function applyProfileResponse(items: any) {
     governorate: items.governorate, city: items.city,
   }
   docFields.forEach(f => { fileUrls.value[f.key] = items[`${f.key}_url`] ?? null })
+  if (items.profile_review !== undefined) profileReview.value = items.profile_review
   profileDataComplete.value = items.profile_data_complete ?? true
   missingProfileFields.value = items.missing_profile_fields ?? []
   logoUrl.value = items.logo_url ?? logoUrl.value
@@ -440,6 +447,7 @@ async function saveProfile() {
       headers: apiHeaders(),
     })
     applyProfileResponse(r.data.items)
+    saveNotice.value = r.data.items?.pending_review ? r.data.message : ''
     editMode.value = false
   } catch (e: any) {
     saveError.value = e?.response?.data?.message || 'تعذّر حفظ التعديلات، حاول مرة أخرى.'
@@ -781,6 +789,21 @@ async function deleteTenderDocument(id: number) {
               <button v-if="!editMode" class="md-link edit-toggle" @click="startEdit">
                 <Pencil :size="15" /> تعديل البيانات
               </button>
+            </div>
+
+            <!-- ══ مراجعة الاتحاد للتعديلات ══ -->
+            <div v-if="saveNotice" class="md-review-note info">{{ saveNotice }}</div>
+            <div v-if="pendingList.length" class="md-review-note pending">
+              <strong>تعديلات قيد المراجعة ({{ pendingList.length }}):</strong>
+              <span v-for="p in pendingList" :key="p.id" class="md-review-chip">
+                {{ p.label }}<template v-if="p.kind !== 'file' && p.display">: {{ p.display }}</template>
+              </span>
+              <div class="md-review-sub">بياناتك الحالية تبقى سارية لحين اعتماد الاتحاد، وسنبلغك بالنتيجة.</div>
+            </div>
+            <div v-if="rejectedList.length" class="md-review-note rejected">
+              <strong>لم يُعتمد:</strong>
+              <div v-for="r in rejectedList" :key="r.id">{{ r.label }}<template v-if="r.reject_reason"> — {{ r.reject_reason }}</template></div>
+              <div class="md-review-sub">يمكنك التصحيح وإعادة الإرسال من «تعديل البيانات».</div>
             </div>
 
             <!-- ══ عرض للقراءة فقط ══ -->
@@ -1193,6 +1216,9 @@ async function deleteTenderDocument(id: number) {
                   <div class="upload-progress-bar"><div class="upload-progress-fill" :style="{ width: (docUploadProgress[f.key] ?? 0) + '%' }" /></div>
                   <span>{{ docUploadProgress[f.key] ?? 0 }}%</span>
                 </div>
+                <div v-else-if="profileReview?.pending_changes?.[f.key]" class="md-doc-uploaded-badge pending">
+                  قيد المراجعة
+                </div>
                 <div v-else-if="docUploadedKeys.has(f.key)" class="md-doc-uploaded-badge">
                   <Check :size="14" /> تم الرفع
                 </div>
@@ -1599,6 +1625,17 @@ textarea.md-fi { resize: vertical; }
   white-space: nowrap; transition: all 0.2s; flex-shrink: 0;
 }
 .md-doc-upload:hover { background: var(--primary); color: #fff; }
+.md-review-note {
+  border-radius: 10px; padding: 0.8rem 1.1rem; font-size: 0.88rem; margin-bottom: 1rem; line-height: 1.9;
+}
+.md-review-note.info { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.md-review-note.pending { background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; }
+.md-review-note.rejected { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+.md-review-chip {
+  display: inline-block; background: rgba(255,255,255,.7); border-radius: 6px; padding: 0 0.5rem; margin-inline-start: 0.4rem;
+}
+.md-review-sub { font-size: 0.8rem; opacity: 0.85; }
+.md-doc-uploaded-badge.pending { background: #ffedd5; color: #c2410c; }
 .md-doc-uploaded-badge {
   display: inline-flex; align-items: center; gap: 0.4rem;
   background: #dcfce7; color: #16a34a; font-size: 0.8rem; font-weight: 700;

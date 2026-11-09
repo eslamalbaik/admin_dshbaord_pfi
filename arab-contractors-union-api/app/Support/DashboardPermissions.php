@@ -43,6 +43,11 @@ class DashboardPermissions
             'children' => [
                 'contractors.list'        => ['label' => 'قائمة المقاولين وتسجيلهم', 'actions' => self::CRUD],
                 'contractors.memberships' => ['label' => 'طلبات الانتساب', 'actions' => [self::VIEW, self::CREATE, self::UPDATE]],
+                'contractors.profile_changes' => [
+                    'label'   => 'طلبات تعديل الملفات',
+                    'actions' => [self::VIEW, self::UPDATE],
+                    'hint'    => '«تعديل» = اعتماد ورفض تعديلات المقاولين على ملفاتهم من التطبيق. «عرض» بيوصّل إشعارات الطلبات الجديدة.',
+                ],
                 'contractors.penalties'   => ['label' => 'الغرامات والمخالفات', 'actions' => self::CRUD],
             ],
         ],

@@ -1,6 +1,7 @@
 import type { VerticalNavItems } from '@layouts/types'
 import type { User } from '@/stores/authStore'
 import { canAccessRoute, isSupervisor } from '@/utils/permissions'
+import { profileChangesPending } from '@/composables/useProfileChangesBadge'
 
 type NavUser = Pick<User, 'role' | 'permissions'> | null | undefined
 
@@ -83,13 +84,19 @@ export function buildPcuNav(user: NavUser): VerticalNavItems {
   // 2. إدارة الأعضاء وخدماتهم (للأدمن فقط)
   if (!isAccountant) {
     menuItems.push({ heading: 'إدارة الأعضاء', subtitle: 'المقاولون وطلبات الانتساب والشهادات' })
+
+    const pendingChanges = profileChangesPending.value
+    const pendingBadge = pendingChanges > 0 ? { badgeContent: String(pendingChanges), badgeClass: 'bg-error' } : {}
+
     menuItems.push({
       title: 'المقاولون',
       icon: { icon: 'tabler-building-factory-2' },
+      ...pendingBadge,
       children: [
         { title: 'قائمة المقاولين', to: 'contractors' },
         { title: 'تسجيل مقاول جديد', to: 'contractors-create' },
         { title: 'طلبات الانتساب', to: 'contractors-memberships' },
+        { title: 'طلبات تعديل الملفات', to: 'contractors-profile-changes', ...pendingBadge },
       ],
     })
     menuItems.push({

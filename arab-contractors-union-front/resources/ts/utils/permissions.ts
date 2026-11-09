@@ -26,6 +26,7 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
   'contractors-edit-id': 'contractors.list',
   'contractors-create': 'contractors.list',
   'contractors-memberships': 'contractors.memberships',
+  'contractors-profile-changes': 'contractors.profile_changes',
   'contractors-penalties': 'contractors.penalties',
   'payments-transactions': 'finance.payments',
   'dues': 'finance.dues',

@@ -276,9 +276,7 @@ class ContractorController extends Controller
 
         foreach (self::FILE_FIELDS as $field => $path) {
             if ($request->hasFile($field)) {
-                if ($contractor && $contractor->$field) {
-                    Storage::disk('public')->delete($contractor->$field);
-                }
+                // الملف القديم ما بينحذف: بيضل مؤرشف ومربوط بسجل التغييرات (contractor_field_history)
                 $validated[$field] = \App\Support\UploadLimits::storeDocument($request->file($field), $path);
                 $uploaded[] = $field;
             }
@@ -310,10 +308,7 @@ class ContractorController extends Controller
                 continue;
             }
 
-            if ($contractor->$field) {
-                Storage::disk('public')->delete($contractor->$field);
-            }
-
+            // الإزالة بتفضّي الحقل بس — الملف نفسه بيضل مؤرشف ومربوط بسجل التغييرات
             $validated[$field] = null;
         }
     }

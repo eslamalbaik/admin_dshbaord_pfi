@@ -12,16 +12,25 @@ declare global {
   const CreateUrl: typeof import('./src/@core/composable/CreateUrl')['CreateUrl']
   const DASHBOARD_ROLES: typeof import('./resources/ts/utils/permissions')['DASHBOARD_ROLES']
   const EffectScope: typeof import('vue')['EffectScope']
+  const FINANCIAL_COLOR: typeof import('./resources/ts/utils/notificationMeta')['FINANCIAL_COLOR']
   const NOTIFICATIONS_KEY: typeof import('./resources/ts/composables/useNotifications')['NOTIFICATIONS_KEY']
+  const PUBLIC_SOCIAL_FOLLOW_TEXT: typeof import('./resources/ts/utils/publicSocialLinks')['PUBLIC_SOCIAL_FOLLOW_TEXT']
+  const PUBLIC_SOCIAL_LINKS: typeof import('./resources/ts/utils/publicSocialLinks')['PUBLIC_SOCIAL_LINKS']
   const ROUTE_PERMISSIONS: typeof import('./resources/ts/utils/permissions')['ROUTE_PERMISSIONS']
+  const UNION_NAME: typeof import('./resources/ts/utils/avatarUrl')['UNION_NAME']
+  const UPLOAD_TIMEOUT_MS: typeof import('./resources/ts/utils/requestError')['UPLOAD_TIMEOUT_MS']
+  const __simulateIncoming: typeof import('./resources/ts/composables/useRealtimeAdminNotifications')['__simulateIncoming']
   const acceptHMRUpdate: typeof import('pinia')['acceptHMRUpdate']
+  const acceptsNational: typeof import('./resources/ts/utils/dialCodes')['acceptsNational']
   const adminToasts: typeof import('./resources/ts/composables/useRealtimeAdminNotifications')['adminToasts']
   const alphaDashValidator: typeof import('./resources/ts/@core/utils/validators')['alphaDashValidator']
   const alphaValidator: typeof import('./resources/ts/@core/utils/validators')['alphaValidator']
   const asyncComputed: typeof import('@vueuse/core')['asyncComputed']
   const autoResetRef: typeof import('@vueuse/core')['autoResetRef']
   const avatarText: typeof import('./resources/ts/@core/utils/formatters')['avatarText']
+  const avatarUrl: typeof import('./resources/ts/utils/avatarUrl')['avatarUrl']
   const betweenValidator: typeof import('./resources/ts/@core/utils/validators')['betweenValidator']
+  const buildRows: typeof import('./resources/ts/utils/activityLogDetails')['buildRows']
   const canAccessRoute: typeof import('./resources/ts/utils/permissions')['canAccessRoute']
   const computed: typeof import('vue')['computed']
   const computedAsync: typeof import('@vueuse/core')['computedAsync']
@@ -30,6 +39,7 @@ declare global {
   const computedWithControl: typeof import('@vueuse/core')['computedWithControl']
   const confirmedValidator: typeof import('./resources/ts/@core/utils/validators')['confirmedValidator']
   const contractorDocumentLabels: typeof import('./resources/ts/utils/contractorDocuments')['contractorDocumentLabels']
+  const contractorRules: typeof import('./resources/ts/utils/contractorValidation')['contractorRules']
   const controlledComputed: typeof import('@vueuse/core')['controlledComputed']
   const controlledRef: typeof import('@vueuse/core')['controlledRef']
   const createApp: typeof import('vue')['createApp']
@@ -48,19 +58,32 @@ declare global {
   const customRef: typeof import('vue')['customRef']
   const debouncedRef: typeof import('@vueuse/core')['debouncedRef']
   const debouncedWatch: typeof import('@vueuse/core')['debouncedWatch']
+  const defaultDialCode: typeof import('./resources/ts/utils/dialCodes')['defaultDialCode']
   const defineAsyncComponent: typeof import('vue')['defineAsyncComponent']
   const defineComponent: typeof import('vue')['defineComponent']
   const defineLoader: typeof import('vue-router/auto')['defineLoader']
   const definePage: typeof import('unplugin-vue-router/runtime')['definePage']
   const defineStore: typeof import('pinia')['defineStore']
+  const describeRequestError: typeof import('./resources/ts/utils/requestError')['describeRequestError']
+  const describeRule: typeof import('./resources/ts/utils/dialCodes')['describeRule']
+  const dialCodes: typeof import('./resources/ts/utils/dialCodes')['dialCodes']
+  const dismissToast: typeof import('./resources/ts/composables/useRealtimeAdminNotifications')['dismissToast']
+  const displayPhone: typeof import('./resources/ts/utils/dialCodes')['displayPhone']
   const eagerComputed: typeof import('@vueuse/core')['eagerComputed']
   const effectScope: typeof import('vue')['effectScope']
   const emailValidator: typeof import('./resources/ts/@core/utils/validators')['emailValidator']
   const extendRef: typeof import('@vueuse/core')['extendRef']
+  const extractChanges: typeof import('./resources/ts/utils/activityLogDetails')['extractChanges']
+  const fieldLabel: typeof import('./resources/ts/utils/activityLogDetails')['fieldLabel']
   const firstAllowedRoute: typeof import('./resources/ts/utils/permissions')['firstAllowedRoute']
   const firstFile: typeof import('./resources/ts/utils/files')['firstFile']
+  const formatAny: typeof import('./resources/ts/utils/activityLogDetails')['formatAny']
   const formatDate: typeof import('./resources/ts/@core/utils/formatters')['formatDate']
+  const formatDateTime: typeof import('./resources/ts/utils/activityLogDetails')['formatDateTime']
   const formatDateToMonthShort: typeof import('./resources/ts/@core/utils/formatters')['formatDateToMonthShort']
+  const formatNumber: typeof import('./resources/ts/utils/activityLogDetails')['formatNumber']
+  const formatPhone: typeof import('./resources/ts/utils/dialCodes')['formatPhone']
+  const formatValue: typeof import('./resources/ts/utils/activityLogDetails')['formatValue']
   const getActivePinia: typeof import('pinia')['getActivePinia']
   const getCurrentInstance: typeof import('vue')['getCurrentInstance']
   const getCurrentScope: typeof import('vue')['getCurrentScope']
@@ -75,6 +98,7 @@ declare global {
   const inject: typeof import('vue')['inject']
   const injectLocal: typeof import('@vueuse/core')['injectLocal']
   const integerValidator: typeof import('./resources/ts/@core/utils/validators')['integerValidator']
+  const invalidFormatFields: typeof import('./resources/ts/utils/contractorValidation')['invalidFormatFields']
   const isDarkPreferred: typeof import('./src/@core/composable/useThemeConfig')['isDarkPreferred']
   const isDefined: typeof import('@vueuse/core')['isDefined']
   const isEmpty: typeof import('./resources/ts/@core/utils/helpers')['isEmpty']
@@ -88,8 +112,10 @@ declare global {
   const isRef: typeof import('vue')['isRef']
   const isSupervisor: typeof import('./resources/ts/utils/permissions')['isSupervisor']
   const isToday: typeof import('./resources/ts/@core/utils/helpers')['isToday']
+  const isValidPhone: typeof import('./resources/ts/utils/dialCodes')['isValidPhone']
   const kFormatter: typeof import('./resources/ts/@core/utils/formatters')['kFormatter']
   const lengthValidator: typeof import('./resources/ts/@core/utils/validators')['lengthValidator']
+  const loadDialCodes: typeof import('./resources/ts/utils/dialCodes')['loadDialCodes']
   const logicAnd: typeof import('@vueuse/math')['logicAnd']
   const logicNot: typeof import('@vueuse/math')['logicNot']
   const logicOr: typeof import('@vueuse/math')['logicOr']
@@ -101,8 +127,13 @@ declare global {
   const mapWritableState: typeof import('pinia')['mapWritableState']
   const markRaw: typeof import('vue')['markRaw']
   const nextTick: typeof import('vue')['nextTick']
+  const normalizeNotificationType: typeof import('./resources/ts/utils/notificationMeta')['normalizeNotificationType']
   const normalizeUser: typeof import('./resources/ts/utils/normalizeUser')['normalizeUser']
   const notificationLink: typeof import('./resources/ts/utils/notificationLink')['notificationLink']
+  const notificationMessage: typeof import('./resources/ts/utils/notificationMeta')['notificationMessage']
+  const notificationMeta: typeof import('./resources/ts/utils/notificationMeta')['notificationMeta']
+  const notificationPulse: typeof import('./resources/ts/composables/useRealtimeAdminNotifications')['notificationPulse']
+  const notificationSoundMuted: typeof import('./resources/ts/composables/useRealtimeAdminNotifications')['notificationSoundMuted']
   const onActivated: typeof import('vue')['onActivated']
   const onBeforeMount: typeof import('vue')['onBeforeMount']
   const onBeforeRouteLeave: typeof import('vue-router/auto')['onBeforeRouteLeave']
@@ -124,9 +155,11 @@ declare global {
   const onUpdated: typeof import('vue')['onUpdated']
   const onWatcherCleanup: typeof import('vue')['onWatcherCleanup']
   const paginationMeta: typeof import('./resources/ts/utils/paginationMeta')['paginationMeta']
+  const parsePhone: typeof import('./resources/ts/utils/dialCodes')['parsePhone']
   const passwordValidator: typeof import('./resources/ts/@core/utils/validators')['passwordValidator']
   const pausableWatch: typeof import('@vueuse/core')['pausableWatch']
   const prefixWithPlus: typeof import('./resources/ts/@core/utils/formatters')['prefixWithPlus']
+  const profileChangesPending: typeof import('./resources/ts/composables/useProfileChangesBadge')['profileChangesPending']
   const provide: typeof import('vue')['provide']
   const provideLocal: typeof import('@vueuse/core')['provideLocal']
   const reactify: typeof import('@vueuse/core')['reactify']
@@ -142,32 +175,39 @@ declare global {
   const refDefault: typeof import('@vueuse/core')['refDefault']
   const refThrottled: typeof import('@vueuse/core')['refThrottled']
   const refWithControl: typeof import('@vueuse/core')['refWithControl']
+  const refreshProfileChangesBadge: typeof import('./resources/ts/composables/useProfileChangesBadge')['refreshProfileChangesBadge']
   const regexValidator: typeof import('./resources/ts/@core/utils/validators')['regexValidator']
   const registerPlugins: typeof import('./resources/ts/@core/utils/plugins')['registerPlugins']
   const registerPlugins_: typeof import('./src/@core/utils/plugins')['registerPlugins_']
+  const relativeTimeAr: typeof import('./resources/ts/utils/notificationMeta')['relativeTimeAr']
   const requiredValidator: typeof import('./resources/ts/@core/utils/validators')['requiredValidator']
   const resolveComponent: typeof import('vue')['resolveComponent']
   const resolveRef: typeof import('@vueuse/core')['resolveRef']
   const resolveUnref: typeof import('@vueuse/core')['resolveUnref']
   const resolveVuetifyTheme: typeof import('./resources/ts/@core/utils/vuetify')['resolveVuetifyTheme']
   const rgbaToHex: typeof import('./resources/ts/@core/utils/colorConverter')['rgbaToHex']
+  const sanitizeNumeric: typeof import('./resources/ts/utils/contractorValidation')['sanitizeNumeric']
   const setActivePinia: typeof import('pinia')['setActivePinia']
   const setMapStoreSuffix: typeof import('pinia')['setMapStoreSuffix']
   const shallowReactive: typeof import('vue')['shallowReactive']
   const shallowReadonly: typeof import('vue')['shallowReadonly']
   const shallowRef: typeof import('vue')['shallowRef']
+  const startProfileChangesBadge: typeof import('./resources/ts/composables/useProfileChangesBadge')['startProfileChangesBadge']
   const storeToRefs: typeof import('pinia')['storeToRefs']
+  const subjectLabel: typeof import('./resources/ts/utils/activityLogDetails')['subjectLabel']
   const syncRef: typeof import('@vueuse/core')['syncRef']
   const syncRefs: typeof import('@vueuse/core')['syncRefs']
   const templateRef: typeof import('@vueuse/core')['templateRef']
   const throttledRef: typeof import('@vueuse/core')['throttledRef']
   const throttledWatch: typeof import('@vueuse/core')['throttledWatch']
   const toFileArray: typeof import('./resources/ts/utils/files')['toFileArray']
+  const toLatinDigits: typeof import('./resources/ts/utils/contractorValidation')['toLatinDigits']
   const toRaw: typeof import('vue')['toRaw']
   const toReactive: typeof import('@vueuse/core')['toReactive']
   const toRef: typeof import('vue')['toRef']
   const toRefs: typeof import('vue')['toRefs']
   const toValue: typeof import('vue')['toValue']
+  const toggleNotificationSound: typeof import('./resources/ts/composables/useRealtimeAdminNotifications')['toggleNotificationSound']
   const triggerRef: typeof import('vue')['triggerRef']
   const tryOnBeforeMount: typeof import('@vueuse/core')['tryOnBeforeMount']
   const tryOnBeforeUnmount: typeof import('@vueuse/core')['tryOnBeforeUnmount']
@@ -183,6 +223,7 @@ declare global {
   const useActiveElement: typeof import('@vueuse/core')['useActiveElement']
   const useAnimate: typeof import('@vueuse/core')['useAnimate']
   const useApi: typeof import('./resources/ts/composables/useApi')['useApi']
+  const useAppUpdateCheck: typeof import('./resources/ts/composables/useAppUpdateCheck')['useAppUpdateCheck']
   const useArrayDifference: typeof import('@vueuse/core')['useArrayDifference']
   const useArrayEvery: typeof import('@vueuse/core')['useArrayEvery']
   const useArrayFilter: typeof import('@vueuse/core')['useArrayFilter']
@@ -315,6 +356,7 @@ declare global {
   const useResponsiveLeftSidebar: typeof import('./resources/ts/@core/composable/useResponsiveSidebar')['useResponsiveLeftSidebar']
   const useRound: typeof import('@vueuse/math')['useRound']
   const useRoute: typeof import('vue-router/auto')['useRoute']
+  const useRouteLoading: typeof import('./resources/ts/composables/useRouteLoading')['useRouteLoading']
   const useRouter: typeof import('vue-router/auto')['useRouter']
   const useScreenOrientation: typeof import('@vueuse/core')['useScreenOrientation']
   const useScreenSafeArea: typeof import('@vueuse/core')['useScreenSafeArea']
@@ -370,6 +412,8 @@ declare global {
   const useWindowScroll: typeof import('@vueuse/core')['useWindowScroll']
   const useWindowSize: typeof import('@vueuse/core')['useWindowSize']
   const usecreateUrl: typeof import('./src/@core/composable/usecreateUrl')['usecreateUrl']
+  const vHoverCard: typeof import('./resources/ts/utils/hoverCard')['vHoverCard']
+  const vNumeric: typeof import('./resources/ts/utils/contractorValidation')['vNumeric']
   const watch: typeof import('vue')['watch']
   const watchArray: typeof import('@vueuse/core')['watchArray']
   const watchAtMost: typeof import('@vueuse/core')['watchAtMost']
@@ -386,6 +430,7 @@ declare global {
   const watchTriggerable: typeof import('@vueuse/core')['watchTriggerable']
   const watchWithFilter: typeof import('@vueuse/core')['watchWithFilter']
   const whenever: typeof import('@vueuse/core')['whenever']
+  const yesterday: typeof import('./resources/ts/utils/contractorValidation')['yesterday']
 }
 // for type re-export
 declare global {
@@ -404,16 +449,25 @@ declare module 'vue' {
     readonly COOKIE_MAX_AGE_1_YEAR: UnwrapRef<typeof import('./resources/ts/utils/constants')['COOKIE_MAX_AGE_1_YEAR']>
     readonly DASHBOARD_ROLES: UnwrapRef<typeof import('./resources/ts/utils/permissions')['DASHBOARD_ROLES']>
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
+    readonly FINANCIAL_COLOR: UnwrapRef<typeof import('./resources/ts/utils/notificationMeta')['FINANCIAL_COLOR']>
     readonly NOTIFICATIONS_KEY: UnwrapRef<typeof import('./resources/ts/composables/useNotifications')['NOTIFICATIONS_KEY']>
+    readonly PUBLIC_SOCIAL_FOLLOW_TEXT: UnwrapRef<typeof import('./resources/ts/utils/publicSocialLinks')['PUBLIC_SOCIAL_FOLLOW_TEXT']>
+    readonly PUBLIC_SOCIAL_LINKS: UnwrapRef<typeof import('./resources/ts/utils/publicSocialLinks')['PUBLIC_SOCIAL_LINKS']>
     readonly ROUTE_PERMISSIONS: UnwrapRef<typeof import('./resources/ts/utils/permissions')['ROUTE_PERMISSIONS']>
+    readonly UNION_NAME: UnwrapRef<typeof import('./resources/ts/utils/avatarUrl')['UNION_NAME']>
+    readonly UPLOAD_TIMEOUT_MS: UnwrapRef<typeof import('./resources/ts/utils/requestError')['UPLOAD_TIMEOUT_MS']>
+    readonly __simulateIncoming: UnwrapRef<typeof import('./resources/ts/composables/useRealtimeAdminNotifications')['__simulateIncoming']>
     readonly acceptHMRUpdate: UnwrapRef<typeof import('pinia')['acceptHMRUpdate']>
+    readonly acceptsNational: UnwrapRef<typeof import('./resources/ts/utils/dialCodes')['acceptsNational']>
     readonly adminToasts: UnwrapRef<typeof import('./resources/ts/composables/useRealtimeAdminNotifications')['adminToasts']>
     readonly alphaDashValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['alphaDashValidator']>
     readonly alphaValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['alphaValidator']>
     readonly asyncComputed: UnwrapRef<typeof import('@vueuse/core')['asyncComputed']>
     readonly autoResetRef: UnwrapRef<typeof import('@vueuse/core')['autoResetRef']>
     readonly avatarText: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['avatarText']>
+    readonly avatarUrl: UnwrapRef<typeof import('./resources/ts/utils/avatarUrl')['avatarUrl']>
     readonly betweenValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['betweenValidator']>
+    readonly buildRows: UnwrapRef<typeof import('./resources/ts/utils/activityLogDetails')['buildRows']>
     readonly canAccessRoute: UnwrapRef<typeof import('./resources/ts/utils/permissions')['canAccessRoute']>
     readonly computed: UnwrapRef<typeof import('vue')['computed']>
     readonly computedAsync: UnwrapRef<typeof import('@vueuse/core')['computedAsync']>
@@ -422,6 +476,7 @@ declare module 'vue' {
     readonly computedWithControl: UnwrapRef<typeof import('@vueuse/core')['computedWithControl']>
     readonly confirmedValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['confirmedValidator']>
     readonly contractorDocumentLabels: UnwrapRef<typeof import('./resources/ts/utils/contractorDocuments')['contractorDocumentLabels']>
+    readonly contractorRules: UnwrapRef<typeof import('./resources/ts/utils/contractorValidation')['contractorRules']>
     readonly controlledComputed: UnwrapRef<typeof import('@vueuse/core')['controlledComputed']>
     readonly controlledRef: UnwrapRef<typeof import('@vueuse/core')['controlledRef']>
     readonly createApp: UnwrapRef<typeof import('vue')['createApp']>
@@ -440,18 +495,31 @@ declare module 'vue' {
     readonly customRef: UnwrapRef<typeof import('vue')['customRef']>
     readonly debouncedRef: UnwrapRef<typeof import('@vueuse/core')['debouncedRef']>
     readonly debouncedWatch: UnwrapRef<typeof import('@vueuse/core')['debouncedWatch']>
+    readonly defaultDialCode: UnwrapRef<typeof import('./resources/ts/utils/dialCodes')['defaultDialCode']>
     readonly defineAsyncComponent: UnwrapRef<typeof import('vue')['defineAsyncComponent']>
     readonly defineComponent: UnwrapRef<typeof import('vue')['defineComponent']>
     readonly definePage: UnwrapRef<typeof import('unplugin-vue-router/runtime')['definePage']>
     readonly defineStore: UnwrapRef<typeof import('pinia')['defineStore']>
+    readonly describeRequestError: UnwrapRef<typeof import('./resources/ts/utils/requestError')['describeRequestError']>
+    readonly describeRule: UnwrapRef<typeof import('./resources/ts/utils/dialCodes')['describeRule']>
+    readonly dialCodes: UnwrapRef<typeof import('./resources/ts/utils/dialCodes')['dialCodes']>
+    readonly dismissToast: UnwrapRef<typeof import('./resources/ts/composables/useRealtimeAdminNotifications')['dismissToast']>
+    readonly displayPhone: UnwrapRef<typeof import('./resources/ts/utils/dialCodes')['displayPhone']>
     readonly eagerComputed: UnwrapRef<typeof import('@vueuse/core')['eagerComputed']>
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly emailValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['emailValidator']>
     readonly extendRef: UnwrapRef<typeof import('@vueuse/core')['extendRef']>
+    readonly extractChanges: UnwrapRef<typeof import('./resources/ts/utils/activityLogDetails')['extractChanges']>
+    readonly fieldLabel: UnwrapRef<typeof import('./resources/ts/utils/activityLogDetails')['fieldLabel']>
     readonly firstAllowedRoute: UnwrapRef<typeof import('./resources/ts/utils/permissions')['firstAllowedRoute']>
     readonly firstFile: UnwrapRef<typeof import('./resources/ts/utils/files')['firstFile']>
+    readonly formatAny: UnwrapRef<typeof import('./resources/ts/utils/activityLogDetails')['formatAny']>
     readonly formatDate: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['formatDate']>
+    readonly formatDateTime: UnwrapRef<typeof import('./resources/ts/utils/activityLogDetails')['formatDateTime']>
     readonly formatDateToMonthShort: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['formatDateToMonthShort']>
+    readonly formatNumber: UnwrapRef<typeof import('./resources/ts/utils/activityLogDetails')['formatNumber']>
+    readonly formatPhone: UnwrapRef<typeof import('./resources/ts/utils/dialCodes')['formatPhone']>
+    readonly formatValue: UnwrapRef<typeof import('./resources/ts/utils/activityLogDetails')['formatValue']>
     readonly getActivePinia: UnwrapRef<typeof import('pinia')['getActivePinia']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
@@ -466,6 +534,7 @@ declare module 'vue' {
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
     readonly injectLocal: UnwrapRef<typeof import('@vueuse/core')['injectLocal']>
     readonly integerValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['integerValidator']>
+    readonly invalidFormatFields: UnwrapRef<typeof import('./resources/ts/utils/contractorValidation')['invalidFormatFields']>
     readonly isDefined: UnwrapRef<typeof import('@vueuse/core')['isDefined']>
     readonly isEmpty: UnwrapRef<typeof import('./resources/ts/@core/utils/helpers')['isEmpty']>
     readonly isEmptyArray: UnwrapRef<typeof import('./resources/ts/@core/utils/helpers')['isEmptyArray']>
@@ -478,8 +547,10 @@ declare module 'vue' {
     readonly isRef: UnwrapRef<typeof import('vue')['isRef']>
     readonly isSupervisor: UnwrapRef<typeof import('./resources/ts/utils/permissions')['isSupervisor']>
     readonly isToday: UnwrapRef<typeof import('./resources/ts/@core/utils/helpers')['isToday']>
+    readonly isValidPhone: UnwrapRef<typeof import('./resources/ts/utils/dialCodes')['isValidPhone']>
     readonly kFormatter: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['kFormatter']>
     readonly lengthValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['lengthValidator']>
+    readonly loadDialCodes: UnwrapRef<typeof import('./resources/ts/utils/dialCodes')['loadDialCodes']>
     readonly logicAnd: UnwrapRef<typeof import('@vueuse/math')['logicAnd']>
     readonly logicNot: UnwrapRef<typeof import('@vueuse/math')['logicNot']>
     readonly logicOr: UnwrapRef<typeof import('@vueuse/math')['logicOr']>
@@ -491,8 +562,13 @@ declare module 'vue' {
     readonly mapWritableState: UnwrapRef<typeof import('pinia')['mapWritableState']>
     readonly markRaw: UnwrapRef<typeof import('vue')['markRaw']>
     readonly nextTick: UnwrapRef<typeof import('vue')['nextTick']>
+    readonly normalizeNotificationType: UnwrapRef<typeof import('./resources/ts/utils/notificationMeta')['normalizeNotificationType']>
     readonly normalizeUser: UnwrapRef<typeof import('./resources/ts/utils/normalizeUser')['normalizeUser']>
     readonly notificationLink: UnwrapRef<typeof import('./resources/ts/utils/notificationLink')['notificationLink']>
+    readonly notificationMessage: UnwrapRef<typeof import('./resources/ts/utils/notificationMeta')['notificationMessage']>
+    readonly notificationMeta: UnwrapRef<typeof import('./resources/ts/utils/notificationMeta')['notificationMeta']>
+    readonly notificationPulse: UnwrapRef<typeof import('./resources/ts/composables/useRealtimeAdminNotifications')['notificationPulse']>
+    readonly notificationSoundMuted: UnwrapRef<typeof import('./resources/ts/composables/useRealtimeAdminNotifications')['notificationSoundMuted']>
     readonly onActivated: UnwrapRef<typeof import('vue')['onActivated']>
     readonly onBeforeMount: UnwrapRef<typeof import('vue')['onBeforeMount']>
     readonly onBeforeRouteLeave: UnwrapRef<typeof import('vue-router/auto')['onBeforeRouteLeave']>
@@ -514,9 +590,11 @@ declare module 'vue' {
     readonly onUpdated: UnwrapRef<typeof import('vue')['onUpdated']>
     readonly onWatcherCleanup: UnwrapRef<typeof import('vue')['onWatcherCleanup']>
     readonly paginationMeta: UnwrapRef<typeof import('./resources/ts/utils/paginationMeta')['paginationMeta']>
+    readonly parsePhone: UnwrapRef<typeof import('./resources/ts/utils/dialCodes')['parsePhone']>
     readonly passwordValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['passwordValidator']>
     readonly pausableWatch: UnwrapRef<typeof import('@vueuse/core')['pausableWatch']>
     readonly prefixWithPlus: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['prefixWithPlus']>
+    readonly profileChangesPending: UnwrapRef<typeof import('./resources/ts/composables/useProfileChangesBadge')['profileChangesPending']>
     readonly provide: UnwrapRef<typeof import('vue')['provide']>
     readonly provideLocal: UnwrapRef<typeof import('@vueuse/core')['provideLocal']>
     readonly reactify: UnwrapRef<typeof import('@vueuse/core')['reactify']>
@@ -532,31 +610,38 @@ declare module 'vue' {
     readonly refDefault: UnwrapRef<typeof import('@vueuse/core')['refDefault']>
     readonly refThrottled: UnwrapRef<typeof import('@vueuse/core')['refThrottled']>
     readonly refWithControl: UnwrapRef<typeof import('@vueuse/core')['refWithControl']>
+    readonly refreshProfileChangesBadge: UnwrapRef<typeof import('./resources/ts/composables/useProfileChangesBadge')['refreshProfileChangesBadge']>
     readonly regexValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['regexValidator']>
     readonly registerPlugins: UnwrapRef<typeof import('./resources/ts/@core/utils/plugins')['registerPlugins']>
+    readonly relativeTimeAr: UnwrapRef<typeof import('./resources/ts/utils/notificationMeta')['relativeTimeAr']>
     readonly requiredValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['requiredValidator']>
     readonly resolveComponent: UnwrapRef<typeof import('vue')['resolveComponent']>
     readonly resolveRef: UnwrapRef<typeof import('@vueuse/core')['resolveRef']>
     readonly resolveUnref: UnwrapRef<typeof import('@vueuse/core')['resolveUnref']>
     readonly resolveVuetifyTheme: UnwrapRef<typeof import('./resources/ts/@core/utils/vuetify')['resolveVuetifyTheme']>
     readonly rgbaToHex: UnwrapRef<typeof import('./resources/ts/@core/utils/colorConverter')['rgbaToHex']>
+    readonly sanitizeNumeric: UnwrapRef<typeof import('./resources/ts/utils/contractorValidation')['sanitizeNumeric']>
     readonly setActivePinia: UnwrapRef<typeof import('pinia')['setActivePinia']>
     readonly setMapStoreSuffix: UnwrapRef<typeof import('pinia')['setMapStoreSuffix']>
     readonly shallowReactive: UnwrapRef<typeof import('vue')['shallowReactive']>
     readonly shallowReadonly: UnwrapRef<typeof import('vue')['shallowReadonly']>
     readonly shallowRef: UnwrapRef<typeof import('vue')['shallowRef']>
+    readonly startProfileChangesBadge: UnwrapRef<typeof import('./resources/ts/composables/useProfileChangesBadge')['startProfileChangesBadge']>
     readonly storeToRefs: UnwrapRef<typeof import('pinia')['storeToRefs']>
+    readonly subjectLabel: UnwrapRef<typeof import('./resources/ts/utils/activityLogDetails')['subjectLabel']>
     readonly syncRef: UnwrapRef<typeof import('@vueuse/core')['syncRef']>
     readonly syncRefs: UnwrapRef<typeof import('@vueuse/core')['syncRefs']>
     readonly templateRef: UnwrapRef<typeof import('@vueuse/core')['templateRef']>
     readonly throttledRef: UnwrapRef<typeof import('@vueuse/core')['throttledRef']>
     readonly throttledWatch: UnwrapRef<typeof import('@vueuse/core')['throttledWatch']>
     readonly toFileArray: UnwrapRef<typeof import('./resources/ts/utils/files')['toFileArray']>
+    readonly toLatinDigits: UnwrapRef<typeof import('./resources/ts/utils/contractorValidation')['toLatinDigits']>
     readonly toRaw: UnwrapRef<typeof import('vue')['toRaw']>
     readonly toReactive: UnwrapRef<typeof import('@vueuse/core')['toReactive']>
     readonly toRef: UnwrapRef<typeof import('vue')['toRef']>
     readonly toRefs: UnwrapRef<typeof import('vue')['toRefs']>
     readonly toValue: UnwrapRef<typeof import('vue')['toValue']>
+    readonly toggleNotificationSound: UnwrapRef<typeof import('./resources/ts/composables/useRealtimeAdminNotifications')['toggleNotificationSound']>
     readonly triggerRef: UnwrapRef<typeof import('vue')['triggerRef']>
     readonly tryOnBeforeMount: UnwrapRef<typeof import('@vueuse/core')['tryOnBeforeMount']>
     readonly tryOnBeforeUnmount: UnwrapRef<typeof import('@vueuse/core')['tryOnBeforeUnmount']>
@@ -571,6 +656,7 @@ declare module 'vue' {
     readonly useActiveElement: UnwrapRef<typeof import('@vueuse/core')['useActiveElement']>
     readonly useAnimate: UnwrapRef<typeof import('@vueuse/core')['useAnimate']>
     readonly useApi: UnwrapRef<typeof import('./resources/ts/composables/useApi')['useApi']>
+    readonly useAppUpdateCheck: UnwrapRef<typeof import('./resources/ts/composables/useAppUpdateCheck')['useAppUpdateCheck']>
     readonly useArrayDifference: UnwrapRef<typeof import('@vueuse/core')['useArrayDifference']>
     readonly useArrayEvery: UnwrapRef<typeof import('@vueuse/core')['useArrayEvery']>
     readonly useArrayFilter: UnwrapRef<typeof import('@vueuse/core')['useArrayFilter']>
@@ -701,6 +787,7 @@ declare module 'vue' {
     readonly useResponsiveLeftSidebar: UnwrapRef<typeof import('./resources/ts/@core/composable/useResponsiveSidebar')['useResponsiveLeftSidebar']>
     readonly useRound: UnwrapRef<typeof import('@vueuse/math')['useRound']>
     readonly useRoute: UnwrapRef<typeof import('vue-router/auto')['useRoute']>
+    readonly useRouteLoading: UnwrapRef<typeof import('./resources/ts/composables/useRouteLoading')['useRouteLoading']>
     readonly useRouter: UnwrapRef<typeof import('vue-router/auto')['useRouter']>
     readonly useScreenOrientation: UnwrapRef<typeof import('@vueuse/core')['useScreenOrientation']>
     readonly useScreenSafeArea: UnwrapRef<typeof import('@vueuse/core')['useScreenSafeArea']>
@@ -753,6 +840,8 @@ declare module 'vue' {
     readonly useWindowFocus: UnwrapRef<typeof import('@vueuse/core')['useWindowFocus']>
     readonly useWindowScroll: UnwrapRef<typeof import('@vueuse/core')['useWindowScroll']>
     readonly useWindowSize: UnwrapRef<typeof import('@vueuse/core')['useWindowSize']>
+    readonly vHoverCard: UnwrapRef<typeof import('./resources/ts/utils/hoverCard')['vHoverCard']>
+    readonly vNumeric: UnwrapRef<typeof import('./resources/ts/utils/contractorValidation')['vNumeric']>
     readonly watch: UnwrapRef<typeof import('vue')['watch']>
     readonly watchArray: UnwrapRef<typeof import('@vueuse/core')['watchArray']>
     readonly watchAtMost: UnwrapRef<typeof import('@vueuse/core')['watchAtMost']>
@@ -769,5 +858,6 @@ declare module 'vue' {
     readonly watchTriggerable: UnwrapRef<typeof import('@vueuse/core')['watchTriggerable']>
     readonly watchWithFilter: UnwrapRef<typeof import('@vueuse/core')['watchWithFilter']>
     readonly whenever: UnwrapRef<typeof import('@vueuse/core')['whenever']>
+    readonly yesterday: UnwrapRef<typeof import('./resources/ts/utils/contractorValidation')['yesterday']>
   }
 }

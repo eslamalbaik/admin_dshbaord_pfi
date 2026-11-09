@@ -17,7 +17,8 @@ class ContractorProfileService
     public function __construct(
         private ContractorFileService $fileService,
         private MembershipStatusService $membershipStatusService,
-        private ContractorFinancialService $financialService
+        private ContractorFinancialService $financialService,
+        private ProfileChangeService $profileChanges,
     ) {
     }
 
@@ -77,7 +78,13 @@ class ContractorProfileService
 
     public function fullResource(Contractor $contractor): array
     {
+        // مراجعة التعديلات: القيم بالرد هي الرسمية (المعتمدة)، والمعلّق تحت profile_review
+        $review = $this->profileChanges->stateFor($contractor);
+        $pendingLabels = array_column($review['pending_changes'], 'label');
+
         return array_merge($this->liteResource($contractor), [
+            'profile_review'    => $review,
+
             // بطاقة "حسابي" — حالة العضوية/الذمم/الشهادات/اشتراك سوق الآليات في نداء واحد
             'account_status'    => $this->accountStatus($contractor),
 
@@ -90,7 +97,9 @@ class ContractorProfileService
 
             // اكتمال الملف التعريفي — مطلوب قبل السماح بطلب شهادة العضوية
             'profile_data_complete' => $contractor->profile_data_complete,
-            'missing_profile_fields' => $contractor->missing_profile_fields,
+            // الحقل اللي بعته المقاول وبانتظار الاعتماد ما بينعدّ ناقص بنظره (ما منلحّ عليه
+            // يكمّل شي بعته)، أما profile_data_complete فبيضل على الرسمي لأنه شرط طلب الشهادة
+            'missing_profile_fields' => array_values(array_diff($contractor->missing_profile_fields, $pendingLabels)),
 
             // المجالات والاختصاصات والدرجات — كل مجال يضم اختصاصاته وكل اختصاص درجته
             'fields'            => ContractorLookups::buildFieldsTree($contractor->specialties),

@@ -22,6 +22,12 @@ export function notificationLink(d: Record<string, any> | null | undefined): str
     case 'payment_submitted':
       return `/payments/transactions${q({ id: d.payment_id })}`
 
+    case 'contractor_profile_changes':
+      return `/contractors/profile-changes${q({ contractor: d.contractor_id, tab: d.needs_approval === false ? 'applied' : 'review' })}`
+
+    case 'contractor_profile_changes_overdue':
+      return '/contractors/profile-changes'
+
     case 'contractor_activated':
     case 'contractor_profile_updated':
       return d.contractor_id ? `/contractors/edit/${d.contractor_id}` : '/contractors'

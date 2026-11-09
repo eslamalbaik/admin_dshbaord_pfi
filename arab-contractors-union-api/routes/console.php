@@ -112,3 +112,10 @@ $alertOnFailure(
     'balances:round',
     'finance'
 );
+
+// طلبات تعديل الملفات: تذكير المراجعين بالطلبات اللي تعدّت مهلة يومي العمل + تنظيف الملفات
+// المؤقتة اليتيمة (مستندات طلبات انسحبت/انرفضت/استُبدلت)
+$alertOnFailure(
+    Schedule::command('profile-changes:maintain')->weekdays()->timezone('Asia/Gaza')->at('09:00'),
+    'profile-changes:maintain'
+);

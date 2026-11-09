@@ -86,6 +86,12 @@ Route::prefix('v1')->group(function () {
         Route::get('home',         [ContractorHomeController::class, 'index']);
         Route::get('home/updates', [ContractorHomeController::class, 'updates']);
 
+        // مراجعة تعديلات الملف التعريفي — المعلّق والمرفوض، والسحب
+        Route::get('profile-changes',                 [ContractorAuthController::class, 'profileChanges']);
+        Route::delete('profile-changes',              [ContractorAuthController::class, 'withdrawProfileChanges']);
+        Route::delete('profile-changes/{id}',         [ContractorAuthController::class, 'withdrawProfileChanges'])->whereNumber('id');
+        Route::post('profile-changes/{id}/dismiss',   [ContractorAuthController::class, 'dismissProfileChange'])->whereNumber('id');
+
         Route::get('dashboard',    [ContractorDashboardController::class, 'index']);
         Route::get('memberships',  [ContractorDashboardController::class, 'memberships']);
         Route::get('payments',     [ContractorDashboardController::class, 'payments']);
@@ -420,6 +426,21 @@ Route::prefix('v1')->group(function () {
         Route::patch('contractors/{contractor}/status', [ContractorController::class, 'changeStatus'])->middleware('perm:contractors.list');
         Route::patch('contractors/{contractor}/freeze', [ContractorController::class, 'freeze'])->middleware('perm:contractors.list');
         Route::patch('contractors/{contractor}/contact', [ContractorController::class, 'updateContact'])->middleware('perm:contractors.list');
+
+        // --------------------------------------------------------
+        //  طلبات تعديل الملفات (مراجعة تعديلات المقاولين من التطبيق) + سجل التغييرات
+        // --------------------------------------------------------
+        Route::prefix('dashboard/profile-changes')->group(function () {
+            Route::get('/',                    [\App\Http\Controllers\Api\ProfileChangeController::class, 'index'])->middleware('perm:contractors.profile_changes,view');
+            Route::get('summary',              [\App\Http\Controllers\Api\ProfileChangeController::class, 'summary'])->middleware('perm:contractors.profile_changes,view');
+            Route::get('contractors/{contractor}', [\App\Http\Controllers\Api\ProfileChangeController::class, 'show'])->middleware('perm:contractors.profile_changes,view');
+            Route::post('contractors/{contractor}/decide', [\App\Http\Controllers\Api\ProfileChangeController::class, 'decide'])->middleware('perm:contractors.profile_changes,update');
+            Route::post('confirm',             [\App\Http\Controllers\Api\ProfileChangeController::class, 'confirm'])->middleware('perm:contractors.profile_changes,update');
+            Route::post('{profileChange}/revert', [\App\Http\Controllers\Api\ProfileChangeController::class, 'revert'])->middleware('perm:contractors.profile_changes,update');
+            Route::put('settings',             [\App\Http\Controllers\Api\ProfileChangeController::class, 'updateSettings'])->middleware(['role:admin', 'perm:contractors.profile_changes,update']);
+        });
+        Route::get('contractors/{contractor}/field-history', [\App\Http\Controllers\Api\ProfileChangeController::class, 'history'])
+             ->middleware('perm:contractors.list|contractors.profile_changes,view');
 
         // --------------------------------------------------------
         //  Memberships

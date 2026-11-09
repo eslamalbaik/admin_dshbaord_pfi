@@ -40,6 +40,7 @@ declare module 'vue-router/auto-routes' {
     'contractors-edit-id': RouteRecordInfo<'contractors-edit-id', '/contractors/edit/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
     'contractors-memberships': RouteRecordInfo<'contractors-memberships', '/contractors/memberships', Record<never, never>, Record<never, never>>,
     'contractors-penalties': RouteRecordInfo<'contractors-penalties', '/contractors/penalties', Record<never, never>, Record<never, never>>,
+    'contractors-profile-changes': RouteRecordInfo<'contractors-profile-changes', '/contractors/profile-changes', Record<never, never>, Record<never, never>>,
     'dashboards': RouteRecordInfo<'dashboards', '/dashboards', Record<never, never>, Record<never, never>>,
     'documents': RouteRecordInfo<'documents', '/documents', Record<never, never>, Record<never, never>>,
     'dues': RouteRecordInfo<'dues', '/dues', Record<never, never>, Record<never, never>>,
@@ -65,6 +66,7 @@ declare module 'vue-router/auto-routes' {
     'landing-services': RouteRecordInfo<'landing-services', '/landing/services', Record<never, never>, Record<never, never>>,
     'landing-terms': RouteRecordInfo<'landing-terms', '/landing/terms', Record<never, never>, Record<never, never>>,
     'landing-training-center': RouteRecordInfo<'landing-training-center', '/landing/training-center', Record<never, never>, Record<never, never>>,
+    'landing-verify-certificate': RouteRecordInfo<'landing-verify-certificate', '/landing/verify-certificate', Record<never, never>, Record<never, never>>,
     'legal-library': RouteRecordInfo<'legal-library', '/legal-library', Record<never, never>, Record<never, never>>,
     'marketplace': RouteRecordInfo<'marketplace', '/marketplace', Record<never, never>, Record<never, never>>,
     'marketplace-id': RouteRecordInfo<'marketplace-id', '/marketplace/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
@@ -85,6 +87,7 @@ declare module 'vue-router/auto-routes' {
     'settings-app-settings': RouteRecordInfo<'settings-app-settings', '/settings/app-settings', Record<never, never>, Record<never, never>>,
     'settings-bank-accounts': RouteRecordInfo<'settings-bank-accounts', '/settings/bank-accounts', Record<never, never>, Record<never, never>>,
     'settings-contractor-lookups': RouteRecordInfo<'settings-contractor-lookups', '/settings/contractor-lookups', Record<never, never>, Record<never, never>>,
+    'settings-country-codes': RouteRecordInfo<'settings-country-codes', '/settings/country-codes', Record<never, never>, Record<never, never>>,
     'settings-exchange-rates': RouteRecordInfo<'settings-exchange-rates', '/settings/exchange-rates', Record<never, never>, Record<never, never>>,
     'settings-governorates': RouteRecordInfo<'settings-governorates', '/settings/governorates', Record<never, never>, Record<never, never>>,
     'settings-grade-fees': RouteRecordInfo<'settings-grade-fees', '/settings/grade-fees', Record<never, never>, Record<never, never>>,
@@ -96,5 +99,6 @@ declare module 'vue-router/auto-routes' {
     'tenders': RouteRecordInfo<'tenders', '/tenders', Record<never, never>, Record<never, never>>,
     'tenders-categories': RouteRecordInfo<'tenders-categories', '/tenders/categories', Record<never, never>, Record<never, never>>,
     'under-construction': RouteRecordInfo<'under-construction', '/under-construction', Record<never, never>, Record<never, never>>,
+    'verify': RouteRecordInfo<'verify', '/verify', Record<never, never>, Record<never, never>>,
   }
 }

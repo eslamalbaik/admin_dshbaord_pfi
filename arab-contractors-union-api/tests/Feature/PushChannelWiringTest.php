@@ -61,6 +61,7 @@ class PushChannelWiringTest extends TestCase
             'announcement'                  => [fn () => new AnnouncementNotification(new Announcement(['title' => 'إعلان']))],
             'subscription expiry reminder'  => [fn () => new SubscriptionExpiryReminderNotification(new Contractor(), now()->addWeek())],
             'subscription payment reminder' => [fn () => new SubscriptionPaymentReminderNotification(new Contractor())],
+            'profile changes decided'       => [fn () => new \App\Notifications\ProfileChangesDecidedNotification([new \App\Models\ProfileChange(['field' => 'capital'])], [])],
         ];
     }
 

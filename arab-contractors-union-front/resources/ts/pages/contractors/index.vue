@@ -32,6 +32,8 @@ const notify = (text: string, color: 'success' | 'error' = 'success') => {
 }
 
 const detailsDialog = ref(false)
+// سجل التغييرات (قبل/بعد/مين) لكل حقل بملف المقاول
+const historyDialog = ref(false)
 const detailsTarget = ref<any>(null)
 
 const headers = [
@@ -686,6 +688,8 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
       </VDataTableServer>
     </VCard>
 
+    <ContractorFieldHistoryDialog v-model="historyDialog" :contractor-id="detailsTarget?.id ?? null" :contractor-name="detailsTarget?.name" />
+
     <!-- Details Dialog -->
     <VDialog v-model="detailsDialog" max-width="960">
       <VCard v-if="detailsTarget" class="contractor-details-card" style="border-radius: 20px; overflow: hidden;">
@@ -715,6 +719,15 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
               </VChip>
             </div>
           </div>
+          <VBtn
+            variant="tonal"
+            color="white"
+            size="small"
+            prepend-icon="tabler-history"
+            @click="historyDialog = true"
+          >
+            سجل التغييرات
+          </VBtn>
           <VBtn icon="tabler-x" variant="tonal" color="white" size="small" @click="detailsDialog = false" />
         </div>
 

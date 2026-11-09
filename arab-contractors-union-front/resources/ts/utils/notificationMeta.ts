@@ -32,6 +32,8 @@ const TYPE_MAP: Record<string, Omit<NotificationMeta, 'financial'> & { financial
   profile_update_request_submitted: { title: 'طلب تعديل بيانات', icon: 'tabler-user-edit', color: 'warning' },
   profile_update_request_status: { title: 'تحديث طلب تعديل البيانات', icon: 'tabler-user-edit', color: 'info' },
   contractor_profile_updated: { title: 'تحديث الملف التعريفي', icon: 'tabler-user-edit', color: 'info' },
+  contractor_profile_changes: { title: 'طلب تعديل ملف مقاول', icon: 'tabler-file-diff', color: 'warning' },
+  contractor_profile_changes_overdue: { title: 'طلبات تعديل ملفات متأخرة', icon: 'tabler-clock-exclamation', color: 'error' },
   certificate_request_submitted: { title: 'طلب شهادة جديد', icon: 'tabler-certificate', color: 'warning' },
   certificate_request_status: { title: 'تحديث طلب شهادة', icon: 'tabler-certificate', color: 'info' },
 
@@ -58,6 +60,8 @@ const CLASS_TO_TYPE: Record<string, string> = {
   PaymentSubmittedNotification: 'payment_submitted',
   ContractorActivatedNotification: 'contractor_activated',
   ContractorProfileUpdatedNotification: 'contractor_profile_updated',
+  ProfileChangesSubmittedNotification: 'contractor_profile_changes',
+  ProfileChangesOverdueNotification: 'contractor_profile_changes_overdue',
   EventJoinedNotification: 'event_joined',
   AdminBroadcastNotification: 'admin_broadcast',
   CertificateRequestSubmittedNotification: 'certificate_request_submitted',
