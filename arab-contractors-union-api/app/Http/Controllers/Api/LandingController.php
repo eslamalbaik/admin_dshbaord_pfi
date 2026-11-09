@@ -11,6 +11,7 @@ use App\Models\Tender;
 use App\Rules\MembershipNumber;
 use App\Support\ContractorLookups;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -88,19 +89,29 @@ class LandingController extends Controller
     }
 
     /**
-     * GET /api/v1/contractors-directory?search=&per_page=
-     * دليل شركات المقاولات المعتمدة بالصفحة الرئيسية — بحث بالاسم أو رقم العضوية.
-     * بيانات عامة فقط (اسم، رقم عضوية، مدينة، مجالات ودرجات، حالة العضوية) — بدون
-     * أي جوال أو بريد أو هوية أو ملفات. المقاولين "قيد المراجعة" ما بيظهروا.
+     * GET /api/v1/contractors-directory?search=&status=&field=&specialization=&grade=&per_page=&page=
+     * دليل شركات المقاولات (الصفحة الرئيسية + صفحة "أعضاء الاتحاد") — بيانات عامة فقط
+     * (اسم، رقم عضوية، مدينة، شعار، مجالات واختصاصات ودرجات، حالة العضوية، سنة الانتساب) —
+     * بدون أي جوال أو بريد أو هوية أو ملفات. المقاولين "قيد المراجعة" ما بيظهروا.
+     *
+     * الفلاتر:
+     *  - status: active | expired | suspended — حالة العضوية المعروضة (نفس صفحة الأرصدة)
+     *  - field: كود المجال، specialization: كود الاختصاص، grade: كود الدرجة (اولى أ، ثانية...)
+     * عدد الأعضاء بالمئات، فالحالة المحسوبة والفلترة بتصير بذاكرة على كل القائمة ثم تقسيم الصفحات.
      */
     public function directory(Request $request)
     {
         $search  = trim((string) $request->query('search', ''));
-        $perPage = min(max((int) $request->query('per_page', 6), 1), 24);
+        $perPage = min(max((int) $request->query('per_page', 6), 1), 60);
+        $page    = max((int) $request->query('page', 1), 1);
+        $status  = (string) $request->query('status', '');
+        $field   = $request->filled('field') ? (int) $request->query('field') : null;
+        $spec    = $request->filled('specialization') ? (int) $request->query('specialization') : null;
+        $grade   = trim((string) $request->query('grade', ''));
 
         $query = Contractor::query()
             ->whereIn('status', ['active', 'expired', 'suspended'])
-            ->select(['id', 'name', 'membership_number', 'city', 'status', 'specialties']);
+            ->select(['id', 'name', 'membership_number', 'city', 'status', 'specialties', 'logo', 'registration_date', 'created_at']);
 
         if ($search !== '') {
             $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $search) . '%';
@@ -112,34 +123,93 @@ class LandingController extends Controller
             });
         }
 
-        $page = $query->orderByRaw("status = 'active' desc")->orderBy('name')->paginate($perPage);
+        $contractors = $query->orderBy('name')->get();
 
         // نفس "حالة العضوية" المعروضة بصفحة الأرصدة وقائمة المقاولين
         $balances = app(ContractorBalanceController::class);
         $rows = DB::query()->fromSub($balances->balancesQuery(), 'b')
-            ->whereIn('id', $page->getCollection()->pluck('id'))->get()->keyBy('id');
+            ->whereIn('id', $contractors->pluck('id'))->get()->keyBy('id');
 
         $labels = ['active' => 'عضوية سارية', 'expired' => 'عضوية منتهية', 'suspended' => 'موقوفة'];
 
-        $page->setCollection($page->getCollection()->map(function (Contractor $c) use ($rows, $balances, $labels) {
-            $status = $c->status === 'suspended' || ! isset($rows[$c->id])
+        $items = $contractors->map(function (Contractor $c) use ($rows, $balances, $labels) {
+            $memberStatus = $c->status === 'suspended' || ! isset($rows[$c->id])
                 ? $c->status
                 : $balances->membershipStatus($rows[$c->id]);
+
+            $specs = collect($c->specialties ?? []);
+            $tree  = ContractorLookups::buildFieldsTree($c->specialties);
+            $since = $c->registration_date ?? $c->created_at;
 
             return [
                 'name'              => $c->name,
                 'membership_number' => $c->membership_number,
                 'city'              => $c->city,
-                'membership_status' => $status,
-                'status_label'      => $labels[$status] ?? $status,
-                'fields'            => collect(ContractorLookups::buildFieldsTree($c->specialties))
-                    ->map(fn ($f) => [
-                        'name'   => $f['field_name'],
-                        'grades' => collect($f['specializations'])->pluck('grade_label')->filter()->unique()->values(),
-                    ])->values(),
+                'logo_url'          => $c->logo ? $c->logo_url : null,
+                'member_since'      => $since ? (int) \Carbon\Carbon::parse($since)->year : null,
+                'membership_status' => $memberStatus,
+                'status_label'      => $labels[$memberStatus] ?? $memberStatus,
+                'fields'            => collect($tree)->map(fn ($f) => [
+                    'name'   => $f['field_name'],
+                    'grades' => collect($f['specializations'])->pluck('grade_label')->filter()->unique()->values(),
+                ])->values(),
+                'specializations'   => collect($tree)->flatMap(fn ($f) => $f['specializations'])
+                    ->map(fn ($s) => ['name' => $s['spec_name'], 'grade' => $s['grade_label']])
+                    ->filter(fn ($s) => $s['name'] !== 'غير محدد')->values(),
+                // للفلترة فقط — ما بترجع بالاستجابة
+                '_field_ids' => $specs->pluck('field_lk_type')->filter()->map(fn ($v) => (int) $v)->all(),
+                '_spec_ids'  => $specs->pluck('specialization_lk_type')->filter()->map(fn ($v) => (int) $v)->all(),
+                '_grades'    => $specs->pluck('classification')->filter()->all(),
             ];
-        }));
+        })->filter(function ($m) use ($status, $field, $spec, $grade) {
+            return ($status === '' || $m['membership_status'] === $status)
+                && ($field === null || in_array($field, $m['_field_ids'], true))
+                && ($spec === null || in_array($spec, $m['_spec_ids'], true))
+                && ($grade === '' || in_array($grade, $m['_grades'], true));
+        })
+            // الفعّالة أولاً ثم أبجدياً
+            ->sortBy(fn ($m) => ($m['membership_status'] === 'active' ? '0' : '1') . $m['name'])
+            ->map(fn ($m) => array_diff_key($m, array_flip(['_field_ids', '_spec_ids', '_grades'])))
+            ->values();
 
-        return $this->paginated($page);
+        $paginator = new LengthAwarePaginator(
+            $items->forPage($page, $perPage)->values()->all(),
+            $items->count(),
+            $perPage,
+            $page,
+        );
+
+        return $this->paginated($paginator);
+    }
+
+    /**
+     * GET /api/v1/contractors-directory/filters
+     * خيارات فلاتر صفحة "أعضاء الاتحاد": المجالات واختصاصاتها، الدرجات، وحالات العضوية.
+     */
+    public function directoryFilters()
+    {
+        $specNames = ContractorLookups::specializations();
+        $map       = ContractorLookups::fieldSpecializationsMap();
+
+        $fields = collect(ContractorLookups::fields())
+            ->reject(fn ($name, $code) => (int) $code === 10) // "غير محدد"
+            ->map(fn ($name, $code) => [
+                'value'           => (int) $code,
+                'label'           => $name,
+                'specializations' => collect($map[$code] ?? [])
+                    ->filter(fn ($s) => isset($specNames[$s]))
+                    ->map(fn ($s) => ['value' => (int) $s, 'label' => $specNames[$s]])->values(),
+            ])->values();
+
+        return $this->success([
+            'fields'   => $fields,
+            'grades'   => collect(ContractorLookups::gradesList())
+                ->map(fn ($g) => ['value' => $g['value'], 'label' => $g['label']])->values(),
+            'statuses' => [
+                ['value' => 'active',    'label' => 'فعّالة'],
+                ['value' => 'expired',   'label' => 'منتهية'],
+                ['value' => 'suspended', 'label' => 'موقوفة'],
+            ],
+        ]);
     }
 }

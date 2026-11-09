@@ -1,57 +1,119 @@
 <script setup lang="ts">
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
-import { ref, computed } from 'vue'
-import { Search, MapPin, Award, Filter, ChevronLeft } from 'lucide-vue-next'
+import api from '@/plugins/axios'
+import { ref, computed, watch, onMounted } from 'vue'
+import { Search, Award, Filter, ChevronLeft } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
+interface FieldOpt { value: number; label: string; specializations: { value: number; label: string }[] }
+interface Member {
+  name: string
+  membership_number: string
+  city: string | null
+  logo_url: string | null
+  member_since: number | null
+  membership_status: 'active' | 'expired' | 'suspended'
+  status_label: string
+  fields: { name: string; grades: string[] }[]
+  specializations: { name: string; grade: string | null }[]
+}
+
+const PER_PAGE = 24
+
 const searchQ = ref('')
-const filterCity = ref('')
-const filterClass = ref('')
 const filterStatus = ref('')
+const filterField = ref('')
+const filterSpec = ref('')
+const filterGrade = ref('')
 
-const cities = ['رام الله','نابلس','الخليل','بيت لحم','جنين','طولكرم','قلقيلية','أريحا','سلفيت','طوباس','القدس']
-const classes = ['A1','A2','B','C','D','E']
-const statuses = ['نشط','منتهي','معلق']
+const fieldOptions = ref<FieldOpt[]>([])
+const gradeOptions = ref<{ value: string; label: string }[]>([])
+const statusOptions = ref<{ value: string; label: string }[]>([
+  { value: 'active', label: 'فعّالة' },
+  { value: 'expired', label: 'منتهية' },
+  { value: 'suspended', label: 'موقوفة' },
+])
 
-const classLabel: Record<string,string> = { A1:'الأولى أ', A2:'الأولى ب', B:'الثانية', C:'الثالثة', D:'الرابعة', E:'الخامسة' }
-const classColors: Record<string,string> = { A1:'#1a237e', A2:'#0277bd', B:'#2e7d32', C:'#e65100', D:'#c62828', E:'#6a1b9a' }
-const classBg: Record<string,string> = { A1:'#e8eaf6', A2:'#e3f2fd', B:'#e8f5e9', C:'#fff8e1', D:'#fce4ec', E:'#f3e5f5' }
+const members = ref<Member[]>([])
+const total = ref(0)
+const page = ref(1)
+const lastPage = ref(1)
+const loading = ref(false)
+let requestId = 0
+let timer: ReturnType<typeof setTimeout> | undefined
 
-const members = Array.from({ length: 40 }, (_, i) => {
-  const cityIdx = i % cities.length
-  const clsIdx = i % classes.length
-  return {
-    id: i + 1,
-    name: [
-      'شركة الخطيب للمقاولات','شركة النجار للإنشاءات','شركة البناء الحديث',
-      'شركة الوطن للمقاولات','شركة الأمل للبناء','شركة فلسطين للإنشاءات',
-      'شركة الريان للمقاولات','شركة الشروق للبناء','شركة القدس للإنشاءات',
-      'شركة الفجر للمقاولات',
-    ][i % 10] + ` ${i + 1}`,
-    city: cities[cityIdx],
-    classification: classes[clsIdx],
-    specialty: ['إنشاءات عامة','طرق وجسور','مياه وصرف صحي','كهرباء وطاقة','إسكان'][i % 5],
-    status: ['نشط','نشط','نشط','منتهي','معلق'][i % 5],
-    memberSince: `${2010 + (i % 14)}`,
-    initial: 'ش',
-  }
+// الاختصاصات المتاحة: تابعة للمجال المختار، أو كلها (بدون تكرار) إن لم يُختر مجال
+const specOptions = computed(() => {
+  const src = filterField.value
+    ? fieldOptions.value.filter(f => String(f.value) === filterField.value)
+    : fieldOptions.value
+  const seen = new Map<number, string>()
+  src.forEach(f => f.specializations.forEach(s => seen.set(s.value, s.label)))
+  return [...seen].map(([value, label]) => ({ value, label }))
 })
 
-const filtered = computed(() =>
-  members.filter(m => {
-    if (searchQ.value && !m.name.includes(searchQ.value) && !m.specialty.includes(searchQ.value)) return false
-    if (filterCity.value && m.city !== filterCity.value) return false
-    if (filterClass.value && m.classification !== filterClass.value) return false
-    if (filterStatus.value && m.status !== filterStatus.value) return false
-    return true
-  })
-)
+const hasFilters = computed(() =>
+  !!(searchQ.value || filterStatus.value || filterField.value || filterSpec.value || filterGrade.value))
+
+const statusClass = (s: string) => (s === 'active' ? 'active' : s === 'suspended' ? 'suspended' : 'expired')
+
+async function load(p = 1) {
+  const id = ++requestId
+  loading.value = true
+  try {
+    const r = await api.get('/api/v1/contractors-directory', {
+      params: {
+        search: searchQ.value.trim() || undefined,
+        status: filterStatus.value || undefined,
+        field: filterField.value || undefined,
+        specialization: filterSpec.value || undefined,
+        grade: filterGrade.value || undefined,
+        page: p,
+        per_page: PER_PAGE,
+      },
+    })
+    if (id !== requestId) return
+    const items: Member[] = r.data.items ?? []
+    members.value = p === 1 ? items : [...members.value, ...items]
+    total.value = r.data.meta?.total ?? items.length
+    page.value = r.data.meta?.current_page ?? p
+    lastPage.value = r.data.meta?.last_page ?? p
+  }
+  catch {
+    if (id === requestId) { members.value = []; total.value = 0; lastPage.value = 1 }
+  }
+  finally {
+    if (id === requestId) loading.value = false
+  }
+}
+
+function reset() {
+  searchQ.value = ''; filterStatus.value = ''; filterField.value = ''; filterSpec.value = ''; filterGrade.value = ''
+}
+
+// تغيير المجال يصفّر الاختصاص إن لم يعد ضمنه
+watch(filterField, () => {
+  if (filterSpec.value && !specOptions.value.some(s => String(s.value) === filterSpec.value)) filterSpec.value = ''
+})
+watch([filterStatus, filterField, filterSpec, filterGrade], () => load(1))
+watch(searchQ, () => { clearTimeout(timer); timer = setTimeout(() => load(1), 350) })
+
+onMounted(async () => {
+  load(1)
+  try {
+    const r = await api.get('/api/v1/contractors-directory/filters')
+    fieldOptions.value = r.data.items?.fields ?? []
+    gradeOptions.value = r.data.items?.grades ?? []
+    if (r.data.items?.statuses?.length) statusOptions.value = r.data.items.statuses
+  }
+  catch { /* الفلاتر اختيارية — القائمة تعمل بدونها */ }
+})
 </script>
 
 <template>
   <div dir="rtl" class="pub-page">
-    
+
     <div class="page-hero">
       <div class="page-hero-shapes"><div class="ph-s ph-s1" /><div class="ph-s ph-s2" /></div>
       <div class="pub-cont page-hero-inner">
@@ -59,72 +121,86 @@ const filtered = computed(() =>
           <RouterLink to="/landing">الرئيسية</RouterLink><span>/</span><span>أعضاء الاتحاد</span>
         </div>
         <h1 class="page-hero-title">أعضاء الاتحاد</h1>
-        <p class="page-hero-desc">دليل شركات المقاولات الأعضاء في اتحاد المقاولين الفلسطينيين — يمكنك البحث والتصفية</p>
+        <p class="page-hero-desc">دليل شركات المقاولات الأعضاء في اتحاد المقاولين — يمكنك البحث والتصفية حسب الحالة والاختصاص والدرجة</p>
       </div>
       <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
 
     <section class="pub-section">
       <div class="pub-cont">
-        <!-- Filters -->
         <div class="filters-bar">
           <div class="search-wrap">
             <Search :size="17" class="search-ico" />
-            <input v-model="searchQ" type="text" placeholder="ابحث باسم الشركة أو التخصص..." class="search-input" />
+            <input v-model="searchQ" type="text" placeholder="ابحث باسم الشركة أو رقم العضوية..." class="search-input" />
           </div>
           <div class="filters-row">
-            <select v-model="filterCity" class="filter-sel">
-              <option value="">كل المحافظات</option>
-              <option v-for="c in cities" :key="c" :value="c">{{ c }}</option>
-            </select>
-            <select v-model="filterClass" class="filter-sel">
-              <option value="">كل الدرجات</option>
-              <option v-for="c in classes" :key="c" :value="c">{{ classLabel[c] }}</option>
-            </select>
             <select v-model="filterStatus" class="filter-sel">
               <option value="">كل الحالات</option>
-              <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
+              <option v-for="s in statusOptions" :key="s.value" :value="s.value">{{ s.label }}</option>
             </select>
-            <button class="filter-reset" @click="searchQ='';filterCity='';filterClass='';filterStatus=''">
+            <select v-model="filterField" class="filter-sel">
+              <option value="">كل المجالات</option>
+              <option v-for="f in fieldOptions" :key="f.value" :value="String(f.value)">{{ f.label }}</option>
+            </select>
+            <select v-model="filterSpec" class="filter-sel">
+              <option value="">كل الاختصاصات</option>
+              <option v-for="s in specOptions" :key="s.value" :value="String(s.value)">{{ s.label }}</option>
+            </select>
+            <select v-model="filterGrade" class="filter-sel">
+              <option value="">كل الدرجات</option>
+              <option v-for="g in gradeOptions" :key="g.value" :value="g.value">{{ g.label }}</option>
+            </select>
+            <button class="filter-reset" @click="reset">
               <Filter :size="14" /> إعادة تعيين
             </button>
           </div>
         </div>
 
-        <p class="results-count">عُثر على <strong>{{ filtered.length }}</strong> شركة</p>
+        <p class="results-count">عُثر على <strong>{{ total }}</strong> شركة</p>
 
         <div class="members-grid">
-          <div v-for="m in filtered" :key="m.id" class="member-card">
-            <div class="member-avatar">{{ m.initial }}</div>
+          <div v-for="m in members" :key="m.membership_number" class="member-card">
+            <div class="member-avatar">
+              <img v-if="m.logo_url" :src="m.logo_url" :alt="m.name" class="member-logo">
+              <template v-else>{{ m.name.charAt(0) }}</template>
+            </div>
             <div class="member-body">
-              <h3 class="member-name">{{ m.name }}</h3>
+              <h3 class="member-name" :title="m.name">{{ m.name }}</h3>
               <div class="member-meta">
-                <span class="member-city"><MapPin :size="12" /> {{ m.city }}</span>
-                <span class="member-spec">{{ m.specialty }}</span>
+                <span class="member-num">رقم العضوية: {{ m.membership_number }}</span>
+              </div>
+              <div v-if="m.specializations.length" class="member-specs">
+                <span v-for="(s, i) in m.specializations.slice(0, 3)" :key="i" class="member-spec">{{ s.name }}</span>
+                <span v-if="m.specializations.length > 3" class="member-spec more">+{{ m.specializations.length - 3 }}</span>
               </div>
               <div class="member-footer">
-                <span class="member-class" :style="`background:${classBg[m.classification]};color:${classColors[m.classification]};border-color:${classColors[m.classification]}`">
-                  <Award :size="11" /> {{ classLabel[m.classification] }}
+                <span v-for="g in [...new Set(m.fields.flatMap(f => f.grades))].slice(0, 2)" :key="g" class="member-class">
+                  <Award :size="11" /> {{ g }}
                 </span>
-                <span class="member-status" :class="m.status === 'نشط' ? 'active' : m.status === 'معلق' ? 'suspended' : 'expired'">
-                  {{ m.status }}
-                </span>
-                <span class="member-since">منذ {{ m.memberSince }}</span>
+                <span class="member-status" :class="statusClass(m.membership_status)">{{ m.status_label }}</span>
+                <span v-if="m.member_since" class="member-since">منذ {{ m.member_since }}</span>
               </div>
             </div>
-            <a href="#" class="member-link"><ChevronLeft :size="16" /></a>
+            <span class="member-link"><ChevronLeft :size="16" /></span>
           </div>
         </div>
 
-        <div v-if="!filtered.length" class="empty-state">
+        <div v-if="loading && !members.length" class="empty-state"><p>جارٍ التحميل...</p></div>
+
+        <div v-if="!loading && !members.length" class="empty-state">
           <Search :size="48" />
           <p>لا توجد نتائج مطابقة للبحث</p>
-          <button @click="searchQ='';filterCity='';filterClass='';filterStatus=''">إعادة تعيين الفلاتر</button>
+          <button v-if="hasFilters" @click="reset">إعادة تعيين الفلاتر</button>
+        </div>
+
+        <div v-if="page < lastPage" class="load-more-wrap">
+          <button class="load-more" :disabled="loading" @click="load(page + 1)">
+            {{ loading ? 'جارٍ التحميل...' : 'عرض المزيد' }}
+          </button>
         </div>
       </div>
     </section>
-
-      </div>
+  </div>
 </template>
 
 <style scoped>
@@ -165,9 +241,16 @@ const filtered = computed(() =>
 .member-name { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: .88rem; font-weight: 800; color: #0d1b3e; margin-bottom: .5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .member-meta { display: flex; gap: .65rem; margin-bottom: .6rem; }
 .member-city { display: flex; align-items: center; gap: .25rem; font-size: .76rem; color: #6b7280; }
+.member-logo { width: 100%; height: 100%; object-fit: contain; border-radius: 12px; background: #fff; }
+.member-num { font-size: .76rem; color: #6b7280; }
+.member-specs { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .6rem; }
+.member-spec.more { background: #e8eaf6; color: #1a237e; }
+.load-more-wrap { text-align: center; margin-top: 2rem; }
+.load-more { background: #1a237e; color: #fff; border: none; border-radius: 9px; padding: .7rem 2rem; font-size: .9rem; cursor: pointer; font-family: 'Tajawal', sans-serif; }
+.load-more:disabled { opacity: .6; cursor: default; }
 .member-spec { font-size: .76rem; color: #6b7280; background: #f3f4f6; border-radius: 50px; padding: .15rem .6rem; }
 .member-footer { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
-.member-class { display: flex; align-items: center; gap: .25rem; font-size: .72rem; font-weight: 700; border: 1px solid; border-radius: 50px; padding: .15rem .6rem; }
+.member-class { display: flex; align-items: center; gap: .25rem; font-size: .72rem; font-weight: 700; border: 1px solid #1a237e; background: #e8eaf6; color: #1a237e; border-radius: 50px; padding: .15rem .6rem; }
 .member-status { font-size: .72rem; font-weight: 700; border-radius: 50px; padding: .15rem .6rem; }
 .member-status.active { background: #e8f5e9; color: #2e7d32; }
 .member-status.expired { background: #fce4ec; color: #c62828; }

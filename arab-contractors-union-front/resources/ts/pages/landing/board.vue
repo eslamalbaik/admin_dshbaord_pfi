@@ -1,74 +1,60 @@
 <script setup lang="ts">
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
-import { Mail, Phone, MapPin } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
+// مصدر البيانات: التقرير الإداري والمالي للدورة الانتخابية الثانية عشرة (2023–2026) وكشف أعضاء مجلس الإدارة.
+// بدون أي بيانات تواصل شخصية (جوال/إيميل/هوية) — عامة فقط.
 const boardMembers = [
   {
-    name: 'م. محمد أحمد الشيخ',
-    position: 'رئيس الاتحاد',
-    bio: 'مهندس مدني بخبرة تزيد على ٣٠ عاماً في قطاع المقاولات، ترأّس عدة مشاريع بنية تحتية وطنية كبرى.',
-    city: 'رام الله', phone: '+970 59 000 0001', email: 'president@pcu.ps',
-    initial: 'م',
+    name: 'م. سهيل هاشم السقا',
+    position: 'نقيب المقاولين الفلسطينيين – المحافظات الجنوبية',
+    subtitle: 'النائب الأول لرئيس الاتحاد في فلسطين',
+    bio: 'رئيس مجلس إدارة شركة سكلز آند كواليتي للإنشاءات، ونقيب المقاولين الفلسطينيين.',
+    photo: '/images/board/saqqa.jpg',
   },
   {
-    name: 'م. سميرة خالد النمر',
-    position: 'نائب الرئيس',
-    bio: 'خبرة واسعة في إدارة مشاريع الإسكان وإعادة الإعمار، عضو في عدة هيئات هندسية دولية.',
-    city: 'نابلس', phone: '+970 59 000 0002', email: 'vp@pcu.ps',
-    initial: 'س',
+    name: 'م. هاشم عرفة سكيك',
+    position: 'أمين سر الاتحاد العام',
+    bio: 'رئيس مجلس إدارة شركة بالكون للتجارة والمقاولات وشركة إمكانات، وعضو المجلس البلدي لبلدية غزة.',
+    photo: '/images/board/sakik.jpg',
   },
   {
-    name: 'م. يوسف عمر الريماوي',
-    position: 'الأمين العام',
-    bio: 'متخصص في إدارة المنظمات المهنية وله تجربة طويلة في تطوير أنظمة تصنيف المقاولين.',
-    city: 'رام الله', phone: '+970 59 000 0003', email: 'secretary@pcu.ps',
-    initial: 'ي',
-  },
-  {
-    name: 'م. إبراهيم سالم الجعبري',
+    name: 'حسين محمد شنن',
     position: 'أمين الصندوق',
-    bio: 'خبير في الإدارة المالية وتمويل مشاريع البنية التحتية، شارك في إعداد الخطط المالية للاتحاد.',
-    city: 'الخليل', phone: '+970 59 000 0004', email: 'treasurer@pcu.ps',
-    initial: 'إ',
+    bio: 'أمين الصندوق باتحاد المقاولين الفلسطينيين، ورئيس مجلس إدارة شركة أبناء شنن ومجموعة شنن.',
+    photo: '/images/board/shannan.jpg',
   },
   {
-    name: 'م. رنا فارس حمدان',
-    position: 'عضو مجلس',
-    bio: 'رائدة في قطاع مقاولات الطاقة المتجددة والبنية التحتية الخضراء في فلسطين.',
-    city: 'جنين', phone: '+970 59 000 0005', email: 'board1@pcu.ps',
-    initial: 'ر',
+    name: 'عبد الحكيم إسماعيل',
+    position: 'عضو مجلس إدارة',
+    bio: 'عضو مجلس إدارة في جمعية رجال الأعمال، ورئيس مجلس إدارة شركة عبد الحكيم إسماعيل.',
+    photo: '/images/board/ismail.jpg',
   },
   {
-    name: 'م. طارق نضال القاسم',
-    position: 'عضو مجلس',
-    bio: 'خبرة في مجال الطرق والجسور، أشرف على تنفيذ عشرات المشاريع الحيوية في الضفة الغربية.',
-    city: 'طولكرم', phone: '+970 59 000 0006', email: 'board2@pcu.ps',
-    initial: 'ط',
+    name: 'أ. محروس سلمان أبو رجيلة',
+    position: 'عضو مجلس إدارة',
+    bio: 'رئيس مجلس إدارة شركة الرحاب للمقاولات العامة.',
+    photo: '/images/board/abu-rujaila.jpg',
   },
   {
-    name: 'م. ليلى حسن أبو عمر',
-    position: 'عضو مجلس',
-    bio: 'متخصصة في قطاع المياه والصرف الصحي، وشاركت في تصميم وتنفيذ مشاريع مياه حيوية.',
-    city: 'بيت لحم', phone: '+970 59 000 0007', email: 'board3@pcu.ps',
-    initial: 'ل',
+    name: 'م. عارف محمود أبو عودة',
+    position: 'عضو مجلس إدارة',
+    bio: 'رئيس مجلس إدارة شركة التأسيس للتجارة والمقاولات العامة وشركة أرض الوفاق.',
+    photo: '/images/board/abu-auda.jpg',
   },
   {
-    name: 'م. وليد كمال ذياب',
-    position: 'عضو مجلس',
-    bio: 'خبير في إدارة مشاريع الكهرباء والاتصالات، ويمثّل قطاع الخليل في مجلس الإدارة.',
-    city: 'الخليل', phone: '+970 59 000 0008', email: 'board4@pcu.ps',
-    initial: 'و',
+    name: 'أ. عماد عبد الله أبو مطر',
+    position: 'عضو مجلس إدارة',
+    bio: 'رئيس مجلس إدارة شركة زهرة الوادي للتجارة والمقاولات.',
+    photo: '/images/board/abu-matar.jpg',
   },
 ]
-
-const colors = ['#1a237e','#c62828','#2e7d32','#e65100','#6a1b9a','#00695c','#0277bd','#558b2f']
 </script>
 
 <template>
   <div dir="rtl" class="pub-page">
-    
+
     <!-- Hero -->
     <div class="page-hero">
       <div class="page-hero-shapes"><div class="ph-s ph-s1" /><div class="ph-s ph-s2" /></div>
@@ -77,51 +63,38 @@ const colors = ['#1a237e','#c62828','#2e7d32','#e65100','#6a1b9a','#00695c','#02
           <RouterLink to="/landing">الرئيسية</RouterLink><span>/</span><span>مجلس الإدارة</span>
         </div>
         <h1 class="page-hero-title">مجلس الإدارة</h1>
-        <p class="page-hero-desc">تعرّف على أعضاء مجلس إدارة اتحاد المقاولين الفلسطينيين المنتخبين لقيادة القطاع</p>
+        <p class="page-hero-desc">مجلس إدارة اتحاد المقاولين الفلسطينيين – المحافظات الجنوبية، الدورة الانتخابية الثانية عشرة (2023 – 2026)</p>
       </div>
       <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
 
-    <!-- Board Members -->
     <section class="pub-section">
       <div class="pub-cont">
-        <!-- President highlight -->
         <div class="president-card">
-          <div class="pres-avatar" :style="`background:${colors[0]}`">{{ boardMembers[0].initial }}</div>
+          <img :src="boardMembers[0].photo" :alt="boardMembers[0].name" class="pres-avatar pres-photo">
           <div class="pres-body">
-            <div class="pub-sec-label" style="margin-bottom:.5rem">رئيس الاتحاد</div>
+            <div class="pub-sec-label" style="margin-bottom:.5rem">{{ boardMembers[0].position }}</div>
             <h2 class="pres-name">{{ boardMembers[0].name }}</h2>
-            <p class="pres-bio">{{ boardMembers[0].bio }}</p>
-            <div class="pres-contacts">
-              <a :href="`tel:${boardMembers[0].phone}`" class="pres-contact"><Phone :size="14" /> {{ boardMembers[0].phone }}</a>
-              <a :href="`mailto:${boardMembers[0].email}`" class="pres-contact"><Mail :size="14" /> {{ boardMembers[0].email }}</a>
-              <span class="pres-contact"><MapPin :size="14" /> {{ boardMembers[0].city }}</span>
-            </div>
+            <p class="pres-bio">{{ boardMembers[0].subtitle }}<br>{{ boardMembers[0].bio }}</p>
           </div>
         </div>
 
-        <!-- Other members -->
         <h3 class="board-section-title">أعضاء مجلس الإدارة</h3>
         <div class="board-grid">
-          <div v-for="(m, i) in boardMembers.slice(1)" :key="m.name" class="board-card">
-            <div class="board-avatar" :style="`background:${colors[(i+1)%colors.length]}`">{{ m.initial }}</div>
+          <div v-for="m in boardMembers.slice(1)" :key="m.name" class="board-card">
+            <img :src="m.photo" :alt="m.name" class="board-avatar board-photo">
             <div class="board-position">{{ m.position }}</div>
             <h3 class="board-name">{{ m.name }}</h3>
             <p class="board-bio">{{ m.bio }}</p>
-            <div class="board-city"><MapPin :size="12" /> {{ m.city }}</div>
-            <div class="board-contacts">
-              <a :href="`tel:${m.phone}`" class="board-contact-btn phone"><Phone :size="13" /></a>
-              <a :href="`mailto:${m.email}`" class="board-contact-btn mail"><Mail :size="13" /></a>
-            </div>
           </div>
         </div>
       </div>
     </section>
-
-      </div>
+  </div>
 </template>
 
 <style scoped>
+.pres-photo, .board-photo { object-fit: cover; object-position: top; }
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap');
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 .pub-page { font-family: 'Tajawal', 'Cairo', sans-serif; direction: rtl; color: #374151; background: #fff; }
