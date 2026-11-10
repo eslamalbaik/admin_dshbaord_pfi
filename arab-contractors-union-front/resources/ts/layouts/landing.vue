@@ -79,8 +79,8 @@ import PublicFooter from '@/components/PublicFooter.vue'
 .lp-layout .lp-page .vp-hero::before { display: none; }
 .lp-layout .lp-page .page-hero-shapes,
 .lp-layout .lp-page .vp-hero-glow { display: none; }
-.lp-layout .lp-page .page-hero { padding-bottom: 3rem; min-height: calc(var(--pub-nav-h, 125px) + 250px); }
-.lp-layout .lp-page .page-header { padding-bottom: 3rem; min-height: calc(var(--pub-nav-h, 125px) + 250px); }
+.lp-layout .lp-page .page-hero { padding-bottom: 4rem; min-height: calc(var(--pub-nav-h, 125px) + 360px); }
+.lp-layout .lp-page .page-header { padding-bottom: 4rem; min-height: calc(var(--pub-nav-h, 125px) + 360px); }
 .lp-layout .lp-page .vp-hero { padding-bottom: 5.5rem; }
 /* titles on the news/events header were navy-on-light */
 .lp-layout .lp-page .page-header .page-title { color: #fff; text-shadow: 0 3px 18px rgba(0, 0, 40, .45); }
@@ -97,6 +97,8 @@ import PublicFooter from '@/components/PublicFooter.vue'
       url('/images/landing/inner-hero-sm.webp');
     background-position: 62% center;
   }
+  .lp-layout .lp-page .page-hero,
+  .lp-layout .lp-page .page-header { padding-bottom: 3rem; min-height: calc(var(--pub-nav-h, 125px) + 270px); }
 }
 
 /* follow-us block: opposite the page title (left in RTL) on wide screens, below the title otherwise */

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
-import { committees } from '@/data/unionCommittees'
-import { Check, Star, Target, Award, Shield, Users, Globe, Handshake, GraduationCap, Scale } from 'lucide-vue-next'
+import PublicCommitteeGrid from '@/components/PublicCommitteeGrid.vue'
+import { Award, ChevronLeft, Eye, GraduationCap, Handshake, Scale, Shield, Target, Users } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
@@ -17,12 +17,12 @@ const goals = [
 ]
 
 const values = [
-  { icon: Shield,        title: 'النزاهة والشفافية',   desc: 'يلتزم الاتحاد بتطبيق أعلى معايير النزاهة والشفافية في جميع معاملاته وقراراته، مما يعزز الثقة والمصداقية لدى أعضائه وشركائه.', color: '#1a237e', bg: '#e8eaf6' },
-  { icon: Award,         title: 'الجودة والتميز',      desc: 'يسعى الاتحاد إلى تحقيق أعلى مستويات الجودة في قطاع المقاولات، من خلال تشجيع التميز والابتكار في تنفيذ المشاريع.', color: '#e65100', bg: '#fff8e1' },
-  { icon: Users,         title: 'المسؤولية المجتمعية', desc: 'يؤمن الاتحاد بدوره في دعم المجتمع الفلسطيني والمساهمة في التنمية المستدامة من خلال تنفيذ مشاريع تخدم الصالح العام.', color: '#c62828', bg: '#fce4ec' },
-  { icon: Handshake,     title: 'التعاون والشراكة',    desc: 'يعزز الاتحاد ثقافة التعاون والشراكة مع الجهات الحكومية والخاصة، بما يسهم في بناء بيئة عمل متكاملة ومثمرة.', color: '#2e7d32', bg: '#e8f5e9' },
-  { icon: GraduationCap, title: 'الاحترافية والمهنية', desc: 'يركز الاتحاد على رفع مستوى الاحترافية والمهنية بين أعضائه، من خلال توفير برامج تدريبية وتطويرية مستمرة.', color: '#6a1b9a', bg: '#f3e5f5' },
-  { icon: Scale,         title: 'العدالة والمساواة',   desc: 'يضمن الاتحاد تطبيق مبدأ العدالة والمساواة بين جميع أعضائه، مع توفير فرص متكافئة للجميع دون أي تمييز.', color: '#00695c', bg: '#e0f2f1' },
+  { num: '٠١', icon: Shield, title: 'النزاهة والشفافية', desc: 'يلتزم الاتحاد بتطبيق أعلى معايير النزاهة والشفافية في جميع معاملاته وقراراته، مما يعزز الثقة والمصداقية لدى أعضائه وشركائه.' },
+  { num: '٠٢', icon: Award, title: 'الجودة والتميز', desc: 'يسعى الاتحاد إلى تحقيق أعلى مستويات الجودة في قطاع المقاولات، من خلال تشجيع التميز والابتكار في تنفيذ المشاريع.' },
+  { num: '٠٣', icon: Users, title: 'المسؤولية المجتمعية', desc: 'يؤمن الاتحاد بدوره في دعم المجتمع الفلسطيني والمساهمة في التنمية المستدامة من خلال تنفيذ مشاريع تخدم الصالح العام.' },
+  { num: '٠٤', icon: Handshake, title: 'التعاون والشراكة', desc: 'يعزز الاتحاد ثقافة التعاون والشراكة مع الجهات الحكومية والخاصة، بما يسهم في بناء بيئة عمل متكاملة ومثمرة.' },
+  { num: '٠٥', icon: GraduationCap, title: 'الاحترافية والمهنية', desc: 'يركز الاتحاد على رفع مستوى الاحترافية والمهنية بين أعضائه، من خلال توفير برامج تدريبية وتطويرية مستمرة.' },
+  { num: '٠٦', icon: Scale, title: 'العدالة والمساواة', desc: 'يضمن الاتحاد تطبيق مبدأ العدالة والمساواة بين جميع أعضائه، مع توفير فرص متكافئة للجميع دون أي تمييز.' },
 ]
 
 const facts = [
@@ -94,15 +94,19 @@ const facts = [
           <div class="pub-sec-label">الرؤية والرسالة</div>
           <h2 class="pub-sec-h center">رؤيتنا ورسالتنا</h2>
         </div>
-        <div class="vm-grid vm-two">
+        <div class="vm-grid">
           <div class="vm-card vm-vision">
-            <div class="vm-icon"><Star :size="32" /></div>
-            <h3 class="vm-title">الرؤية</h3>
+            <div class="vm-head">
+              <div class="vm-icon"><Eye :size="30" /></div>
+              <h3 class="vm-title">الرؤية</h3>
+            </div>
             <p class="vm-desc">اتحاد المقاولين الفلسطينيين المحرك الأساسي للنمو الاقتصادي والتنموي في فلسطين، ونموذجا يُحتذى به في الصمود والتميز والابتكار.</p>
           </div>
           <div class="vm-card vm-mission">
-            <div class="vm-icon"><Target :size="32" /></div>
-            <h3 class="vm-title">الرسالة</h3>
+            <div class="vm-head">
+              <div class="vm-icon"><Target :size="30" /></div>
+              <h3 class="vm-title">الرسالة</h3>
+            </div>
             <p class="vm-desc">يسعى اتحاد المقاولين الفلسطينيين بالمحافظات الجنوبية إلى تنظيم مهنة المقاولات والارتقاء بها وتعزيز القدرة التنافسية للمقاول الفلسطيني، وذلك من خلال وضع الأطر القانونية والفنية المرتكزة على التميز والابتكار ونسج الشراكات المحلية والدولية من منصة واحدة، ملتزمين بالشفافية والاحترافية والتميز بكل عدالة ومساواة.</p>
           </div>
         </div>
@@ -111,48 +115,59 @@ const facts = [
 
     <!-- Goals -->
     <section class="pub-section">
-      <div class="pub-cont goals-wrap">
+      <div class="pub-cont">
         <div class="pub-sec-header-c">
           <div class="pub-sec-label">الأهداف</div>
           <h2 class="pub-sec-h center">أهداف الاتحاد</h2>
         </div>
-        <ul class="about-checklist">
-          <li v-for="g in goals" :key="g"><Check :size="15" class="chk-ico" /> {{ g }}</li>
-        </ul>
+        <div class="goals-grid">
+          <ol class="goals-list">
+            <li v-for="(g, i) in goals" :key="g" class="goal-item">
+              <span class="goal-num">{{ String(i + 1).padStart(2, '0') }}</span>
+              <span class="goal-arrow" aria-hidden="true"><ChevronLeft :size="18" /></span>
+              <p>{{ g }}</p>
+            </li>
+          </ol>
+          <div class="goals-photo">
+            <img src="/images/landing/goals-workers.jpg" alt="مهندسون في موقع إنشاءات" loading="lazy">
+            <div class="goals-photo-cap">
+              <span class="goals-photo-bar" />
+              <p>معاً .. نحو قطاع إنشائي قوي ومستدام في فلسطين</p>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
     <!-- Values -->
-    <section class="pub-section bg-soft">
-      <div class="pub-cont">
+    <section class="pub-section values-sec">
+      <div class="values-shapes"><div class="ph-s vs-s1" /><div class="ph-s vs-s2" /></div>
+      <div class="pub-cont values-inner">
         <div class="pub-sec-header-c">
-          <div class="pub-sec-label">القيم</div>
-          <h2 class="pub-sec-h center">قيمنا المؤسسية</h2>
+          <div class="pub-sec-label values-label">القيم</div>
+          <h2 class="pub-sec-h center values-h">قيمنا المؤسسية</h2>
         </div>
         <div class="values-grid">
-          <div v-for="v in values" :key="v.title" class="value-card" :style="`--vc:${v.color};--vbg:${v.bg}`">
-            <div class="value-icon"><component :is="v.icon" :size="26" /></div>
+          <article v-for="v in values" :key="v.title" class="value-card">
+            <div class="value-head">
+              <div class="value-icon"><component :is="v.icon" :size="24" /></div>
+              <span class="value-num" aria-hidden="true">{{ v.num }}</span>
+            </div>
             <h3 class="value-title">{{ v.title }}</h3>
             <p class="value-desc">{{ v.desc }}</p>
-          </div>
+          </article>
         </div>
       </div>
     </section>
 
     <!-- Committees -->
-    <section class="pub-section">
+    <section class="pub-section bg-soft">
       <div class="pub-cont">
         <div class="pub-sec-header-c">
           <div class="pub-sec-label">اللجان</div>
           <h2 class="pub-sec-h center">اللجان الداخلية للاتحاد</h2>
         </div>
-        <div class="values-grid">
-          <div v-for="c in committees" :key="c.name" class="value-card" style="--vc:#1a237e;--vbg:#f5f7ff">
-            <h3 class="value-title">{{ c.name }}</h3>
-            <p class="value-desc">{{ c.desc }}</p>
-            <p class="chair"><Globe :size="13" /> رئيس اللجنة: {{ c.chair }}</p>
-          </div>
-        </div>
+        <PublicCommitteeGrid />
       </div>
     </section>
 
@@ -189,9 +204,6 @@ const facts = [
 
 /* About */
 .about-two-col { display: grid; grid-template-columns: 1.2fr 1fr; gap: 5rem; align-items: center; }
-.about-checklist { list-style: none; margin: 1.5rem 0 0; display: flex; flex-direction: column; gap: .6rem; }
-.about-checklist li { display: flex; align-items: center; gap: .6rem; font-size: .9rem; color: #374151; padding: .5rem; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb; }
-.chk-ico { color: #2e7d32; flex-shrink: 0; }
 .about-stats-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .ach-card { background: linear-gradient(135deg, #e8eaf6, #f5f7ff); border: 1.5px solid #c5cae9; border-radius: 16px; padding: 1.75rem 1.25rem; text-align: center; transition: transform .2s; }
 .ach-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(13,27,75,.1); }
@@ -199,31 +211,56 @@ const facts = [
 .ach-lbl { display: block; font-size: .8rem; color: #6b7280; font-weight: 600; margin-top: .35rem; }
 
 /* Vision & Mission */
-.vm-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
-.vm-card { border-radius: 20px; padding: 2.5rem 2rem; text-align: center; }
-.vm-vision { background: linear-gradient(145deg, #e8eaf6, #c5cae9); border: 1.5px solid #9fa8da; }
-.vm-mission { background: linear-gradient(145deg, #fff8e1, #ffe082); border: 1.5px solid #fdd835; }
-.vm-goals { background: linear-gradient(145deg, #e8f5e9, #c8e6c9); border: 1.5px solid #81c784; }
-.vm-icon { width: 64px; height: 64px; border-radius: 18px; background: rgba(255,255,255,.6); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; color: #1a237e; }
-.vm-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 1.15rem; font-weight: 900; color: #0d1b3e; margin-bottom: .875rem; }
-.vm-desc { font-size: .9rem; color: #4b5563; line-height: 1.85; }
-.vm-list { list-style: none; text-align: right; }
-.vm-list li { font-size: .88rem; color: #4b5563; padding: .35rem 0; border-bottom: 1px solid rgba(0,0,0,.06); display: flex; align-items: center; }
-.vm-list li::before { content: '•'; color: #2e7d32; margin-inline-end: .5rem; font-weight: 900; }
+.vm-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.75rem; }
+.vm-card { position: relative; overflow: hidden; isolation: isolate; display: flex; flex-direction: column; min-height: 340px; border-radius: 24px; padding: 3rem 2.75rem; box-shadow: 0 10px 30px rgba(13,27,75,.08); transition: transform .3s, box-shadow .3s; }
+.vm-card::after { content: ''; position: absolute; bottom: -90px; inset-inline-end: -90px; width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.75), transparent 70%); z-index: -1; }
+.vm-card:hover { transform: translateY(-6px); box-shadow: 0 18px 40px rgba(13,27,75,.14); }
+.vm-vision { background: linear-gradient(145deg, #f2f5fd 0%, #dde5f8 100%); border: 1px solid #c5cae9; border-inline-start: 6px solid #1a237e; }
+.vm-mission { background: linear-gradient(145deg, #fffaf0 0%, #fbe7c0 100%); border: 1px solid #f3d9a4; border-inline-start: 6px solid #e8790a; }
+.vm-head { display: flex; align-items: center; gap: 1.1rem; margin-bottom: 1.5rem; }
+.vm-icon { width: 68px; height: 68px; border-radius: 18px; background: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 14px rgba(13,27,75,.1); }
+.vm-vision .vm-icon { color: #1a237e; }
+.vm-mission .vm-icon { color: #e8790a; }
+.vm-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 1.6rem; font-weight: 900; color: #0d1b3e; }
+.vm-desc { font-size: 1.02rem; color: #374151; line-height: 2.05; }
+
+/* Goals */
+.goals-grid { display: grid; grid-template-columns: 1.55fr 1fr; gap: 2.5rem; align-items: stretch; }
+.goals-list { list-style: none; display: flex; flex-direction: column; gap: .7rem; }
+.goal-item { display: flex; align-items: center; gap: .85rem; background: #fff; border: 1px solid #e5e9f5; border-radius: 14px; padding: .75rem 1rem; box-shadow: 0 4px 14px rgba(13,27,75,.06); transition: transform .25s, box-shadow .25s, border-color .25s; }
+.goal-item:hover { transform: translateX(-4px); box-shadow: 0 10px 24px rgba(13,27,75,.12); border-color: #f9a825; }
+.goal-num { width: 50px; height: 42px; border-radius: 10px; background: #1a237e; color: #fff; font-weight: 900; font-size: 1rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.goal-arrow { color: #e8790a; display: flex; flex-shrink: 0; }
+.goal-item p { flex: 1; font-size: .93rem; line-height: 1.85; color: #1f2937; }
+.goals-photo { position: relative; border-radius: 24px; overflow: hidden; min-height: 420px; box-shadow: 0 16px 40px rgba(13,27,75,.18); }
+.goals-photo img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+/* النص على يمين الصورة: تعتيم من جهة اليمين */
+.goals-photo-cap { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start; padding: 2rem 1.75rem; color: #fff; background: linear-gradient(to left, rgba(13,27,75,.92) 0%, rgba(13,27,75,.62) 38%, rgba(13,27,75,0) 72%), linear-gradient(to top, rgba(13,27,75,.55) 0%, rgba(13,27,75,0) 45%); }
+.goals-photo-bar { display: block; width: 44px; height: 4px; border-radius: 2px; background: #f9a825; margin-bottom: .9rem; }
+.goals-photo-cap p { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 1.2rem; font-weight: 800; line-height: 1.75; max-width: 11rem; text-align: start; }
 
 /* Values */
-.values-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
-.value-card { background: var(--vbg); border: 1.5px solid var(--vc); border-top: 4px solid var(--vc); border-radius: 16px; padding: 1.75rem; transition: transform .25s, box-shadow .25s; }
-.value-card:hover { transform: translateY(-5px); box-shadow: 0 10px 28px rgba(0,0,0,.1); }
-.value-icon { width: 54px; height: 54px; border-radius: 14px; background: rgba(255,255,255,.6); border: 1.5px solid var(--vc); color: var(--vc); display: flex; align-items: center; justify-content: center; margin-bottom: 1rem; }
-.value-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: .95rem; font-weight: 800; color: #0d1b3e; margin-bottom: .4rem; }
-.value-desc { font-size: .83rem; color: #6b7280; line-height: 1.75; }
+.values-sec { background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); position: relative; overflow: hidden; }
+.values-shapes { position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; }
+.vs-s1 { width: 460px; height: 460px; background: radial-gradient(circle, rgba(249,168,37,.14), transparent 65%); top: -160px; right: -80px; }
+.vs-s2 { width: 380px; height: 380px; background: radial-gradient(circle, rgba(255,255,255,.06), transparent 65%); bottom: -140px; left: -60px; }
+.values-inner { position: relative; z-index: 1; }
+.values-label { background: rgba(249,168,37,.12); color: #f9a825; border-color: rgba(249,168,37,.35); }
+.values-h { color: #fff; }
+.values-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
+.value-card { position: relative; overflow: hidden; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); border-radius: 18px; padding: 1.75rem; transition: transform .25s, background .25s, border-color .25s, box-shadow .25s; }
+.value-card::before { content: ''; position: absolute; top: 0; inset-inline-start: 0; width: 48px; height: 3px; background: linear-gradient(90deg,#f9a825,#e65100); transition: width .35s; }
+.value-card:hover { transform: translateY(-5px); background: rgba(255,255,255,.1); border-color: rgba(249,168,37,.45); box-shadow: 0 16px 36px rgba(0,0,0,.25); }
+.value-card:hover::before { width: 100%; }
+.value-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+.value-icon { width: 52px; height: 52px; border-radius: 14px; background: rgba(249,168,37,.14); border: 1px solid rgba(249,168,37,.3); color: #f9a825; display: flex; align-items: center; justify-content: center; transition: background .25s, color .25s; }
+.value-card:hover .value-icon { background: #f9a825; color: #0d1b3e; }
+.value-num { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 2.2rem; font-weight: 900; line-height: 1; color: rgba(255,255,255,.16); }
+.value-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 1.08rem; font-weight: 800; color: #fff; margin-bottom: .5rem; }
+.value-desc { font-size: .88rem; color: rgba(255,255,255,.72); line-height: 1.85; }
 
 /* extra */
 .about-hq { grid-column: 1 / -1; width: 100%; border-radius: 16px; object-fit: cover; max-height: 280px; }
-.vm-two { grid-template-columns: repeat(2, 1fr); }
-.goals-wrap { max-width: 900px; }
-.chair { display: flex; align-items: center; gap: .4rem; margin-top: .75rem; font-size: .8rem; font-weight: 700; color: #1a237e; }
 /* Timeline (unused) */
 .timeline { position: relative; max-width: 860px; margin: 0 auto; }
 .tl-line { position: absolute; top: 0; bottom: 0; right: 50%; width: 2px; background: linear-gradient(to bottom, #1a237e, #c5cae9); transform: translateX(50%); }
@@ -238,7 +275,9 @@ const facts = [
 
 @media (max-width: 1024px) {
   .about-two-col { grid-template-columns: 1fr; gap: 2.5rem; }
-  .vm-grid, .vm-two { grid-template-columns: 1fr; }
+  .vm-grid, .goals-grid { grid-template-columns: 1fr; }
+  .vm-card { min-height: 0; padding: 2.25rem 1.75rem; }
+  .goals-photo { min-height: 320px; }
 }
 @media (max-width: 768px) {
   .values-grid { grid-template-columns: 1fr 1fr; }

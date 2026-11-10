@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
-import { committees } from '@/data/unionCommittees'
-import { Globe } from 'lucide-vue-next'
+import PublicCommitteeGrid from '@/components/PublicCommitteeGrid.vue'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 </script>
@@ -27,15 +26,7 @@ definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false
           <div class="pub-sec-label">اللجان</div>
           <h2 class="pub-sec-h center">اللجان الداخلية للاتحاد</h2>
         </div>
-        <div class="committees-grid">
-          <div v-for="c in committees" :key="c.name" class="committee-card" style="--cc:#1a237e;--cbg:#f5f7ff">
-            <div class="committee-header">
-              <h3 class="committee-name">{{ c.name }}</h3>
-            </div>
-            <p class="committee-desc">{{ c.desc }}</p>
-            <p class="chair"><Globe :size="13" /> رئيس اللجنة: {{ c.chair }}</p>
-          </div>
-        </div>
+        <PublicCommitteeGrid />
       </div>
     </section>
 
@@ -66,16 +57,4 @@ definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false
 .page-breadcrumb a:hover { color: #f9a825; }
 .page-hero-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: clamp(2rem,4vw,3rem); font-weight: 900; color: #fff; margin-bottom: .75rem; }
 .page-hero-desc { font-size: 1rem; color: rgba(255,255,255,.75); line-height: 1.75; max-width: 600px; }
-
-.committees-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1.5rem; }
-.committee-card { background: var(--cbg); border: 1.5px solid var(--cc); border-top: 5px solid var(--cc); border-radius: 16px; padding: 1.75rem; transition: transform .25s, box-shadow .25s; }
-.committee-card:hover { transform: translateY(-5px); box-shadow: 0 10px 28px rgba(0,0,0,.1); }
-.committee-header { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; margin-bottom: .875rem; }
-.committee-name { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: .95rem; font-weight: 800; color: #0d1b3e; line-height: 1.4; }
-.committee-members { display: flex; align-items: center; gap: .3rem; font-size: .76rem; font-weight: 700; color: var(--cc); background: rgba(255,255,255,.7); border: 1px solid var(--cc); border-radius: 50px; padding: .2rem .65rem; white-space: nowrap; flex-shrink: 0; }
-.committee-desc { font-size: .85rem; color: #4b5563; line-height: 1.8; }
-
-.chair { display: flex; align-items: center; gap: .4rem; margin-top: .75rem; font-size: .8rem; font-weight: 700; color: #1a237e; }
-@media (max-width: 900px) { .committees-grid { grid-template-columns: repeat(2,1fr); } }
-@media (max-width: 640px) { .committees-grid { grid-template-columns: 1fr; } }
 </style>
