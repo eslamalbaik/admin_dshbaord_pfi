@@ -75,6 +75,20 @@ const boardMembers = [
 
 <template>
   <div dir="rtl" class="board-page">
+
+    <!-- Hero -->
+    <div class="page-hero">
+      <div class="page-hero-shapes"><div class="ph-s ph-s1" /><div class="ph-s ph-s2" /></div>
+      <div class="pub-cont page-hero-inner">
+        <div class="page-breadcrumb">
+          <RouterLink to="/landing">الرئيسية</RouterLink><span>/</span><span>مجلس الإدارة</span>
+        </div>
+        <h1 class="page-hero-title">مجلس الإدارة</h1>
+        <p class="page-hero-desc">مجلس إدارة اتحاد المقاولين الفلسطينيين — المحافظات الجنوبية (الدورة الانتخابية الثانية عشرة 2023 – 2025)</p>
+      </div>
+      <div class="pub-follow-slot"><PublicSocialFollow /></div>
+    </div>
+
     <div class="board-wrap">
       <!-- بطاقة الرئيس -->
       <section class="pres-card">
@@ -134,8 +148,6 @@ const boardMembers = [
           <span class="m-corner" />
         </article>
       </div>
-
-      <div class="board-follow"><PublicSocialFollow /></div>
     </div>
   </div>
 </template>
@@ -149,9 +161,23 @@ const boardMembers = [
   color: #4b5563;
   background: linear-gradient(180deg, #eef3fb 0%, #f7f9fd 100%);
   min-height: 100vh;
-  padding: 3rem 0 4rem;
+  padding: 0 0 4rem;
 }
-.board-wrap { max-width: 1100px; margin: 0 auto; padding: 0 1.25rem; }
+.board-wrap { max-width: 1100px; margin: 0 auto; padding: 3rem 1.25rem 0; }
+.pub-cont { max-width: 1240px; margin: 0 auto; padding: 0 1.5rem; }
+
+/* Hero */
+.page-hero { background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); margin-top: calc(-1 * var(--pub-nav-h, 114px)); padding: calc(var(--pub-nav-h, 114px) + 2.5rem) 0 3rem; position: relative; overflow: hidden; }
+.page-hero-shapes { position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; }
+.ph-s { position: absolute; border-radius: 50%; }
+.ph-s1 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(249,168,37,.12), transparent 65%); top: -100px; left: 5%; }
+.ph-s2 { width: 300px; height: 300px; background: radial-gradient(circle, rgba(255,255,255,.05), transparent 65%); bottom: -80px; right: 10%; }
+.page-hero-inner { position: relative; z-index: 2; }
+.page-breadcrumb { display: flex; align-items: center; gap: .5rem; font-size: .82rem; color: rgba(255,255,255,.6); margin-bottom: 1rem; }
+.page-breadcrumb a { color: rgba(255,255,255,.6); text-decoration: none; }
+.page-breadcrumb a:hover { color: #f9a825; }
+.page-hero-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: clamp(2rem,4vw,3rem); font-weight: 900; color: #fff; margin-bottom: .75rem; }
+.page-hero-desc { font-size: 1rem; color: rgba(255,255,255,.75); line-height: 1.75; max-width: 600px; }
 
 /* بطاقة الرئيس */
 .pres-card {
@@ -230,8 +256,6 @@ const boardMembers = [
   background: linear-gradient(135deg, transparent 50%, #f9c846 50%);
   border-bottom-left-radius: 18px;
 }
-
-.board-follow { margin-top: 3rem; }
 
 @media (max-width: 1000px) { .pres-skyline { display: none; } }
 @media (max-width: 900px) {
