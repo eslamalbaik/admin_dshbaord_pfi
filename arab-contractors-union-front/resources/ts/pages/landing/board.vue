@@ -184,35 +184,37 @@ const boardMembers = [
   position: relative;
   display: flex;
   align-items: center;
-  gap: 2.25rem;
-  background: #fff;
-  border-radius: 24px;
-  padding: 1.5rem 1.75rem;
-  box-shadow: 0 10px 40px rgba(26, 35, 126, .08);
+  gap: 2rem;
+  background: linear-gradient(100deg, #e4ecf9 0%, #f1f6fd 50%, #fbfdff 100%);
+  border: 1px solid #dde6f5;
+  border-radius: 22px;
+  padding: 1.1rem 1.4rem 1.1rem 1.75rem;
+  box-shadow: 0 10px 36px rgba(26, 35, 126, .09);
   overflow: hidden;
 }
-.pres-skyline { position: absolute; left: 1.5rem; bottom: 0; width: 260px; opacity: .9; pointer-events: none; }
+.pres-skyline { position: absolute; left: 1rem; bottom: 0; width: 330px; opacity: .55; pointer-events: none; }
 .pres-photo {
   position: relative; z-index: 1;
-  width: 215px; height: 235px; flex-shrink: 0;
-  border-radius: 20px; overflow: hidden;
+  width: 200px; height: 215px; flex-shrink: 0;
+  border-radius: 18px; overflow: hidden;
   background: linear-gradient(160deg, #dfe6f4, #c4d0e8);
-  box-shadow: 0 8px 24px rgba(13, 27, 75, .15);
+  box-shadow: 0 8px 22px rgba(13, 27, 75, .18);
 }
 .pres-photo img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
 .pres-body { position: relative; z-index: 1; flex: 1; min-width: 0; }
 .pres-pill {
-  display: inline-block; background: #e8eefb; color: #2b4a8b;
-  border-radius: 50px; padding: .3rem 1.1rem; font-size: .8rem; font-weight: 700; margin-bottom: .9rem;
+  display: inline-block; background: #d9e5f8; color: #2b4a8b;
+  border-radius: 50px; padding: .28rem 1.1rem; font-size: .78rem; font-weight: 700; margin-bottom: .7rem;
 }
-.pres-name { font-family: 'Cairo', sans-serif; font-size: 2rem; font-weight: 900; color: #14275f; line-height: 1.3; }
-.pres-title { font-size: 1.05rem; font-weight: 800; color: #14275f; margin: .35rem 0 .6rem; }
-.pres-bio { font-size: .92rem; color: #5b6475; line-height: 1.8; margin-bottom: 1.1rem; }
-.pres-contacts { display: flex; flex-wrap: wrap; gap: .5rem 1.4rem; }
+.pres-name { font-family: 'Cairo', sans-serif; font-size: 2rem; font-weight: 900; color: #14275f; line-height: 1.25; }
+.pres-title { font-size: 1.05rem; font-weight: 800; color: #14275f; margin: .3rem 0 .45rem; }
+.pres-bio { font-size: .88rem; color: #5b6475; line-height: 1.75; margin-bottom: .85rem; }
+.pres-contacts { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem 1.4rem; padding-top: .8rem; border-top: 1px solid rgba(43, 74, 139, .14); }
 .pres-contact {
-  display: inline-flex; align-items: center; gap: .4rem;
-  font-size: .82rem; font-weight: 600; color: #2b4a8b; text-decoration: none;
+  display: inline-flex; align-items: center; gap: .45rem;
+  font-size: .8rem; font-weight: 600; color: #2b4a8b; text-decoration: none;
 }
+.pres-contact svg { flex-shrink: 0; color: #4a6cb3; }
 .pres-contact:hover { color: #f9a825; }
 
 /* عنوان الأعضاء */
@@ -251,11 +253,12 @@ const boardMembers = [
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .m-contact:hover { background: #e8eefb; }
-.m-corner {
-  position: absolute; left: 0; bottom: 0; width: 46px; height: 46px;
-  background: linear-gradient(135deg, transparent 50%, #f9c846 50%);
-  border-bottom-left-radius: 18px;
-}
+.m-corner { position: absolute; left: 0; bottom: 0; width: 64px; height: 64px; pointer-events: none; }
+/* ركن ذهبي منحنٍ بطبقتين: قوس شفاف كبير + ربع دائرة متدرّج أصغر */
+.m-corner::before,
+.m-corner::after { content: ''; position: absolute; left: 0; bottom: 0; border-top-right-radius: 100%; }
+.m-corner::before { width: 64px; height: 64px; background: linear-gradient(45deg, rgba(249, 200, 70, .28), rgba(249, 200, 70, 0)); }
+.m-corner::after { width: 38px; height: 38px; background: linear-gradient(45deg, #f5a623, #f9d56a); box-shadow: 0 -2px 10px rgba(245, 166, 35, .35); }
 
 @media (max-width: 1000px) { .pres-skyline { display: none; } }
 @media (max-width: 900px) {

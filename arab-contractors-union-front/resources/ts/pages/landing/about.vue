@@ -215,8 +215,8 @@ const facts = [
 .vm-card { position: relative; overflow: hidden; isolation: isolate; display: flex; flex-direction: column; min-height: 340px; border-radius: 24px; padding: 3rem 2.75rem; box-shadow: 0 10px 30px rgba(13,27,75,.08); transition: transform .3s, box-shadow .3s; }
 .vm-card::after { content: ''; position: absolute; bottom: -90px; inset-inline-end: -90px; width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.75), transparent 70%); z-index: -1; }
 .vm-card:hover { transform: translateY(-6px); box-shadow: 0 18px 40px rgba(13,27,75,.14); }
-.vm-vision { background: linear-gradient(145deg, #f2f5fd 0%, #dde5f8 100%); border: 1px solid #c5cae9; border-inline-start: 6px solid #1a237e; }
-.vm-mission { background: linear-gradient(145deg, #fffaf0 0%, #fbe7c0 100%); border: 1px solid #f3d9a4; border-inline-start: 6px solid #e8790a; }
+.vm-vision { background: linear-gradient(145deg, #f2f5fd 0%, #dde5f8 100%); border: 1px solid #c5cae9; }
+.vm-mission { background: linear-gradient(145deg, #fffaf0 0%, #fbe7c0 100%); border: 1px solid #f3d9a4; }
 .vm-head { display: flex; align-items: center; gap: 1.1rem; margin-bottom: 1.5rem; }
 .vm-icon { width: 68px; height: 68px; border-radius: 18px; background: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 14px rgba(13,27,75,.1); }
 .vm-vision .vm-icon { color: #1a237e; }

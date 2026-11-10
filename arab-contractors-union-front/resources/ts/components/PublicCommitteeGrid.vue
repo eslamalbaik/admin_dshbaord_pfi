@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { committees } from '@/data/unionCommittees'
-import { ArrowLeft, BadgeCheck, FileText, HeartHandshake, MessageSquare, Presentation, Receipt, Scale, Truck, Users } from 'lucide-vue-next'
+import { BadgeCheck, FileText, HeartHandshake, MessageSquare, Presentation, Receipt, Scale, Truck, Users } from 'lucide-vue-next'
 
 // بنفس ترتيب اللجان في unionCommittees
 const icons = [BadgeCheck, Scale, Presentation, Users, FileText, MessageSquare, HeartHandshake, Truck, Receipt]
@@ -16,7 +16,6 @@ const icons = [BadgeCheck, Scale, Presentation, Users, FileText, MessageSquare, 
       <p class="cm-desc">{{ c.desc }}</p>
       <div class="cm-foot">
         <span class="cm-chair">رئيس اللجنة: {{ c.chair }}</span>
-        <span class="cm-arrow" aria-hidden="true"><ArrowLeft :size="16" /></span>
       </div>
     </article>
   </div>
@@ -33,7 +32,6 @@ const icons = [BadgeCheck, Scale, Presentation, Users, FileText, MessageSquare, 
 .cm-desc { margin: 0 0 1.1rem; font-size: .88rem; color: #4b5563; line-height: 1.85; }
 .cm-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding-top: .9rem; border-top: 1px solid #eef0f6; }
 .cm-chair { font-size: .82rem; font-weight: 700; color: #0d1b3e; }
-.cm-arrow { width: 34px; height: 34px; border-radius: 50%; background: #fff; border: 1px solid #e5e7eb; box-shadow: 0 2px 6px rgba(0,0,0,.08); color: #0d1b3e; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 @media (max-width: 900px) { .cm-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 640px) { .cm-grid { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .cm-card { transition: none; } .cm-card:hover { transform: none; } }

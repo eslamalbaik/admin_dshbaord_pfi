@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Search, Calendar, ChevronLeft, Filter, ExternalLink, FileText } from 'lucide-vue-next'
+import { Search, Calendar, CalendarDays, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, ArrowUpDown, Clock, Tag, ExternalLink, FileText } from 'lucide-vue-next'
 import { vHoverCard } from '@/utils/hoverCard'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
@@ -80,8 +80,9 @@ const categories = ref<string[]>([])
 const statusLabel: Record<string, string> = { open: 'مفتوحة', closed: 'مغلقة', cancelled: 'ملغاة' }
 const statusClass: Record<string, string> = { open: 'status-open', closed: 'status-closed', cancelled: 'status-closed' }
 
-const cardColors = ['#2e7d32', '#1a237e', '#e65100', '#6a1b9a', '#c62828', '#00695c']
-const colorFor = (id: number) => cardColors[id % cardColors.length]
+// تسميات وألوان شارة الحالة في بطاقات القائمة
+const cardStatusLabel: Record<string, string> = { open: 'مفتوح', closed: 'مغلق', cancelled: 'ملغى' }
+const cardStatusClass: Record<string, string> = { open: 'cs-open', closed: 'cs-closed', cancelled: 'cs-closed' }
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -182,6 +183,35 @@ function fmtDate(d: string | null) {
   return new Date(d).toLocaleDateString('ar-EG')
 }
 
+// تاريخ بأرقام لاتينية وأسماء أشهر عربية، مثل: 25 نوفمبر 2025
+function fmtLongDate(d: string | null) {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('ar-u-nu-latn', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+// الوقت يظهر فقط لو الـ deadline يحمل وقتاً فعلياً (غير منتصف الليل)
+function fmtTime(d: string | null) {
+  if (!d || !/[T ]\d{2}:\d{2}/.test(d)) return ''
+  const dt = new Date(d)
+  if (Number.isNaN(dt.getTime()) || (dt.getHours() === 0 && dt.getMinutes() === 0)) return ''
+  return dt.toLocaleTimeString('ar-u-nu-latn', { hour: '2-digit', minute: '2-digit', hour12: true })
+}
+
+// أرقام الصفحات: كلها لو قليلة، وإلا نافذة حول الصفحة الحالية مع نقاط
+const pageNumbers = computed<(number | '…')[]>(() => {
+  const last = lastPage.value
+  const cur = page.value
+  if (last <= 7) return Array.from({ length: last }, (_, i) => i + 1)
+  const out: (number | '…')[] = [1]
+  const from = Math.max(2, cur - 1)
+  const to = Math.min(last - 1, cur + 1)
+  if (from > 2) out.push('…')
+  for (let p = from; p <= to; p++) out.push(p)
+  if (to < last - 1) out.push('…')
+  out.push(last)
+  return out
+})
+
 function openTender(t: Tender) {
   router.push({ path: '/landing/public-tenders', query: { id: String(t.id) } })
 }
@@ -199,7 +229,15 @@ function openTender(t: Tender) {
       <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
 
-    <section class="pub-section">
+    <section class="pub-section tenders-section">
+      <svg class="tenders-skyline" viewBox="0 0 320 180" fill="none" aria-hidden="true">
+        <g fill="#dbe4f5">
+          <rect x="10" y="90" width="30" height="90" rx="2" /><rect x="48" y="50" width="34" height="130" rx="2" />
+          <rect x="90" y="75" width="28" height="105" rx="2" /><rect x="126" y="15" width="40" height="165" rx="2" />
+          <rect x="174" y="60" width="30" height="120" rx="2" /><rect x="212" y="95" width="32" height="85" rx="2" />
+          <rect x="252" y="115" width="30" height="65" rx="2" />
+        </g>
+      </svg>
       <div class="pub-cont">
         <div v-if="route.query.id" ref="detailEl" class="tender-detail">
           <div v-if="selectedLoading" class="detail-msg">جاري تحميل تفاصيل العطاء...</div>
@@ -248,76 +286,76 @@ function openTender(t: Tender) {
 
         <div class="tender-filters">
           <div class="search-wrap">
-            <Search :size="16" class="search-ico" />
+            <Search :size="17" class="search-ico" />
             <input v-model="searchQ" type="text" placeholder="ابحث في العطاءات..." class="search-input" />
           </div>
-          <div class="filter-row">
-            <select v-model="filterStatus" class="filter-sel">
-              <option value="">كل الحالات</option>
-              <option v-for="s in statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
-            </select>
+          <div class="sel-wrap">
             <select v-model="filterCategory" class="filter-sel">
               <option value="">كل الفئات</option>
               <option v-for="c in categories" :key="c" :value="c">{{ c }}</option>
             </select>
-            <input
-              v-model="filterUpdatedFrom"
-              type="date"
-              class="filter-sel"
-              title="آخر تحديث منذ تاريخ"
-            />
-            <select v-model="sort" class="filter-sel">
+            <Tag :size="15" class="sel-ico" />
+            <ChevronDown :size="15" class="sel-chev" />
+          </div>
+          <div class="sel-wrap">
+            <select v-model="filterStatus" class="filter-sel">
+              <option value="">حالة العطاء</option>
+              <option v-for="s in statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
+            </select>
+            <ChevronDown :size="15" class="sel-chev" />
+          </div>
+          <div class="sel-wrap" title="آخر تحديث منذ تاريخ">
+            <input v-model="filterUpdatedFrom" type="date" class="filter-sel filter-date" />
+            <CalendarDays :size="15" class="sel-ico" />
+          </div>
+          <button class="adv-btn" @click="resetFilters">
+            <SlidersHorizontal :size="16" /> إعادة تعيين
+          </button>
+        </div>
+
+        <div class="results-bar">
+          <p class="results-count">عدد النتائج ( {{ total }} )</p>
+          <label class="sort-wrap">
+            <ArrowUpDown :size="14" />
+            <span>ترتيب حسب :</span>
+            <select v-model="sort" class="sort-sel">
               <option v-for="s in sorts" :key="s.value" :value="s.value">{{ s.label }}</option>
             </select>
-            <button class="filter-reset" @click="resetFilters">
-              <Filter :size="14" /> إعادة تعيين
-            </button>
-          </div>
+          </label>
         </div>
-        <p class="results-count">{{ total }} عطاء</p>
 
         <div class="tenders-list">
-          <div
+          <article
             v-for="t in tenders"
             :key="t.id"
             v-hover-card
             class="tender-card"
-            :style="`--tc:${colorFor(t.id)}`"
           >
-            <div class="tender-color-bar" />
             <div class="tender-thumb hc-media">
               <img :src="tenderImage(t)" :alt="t.title" loading="lazy">
             </div>
             <div class="tender-body">
-              <div class="tender-top">
-                <div>
-                  <div class="tender-meta-top">
-                    <span class="tender-ref">PCU-{{ t.id }}</span>
-                    <span
-                      v-if="t.category"
-                      class="tender-sector"
-                      :style="`background:${colorFor(t.id)}15;color:${colorFor(t.id)};border-color:${colorFor(t.id)}40`"
-                    >{{ t.category }}</span>
-                    <span class="tender-status" :class="statusClass[t.status]">{{ statusLabel[t.status] ?? t.status }}</span>
-                    <span v-if="t.closing_soon" class="tender-status status-closing">ينتهي قريباً</span>
-                  </div>
-                  <h3 class="tender-title hc-title">{{ t.title }}</h3>
-                </div>
+              <div class="tender-headline">
+                <h3 class="tender-title hc-title">{{ t.title }}</h3>
+                <span class="card-status" :class="cardStatusClass[t.status]"><i />{{ cardStatusLabel[t.status] ?? t.status }}</span>
+                <span v-if="t.closing_soon" class="card-status cs-soon"><i />ينتهي قريباً</span>
               </div>
-              <div class="tender-info">
-                <span><Calendar :size="13" /> تاريخ النشر: {{ fmtDate(t.published_at) }}</span>
-                <span><Calendar :size="13" /> آخر موعد: {{ fmtDate(t.deadline) }}</span>
-                <span><Calendar :size="13" /> آخر تحديث: {{ fmtDate(t.updated_at) }}</span>
+              <div class="tender-facts">
+                <span class="fact"><Calendar :size="15" /> {{ t.status === 'open' ? 'ينتهي في' : 'انتهى في' }} {{ fmtLongDate(t.deadline) }}</span>
+                <template v-if="fmtTime(t.deadline)">
+                  <span class="fact-sep" />
+                  <span class="fact"><Clock :size="15" /> {{ fmtTime(t.deadline) }}</span>
+                </template>
+                <template v-if="t.category">
+                  <span class="fact-sep" />
+                  <span class="fact"><Tag :size="15" /> {{ t.category }}</span>
+                </template>
               </div>
             </div>
-            <button
-              class="tender-btn"
-              :style="`background:${colorFor(t.id)}`"
-              @click="openTender(t)"
-            >
+            <button class="tender-btn" @click="openTender(t)">
               عرض التفاصيل <ChevronLeft :size="14" class="hc-arrow" />
             </button>
-          </div>
+          </article>
         </div>
 
         <div v-if="!loading && !tenders.length" class="empty-state">
@@ -325,15 +363,14 @@ function openTender(t: Tender) {
           <p>لا توجد عطاءات مطابقة</p>
         </div>
 
-        <div v-if="lastPage > 1" class="filter-row" style="justify-content: center; margin-top: 2rem;">
-          <button class="filter-reset" :disabled="page <= 1" @click="page--">
-            السابق
-          </button>
-          <span class="results-count" style="margin: 0; align-self: center;">صفحة {{ page }} من {{ lastPage }}</span>
-          <button class="filter-reset" :disabled="page >= lastPage" @click="page++">
-            التالي
-          </button>
-        </div>
+        <nav v-if="lastPage > 1" class="pager" aria-label="التنقل بين الصفحات">
+          <button class="pg-btn" :disabled="page <= 1" aria-label="السابق" @click="page--"><ChevronRight :size="16" /></button>
+          <template v-for="(n, i) in pageNumbers" :key="i">
+            <span v-if="n === '…'" class="pg-dots">…</span>
+            <button v-else class="pg-btn pg-num" :class="{ active: n === page }" @click="page = n">{{ n }}</button>
+          </template>
+          <button class="pg-btn" :disabled="page >= lastPage" aria-label="التالي" @click="page++"><ChevronLeft :size="16" /></button>
+        </nav>
       </div>
     </section>
 
@@ -357,23 +394,63 @@ function openTender(t: Tender) {
 .page-hero-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: clamp(2rem,4vw,3rem); font-weight: 900; color: #fff; margin-bottom: .75rem; }
 .page-hero-desc { font-size: 1rem; color: rgba(255,255,255,.75); line-height: 1.75; max-width: 600px; }
 
-.tender-filters { background: #f9fafb; border: 1.5px solid #e5e7eb; border-radius: 16px; padding: 1.5rem; margin-bottom: 2rem; display: flex; flex-direction: column; gap: 1rem; }
-.search-wrap { position: relative; }
-.search-ico { position: absolute; top: 50%; right: 1rem; transform: translateY(-50%); color: #9ca3af; }
-.search-input { width: 100%; border: 1.5px solid #e5e7eb; border-radius: 10px; padding: .75rem 2.75rem .75rem 1rem; font-size: .9rem; font-family: 'Tajawal', sans-serif; color: #374151; background: #fff; outline: none; transition: border-color .2s; }
+.tenders-section { position: relative; overflow: hidden; background: linear-gradient(180deg, #f3f6fc 0%, #fbfcfe 100%); }
+.tenders-section > .pub-cont { position: relative; z-index: 1; }
+.tenders-skyline { position: absolute; left: 0; bottom: 0; width: 340px; opacity: .8; pointer-events: none; }
+
+/* الفلاتر: شريط أبيض واحد بعناصر دائرية */
+.tender-filters { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; background: #fff; border-radius: 20px; padding: .8rem 1rem; margin-bottom: 1.5rem; box-shadow: 0 8px 28px rgba(26, 35, 126, .08); }
+.search-wrap { position: relative; flex: 1.6 1 240px; }
+.search-ico { position: absolute; top: 50%; left: 1rem; transform: translateY(-50%); color: #1a237e; pointer-events: none; }
+.search-input { width: 100%; border: 1.5px solid #e5e9f2; border-radius: 50px; padding: .65rem 1.1rem .65rem 2.8rem; font-size: .88rem; font-family: 'Tajawal', sans-serif; color: #374151; background: #fff; outline: none; transition: border-color .2s; }
 .search-input:focus { border-color: #1a237e; }
-.filter-row { display: flex; gap: .875rem; flex-wrap: wrap; }
-.filter-sel { border: 1.5px solid #e5e7eb; border-radius: 9px; padding: .55rem 1rem; font-size: .85rem; font-family: 'Tajawal', sans-serif; color: #374151; background: #fff; outline: none; cursor: pointer; }
+.sel-wrap { position: relative; flex: 1 1 150px; }
+.filter-sel { width: 100%; appearance: none; -webkit-appearance: none; border: 1.5px solid #e5e9f2; border-radius: 50px; padding: .65rem 2.4rem .65rem 2.2rem; font-size: .85rem; font-family: 'Tajawal', sans-serif; color: #374151; background: #fff; outline: none; cursor: pointer; transition: border-color .2s; }
 .filter-sel:focus { border-color: #1a237e; }
+.filter-date { padding-left: 2.2rem; }
+.sel-ico { position: absolute; top: 50%; right: .9rem; transform: translateY(-50%); color: #6b7280; pointer-events: none; }
+.sel-chev { position: absolute; top: 50%; left: .9rem; transform: translateY(-50%); color: #6b7280; pointer-events: none; }
+.sel-wrap:has(.filter-date) .sel-ico { right: auto; left: .9rem; }
+.adv-btn { display: inline-flex; align-items: center; justify-content: center; gap: .45rem; background: linear-gradient(145deg, #1a237e, #0d1b4b); color: #fff; border: none; border-radius: 50px; padding: .7rem 1.5rem; font-size: .85rem; font-weight: 700; font-family: 'Tajawal', sans-serif; cursor: pointer; white-space: nowrap; box-shadow: 0 6px 16px rgba(13, 27, 75, .3); transition: transform .2s, filter .2s; }
+.adv-btn:hover { transform: translateY(-1px); filter: brightness(1.12); }
 .filter-reset { display: flex; align-items: center; gap: .4rem; background: #e8eaf6; color: #1a237e; border: 1.5px solid #c5cae9; border-radius: 9px; padding: .55rem 1rem; font-size: .83rem; font-weight: 600; cursor: pointer; font-family: 'Tajawal', sans-serif; }
 .filter-reset:hover { background: #1a237e; color: #fff; }
-.results-count { font-size: .85rem; color: #9ca3af; margin-bottom: 1.25rem; }
 
-.tenders-list { display: flex; flex-direction: column; gap: 1.25rem; }
-.tender-card { display: flex; gap: 1.5rem; align-items: center; background: #fff; border: 1.5px solid #e5e7eb; border-radius: 16px; overflow: hidden; }
-.tender-color-bar { width: 6px; background: var(--tc); flex-shrink: 0; align-self: stretch; }
-.tender-body { flex: 1; min-width: 0; padding: 1.25rem 0; }
-.tender-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: .875rem; }
+.results-bar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 0 .5rem 1rem; }
+.results-count { font-size: .85rem; font-weight: 700; color: #374151; }
+.sort-wrap { display: inline-flex; align-items: center; gap: .4rem; font-size: .82rem; color: #374151; font-weight: 600; }
+.sort-sel { border: none; background: transparent; font-size: .82rem; font-weight: 700; font-family: 'Tajawal', sans-serif; color: #1a237e; cursor: pointer; outline: none; }
+
+/* بطاقات العطاءات */
+.tenders-list { display: flex; flex-direction: column; gap: .9rem; }
+.tender-card { display: flex; gap: 1.1rem; align-items: center; background: #fff; border-radius: 16px; padding: .7rem .9rem; box-shadow: 0 5px 20px rgba(26, 35, 126, .07); transition: transform .25s, box-shadow .25s; }
+.tender-card:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(26, 35, 126, .13); }
+.tender-thumb { width: 118px; height: 82px; flex-shrink: 0; border-radius: 12px; overflow: hidden; background: #eef2fa; }
+.tender-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tender-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .7rem; }
+.tender-headline { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.tender-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 1.05rem; font-weight: 800; color: #14275f; line-height: 1.5; }
+.card-status { display: inline-flex; align-items: center; gap: .4rem; font-size: .75rem; font-weight: 700; border-radius: 50px; padding: .15rem .75rem; }
+.card-status i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.cs-open { background: #e3f5e6; color: #2e7d32; }
+.cs-closed { background: #fde6e6; color: #d32f2f; }
+.cs-soon { background: #fff1de; color: #ef6c00; }
+.tender-facts { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem 0; }
+.fact { display: inline-flex; align-items: center; gap: .4rem; font-size: .8rem; color: #4b5563; }
+.fact svg { color: #6b7280; }
+.fact-sep { width: 1px; height: 14px; background: #d5dae6; margin: 0 .9rem; }
+.tender-btn { display: inline-flex; align-items: center; gap: .4rem; border: none; border-radius: 50px; padding: .65rem 1.4rem; font-size: .83rem; font-weight: 700; color: #fff; background: linear-gradient(145deg, #1a237e, #0d1b4b); cursor: pointer; font-family: 'Tajawal', sans-serif; transition: transform .2s, filter .2s; white-space: nowrap; flex-shrink: 0; box-shadow: 0 5px 14px rgba(13, 27, 75, .28); }
+.tender-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+
+/* التقسيم */
+.pager { display: flex; align-items: center; justify-content: center; gap: .55rem; margin-top: 2rem; }
+.pg-btn { width: 38px; height: 38px; border-radius: 50%; border: 1.5px solid #e1e6f1; background: #fff; color: #14275f; font-size: .85rem; font-weight: 700; font-family: 'Tajawal', sans-serif; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: all .2s; }
+.pg-btn:hover:not(:disabled) { border-color: #1a237e; }
+.pg-btn:disabled { opacity: .45; cursor: not-allowed; }
+.pg-num.active { background: #1a237e; border-color: #1a237e; color: #fff; box-shadow: 0 5px 14px rgba(26, 35, 126, .3); }
+.pg-dots { color: #9ca3af; padding: 0 .2rem; }
+
+/* عناصر مشتركة مع لوحة تفاصيل العطاء */
 .tender-meta-top { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .5rem; align-items: center; }
 .tender-ref { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: .75rem; font-weight: 800; color: #9ca3af; letter-spacing: .02em; }
 .tender-sector { font-size: .75rem; font-weight: 700; border: 1px solid; border-radius: 50px; padding: .15rem .65rem; }
@@ -381,20 +458,14 @@ function openTender(t: Tender) {
 .status-open    { background: #e8f5e9; color: #2e7d32; }
 .status-closing { background: #fff8e1; color: #e65100; }
 .status-closed  { background: #f3f4f6; color: #9ca3af; }
-.tender-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 1rem; font-weight: 800; color: #0d1b3e; line-height: 1.5; }
 .tender-info { display: flex; gap: 1.25rem; flex-wrap: wrap; }
 .tender-info span { display: flex; align-items: center; gap: .35rem; font-size: .8rem; color: #6b7280; }
-.tender-pub { background: #f3f4f6; border-radius: 50px; padding: .15rem .65rem; }
-.tender-btn { display: flex; align-items: center; gap: .4rem; border: none; border-radius: 10px; margin: 1rem 1.25rem 1rem 0; padding: .65rem 1.25rem; font-size: .83rem; font-weight: 700; color: #fff; cursor: pointer; font-family: 'Tajawal', sans-serif; transition: all .2s; white-space: nowrap; flex-shrink: 0; }
-.tender-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
 .tender-details { margin-top: .75rem; padding-top: .75rem; border-top: 1px dashed #e5e7eb; font-size: .85rem; color: #6b7280; line-height: 1.8; }
 .tender-details a { color: #1a237e; display: inline-flex; align-items: center; gap: .3rem; }
 .tender-attachments { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
 .tender-attachment { display: flex; align-items: center; gap: .4rem; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 8px; padding: .3rem .6rem; font-size: .78rem; color: #1a237e; text-decoration: none; }
 .tender-attachment:hover { background: #e8eaf6; }
 .tender-attachment-img { width: 18px; height: 18px; object-fit: cover; border-radius: 4px; }
-.tender-thumb { width: 180px; flex-shrink: 0; align-self: stretch; min-height: 120px; }
-.tender-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .tender-detail { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); background: #fff; border: 1.5px solid #e5e7eb; border-radius: 18px; overflow: hidden; margin-bottom: 2.5rem; box-shadow: 0 10px 30px rgba(13, 27, 75, .08); scroll-margin-top: calc(var(--pub-nav-h, 114px) + 1rem); }
 .detail-msg { grid-column: 1 / -1; text-align: center; padding: 3rem 1.5rem; color: #6b7280; display: flex; flex-direction: column; align-items: center; }
 .detail-img { min-height: 260px; }
@@ -412,5 +483,12 @@ function openTender(t: Tender) {
 .empty-state { text-align: center; padding: 4rem 2rem; color: #9ca3af; }
 .empty-state p { font-size: 1rem; margin-top: 1rem; }
 
-@media (max-width: 700px) { .tender-card { flex-wrap: wrap; } .tender-color-bar { width: 100%; height: 5px; align-self: auto; } .tender-btn { margin: 0 1rem 1rem; width: calc(100% - 2rem); justify-content: center; } .tender-top { flex-direction: column; } .tender-thumb { width: 100%; height: 170px; min-height: 0; } .tender-body { padding: 0 1rem; flex-basis: 100%; } .tender-card { gap: .9rem; } }
+@media (max-width: 760px) {
+  .tender-card { flex-wrap: wrap; }
+  .tender-thumb { width: 100%; height: 160px; }
+  .tender-body { flex-basis: 100%; }
+  .tender-btn { width: 100%; justify-content: center; }
+  .adv-btn { width: 100%; }
+  .tenders-skyline { display: none; }
+}
 </style>
