@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Check, Star, Lightbulb, Shield, Users, Target, Award, Globe, TrendingUp } from 'lucide-vue-next'
+import { Award, Check, GraduationCap, Handshake, Scale, ShieldCheck, Star, Target, Users } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
@@ -15,12 +15,12 @@ const timeline = [
 ]
 
 const values = [
-  { icon: Shield,     title: 'النزاهة والشفافية',   desc: 'نتعامل بمنتهى الشفافية مع أعضائنا والجهات الرسمية', color: '#1a237e', bg: '#e8eaf6' },
-  { icon: Users,      title: 'الانتماء والوحدة',     desc: 'نحن صوت واحد موحّد يمثل جميع المقاولين الفلسطينيين', color: '#c62828', bg: '#fce4ec' },
-  { icon: Target,     title: 'الاحترافية والجودة',   desc: 'نسعى دائماً لرفع معايير الجودة في قطاع المقاولات', color: '#e65100', bg: '#fff8e1' },
-  { icon: Globe,      title: 'الانفتاح والشراكة',    desc: 'نبني شراكات استراتيجية مع المؤسسات المحلية والدولية', color: '#2e7d32', bg: '#e8f5e9' },
-  { icon: Lightbulb,  title: 'الابتكار والتطوير',    desc: 'نتبنى الحلول المبتكرة لتطوير بيئة المقاولات الفلسطينية', color: '#6a1b9a', bg: '#f3e5f5' },
-  { icon: TrendingUp, title: 'التنمية المستدامة',    desc: 'نسعى لبناء قطاع مقاولات متوازن ومستدام للأجيال القادمة', color: '#00695c', bg: '#e0f2f1' },
+  { num: '٠١', icon: ShieldCheck,   title: 'النزاهة والشفافية',    desc: 'يلتزم الاتحاد بتطبيق أعلى معايير النزاهة والشفافية في جميع معاملاته، مما يعزز الثقة والمصداقية في عمله.' },
+  { num: '٠٢', icon: Award,         title: 'الجودة والتميز',       desc: 'يسعى الاتحاد إلى تحقيق أعلى مستويات الجودة في قطاع المقاولات، من خلال تشجيع التميز والابتكار في تنفيذ المشاريع.' },
+  { num: '٠٣', icon: Users,         title: 'المسؤولية المجتمعية',  desc: 'يؤمن الاتحاد بدوره في دعم المجتمع الفلسطيني والمساهمة في تنمية المجتمع وتحقيق الصالح العام.' },
+  { num: '٠٤', icon: Handshake,     title: 'التعاون والشراكة',     desc: 'يعزز الاتحاد ثقافة التعاون والشراكة مع الجهات الحكومية والخاصة، بما يسهم في بناء بيئة عمل متكاملة ومثمرة.' },
+  { num: '٠٥', icon: GraduationCap, title: 'الاحترافية والمهنية',  desc: 'يركز الاتحاد على رفع مستوى الاحترافية والمهنية بين أعضائه، من خلال توفير برامج تدريبية وتطويرية مستمرة.' },
+  { num: '٠٦', icon: Scale,         title: 'العدالة والمساواة',    desc: 'يضمن الاتحاد تحقيق مبدأ العدالة والمساواة بين جميع أعضائه، مع توفير فرص متكافئة للجميع دون أي تمييز.' },
 ]
 
 const achievements = [
@@ -116,18 +116,25 @@ const achievements = [
     </section>
 
     <!-- Values -->
-    <section class="pub-section">
-      <div class="pub-cont">
+    <section class="pub-section values-sec">
+      <div class="values-shapes">
+        <div class="ph-s vs-s1" /><div class="ph-s vs-s2" />
+      </div>
+      <div class="pub-cont values-inner">
         <div class="pub-sec-header-c">
-          <div class="pub-sec-label">القيم</div>
-          <h2 class="pub-sec-h center">قيمنا المؤسسية</h2>
+          <div class="pub-sec-label values-label">القيم</div>
+          <h2 class="pub-sec-h center values-h">قيمنا المؤسسية</h2>
+          <p class="values-lead">ستّ قيم تحكم عمل الاتحاد وعلاقته بأعضائه وشركائه</p>
         </div>
         <div class="values-grid">
-          <div v-for="v in values" :key="v.title" class="value-card" :style="`--vc:${v.color};--vbg:${v.bg}`">
-            <div class="value-icon"><component :is="v.icon" :size="26" /></div>
+          <article v-for="v in values" :key="v.title" class="value-card">
+            <div class="value-head">
+              <div class="value-icon"><component :is="v.icon" :size="24" /></div>
+              <span class="value-num" aria-hidden="true">{{ v.num }}</span>
+            </div>
             <h3 class="value-title">{{ v.title }}</h3>
             <p class="value-desc">{{ v.desc }}</p>
-          </div>
+          </article>
         </div>
       </div>
     </section>
@@ -209,12 +216,29 @@ const achievements = [
 .vm-list li::before { content: '•'; color: #2e7d32; margin-inline-end: .5rem; font-weight: 900; }
 
 /* Values */
-.values-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
-.value-card { background: var(--vbg); border: 1.5px solid var(--vc); border-top: 4px solid var(--vc); border-radius: 16px; padding: 1.75rem; transition: transform .25s, box-shadow .25s; }
-.value-card:hover { transform: translateY(-5px); box-shadow: 0 10px 28px rgba(0,0,0,.1); }
-.value-icon { width: 54px; height: 54px; border-radius: 14px; background: rgba(255,255,255,.6); border: 1.5px solid var(--vc); color: var(--vc); display: flex; align-items: center; justify-content: center; margin-bottom: 1rem; }
-.value-title { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: .95rem; font-weight: 800; color: #0d1b3e; margin-bottom: .4rem; }
-.value-desc { font-size: .83rem; color: #6b7280; line-height: 1.75; }
+.values-sec { background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); position: relative; overflow: hidden; }
+.values-shapes { position: absolute; inset: 0; pointer-events: none; }
+.vs-s1 { width: 460px; height: 460px; background: radial-gradient(circle, rgba(249,168,37,.14), transparent 65%); top: -160px; right: -80px; }
+.vs-s2 { width: 380px; height: 380px; background: radial-gradient(circle, rgba(255,255,255,.06), transparent 65%); bottom: -140px; left: -60px; }
+.values-inner { position: relative; z-index: 1; }
+.values-label { background: rgba(249,168,37,.12); color: #f9a825; border-color: rgba(249,168,37,.35); }
+.values-h { color: #fff; }
+.values-lead { color: rgba(255,255,255,.7); font-size: .97rem; line-height: 1.8; margin-top: .9rem; }
+.values-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
+.value-card { position: relative; overflow: hidden; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); border-radius: 18px; padding: 1.75rem; transition: transform .25s, background .25s, border-color .25s, box-shadow .25s; }
+.value-card::before { content: ''; position: absolute; top: 0; inset-inline-start: 0; width: 48px; height: 3px; background: linear-gradient(90deg,#f9a825,#e65100); transition: width .35s; }
+.value-card:hover { transform: translateY(-5px); background: rgba(255,255,255,.1); border-color: rgba(249,168,37,.45); box-shadow: 0 16px 36px rgba(0,0,0,.25); }
+.value-card:hover::before { width: 100%; }
+.value-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+.value-icon { width: 52px; height: 52px; border-radius: 14px; background: rgba(249,168,37,.14); border: 1px solid rgba(249,168,37,.3); color: #f9a825; display: flex; align-items: center; justify-content: center; transition: background .25s, color .25s; }
+.value-card:hover .value-icon { background: #f9a825; color: #0d1b3e; }
+.value-num { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: 2.2rem; font-weight: 900; line-height: 1; color: rgba(255,255,255,.16); }
+.value-title { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: 1.08rem; font-weight: 800; color: #fff; margin-bottom: .5rem; }
+.value-desc { font-size: .88rem; color: rgba(255,255,255,.72); line-height: 1.85; }
+@media (prefers-reduced-motion: reduce) {
+  .value-card, .value-card::before, .value-icon { transition: none; }
+  .value-card:hover { transform: none; }
+}
 
 /* Timeline */
 .timeline { position: relative; max-width: 860px; margin: 0 auto; }
