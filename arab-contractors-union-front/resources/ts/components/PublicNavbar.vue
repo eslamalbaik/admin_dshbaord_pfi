@@ -53,7 +53,14 @@ const navLinks = [
     children: [
       { label: 'الأخبار', href: '/landing/news' },
       { label: 'الفعاليات', href: '/landing/events' },
-      { label: 'المشاريع والمعارض', href: '/landing/projects' },
+    ],
+  },
+  {
+    label: 'اجتماعيات', href: '#',
+    children: [
+      { label: 'تعازي', href: '/landing/condolences' },
+      { label: 'تهاني', href: '/landing/congratulations' },
+      { label: 'شهداء المهنة', href: '/landing/martyrs' },
     ],
   },
   { label: 'تواصل معنا', href: '/landing/contact-us' },
