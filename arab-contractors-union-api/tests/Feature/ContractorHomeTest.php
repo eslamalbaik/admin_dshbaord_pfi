@@ -627,4 +627,41 @@ class ContractorHomeTest extends TestCase
     }
 
     // Address fields are tested via integration tests (verified via manual testing)
+
+    public function test_subscription_returns_same_financial_object_as_home(): void
+    {
+        $contractor = $this->createContractor();
+
+        ContractorDue::create([
+            'contractor_id' => $contractor->id,
+            'description'   => 'رسوم اشتراك 2024',
+            'amount_jod'    => 100,
+            'paid_jod'      => 40,
+            'status'        => 'partially_paid',
+        ]);
+        Payment::create([
+            'contractor_id' => $contractor->id,
+            'amount'        => 50,
+            'status'        => 'pending',
+        ]);
+        Penalty::create([
+            'contractor_id' => $contractor->id,
+            'reason'        => 'تأخير سداد',
+            'amount'        => 20,
+            'status'        => 'unpaid',
+        ]);
+
+        Sanctum::actingAs($contractor, ['*']);
+        $homeFinancial = $this->getJson('/api/v1/contractor/home')->json('items.financial');
+        $subscription  = $this->getJson('/api/v1/contractor/subscription')->assertOk()->json('items');
+
+        // حقول حالة العضوية القديمة باقية متل ما هي
+        foreach (['badge', 'expires_at', 'expiring_soon', 'days_remaining', 'can_renew', 'renewal_blockers', 'outstanding_total_jod'] as $key) {
+            $this->assertArrayHasKey($key, $subscription);
+        }
+
+        $this->assertSame($homeFinancial, $subscription['financial']);
+        $this->assertEquals('80.00', $subscription['financial']['balance']);
+        $this->assertEquals('owes', $subscription['financial']['position']);
+    }
 }

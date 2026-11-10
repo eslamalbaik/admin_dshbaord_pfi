@@ -2002,40 +2002,7 @@
                               }
                             },
                             "financial": {
-                              "type": "object",
-                              "properties": {
-                                "balance": {
-                                  "type": "string",
-                                  "description": "Total obligations in JOD (dues + unpaid penalties + pending payments), 2 decimals.",
-                                  "example": "150.00"
-                                },
-                                "has_overdue": {
-                                  "type": "boolean"
-                                },
-                                "last_invoice": {
-                                  "type": "object",
-                                  "nullable": true,
-                                  "properties": {
-                                    "id": {
-                                      "type": "integer"
-                                    },
-                                    "description": {
-                                      "type": "string"
-                                    },
-                                    "amount_jod": {
-                                      "type": "number"
-                                    },
-                                    "status": {
-                                      "$ref": "#/components/schemas/DueStatus"
-                                    },
-                                    "due_date": {
-                                      "type": "string",
-                                      "format": "date",
-                                      "nullable": true
-                                    }
-                                  }
-                                }
-                              }
+                              "$ref": "#/components/schemas/HomeFinancial"
                             },
                             "stats": {
                               "type": "object",
@@ -2293,7 +2260,7 @@
           "Membership & Finance"
         ],
         "summary": "Subscription (membership) status object",
-        "description": "Single reusable object for membership state. Memberships end on 31 December of each year.",
+        "description": "Single reusable object for membership state. Memberships end on 31 December of each year.\n\nAlso returns `financial`: exactly the same object as `GET /contractor/home` → `items.financial` (see HomeFinancial).",
         "operationId": "getSubscription",
         "responses": {
           "200": {
@@ -8497,6 +8464,9 @@
           },
           "outstanding_total_jod": {
             "type": "number"
+          },
+          "financial": {
+            "$ref": "#/components/schemas/HomeFinancial"
           }
         }
       },
@@ -9936,6 +9906,86 @@
           "created_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "HomeFinancial": {
+        "type": "object",
+        "description": "Same object in GET /contractor/home (items.financial) and GET /contractor/subscription (items.financial), built by the same server function.",
+        "properties": {
+          "balance": {
+            "type": "string",
+            "description": "Amount still owed after credit and previous payments, 2 decimals (\"0.00\" when nothing is owed).",
+            "example": "80.00"
+          },
+          "amount_due_jod": {
+            "type": "number",
+            "description": "Same as balance, as a number.",
+            "example": 80
+          },
+          "net_jod": {
+            "type": "number",
+            "description": "Signed net: positive = contractor has credit, negative = contractor owes.",
+            "example": -80
+          },
+          "credit_jod": {
+            "type": "number",
+            "description": "Available credit in JOD.",
+            "example": 0
+          },
+          "dues_jod": {
+            "type": "number",
+            "description": "Open dues in JOD.",
+            "example": 60
+          },
+          "penalties_jod": {
+            "type": "number",
+            "description": "Open penalties in JOD.",
+            "example": 20
+          },
+          "position": {
+            "type": "string",
+            "enum": [
+              "owes",
+              "credit",
+              "settled"
+            ],
+            "example": "owes"
+          },
+          "currency": {
+            "type": "string",
+            "example": "JOD"
+          },
+          "pending_payments_jod": {
+            "type": "number",
+            "description": "Transfers still under review (not counted in the balance).",
+            "example": 50
+          },
+          "has_overdue": {
+            "type": "boolean"
+          },
+          "last_invoice": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "description": {
+                "type": "string"
+              },
+              "amount_jod": {
+                "type": "number"
+              },
+              "status": {
+                "$ref": "#/components/schemas/DueStatus"
+              },
+              "due_date": {
+                "type": "string",
+                "format": "date",
+                "nullable": true
+              }
+            }
           }
         }
       }
