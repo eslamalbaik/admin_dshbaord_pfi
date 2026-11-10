@@ -97,12 +97,12 @@ const sections = computed(() => data.value ?? [])
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 .pub-page { font-family: 'Neo Sans Arabic', 'Tajawal', 'Cairo', sans-serif; direction: rtl; color: #374151; background: #fff; }
 .pub-cont { max-width: 1240px; margin: 0 auto; padding: 0 1.5rem; }
-.page-hero { background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); padding: 4rem 0 3rem; position: relative; overflow: hidden; }
+.page-hero { background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); padding: 6rem 0 5rem; position: relative; overflow: hidden; }
 .page-hero-shapes { position: absolute; inset: 0; pointer-events: none; }
 .ph-s { position: absolute; border-radius: 50%; }
 .ph-s1 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(249,168,37,.12), transparent 65%); top: -100px; left: 5%; }
 .page-hero-inner { position: relative; z-index: 2; }
-.page-breadcrumb { display: flex; align-items: center; gap: .5rem; font-size: .82rem; color: rgba(255,255,255,.6); margin-bottom: 1rem; }
+.page-breadcrumb { display: flex; align-items: center; gap: .5rem; font-size: .82rem; color: rgba(255,255,255,.6); margin-bottom: 1.5rem; }
 .page-breadcrumb a { color: rgba(255,255,255,.6); text-decoration: none; }
 .page-hero-title { font-family: 'Neo Sans Arabic', 'Cairo', sans-serif; font-size: clamp(2rem,4vw,3rem); font-weight: 900; color: #fff; margin-bottom: .5rem; }
 .page-hero-desc { font-size: .9rem; color: rgba(255,255,255,.6); }
