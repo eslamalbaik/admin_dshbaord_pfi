@@ -79,15 +79,24 @@ import PublicFooter from '@/components/PublicFooter.vue'
 .lp-layout .lp-page .vp-hero::before { display: none; }
 .lp-layout .lp-page .page-hero-shapes,
 .lp-layout .lp-page .vp-hero-glow { display: none; }
-.lp-layout .lp-page .page-hero { padding-bottom: 4rem; min-height: calc(var(--pub-nav-h, 125px) + 360px); }
-.lp-layout .lp-page .page-header { padding-bottom: 4rem; min-height: calc(var(--pub-nav-h, 125px) + 360px); }
-.lp-layout .lp-page .vp-hero { padding-bottom: 5.5rem; }
+.lp-layout .lp-page .page-hero { padding-bottom: 3rem; min-height: calc(var(--pub-nav-h, 125px) + 290px); }
+.lp-layout .lp-page .page-header { padding-bottom: 3rem; min-height: calc(var(--pub-nav-h, 125px) + 290px); }
+.lp-layout .lp-page .vp-hero { padding-bottom: 4rem; }
+/* hero content is centered, both across and down the (shorter) banner */
+.lp-layout .lp-page .page-hero,
+.lp-layout .lp-page .page-header,
+.lp-layout .lp-page .vp-hero { display: flex; flex-direction: column; justify-content: center; text-align: center; }
+.lp-layout .lp-page .page-hero-inner,
+.lp-layout .lp-page .page-header > .container,
+.lp-layout .lp-page .vp-hero-inner { width: 100%; }
+.lp-layout .lp-page .page-breadcrumb { justify-content: center; }
+.lp-layout .lp-page .page-hero-desc { margin-inline: auto; }
 /* titles on the news/events header were navy-on-light */
 .lp-layout .lp-page .page-header .page-title { color: #fff; text-shadow: 0 3px 18px rgba(0, 0, 40, .45); }
-.lp-layout .lp-page .page-header .page-desc { color: rgba(255, 255, 255, .86); margin-inline: 0; max-width: 600px; }
-.lp-layout .lp-page .vp-hero-inner { text-align: start; align-items: flex-start; }
-.lp-layout .lp-page .vp-crumb { justify-content: flex-start; }
-.lp-layout .lp-page .vp-sub { margin-inline: 0; }
+.lp-layout .lp-page .page-header .page-desc { color: rgba(255, 255, 255, .86); margin-inline: auto; max-width: 600px; }
+.lp-layout .lp-page .vp-hero-inner { text-align: center; align-items: center; }
+.lp-layout .lp-page .vp-crumb { justify-content: center; }
+.lp-layout .lp-page .vp-sub { margin-inline: auto; }
 @media (max-width: 760px) {
   .lp-layout .lp-page .page-hero,
   .lp-layout .lp-page .page-header,
@@ -98,7 +107,7 @@ import PublicFooter from '@/components/PublicFooter.vue'
     background-position: 62% center;
   }
   .lp-layout .lp-page .page-hero,
-  .lp-layout .lp-page .page-header { padding-bottom: 3rem; min-height: calc(var(--pub-nav-h, 125px) + 270px); }
+  .lp-layout .lp-page .page-header { padding-bottom: 2.5rem; min-height: calc(var(--pub-nav-h, 125px) + 230px); }
 }
 
 /* follow-us block: opposite the page title (left in RTL) on wide screens, below the title otherwise */
