@@ -316,10 +316,33 @@ class CertificateRequestController extends Controller
 
         $serial = 'MC-' . str_pad((string) $certificateRequest->id, 6, '0', STR_PAD_LEFT) . ($english ? '-en' : '');
 
+        // dl=1 (جزء من الرابط الموقَّع) = تحميل كملف بدل العرض بالمتصفح
+        $disposition = $request->query('dl') === '1' ? 'attachment' : 'inline';
+
         return Storage::disk('public')->response($path, "{$serial}.pdf", [
-            'Content-Type'  => 'application/pdf',
-            'Cache-Control' => 'no-store',
-        ]);
+            'Content-Type'            => 'application/pdf',
+            'Cache-Control'           => 'no-store',
+            // بينعرض داخل iframe بلوحة التحكم وصفحة التحقق العامة بس
+            'Content-Security-Policy' => 'frame-ancestors ' . $this->frameAncestors(),
+        ], $disposition);
+    }
+
+    /** مواقع الواجهة المسموح لها تعرض ملف الشهادة بـ iframe */
+    private function frameAncestors(): string
+    {
+        $origins = collect([config('app.frontend_url'), config('app.certificate_verify_url')])
+            ->filter()
+            ->map(function ($url) {
+                $p = parse_url((string) $url);
+
+                return isset($p['scheme'], $p['host'])
+                    ? $p['scheme'] . '://' . $p['host'] . (isset($p['port']) ? ':' . $p['port'] : '')
+                    : null;
+            })
+            ->filter()
+            ->unique();
+
+        return trim("'self' " . $origins->implode(' '));
     }
 
     /**

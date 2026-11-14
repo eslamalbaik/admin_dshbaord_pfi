@@ -14,6 +14,8 @@ import {
   ClipboardCheck,
   FileText,
   Hash,
+  Download,
+  ExternalLink,
   IdCard,
   Languages,
   Link2,
@@ -41,6 +43,10 @@ interface VerifyResult {
   issued_at?: string | null
   valid_until?: string | null
   revoked_at?: string | null
+  certificate_url?: string | null
+  certificate_url_en?: string | null
+  download_url?: string | null
+  download_url_en?: string | null
 }
 
 const route = useRoute()
@@ -78,6 +84,8 @@ const I18N = {
     s1t: 'امسح الرمز أو انسخ الرقم', s1d: 'على كل شهادة رمز QR ورقم تسلسلي أسفلها. الماسح يفتح هذه الصفحة ويتحقق فوراً.',
     s2t: 'ابحث في سجل الاتحاد', s2d: 'نقرأ الرقم من قاعدة بيانات الاتحاد مباشرة دون أي بيانات مخزّنة مؤقتاً.',
     s3t: 'اعرف حالة الشهادة', s3d: 'سارية، منتهية، ملغاة أو غير موجودة، مع بيانات الشركة وتاريخَي الإصدار والانتهاء.',
+    certTitle: 'الشهادة', download: 'تحميل الشهادة', downloadEn: 'تحميل النسخة الإنجليزية', openTab: 'فتح بتبويب جديد',
+    certNote: 'رابط العرض والتحميل صالح لمدة ساعتين — أعد التحقق للحصول على رابط جديد.',
     switchLang: 'English', logoAlt: 'اتحاد المقاولين الفلسطينيين', membershipType: 'شهادة عضوية',
   },
   en: {
@@ -99,6 +107,8 @@ const I18N = {
     s1t: 'Scan the code or copy the number', s1d: 'Every certificate carries a QR code and a serial number at the bottom. Scanning opens this page and verifies instantly.',
     s2t: 'We search the Union register', s2d: 'The number is read directly from the Union database, never from a cache.',
     s3t: 'See the certificate status', s3d: 'Valid, expired, revoked or not found, with the company details and the issue and expiry dates.',
+    certTitle: 'Certificate', download: 'Download (Arabic)', downloadEn: 'Download (English)', openTab: 'Open in new tab',
+    certNote: 'The view and download links are valid for two hours — verify again for a new link.',
     switchLang: 'العربية', logoAlt: 'Palestinian Contractors Union', membershipType: 'Membership certificate',
   },
 } as const
@@ -132,6 +142,10 @@ const companyName = computed(() =>
   (isEn.value && result.value?.contractor_name_en) || result.value?.contractor_name)
 const typeLabel = computed(() =>
   isEn.value && result.value?.type_label ? I18N.en.membershipType : result.value?.type_label)
+// الشهادة نفسها: بلغة الصفحة إذا متوفرة، وإلا العربية
+const viewUrl = computed(() =>
+  (isEn.value && result.value?.certificate_url_en) || result.value?.certificate_url || null)
+
 const locale = computed(() => (isEn.value ? 'en-GB' : 'ar-PS-u-nu-latn'))
 
 const daysLeft = computed(() => {
@@ -364,6 +378,46 @@ onMounted(() => {
           </div>
         </template>
 
+        <!-- الشهادة نفسها: عرض + تحميل (السارية والمنتهية؛ الملغاة ما إلها رابط) -->
+        <div
+          v-if="viewUrl"
+          class="vp-doc"
+        >
+          <div class="vp-doc-head">
+            <strong><FileText :size="18" /> {{ t.certTitle }}</strong>
+            <div class="vp-doc-actions">
+              <a
+                v-if="isEn ? result.download_url_en : result.download_url"
+                :href="(isEn ? result.download_url_en : result.download_url)!"
+                class="vp-doc-btn vp-doc-btn--primary"
+              ><Download :size="16" /> {{ isEn ? t.downloadEn : t.download }}</a>
+              <a
+                v-if="!isEn && result.download_url_en"
+                :href="result.download_url_en"
+                class="vp-doc-btn"
+              ><Download :size="16" /> {{ t.downloadEn }}</a>
+              <a
+                v-if="isEn && result.download_url"
+                :href="result.download_url"
+                class="vp-doc-btn"
+              ><Download :size="16" /> {{ t.download }}</a>
+              <a
+                :href="viewUrl"
+                target="_blank"
+                rel="noopener"
+                class="vp-doc-btn"
+              ><ExternalLink :size="16" /> {{ t.openTab }}</a>
+            </div>
+          </div>
+          <iframe
+            :key="viewUrl"
+            :src="viewUrl"
+            class="vp-doc-frame"
+            :title="t.certTitle"
+          />
+          <small class="vp-doc-note">{{ t.certNote }}</small>
+        </div>
+
         <footer class="vp-seal">
           <ShieldCheck :size="20" />
           <div>
@@ -423,6 +477,22 @@ onMounted(() => {
   padding: .3rem .8rem; border-radius: 999px; font-size: .8rem; font-weight: 700; color: #ffd54f; margin-bottom: .9rem; }
 .vp-title { color: #fff !important; font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 900; letter-spacing: -.01em; text-shadow: 0 4px 24px rgba(0,0,0,.25); margin: 0 0 .6rem; line-height: 1.25; }
 .vp-sub { margin: 0 auto; max-width: 600px; color: rgba(255,255,255,.82); font-size: 1.02rem; line-height: 1.7; }
+
+/* الشهادة: عرض وتحميل */
+.vp-doc { margin: 1rem 1.4rem 0; border: 1px solid var(--line); border-radius: 16px; padding: 1rem; background: #fff; }
+.vp-doc-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: .75rem; }
+.vp-doc-head strong { display: inline-flex; align-items: center; gap: .4rem; color: var(--ink); }
+.vp-doc-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.vp-doc-actions a { text-decoration: none; }
+.vp-doc-btn { display: inline-flex; align-items: center; gap: .35rem; border: 1px solid var(--line); background: #f4f6fc; color: var(--blue);
+  font-weight: 700; font-size: .85rem; padding: .5rem .85rem; border-radius: 10px; }
+.vp-doc-btn:hover { background: #e8ebf7; }
+.vp-doc-btn--primary { background: var(--blue); color: #fff; border-color: var(--blue); }
+.vp-doc-btn--primary:hover { background: var(--navy); }
+.vp-doc-frame { display: block; width: 100%; height: 75vh; min-height: 480px; border: 1px solid var(--line); border-radius: 12px; background: #f4f6fc; }
+.vp-doc-note { display: block; margin-top: .5rem; color: var(--muted); font-size: .78rem; }
+/* الجوال ما بيعرض PDF داخل إطار بشكل موثوق — بيكفي زر التحميل والفتح */
+@media (max-width: 700px) { .vp-doc-frame { display: none; } }
 
 /* زر اللغة */
 .vp-lang { display: inline-flex; align-items: center; gap: .4rem; background: transparent; color: #fff; cursor: pointer;
