@@ -568,6 +568,9 @@ const documentUrl = (key: string) => detailsTarget.value?.[`${key}_url`] ?? deta
         <VBtn variant="tonal" prepend-icon="tabler-file-spreadsheet" :loading="exporting" @click="exportContractors">
           تصدير Excel
         </VBtn>
+        <VBtn variant="tonal" prepend-icon="tabler-language" :to="{ name: 'contractors-english-names' }">
+          الأسماء بالإنجليزي
+        </VBtn>
         <VBtn v-if="$can('contractors.list', 'create')" color="primary" prepend-icon="tabler-plus" :to="{ name: 'contractors-create' }">
           تسجيل مقاول جديد
         </VBtn>
