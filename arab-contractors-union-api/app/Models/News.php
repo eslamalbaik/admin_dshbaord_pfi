@@ -16,12 +16,13 @@ class News extends Model
     protected $fillable = [
         'title', 'slug', 'excerpt', 'body',
         'image', 'video_url', 'external_url', 'gallery',
-        'is_published',
+        'is_published', 'convened_at',
         'published_at', 'created_by',
     ];
 
     protected $casts = [
         'is_published' => 'boolean',
+        'convened_at'  => 'date:Y-m-d',
         'published_at' => 'datetime',
     ];
 

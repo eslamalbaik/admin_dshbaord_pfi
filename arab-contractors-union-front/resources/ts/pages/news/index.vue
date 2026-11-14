@@ -63,6 +63,7 @@ const emptyForm = () => ({
   existingGallery: [] as string[],
   video_url: '',
   external_url: '',
+  convened_at: '',
   publishMode: 'now' as PublishMode,
   published_at: '',
 })
@@ -232,6 +233,7 @@ const openEdit = (item: any) => {
     existingGallery: item.gallery ?? [],
     video_url: item.video_url ?? '',
     external_url: item.external_url ?? '',
+    convened_at: item.convened_at ? item.convened_at.substring(0, 10) : '',
     publishMode: !item.is_published
       ? 'draft'
       : (item.published_at && new Date(item.published_at) > new Date() ? 'schedule' : 'now'),
@@ -338,6 +340,8 @@ const saveNews = async () => {
     fd.append('is_published', mode === 'draft' ? '0' : '1')
     if (form.value.video_url) fd.append('video_url', form.value.video_url)
     if (form.value.external_url) fd.append('external_url', form.value.external_url)
+    // عند التعديل نرسله حتى لو فارغ ليتمكن الأدمن من مسحه
+    if (form.value.convened_at || isEditing.value) fd.append('convened_at', form.value.convened_at)
     if (mode === 'schedule')
       fd.append('published_at', form.value.published_at)
     // خبر كان مسودة/مجدول وصار "نشر مباشرة": تاريخ نشره يصير وقت الحفظ
@@ -603,6 +607,16 @@ const deleteNews = async () => {
               <VTextField v-model="form.external_url" label="رابط خارجي (اختياري)" prepend-inner-icon="tabler-external-link" dir="ltr" />
             </VCol>
 
+            <VCol cols="12" md="6">
+              <VTextField
+                v-model="form.convened_at"
+                label="تاريخ الانعقاد (اختياري)"
+                type="date"
+                prepend-inner-icon="tabler-calendar-event"
+                style="font-family:Cairo,sans-serif"
+              />
+            </VCol>
+
             <VCol cols="12">
               <label class="text-body-2 font-weight-medium mb-2 d-block" style="font-family:Cairo,sans-serif">طريقة النشر</label>
               <VBtnToggle
@@ -671,6 +685,10 @@ const deleteNews = async () => {
               <span v-if="viewingItem.published_at" class="news-view__meta">
                 <VIcon icon="tabler-calendar" size="16" />
                 {{ formatLongDate(viewingItem.published_at) }}
+              </span>
+              <span v-if="viewingItem.convened_at" class="news-view__meta">
+                <VIcon icon="tabler-calendar-event" size="16" />
+                تاريخ الانعقاد: {{ formatLongDate(viewingItem.convened_at) }}
               </span>
             </div>
 

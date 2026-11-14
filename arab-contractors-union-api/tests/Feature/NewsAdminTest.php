@@ -41,6 +41,31 @@ class NewsAdminTest extends TestCase
         $this->assertDatabaseCount('news', 0);
     }
 
+    public function test_store_saves_convened_at_even_in_the_past(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/news', [
+            'title' => 'خبر بتاريخ انعقاد', 'body' => 'نص',
+            'convened_at' => '2026-10-20',
+        ])->assertStatus(201);
+
+        $this->assertSame('2026-10-20', News::first()->convened_at->toDateString());
+    }
+
+    public function test_update_can_clear_convened_at(): void
+    {
+        $this->actingAsAdmin();
+
+        $news = News::create([
+            'title' => 'خبر', 'slug' => 'khabar', 'body' => 'نص', 'convened_at' => '2026-10-20',
+        ]);
+
+        $this->putJson("/api/v1/admin/news/{$news->id}", ['convened_at' => null])->assertStatus(200);
+
+        $this->assertNull($news->fresh()->convened_at);
+    }
+
     public function test_update_allows_past_published_at_unchanged(): void
     {
         $this->actingAsAdmin();
