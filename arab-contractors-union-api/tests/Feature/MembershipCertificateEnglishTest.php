@@ -233,4 +233,47 @@ class MembershipCertificateEnglishTest extends TestCase
             ->assertOk()
             ->assertJsonPath('items.contractor_name_en', 'Arab Union Contracting Co.');
     }
+
+    public function test_verify_page_gets_view_and_download_links_for_a_valid_certificate(): void
+    {
+        $c = $this->contractor();
+        $cert = $c->certificateRequests()->create(['type' => 'membership', 'status' => 'issued']);
+        $path = app(MembershipCertificatePdfService::class)->generate($cert);
+        $cert->forceFill(['certificate_path' => $path, 'issued_at' => now(), 'valid_until' => now()->addMonth()->toDateString()])->save();
+        $serial = $cert->ensureSerialNumber();
+
+        $res = $this->getJson('/api/v1/certificates/check?serial=' . $serial)->assertOk();
+        foreach (['certificate_url', 'certificate_url_en', 'download_url', 'download_url_en'] as $key) {
+            $this->assertNotNull($res->json("items.{$key}"), $key);
+        }
+
+        // العرض: inline وبيسمح بالـiframe من الواجهة، وما بينحسب فتح على المقاول
+        $view = $this->get($this->relative($res->json('items.certificate_url')))->assertOk();
+        $this->assertStringStartsWith('inline', $view->headers->get('Content-Disposition'));
+        $this->assertStringContainsString('frame-ancestors', $view->headers->get('Content-Security-Policy'));
+        $this->assertFalse($view->headers->has('X-Frame-Options'));
+        $this->assertSame(0, (int) $cert->fresh()->views_count);
+
+        // التحميل: attachment، والنسخة الإنجليزية بتتولّد عند الطلب
+        $dl = $this->get($this->relative($res->json('items.download_url_en')))->assertOk();
+        $this->assertStringStartsWith('attachment', $dl->headers->get('Content-Disposition'));
+        $this->assertStringContainsString('-en.pdf', $dl->headers->get('Content-Disposition'));
+
+        // باقي الردود لسا ممنوع تنعرض بإطار
+        $this->getJson('/api/v1/certificates/check?serial=' . $serial)->assertHeader('X-Frame-Options', 'DENY');
+    }
+
+    public function test_verify_page_gets_no_links_for_a_revoked_certificate(): void
+    {
+        $c = $this->contractor();
+        $cert = $c->certificateRequests()->create(['type' => 'membership', 'status' => 'issued']);
+        $path = app(MembershipCertificatePdfService::class)->generate($cert);
+        $cert->forceFill(['certificate_path' => $path, 'issued_at' => now(), 'revoked_at' => now()])->save();
+        $serial = $cert->ensureSerialNumber();
+
+        $this->getJson('/api/v1/certificates/check?serial=' . $serial)
+            ->assertOk()
+            ->assertJsonPath('items.certificate_url', null)
+            ->assertJsonPath('items.download_url', null);
+    }
 }

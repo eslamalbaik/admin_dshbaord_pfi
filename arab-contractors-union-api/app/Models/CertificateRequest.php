@@ -185,6 +185,26 @@ class CertificateRequest extends Model
         return url(URL::signedRoute('certificates.file', $params, absolute: false));
     }
 
+    /**
+     * رابط مؤقت (ساعتين) لملف الشهادة لصفحة التحقق العامة: اللي بيتحقق من شهادة سارية أو منتهية
+     * بيقدر يعرضها ويحمّلها. ما بينحسب فتح على المقاول (track=0)، والملغاة ما إلها رابط.
+     */
+    public function publicFileUrl(string $lang = 'ar', bool $download = false): ?string
+    {
+        if ($this->type !== 'membership' || $this->status !== 'issued' || ! $this->certificate_path || $this->isRevoked()) {
+            return null;
+        }
+        if ($lang === 'en' && blank($this->certificate_path_en) && blank($this->contractor?->name_en)) {
+            return null;
+        }
+
+        $params = ['certificateRequest' => $this->id, 'track' => 0]
+            + ($lang === 'en' ? ['lang' => 'en'] : [])
+            + ($download ? ['dl' => 1] : []);
+
+        return url(URL::temporarySignedRoute('certificates.file', now()->addHours(2), $params, absolute: false));
+    }
+
     public function getTypeLabelAttribute(): string
     {
         return [

@@ -74,6 +74,11 @@ class CertificateVerificationController extends Controller
             'issued_at'         => $cert->issued_at?->setTimezone(config('app.local_timezone', 'Asia/Gaza'))->toDateString(),
             'valid_until'       => $cert->valid_until?->toDateString(),
             'revoked_at'        => $cert->revoked_at?->setTimezone(config('app.local_timezone', 'Asia/Gaza'))->toDateString(),
+            // عرض/تحميل الشهادة نفسها من صفحة التحقق — null للملغاة أو لما ما في ملف
+            'certificate_url'    => $cert->publicFileUrl('ar'),
+            'certificate_url_en' => $cert->publicFileUrl('en'),
+            'download_url'       => $cert->publicFileUrl('ar', download: true),
+            'download_url_en'    => $cert->publicFileUrl('en', download: true),
         ]);
     }
 }
