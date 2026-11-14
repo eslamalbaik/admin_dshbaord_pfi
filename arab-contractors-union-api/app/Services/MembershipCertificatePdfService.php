@@ -188,9 +188,10 @@ class MembershipCertificatePdfService
             'valid_until'       => $validUntil,
             'rows'              => ContractorLookups::englishCertificateRows($contractor->specialties)['rows'],
             'verify_url'        => self::verificationUrl($serial) . '&lang=en',
-            'president_name'    => \App\Models\Setting::get('union_president_name_en', 'Eng. Suhail Hashem Al-Saqqa'),
-            'president_title1'  => \App\Models\Setting::get('union_president_title1_en', 'Head of the Palestinian Contractors'),
-            'president_title2'  => \App\Models\Setting::get('union_president_title2_en', 'First Vice President of the Union'),
+            // صيغة الاتحاد المعتمدة (eslam، 14/11): سطر اسم وسطر صفة وحيد
+            'president_name'    => \App\Models\Setting::get('union_president_name_en', 'Eng : Suhail Hashem Saqqa'),
+            'president_title1'  => \App\Models\Setting::get('union_president_title1_en', "First Vice President of Palestinian Contractor's"),
+            'president_title2'  => \App\Models\Setting::get('union_president_title2_en', ''),
         ]);
 
         $path = $preview
@@ -522,7 +523,7 @@ HTML);
             '<div style="text-align: center; line-height: 1.5;">'
             . "<div style=\"font-family: plexmedium; font-size: 12.5pt; color: {$navy};\">" . $e($d['president_name']) . '</div>'
             . '<div style="font-size: 10pt;">' . $e($d['president_title1']) . '</div>'
-            . '<div style="font-size: 10pt;">' . $e($d['president_title2']) . '</div>'
+            . (filled($d['president_title2']) ? '<div style="font-size: 10pt;">' . $e($d['president_title2']) . '</div>' : '')
             . '</div>',
             60, 252.8, 89.5, 24, 'auto'
         );
