@@ -49,10 +49,10 @@ const openCreate = (kind: LookupKind) => {
   formEditingId.value = null
   formError.value = ''
   form.value = kind === 'grade'
-    ? { code: '', label: '', level: 1, eligible_field_codes: null }
+    ? { code: '', label: '', label_en: '', level: 1, eligible_field_codes: null }
     : kind === 'specialization'
-      ? { code: null, name: '', contractor_field_id: null }
-      : { code: null, name: '' }
+      ? { code: null, name: '', name_en: '', contractor_field_id: null }
+      : { code: null, name: '', name_en: '' }
   formOpen.value = true
 }
 
@@ -61,10 +61,10 @@ const openEdit = (kind: LookupKind, row: any) => {
   formEditingId.value = row.id
   formError.value = ''
   form.value = kind === 'grade'
-    ? { label: row.label, level: row.level, eligible_field_codes: row.eligible_field_codes }
+    ? { label: row.label, label_en: row.label_en ?? '', level: row.level, eligible_field_codes: row.eligible_field_codes }
     : kind === 'specialization'
-      ? { name: row.name, contractor_field_id: row.contractor_field_id }
-      : { name: row.name }
+      ? { name: row.name, name_en: row.name_en ?? '', contractor_field_id: row.contractor_field_id }
+      : { name: row.name, name_en: row.name_en ?? '' }
   formOpen.value = true
 }
 
@@ -145,6 +145,7 @@ const reactivateMutation = useMutation({
           <tr>
             <th>الكود</th>
             <th>الاسم</th>
+            <th>بالإنجليزي</th>
             <th>الحالة</th>
             <th class="text-center">إجراءات</th>
           </tr>
@@ -153,6 +154,7 @@ const reactivateMutation = useMutation({
           <tr v-for="row in fields" :key="row.id">
             <td>{{ row.code }}</td>
             <td>{{ row.name }}</td>
+            <td dir="ltr" :class="{ 'text-disabled': !row.name_en }">{{ row.name_en || '—' }}</td>
             <td>
               <VChip size="small" :color="row.is_active ? 'success' : 'default'" variant="tonal">
                 {{ row.is_active ? 'مفعّل' : 'مخفي' }}
@@ -189,6 +191,7 @@ const reactivateMutation = useMutation({
           <tr>
             <th>الكود</th>
             <th>الاسم</th>
+            <th>بالإنجليزي</th>
             <th>المجال</th>
             <th>الحالة</th>
             <th class="text-center">إجراءات</th>
@@ -198,6 +201,7 @@ const reactivateMutation = useMutation({
           <tr v-for="row in specializations" :key="row.id">
             <td>{{ row.code }}</td>
             <td>{{ row.name }}</td>
+            <td dir="ltr" :class="{ 'text-disabled': !row.name_en }">{{ row.name_en || '—' }}</td>
             <td>{{ row.field?.name ?? '—' }}</td>
             <td>
               <VChip size="small" :color="row.is_active ? 'success' : 'default'" variant="tonal">
@@ -235,6 +239,7 @@ const reactivateMutation = useMutation({
           <tr>
             <th>الكود</th>
             <th>المسمّى</th>
+            <th>على الشهادة الإنجليزية</th>
             <th>المستوى</th>
             <th>المجالات المؤهَّلة</th>
             <th>الحالة</th>
@@ -245,6 +250,7 @@ const reactivateMutation = useMutation({
           <tr v-for="row in grades" :key="row.id">
             <td>{{ row.code }}</td>
             <td>{{ row.label }}</td>
+            <td dir="ltr" :class="{ 'text-disabled': !row.label_en }">{{ row.label_en || '—' }}</td>
             <td>{{ row.level }}</td>
             <td>{{ row.eligible_field_codes ? row.eligible_field_codes.join(', ') : 'كل المجالات' }}</td>
             <td>
@@ -288,6 +294,9 @@ const reactivateMutation = useMutation({
               <VCol cols="12">
                 <VTextField v-model="form.name" label="اسم المجال" />
               </VCol>
+              <VCol cols="12">
+                <VTextField v-model="form.name_en" label="الاسم بالإنجليزي" dir="ltr" hint="بينطبع على النسخة الإنجليزية من شهادة العضوية" persistent-hint />
+              </VCol>
             </template>
 
             <template v-else-if="formKind === 'specialization'">
@@ -296,6 +305,9 @@ const reactivateMutation = useMutation({
               </VCol>
               <VCol cols="12">
                 <VTextField v-model="form.name" label="اسم الاختصاص" />
+              </VCol>
+              <VCol cols="12">
+                <VTextField v-model="form.name_en" label="الاسم بالإنجليزي" dir="ltr" hint="بينطبع على النسخة الإنجليزية من شهادة العضوية" persistent-hint />
               </VCol>
               <VCol cols="12">
                 <VSelect
@@ -315,6 +327,9 @@ const reactivateMutation = useMutation({
               </VCol>
               <VCol cols="12">
                 <VTextField v-model="form.label" label="المسمّى المعروض" />
+              </VCol>
+              <VCol cols="12">
+                <VTextField v-model="form.label_en" label="الدرجة بالإنجليزي (مثال: First A)" dir="ltr" hint="بينطبع على النسخة الإنجليزية من شهادة العضوية" persistent-hint />
               </VCol>
               <VCol cols="12" md="6">
                 <VTextField v-model.number="form.level" label="المستوى (الأقل = الأعلى درجة)" type="number" min="1" />

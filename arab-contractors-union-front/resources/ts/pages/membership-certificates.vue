@@ -62,6 +62,9 @@ const issueAddress = ref('')
 const issueDecisionNumber = ref('')
 const issueDecisionDate = ref('')
 const issueValidUntil = ref('')
+const issueNameEn = ref('')
+const issueAddressEn = ref('')
+const issueIncludeEnglish = ref(true)
 const loadingIssueDefaults = ref(false)
 
 async function openIssueDialog(c: any) {
@@ -76,6 +79,9 @@ async function openIssueDialog(c: any) {
   issueDecisionNumber.value = ''
   issueDecisionDate.value = ''
   issueValidUntil.value = ''
+  issueNameEn.value = ''
+  issueAddressEn.value = ''
+  issueIncludeEnglish.value = true
   isIssueOpen.value = true
 
   loadingIssueDefaults.value = true
@@ -85,6 +91,8 @@ async function openIssueDialog(c: any) {
     issueDecisionNumber.value = full?.classification_decision_number || ''
     issueDecisionDate.value = full?.classification_decision_date?.slice(0, 10) || ''
     issueValidUntil.value = full?.active_membership?.expires_at?.slice(0, 10) || ''
+    issueNameEn.value = full?.name_en || ''
+    issueAddressEn.value = full?.address_en || ''
   } finally {
     loadingIssueDefaults.value = false
   }
@@ -99,6 +107,8 @@ const issueMutation = useMutation({
       decision_number: issueDecisionNumber.value || undefined,
       decision_date: issueDecisionDate.value || undefined,
       valid_until: issueValidUntil.value || undefined,
+      include_english: issueNameEn.value ? issueIncludeEnglish.value : undefined,
+      address_en: issueNameEn.value && issueIncludeEnglish.value ? (issueAddressEn.value || undefined) : undefined,
     })).data
   },
   onSuccess: (data: any) => {
@@ -719,6 +729,15 @@ const contractorStatusLabel: Record<string, string> = {
             :loading="loadingIssueDefaults"
             hint="افتراضياً آخر عضوية للمقاول (31/12 من سنة العضوية) — عدّله إذا لزم"
             persistent-hint
+          />
+
+          <CertificateEnglishFields
+            class="mt-6"
+            v-model:include="issueIncludeEnglish"
+            v-model:address-en="issueAddressEn"
+            :contractor-id="selectedContractor.id"
+            :name-en="issueNameEn"
+            :loading="loadingIssueDefaults"
           />
 
           <VTextarea

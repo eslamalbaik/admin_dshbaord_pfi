@@ -234,6 +234,9 @@ class CertificateRequestController extends Controller
             array_unshift($data['requirement_issues'], $this->thresholdRequirementIssue($threshold));
         }
         $data['delivery'] = $this->deliveryStatus($certificateRequest);
+        $data['english'] = $certificateRequest->type === 'membership' && $certificateRequest->contractor
+            ? MembershipCertificatePdfService::englishReadiness($certificateRequest->contractor)
+            : null;
 
         return $this->success($data);
     }
@@ -293,24 +296,54 @@ class CertificateRequestController extends Controller
             abort(403, 'رابط الشهادة غير صالح.');
         }
 
-        $path = $certificateRequest->certificate_path;
+        $english = $request->query('lang') === 'en';
+        $path = $english
+            ? $this->englishFilePath($certificateRequest)
+            : $certificateRequest->certificate_path;
         if ($certificateRequest->status !== 'issued' || ! $path || ! Storage::disk('public')->exists($path)) {
             abort(404, 'الشهادة غير متاحة.');
         }
 
-        // تحديث مباشر بدون updated_at — الفتح مش تعديل على الطلب
-        CertificateRequest::whereKey($certificateRequest->id)->update([
-            'viewed_at'      => $certificateRequest->viewed_at ?? now(),
-            'last_viewed_at' => now(),
-            'views_count'    => \Illuminate\Support\Facades\DB::raw('views_count + 1'),
-        ]);
+        // رابط اللوحة (track=0) بيفتح نفس الملف بدون ما ينحسب فتح على المقاول
+        if ($request->query('track') !== '0') {
+            // تحديث مباشر بدون updated_at — الفتح مش تعديل على الطلب
+            CertificateRequest::whereKey($certificateRequest->id)->update([
+                'viewed_at'      => $certificateRequest->viewed_at ?? now(),
+                'last_viewed_at' => now(),
+                'views_count'    => \Illuminate\Support\Facades\DB::raw('views_count + 1'),
+            ]);
+        }
 
-        $serial = 'MC-' . str_pad((string) $certificateRequest->id, 6, '0', STR_PAD_LEFT);
+        $serial = 'MC-' . str_pad((string) $certificateRequest->id, 6, '0', STR_PAD_LEFT) . ($english ? '-en' : '');
 
         return Storage::disk('public')->response($path, "{$serial}.pdf", [
             'Content-Type'  => 'application/pdf',
             'Cache-Control' => 'no-store',
         ]);
+    }
+
+    /**
+     * مسار النسخة الإنجليزية، وبيولّدها عند أول طلب لو ما انولّدت (شهادة صدرت قبل ما ينعبّى
+     * الاسم الإنجليزي، أو انمسحت لما تغيّر). null = ما في نسخة إنجليزية لهالشهادة.
+     */
+    private function englishFilePath(CertificateRequest $certificateRequest): ?string
+    {
+        if ($certificateRequest->type !== 'membership' || $certificateRequest->status !== 'issued' || $certificateRequest->isRevoked()) {
+            return null;
+        }
+
+        $path = $certificateRequest->certificate_path_en;
+        if ($path && Storage::disk('public')->exists($path)) {
+            return $path;
+        }
+        if (blank($certificateRequest->contractor?->name_en)) {
+            return null;
+        }
+
+        $path = $this->pdfService->generateEnglish($certificateRequest);
+        $certificateRequest->forceFill(['certificate_path_en' => $path])->saveQuietly();
+
+        return $path;
     }
 
     /**
@@ -449,6 +482,10 @@ class CertificateRequestController extends Controller
         $oldIssuedAt = $certificateRequest->issued_at;
         $generated   = ! $request->hasFile('certificate');
 
+        if ($generated && $blocked = $this->blockedEnglishWithoutName($certificateRequest, $request->validated())) {
+            return $blocked;
+        }
+
         // تاريخ الانتهاء المُدخل بيتطبع بالتوليد ويرجع بالـAPI، حتى لو الملف مرفوع يدوياً
         if ($certificateRequest->type === 'membership' && $request->filled('valid_until')) {
             $certificateRequest->valid_until = $request->validated()['valid_until'];
@@ -489,6 +526,9 @@ class CertificateRequestController extends Controller
         if ($certificateRequest->type === 'membership') {
             $certificateRequest->ensureSerialNumber();
         }
+
+        // النسخة الإنجليزية: بس للشهادة المولَّدة — الملف المرفوع يدوياً ما إله نسخة إنجليزية
+        $this->syncEnglishCertificate($certificateRequest, $generated ? $this->englishWanted($request->validated()) : false);
 
         $certificateRequest->contractor?->notify(
             new CertificateRequestStatusNotification($certificateRequest)
@@ -587,6 +627,9 @@ class CertificateRequestController extends Controller
         if ($certificateRequest->certificate_path) {
             Storage::disk('public')->delete($certificateRequest->certificate_path);
         }
+        if ($certificateRequest->certificate_path_en) {
+            Storage::disk('public')->delete($certificateRequest->certificate_path_en);
+        }
 
         AuditLogService::record(Auth::user(), 'certificate.deleted', $certificateRequest, ['contractor_id' => $certificateRequest->contractor_id]);
 
@@ -605,6 +648,9 @@ class CertificateRequestController extends Controller
         foreach ($requests as $r) {
             if ($r->certificate_path) {
                 Storage::disk('public')->delete($r->certificate_path);
+            }
+            if ($r->certificate_path_en) {
+                Storage::disk('public')->delete($r->certificate_path_en);
             }
             $r->delete();
         }
@@ -633,6 +679,10 @@ class CertificateRequestController extends Controller
         $oldPath = $certificateRequest->certificate_path;
         $oldIssuedAt = $certificateRequest->issued_at;
 
+        if ($blocked = $this->blockedEnglishWithoutName($certificateRequest, $data)) {
+            return $blocked;
+        }
+
         // القيم المُدخلة الآن بتغلب على المحفوظة على الطلب (من الموافقة/الإصدار)، وبتنحفظ بداله
         $certificateRequest->fill($this->certificateFields($data));
         $path = $this->pdfService->generate($certificateRequest, $certificateRequest->certificateOverrides());
@@ -648,6 +698,8 @@ class CertificateRequestController extends Controller
             'reviewed_by'      => Auth::id(),
             'reviewed_at'      => now(),
         ]);
+
+        $this->syncEnglishCertificate($certificateRequest, $this->englishWanted($data));
 
         // سجل المحددات الهامة — إعادة إصدار شهادة عضوية (مع أي بيانات مخالفة لملف المقاول)
         [$before, $after] = $this->certificateOverrideDiff($certificateRequest->contractor, $data);
@@ -670,6 +722,10 @@ class CertificateRequestController extends Controller
         $data = $request->validated();
         $contractor = Contractor::findOrFail($data['contractor_id']);
 
+        if (($data['include_english'] ?? null) && blank($contractor->name_en)) {
+            return $this->englishNameMissingError();
+        }
+
         $certRequest = $contractor->certificateRequests()->create([
             'type'   => 'membership',
             'notes'  => $data['notes'] ?? 'إصدار مباشر من لوحة التحكم',
@@ -690,6 +746,8 @@ class CertificateRequestController extends Controller
             'reviewed_by'      => Auth::id(),
             'reviewed_at'      => now(),
         ]);
+
+        $this->syncEnglishCertificate($certRequest, $this->englishWanted($data));
 
         $certRequest->contractor?->notify(
             new CertificateRequestStatusNotification($certRequest)
@@ -723,6 +781,64 @@ class CertificateRequestController extends Controller
         );
     }
 
+    /** include_english: true = لازم نسخة إنجليزية، false = لا، فاضي = تلقائي (إذا للمقاول اسم إنجليزي). */
+    private function englishWanted(array $data): ?bool
+    {
+        return array_key_exists('include_english', $data) && $data['include_english'] !== null
+            ? (bool) $data['include_english']
+            : null;
+    }
+
+    private function englishNameMissingError(): \Illuminate\Http\JsonResponse
+    {
+        return $this->error(
+            'أدخل اسم الشركة بالإنجليزي بملف المقاول أولاً لتصدر النسخة الإنجليزية من الشهادة.',
+            422,
+            ['include_english' => ['اسم الشركة بالإنجليزي غير مُدخل بملف المقاول.']],
+            'english_name_missing',
+        );
+    }
+
+    private function blockedEnglishWithoutName(CertificateRequest $certificateRequest, array $data): ?\Illuminate\Http\JsonResponse
+    {
+        if ($certificateRequest->type !== 'membership' || ! $this->englishWanted($data)) {
+            return null;
+        }
+
+        return blank($certificateRequest->contractor?->name_en) ? $this->englishNameMissingError() : null;
+    }
+
+    /**
+     * يولّد النسخة الإنجليزية بعد العربية (نفس الرقم التسلسلي)، أو يشيلها.
+     * $want = null: تلقائي — بتطلع إذا المقاول إله اسم بالإنجليزي. فشل التوليد الإنجليزي ما بيوقّف
+     * إصدار العربية (بينسجّل بس)، والمقاول بيقدر يفتحها بعدين فبتتولّد عند الطلب.
+     */
+    private function syncEnglishCertificate(CertificateRequest $certificateRequest, ?bool $want): void
+    {
+        if ($certificateRequest->type !== 'membership') {
+            return;
+        }
+
+        $old  = $certificateRequest->certificate_path_en;
+        $want ??= filled($certificateRequest->contractor?->name_en);
+        $path = null;
+
+        if ($want) {
+            try {
+                $path = $this->pdfService->generateEnglish($certificateRequest->fresh(['contractor']));
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
+        if ($old && $old !== $path) {
+            Storage::disk('public')->delete($old);
+        }
+        if ($old !== $path) {
+            $certificateRequest->forceFill(['certificate_path_en' => $path])->saveQuietly();
+        }
+    }
+
     /**
      * حقول الشهادة المُرسلة (address/decision_number/decision_date) بأسماء أعمدة الطلب.
      * الفارغ ما بيمسح المحفوظ — بيضل اللي انحفظ عند الموافقة أو إصدار سابق.
@@ -731,6 +847,7 @@ class CertificateRequestController extends Controller
     {
         return array_filter([
             'certificate_address' => $data['address'] ?? null,
+            'certificate_address_en' => $data['address_en'] ?? null,
             'decision_number'     => $data['decision_number'] ?? null,
             'decision_date'       => $data['decision_date'] ?? null,
             'valid_until'         => $data['valid_until'] ?? null,

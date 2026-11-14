@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import api from '@/plugins/axios'
 
@@ -32,8 +32,18 @@ const { data, isFetching } = useQuery({
 const cert = computed(() => data.value?.items ?? null)
 const delivery = computed<Delivery | null>(() => cert.value?.delivery ?? null)
 
+// عربي / English — النسخة الإنجليزية رابط موقَّع (ما بنضيفله v= لأنه بيكسر التوقيع، والرد no-store أصلاً)
+const lang = ref<'ar' | 'en'>('ar')
+watch(() => props.requestId, () => { lang.value = 'ar' })
+
+const englishUrl = computed<string | null>(() => cert.value?.certificate_url_en ?? null)
+const english = computed(() => cert.value?.english ?? null)
+
 // إعادة الإصدار بتكتب نفس المسار، فبنكسر كاش المتصفح بوقت الإصدار
 const fileUrl = computed(() => {
+  if (lang.value === 'en' && englishUrl.value)
+    return englishUrl.value
+
   const url = cert.value?.certificate_url
   if (!url)
     return null
@@ -162,8 +172,46 @@ const steps = computed(() => {
           </div>
         </div>
 
+        <!-- ─── اللغة ─── -->
+        <div
+          v-if="englishUrl"
+          class="d-flex align-center gap-3 mb-3"
+        >
+          <VBtnToggle
+            v-model="lang"
+            mandatory
+            density="compact"
+            color="primary"
+            variant="outlined"
+            divided
+          >
+            <VBtn value="ar">
+              عربي
+            </VBtn>
+            <VBtn value="en">
+              English
+            </VBtn>
+          </VBtnToggle>
+          <span
+            v-if="lang === 'en' && english?.untranslated?.length"
+            class="text-caption text-warning"
+          >
+            بدون ترجمة (بتنطبع بالعربي): {{ english.untranslated.join('، ') }}
+          </span>
+        </div>
+        <VAlert
+          v-else-if="cert.status === 'issued' && cert.type === 'membership' && english?.missing_company_name"
+          type="info"
+          variant="tonal"
+          density="compact"
+          class="mb-3"
+        >
+          ما في نسخة إنجليزية لأن اسم الشركة بالإنجليزي مش مُدخل بملف المقاول. بعد ما تضيفه بتظهر النسخة الإنجليزية هون.
+        </VAlert>
+
         <!-- ─── الشهادة ─── -->
         <iframe
+          :key="lang"
           v-if="fileUrl"
           :src="fileUrl"
           class="certificate-frame rounded-lg"

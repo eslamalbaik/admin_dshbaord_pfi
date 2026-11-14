@@ -38,7 +38,7 @@ class CertificateVerificationController extends Controller
 
         $cert = $candidates
             ? CertificateRequest::query()
-                ->with('contractor:id,name,membership_number')
+                ->with('contractor:id,name,name_en,membership_number')
                 ->whereIn('serial_number', $candidates)
                 ->where('status', 'issued')
                 ->first()
@@ -66,6 +66,7 @@ class CertificateVerificationController extends Controller
             'state_label'       => self::LABELS[$state],
             'found'             => true,
             'contractor_name'   => $cert->contractor?->name,
+            'contractor_name_en' => $cert->contractor?->name_en,
             'membership_number' => $cert->contractor?->membership_number,
             'serial_number'     => $cert->serial_number,
             'type'              => $cert->type,

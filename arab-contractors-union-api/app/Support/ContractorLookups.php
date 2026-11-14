@@ -80,6 +80,26 @@ class ContractorLookups
 
     private const DEFAULT_TOP_TIER_FIELDS = [20, 30];
 
+    // ترجمة شهادة العضوية الإنجليزية — fallback لو الجداول فاضية أو العمود name_en ما تعبّى
+    private const DEFAULT_FIELDS_EN = [
+        10 => 'Unspecified', 20 => 'Roads', 30 => 'Buildings',
+        40 => 'Electromechanical', 50 => 'Water & Sewage', 60 => 'Public Works',
+    ];
+
+    private const DEFAULT_SPECIALIZATIONS_EN = [
+        10 => 'Unspecified', 20 => 'Roads', 30 => 'Asphalt Mixes', 40 => 'Bridges & Culverts Concrete',
+        50 => 'Earthworks', 60 => 'Buildings', 70 => 'Precast Concrete', 80 => 'Steel Structures',
+        90 => 'Prefabricated Buildings', 100 => 'Building Maintenance', 110 => 'Electromechanical',
+        120 => 'Electromechanical Maintenance', 130 => 'Mechanical Works', 140 => 'Electrical Works',
+        150 => 'Electronics', 160 => 'Water & Sewage', 170 => 'Treatment Plants', 180 => 'Irrigation & Drainage',
+        190 => 'Excavation & Mining', 200 => 'Public Works', 210 => 'Railways', 220 => 'Well Drilling',
+    ];
+
+    private const DEFAULT_GRADES_EN = [
+        'اولى أ' => 'First A', 'اولى ب' => 'First B', 'اولى' => 'First',
+        'ثانية' => 'Second', 'ثالثة' => 'Third', 'رابعة' => 'Fourth', 'خامسة' => 'Fifth',
+    ];
+
     // ─── القراءة (مصدر ديناميكي + fallback) ────────────────────────────────
 
     /** [code => name] للمجالات الفعّالة فقط، مرتّبة. */
@@ -181,8 +201,61 @@ class ContractorLookups
         return $grade['eligible_fields'] ?? self::DEFAULT_TOP_TIER_FIELDS;
     }
 
+    /**
+     * الأسماء الإنجليزية [code => name_en] للمجالات/الاختصاصات و[grade_code => label_en] للدرجات،
+     * لشهادة العضوية الإنجليزية. تشمل غير الفعّال كمان: شهادة قديمة ممكن تحمل اختصاص انوقف.
+     * الكود اللي ما إله ترجمة بالجدول بياخد الترجمة الافتراضية، وإلا بيضل ناقص (null).
+     */
+    public static function englishNames(): array
+    {
+        return Cache::remember('contractor_lookups.english', self::CACHE_TTL, function () {
+            $fields = ContractorField::whereNotNull('name_en')->where('name_en', '!=', '')->pluck('name_en', 'code')->all();
+            $specs  = ContractorSpecialization::whereNotNull('name_en')->where('name_en', '!=', '')->pluck('name_en', 'code')->all();
+            $grades = ContractorGrade::whereNotNull('label_en')->where('label_en', '!=', '')->pluck('label_en', 'code')->all();
+
+            return [
+                'fields'          => $fields + self::DEFAULT_FIELDS_EN,
+                'specializations' => $specs + self::DEFAULT_SPECIALIZATIONS_EN,
+                'grades'          => $grades + self::DEFAULT_GRADES_EN,
+            ];
+        });
+    }
+
+    /**
+     * صفوف جدول الشهادة الإنجليزية: [field_en, spec_en, grade_en] + قائمة اللي ما إلهم ترجمة
+     * (بينطبعوا بالعربي، واللوحة بتنبّه الأدمن عليهم).
+     *
+     * @return array{rows: list<array{0: string, 1: string, 2: string}>, missing: list<string>}
+     */
+    public static function englishCertificateRows(?array $specialties): array
+    {
+        $en = self::englishNames();
+        $rows = $missing = [];
+
+        foreach (self::buildFieldsTree($specialties) as $field) {
+            $fieldEn = $en['fields'][$field['field_id']] ?? null;
+            if (! $fieldEn) {
+                $missing[] = $field['field_name'];
+            }
+            foreach ($field['specializations'] as $spec) {
+                $specEn  = $en['specializations'][$spec['spec_id']] ?? null;
+                $gradeEn = $spec['grade'] ? ($en['grades'][$spec['grade']] ?? null) : '—';
+                if (! $specEn) {
+                    $missing[] = $spec['spec_name'];
+                }
+                if (! $gradeEn) {
+                    $missing[] = $spec['grade'];
+                }
+                $rows[] = [$fieldEn ?: $field['field_name'], $specEn ?: $spec['spec_name'], $gradeEn ?: (string) $spec['grade']];
+            }
+        }
+
+        return ['rows' => $rows, 'missing' => array_values(array_unique($missing))];
+    }
+
     public static function clearCache(): void
     {
+        Cache::forget('contractor_lookups.english');
         Cache::forget('contractor_lookups.fields');
         Cache::forget('contractor_lookups.specializations');
         Cache::forget('contractor_lookups.field_specializations');

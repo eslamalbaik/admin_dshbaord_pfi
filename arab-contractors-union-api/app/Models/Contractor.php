@@ -25,7 +25,7 @@ class Contractor extends Authenticatable
     ];
 
     protected $fillable = [
-        'membership_number', 'name', 'authorized_person', 'authorized_person_title',
+        'membership_number', 'name', 'name_en', 'address_en', 'authorized_person', 'authorized_person_title',
         'authorized_person_id_number', 'authorized_person_phone', 'authorized_person_whatsapp',
         'commercial_register',
         'license_number', 'classification', 'owner_name',
@@ -51,6 +51,22 @@ class Contractor extends Authenticatable
         'password',
         'remember_token',
     ];
+
+    protected static function booted(): void
+    {
+        // تغيّر الاسم/العنوان الإنجليزي: النسخ الإنجليزية من شهاداته صارت قديمة — بنمسحها
+        // وبتتولّد من جديد عند أول فتح (CertificateRequestController::englishFilePath).
+        static::updated(function (self $contractor) {
+            if (! $contractor->wasChanged(['name_en', 'address_en'])) {
+                return;
+            }
+            $contractor->certificateRequests()->whereNotNull('certificate_path_en')->get()
+                ->each(function ($cert) {
+                    \Illuminate\Support\Facades\Storage::disk('public')->delete($cert->certificate_path_en);
+                    $cert->forceFill(['certificate_path_en' => null])->saveQuietly();
+                });
+        });
+    }
 
     /** أسماء أعمدة الملفات المخزّنة على القرص — تُستخدم لبناء رابط `<field>_url` كامل تلقائيًا. */
     public const FILE_FIELDS = [
