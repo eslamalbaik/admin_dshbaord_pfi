@@ -54,14 +54,22 @@ class PublicBankAccountsTest extends TestCase
         $this->assertSame(['البنك الإسلامي', 'بنك القدس', 'البنك العربي'], array_column($banks, 'bank_name'));
     }
 
-    public function test_same_bank_name_in_two_currencies_is_one_card_with_both_ibans(): void
+    public function test_same_bank_name_in_two_currencies_returns_a_card_per_account(): void
     {
+        // 4 حسابات فعّالة، اثنين منهم بنفس اسم البنك → لازم ترجع 4 بطاقات (مثل app/settings)
         $this->account('بنك فلسطين', 'JOD', 0);
-        $this->account('بنك فلسطين', 'ILS', 1);
+        $this->account('البنك الإسلامي', 'JOD', 1);
+        $this->account('بنك القدس', 'ILS', 2);
+        $this->account('بنك فلسطين', 'ILS', 3);
 
         $banks = $this->getJson('/api/v1/bank-accounts')->assertOk()->json('items.banks');
+        $settings = $this->getJson('/api/v1/app/settings')->assertOk()->json('items.payment_info.bank_accounts');
 
-        $this->assertCount(1, $banks);
-        $this->assertSame(['JOD', 'ILS'], array_column($banks[0]['accounts'], 'currency'));
+        $this->assertCount(4, $banks);
+        $this->assertCount(count($settings), $banks);
+        $this->assertSame(['JOD', 'JOD', 'ILS', 'ILS'], array_column($banks, 'currency'));
+        $this->assertSame('PS00TEST3ILS', $banks[3]['iban']);
+        $this->assertSame('PS00TEST3ILS', $banks[3]['accounts'][0]['iban']);
+        $this->assertCount(1, $banks[0]['accounts']);
     }
 }

@@ -36,32 +36,31 @@ class BankAccountController extends Controller
     // ─────────────────────────────────────────────────────────────────────────
     //  Contractor Mobile App — الحسابات البنكية الظاهرة في شاشة الدفع (Public)
     //  GET /api/v1/bank-accounts
-    //  مجمَّعة حسب اسم البنك — كل بنك بطاقة واحدة تحوي إيبان لكل عملة (JOD/USD/ILS)
-    //  بدل صف منفصل لكل عملة (البيانات بجدول bank_accounts تبقى صف لكل بنك+عملة كما هي).
+    //  كل حساب فعّال بطاقة مستقلة (نفس عدد وترتيب payment_info.bank_accounts في app/settings).
+    //  كانت مجمَّعة حسب اسم البنك، فحسابان بنفس الاسم (مثلاً عملتين) يصيروا بطاقة واحدة
+    //  والتطبيق يعرض أول إيبان بس — فيبان كأن الحساب الرابع "مخفي".
+    //  accounts[] باقية (عنصر واحد) حتى ما ينكسر شكل الـ JSON عند التطبيق.
     // ─────────────────────────────────────────────────────────────────────────
     public function publicIndex()
     {
-        $accounts = BankAccount::active()->orderBy('sort')->orderBy('id')->get();
-
-        $banks = $accounts->groupBy('bank_name')->map(function ($rows) {
-            $first = $rows->first();
-
-            return [
-                'bank_name'      => $first->bank_name,
-                'bank_name_en'   => $first->bank_name_en,
-                'logo_url'       => $first->logo_url,
-                'account_holder' => $first->account_holder,
-                'account_number' => $first->account_number,
-                'swift'          => $first->swift,
-                'notes'          => $first->notes,
-                // إيبان كل عملة على حدة — نفس البنك ممكن يكون له أكثر من صف بجدول bank_accounts (صف لكل عملة)
-                'accounts'       => $rows->map(fn ($r) => [
+        $banks = BankAccount::active()->orderBy('sort')->orderBy('id')->get()
+            ->map(fn ($r) => [
+                'id'             => $r->id,
+                'bank_name'      => $r->bank_name,
+                'bank_name_en'   => $r->bank_name_en,
+                'logo_url'       => $r->logo_url,
+                'account_holder' => $r->account_holder,
+                'account_number' => $r->account_number,
+                'swift'          => $r->swift,
+                'notes'          => $r->notes,
+                'currency'       => $r->currency,
+                'iban'           => $r->iban,
+                'accounts'       => [[
                     'id'       => $r->id,
                     'currency' => $r->currency,
                     'iban'     => $r->iban,
-                ])->values(),
-            ];
-        })->values();
+                ]],
+            ])->values();
 
         return $this->success(['banks' => $banks]);
     }
