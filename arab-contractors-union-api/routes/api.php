@@ -415,6 +415,10 @@ Route::prefix('v1')->group(function () {
         //  Contractors
         // --------------------------------------------------------
         Route::get('contractors/next-membership-number', [ContractorController::class, 'nextMembershipNumber'])->middleware('perm:contractors.list,create');
+        // الاسم والعنوان بالإنجليزي (شهادة العضوية الإنجليزية): اقتراح تلقائي + مراجعة جماعية
+        Route::post('dashboard/contractors/english-suggest', [\App\Http\Controllers\Api\ContractorEnglishNameController::class, 'suggest'])->middleware('perm:contractors.list,view');
+        Route::get('dashboard/contractors/english-names',    [\App\Http\Controllers\Api\ContractorEnglishNameController::class, 'index'])->middleware('perm:contractors.list,view');
+        Route::post('dashboard/contractors/english-names',   [\App\Http\Controllers\Api\ContractorEnglishNameController::class, 'save'])->middleware('perm:contractors.list,update');
         // القائمة/التفاصيل بتستخدمها صفحات تانية لاختيار مقاول (الذمم، المدفوعات، الوثائق...)
         Route::apiResource('contractors', ContractorController::class)
              ->only(['index', 'show'])

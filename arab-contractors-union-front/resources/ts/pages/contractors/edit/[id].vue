@@ -324,9 +324,9 @@ const fetchContractor = async () => {
 }
 
 onMounted(() => {
-  fetchContractor()
   fetchCatalog()
-  fetchGovernorates()
+  // الاسم/العنوان الإنجليزي الفاضي بيتعبّى باقتراح تلقائي بعد ما يتحمّل الملف والمحافظات
+  Promise.all([fetchContractor(), fetchGovernorates()]).then(() => suggestEnglish(true))
 })
 
 // لا يُفرَّغ city_id إلا عند تغيير المحافظة يدوياً بعد تحميل الملف — وإلا يُمسح city_id
@@ -448,6 +448,47 @@ const handleSave = async () => {
 
 // ملخص المراجعة قبل الحفظ
 const governorateName = computed(() => governorates.value.find(g => g.id === form.value.governorate_id)?.name ?? '')
+
+// ─── اقتراح الاسم والعنوان بالإنجليزي (لشهادة العضوية الإنجليزية) ───────────
+// الاقتراح نقل حرفي/ترجمة من السيرفر — بيتعبّى بالخانة والأدمن بيراجعه قبل الحفظ
+const englishSuggested = ref({ name: false, address: false })
+const suggestingEnglish = ref(false)
+
+const arabicAddressForEnglish = () => {
+  const city = citiesForGovernorate(form.value.governorate_id).find(c => c.id === form.value.city_id)?.name
+  const parts = [city || governorateName.value, form.value.district, form.value.address].filter(Boolean)
+
+  return [...new Set(parts)].join(' - ')
+}
+
+async function suggestEnglish(onlyEmpty = false) {
+  const wantName = !!form.value.name && (!onlyEmpty || !form.value.name_en)
+  const address = arabicAddressForEnglish()
+  const wantAddress = !!address && (!onlyEmpty || !form.value.address_en)
+  if (!wantName && !wantAddress)
+    return
+
+  suggestingEnglish.value = true
+  try {
+    const { data } = await api.post('/api/v1/dashboard/contractors/english-suggest', {
+      name: wantName ? form.value.name : undefined,
+      address: wantAddress ? address : undefined,
+    })
+    const s = data.items ?? {}
+    if (wantName && s.name_en) {
+      form.value.name_en = s.name_en
+      englishSuggested.value.name = true
+    }
+    if (wantAddress && s.address_en) {
+      form.value.address_en = s.address_en
+      englishSuggested.value.address = true
+    }
+  }
+  catch {}
+  finally {
+    suggestingEnglish.value = false
+  }
+}
 const cityName = computed(() => citiesForGovernorate(form.value.governorate_id).find(c => c.id === form.value.city_id)?.name ?? '')
 const reviewItems = computed(() => [
   { step: 1, label: 'اسم المنشأة', value: form.value.name },
@@ -703,6 +744,23 @@ const submit = async () => {
             </VCol>
             <VCol
               cols="12"
+              class="d-flex align-center gap-3 flex-wrap"
+            >
+              <span class="text-body-2 text-medium-emphasis">الاسم والعنوان بالإنجليزي (للشهادة الإنجليزية):</span>
+              <VBtn
+                size="small"
+                variant="tonal"
+                color="primary"
+                prepend-icon="tabler-language"
+                :loading="suggestingEnglish"
+                :disabled="!form.name"
+                @click="suggestEnglish(false)"
+              >
+                اقتراح تلقائي بالإنجليزي
+              </VBtn>
+            </VCol>
+            <VCol
+              cols="12"
               md="6"
             >
               <VTextField
@@ -710,8 +768,9 @@ const submit = async () => {
                 label="اسم الشركة بالإنجليزي"
                 placeholder="Company name in English"
                 dir="ltr"
-                hint="بينطبع على النسخة الإنجليزية من شهادة العضوية"
+                :hint="englishSuggested.name ? 'اقتراح تلقائي — راجعه وعدّله قبل الحفظ' : 'بينطبع على النسخة الإنجليزية من شهادة العضوية'"
                 persistent-hint
+                @update:model-value="englishSuggested.name = false"
                 :rules="[v => !v || /^[A-Za-z0-9 .,&'()\/\-]+$/.test(v) || 'حروف إنجليزية وأرقام فقط']"
                 :error-messages="validationErrors.name_en"
               />
@@ -725,8 +784,9 @@ const submit = async () => {
                 label="العنوان بالإنجليزي"
                 placeholder="e.g. Gaza - Al-Rimal"
                 dir="ltr"
-                hint="العنوان على الشهادة الإنجليزية"
+                :hint="englishSuggested.address ? 'اقتراح تلقائي من المدينة والحي والشارع — راجعه' : 'العنوان على الشهادة الإنجليزية'"
                 persistent-hint
+                @update:model-value="englishSuggested.address = false"
                 :rules="[v => !v || /^[A-Za-z0-9 .,&'()\/\-#]+$/.test(v) || 'حروف إنجليزية وأرقام فقط']"
                 :error-messages="validationErrors.address_en"
               />

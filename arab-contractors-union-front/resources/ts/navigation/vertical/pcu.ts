@@ -97,6 +97,7 @@ export function buildPcuNav(user: NavUser): VerticalNavItems {
         { title: 'تسجيل مقاول جديد', to: 'contractors-create' },
         { title: 'طلبات الانتساب', to: 'contractors-memberships' },
         { title: 'طلبات تعديل الملفات', to: 'contractors-profile-changes', ...pendingBadge },
+        { title: 'الأسماء بالإنجليزي', to: 'contractors-english-names' },
       ],
     })
     menuItems.push({
