@@ -13,6 +13,7 @@ class CertificateRequest extends Model
         'reject_reason', 'certificate_path', 'issued_at', 'reviewed_by', 'reviewed_at',
         'pending_payment_id', 'viewed_at', 'last_viewed_at', 'views_count',
         'certificate_address', 'decision_number', 'decision_date', 'valid_until',
+        'certificate_path_en', 'certificate_address_en',
         'revoked_at', 'revoked_by', 'revoke_reason',
     ];
 
@@ -164,6 +165,24 @@ class CertificateRequest extends Model
         // توقيع نسبي (مسار + query بس): رابط مطلق بيتكسر توقيعه لو اختلف المخطط/المضيف
         // بين APP_URL والطلب الواصل من خلف nginx.
         return url(URL::signedRoute('certificates.file', ['certificateRequest' => $this->id], absolute: false));
+    }
+
+    /**
+     * رابط النسخة الإنجليزية (نفس الراوت الموقَّع مع lang=en). بيرجع رابط حتى لو الملف لسا ما انولّد،
+     * طالما للمقاول اسم إنجليزي: أول فتح بيولّده. $track=false للّوحة — فتح الأدمن ما بينحسب على المقاول.
+     */
+    public function englishCertificateUrl(bool $track = true): ?string
+    {
+        if ($this->type !== 'membership' || $this->status !== 'issued' || ! $this->certificate_path) {
+            return null;
+        }
+        if (blank($this->certificate_path_en) && blank($this->contractor?->name_en)) {
+            return null;
+        }
+
+        $params = ['certificateRequest' => $this->id, 'lang' => 'en'] + ($track ? [] : ['track' => 0]);
+
+        return url(URL::signedRoute('certificates.file', $params, absolute: false));
     }
 
     public function getTypeLabelAttribute(): string

@@ -162,6 +162,9 @@ class ContractorController extends Controller
 
         return [
             'name'                          => 'required|string|max:255',
+            // اسم الشركة وعنوانها بالإنجليزي — لشهادة العضوية الإنجليزية، الأدمن بس بيعبّيهم
+            'name_en'                       => ['nullable', 'string', 'max:255', 'regex:/^[A-Za-z0-9 .,&\'()\/\-]+$/'],
+            'address_en'                    => ['nullable', 'string', 'max:255', 'regex:/^[A-Za-z0-9 .,&\'()\/\-#]+$/'],
             'membership_number'             => [
                 'required',
                 'string',
@@ -338,6 +341,8 @@ class ContractorController extends Controller
             'not_regex' => 'حقل :attribute لا يقبل أرقاماً.',
             'before_or_equal' => 'حقل :attribute لا يمكن أن يكون تاريخاً في المستقبل.',
             'registration_date.before' => 'تاريخ التسجيل يجب أن يكون قبل تاريخ اليوم (أمس أو أقدم).',
+            'name_en.regex'                     => 'اسم الشركة بالإنجليزي يقبل حروفاً إنجليزية وأرقاماً فقط.',
+            'address_en.regex'                  => 'العنوان بالإنجليزي يقبل حروفاً إنجليزية وأرقاماً فقط.',
             'phone.regex'                       => 'رقم الجوال يقبل أرقاماً فقط (9 إلى 15 رقماً).',
             'fax.regex'                         => 'الهاتف / الفاكس يقبل أرقاماً فقط (6 إلى 15 رقماً).',
             'authorized_person_id_number.regex' => 'رقم هوية المفوض يجب أن يتكون من 9 أرقام فقط.',
@@ -364,6 +369,8 @@ class ContractorController extends Controller
             'city_id'                       => 'المدينة',
             'district'                      => 'الحي',
             'address'                       => 'العنوان',
+            'name_en'                       => 'اسم الشركة بالإنجليزي',
+            'address_en'                    => 'العنوان بالإنجليزي',
             'partners'                      => 'الشركاء',
             'fax'                           => 'الفاكس',
             'building'                      => 'العمارة',

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class ContractorSpecialization extends Model
 {
-    protected $fillable = ['code', 'contractor_field_id', 'name', 'sort_order', 'is_active'];
+    protected $fillable = ['code', 'contractor_field_id', 'name', 'name_en', 'sort_order', 'is_active'];
 
     protected $casts = [
         'is_active' => 'boolean',

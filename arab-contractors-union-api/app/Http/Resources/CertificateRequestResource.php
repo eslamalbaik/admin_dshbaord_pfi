@@ -41,11 +41,15 @@ class CertificateRequestResource extends JsonResource
             'reject_reason'     => $this->reject_reason,
             // المقاول بياخد الرابط المتتبَّع (فتحه بيتسجّل)، واللوحة الرابط المباشر
             'certificate_url'   => $forContractor ? $this->tracked_certificate_url : $this->certificate_url,
+            // النسخة الإنجليزية من شهادة العضوية (نفس الرقم التسلسلي) — null = ما في نسخة إنجليزية
+            'certificate_url_en' => $this->englishCertificateUrl(track: $forContractor),
+            'english_available'  => $this->englishCertificateUrl() !== null,
             'request_date'      => $this->created_at,
             'issue_date'        => $this->issued_at,
             'reviewed_by'       => $this->reviewedBy?->name,
             // بيانات شهادة العضوية المُدخلة عند الموافقة/الإصدار (العنوان ورقم وتاريخ القرار)
             'certificate_address' => $this->certificate_address,
+            'certificate_address_en' => $this->certificate_address_en,
             'decision_number'     => $this->decision_number,
             'decision_date'       => $this->decision_date?->toDateString(),
             // تاريخ انتهاء شهادة العضوية ("سارية المفعول حتى") كما انطبع عليها — null لغير العضوية أو قبل الإصدار

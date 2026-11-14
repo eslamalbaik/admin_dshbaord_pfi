@@ -28,6 +28,8 @@ const form = ref({
   membership_number: '',
   commercial_register: '',
   name: '',
+  name_en: '',
+  address_en: '',
   capital: '',
   registration_date: '',
   legal_form: '',
@@ -267,7 +269,7 @@ const fetchContractor = async () => {
 
     // Populate text fields only
     const textFields = [
-      'membership_number', 'commercial_register', 'name', 'capital', 'registration_date',
+      'membership_number', 'commercial_register', 'name', 'name_en', 'address_en', 'capital', 'registration_date',
       'legal_form', 'company_purposes', 'owner_name', 'authorized_person',
       'authorized_person_id_number', 'authorized_person_phone', 'authorized_person_whatsapp',
       'fax', 'email', 'governorate_id', 'city_id', 'district', 'building', 'floor',
@@ -337,7 +339,7 @@ watch(() => form.value.governorate_id, () => {
 // أي خطوة يتبع لها كل حقل — لإرجاع المستخدم للخطوة الصحيحة عند خطأ من الخادم
 // ولتعليم الخطوة بعلامة خطأ في الشريط.
 const STEP_FIELDS: Record<number, string[]> = {
-  1: ['membership_number', 'commercial_register', 'name', 'capital', 'registration_date', 'legal_form', 'company_purposes'],
+  1: ['membership_number', 'commercial_register', 'name', 'name_en', 'address_en', 'capital', 'registration_date', 'legal_form', 'company_purposes'],
   2: ['owner_name', 'partners', 'authorized_person', 'authorized_person_id_number', 'authorized_person_phone', 'authorized_person_whatsapp'],
   3: ['fax', 'email', 'governorate_id', 'city_id', 'district', 'address', 'building', 'floor', 'license_number', 'established_date', 'classification', 'specialties'],
 }
@@ -697,6 +699,36 @@ const submit = async () => {
                 label="اسم طالب الانتساب (الشركة / المؤسسة) *"
                 :rules="[v => !!v || 'اسم طالب الانتساب مطلوب']"
                 :error-messages="validationErrors.name"
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              md="6"
+            >
+              <VTextField
+                v-model="form.name_en"
+                label="اسم الشركة بالإنجليزي"
+                placeholder="Company name in English"
+                dir="ltr"
+                hint="بينطبع على النسخة الإنجليزية من شهادة العضوية"
+                persistent-hint
+                :rules="[v => !v || /^[A-Za-z0-9 .,&'()\/\-]+$/.test(v) || 'حروف إنجليزية وأرقام فقط']"
+                :error-messages="validationErrors.name_en"
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              md="6"
+            >
+              <VTextField
+                v-model="form.address_en"
+                label="العنوان بالإنجليزي"
+                placeholder="e.g. Gaza - Al-Rimal"
+                dir="ltr"
+                hint="العنوان على الشهادة الإنجليزية"
+                persistent-hint
+                :rules="[v => !v || /^[A-Za-z0-9 .,&'()\/\-#]+$/.test(v) || 'حروف إنجليزية وأرقام فقط']"
+                :error-messages="validationErrors.address_en"
               />
             </VCol>
             <VCol

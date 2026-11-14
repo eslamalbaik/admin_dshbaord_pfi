@@ -122,7 +122,9 @@ const refresh = () => {
 const certFieldsOpen = ref(false)
 const certFieldsMode = ref<'approve' | 'issue' | 'regenerate'>('approve')
 const certFieldsLoading = ref(false)
-const certFields = ref({ address: '', decision_number: '', decision_date: '', valid_until: '' })
+const certFields = ref({ address: '', decision_number: '', decision_date: '', valid_until: '', address_en: '', include_english: true })
+// اسم الشركة بالإنجليزي من ملف المقاول — بدونه ما في نسخة إنجليزية من شهادة العضوية
+const certNameEn = ref('')
 
 async function openCertFields(mode: 'approve' | 'issue' | 'regenerate') {
   const r = detail.value
@@ -134,12 +136,12 @@ async function openCertFields(mode: 'approve' | 'issue' | 'regenerate') {
     decision_date: r?.decision_date || '',
     // تاريخ انتهاء الشهادة: المحفوظ على الطلب، وإلا آخر عضوية للمقاول (تُعبَّا بعد التحميل)
     valid_until: r?.expiry_date || '',
+    address_en: r?.certificate_address_en || '',
+    include_english: true,
   }
+  certNameEn.value = ''
   actionError.value = ''
   certFieldsOpen.value = true
-
-  if (certFields.value.decision_number && certFields.value.decision_date && (mode === 'approve' || certFields.value.address))
-    return
 
   certFieldsLoading.value = true
   try {
@@ -149,6 +151,8 @@ async function openCertFields(mode: 'approve' | 'issue' | 'regenerate') {
     certFields.value.decision_number ||= c?.classification_decision_number || ''
     certFields.value.decision_date ||= c?.classification_decision_date?.slice(0, 10) || ''
     certFields.value.valid_until ||= c?.active_membership?.expires_at?.slice(0, 10) || ''
+    certFields.value.address_en ||= c?.address_en || ''
+    certNameEn.value = c?.name_en || ''
   }
   catch {}
   finally {
@@ -168,6 +172,11 @@ function certFieldsPayload() {
     payload.decision_date = f.decision_date
   if (detail.value?.type === 'membership' && f.valid_until)
     payload.valid_until = f.valid_until
+  if (certFieldsMode.value !== 'approve' && detail.value?.type === 'membership' && certNameEn.value) {
+    payload.include_english = f.include_english ? '1' : '0'
+    if (f.include_english && f.address_en)
+      payload.address_en = f.address_en
+  }
 
   return payload
 }
@@ -665,6 +674,16 @@ function fmtDate(d: string | null) {
               />
             </VCol>
           </VRow>
+
+          <CertificateEnglishFields
+            v-if="certFieldsMode !== 'approve' && detail?.type === 'membership' && !needsFile"
+            v-model:include="certFields.include_english"
+            v-model:address-en="certFields.address_en"
+            class="mt-4"
+            :contractor-id="detail?.contractor_id"
+            :name-en="certNameEn"
+            :loading="certFieldsLoading"
+          />
 
           <VAlert v-if="actionError" type="error" variant="tonal" density="compact" class="mt-3">
             {{ actionError }}

@@ -42,6 +42,7 @@ class ContractorLookupController extends Controller
         $data = $request->validate([
             'code'       => 'required|integer|min:1|unique:contractor_fields,code',
             'name'       => 'required|string|max:100',
+            'name_en'    => 'nullable|string|max:100',
             'sort_order' => 'nullable|integer|min:0',
         ]);
 
@@ -56,6 +57,7 @@ class ContractorLookupController extends Controller
     {
         $data = $request->validate([
             'name'       => 'sometimes|string|max:100',
+            'name_en'    => 'sometimes|nullable|string|max:100',
             'sort_order' => 'sometimes|integer|min:0',
             'is_active'  => 'sometimes|boolean',
         ]);
@@ -93,6 +95,7 @@ class ContractorLookupController extends Controller
             'code'                 => 'required|integer|min:1|unique:contractor_specializations,code',
             'contractor_field_id'  => 'nullable|integer|exists:contractor_fields,id',
             'name'                 => 'required|string|max:100',
+            'name_en'              => 'nullable|string|max:100',
             'sort_order'           => 'nullable|integer|min:0',
         ]);
 
@@ -108,6 +111,7 @@ class ContractorLookupController extends Controller
         $data = $request->validate([
             'contractor_field_id' => 'sometimes|nullable|integer|exists:contractor_fields,id',
             'name'                => 'sometimes|string|max:100',
+            'name_en'             => 'sometimes|nullable|string|max:100',
             'sort_order'          => 'sometimes|integer|min:0',
             'is_active'           => 'sometimes|boolean',
         ]);
@@ -142,6 +146,7 @@ class ContractorLookupController extends Controller
         $data = $request->validate([
             'code'                  => 'required|string|max:20|unique:contractor_grades,code',
             'label'                 => 'required|string|max:100',
+            'label_en'              => 'nullable|string|max:100',
             // level لازم يكون فريداً — MembershipFeeCalculator يعتمد عليه كترتيب صارم لاختيار
             // "أعلى مجال" (أقل grade_level)؛ تكرار نفس القيمة بين درجتين يجعل اختيار المجال
             // صاحب النسبة 100% غير محدَّد (يعتمد على ترتيب الاستعلام لا على منطق واضح).
@@ -162,6 +167,7 @@ class ContractorLookupController extends Controller
     {
         $data = $request->validate([
             'label'                  => 'sometimes|string|max:100',
+            'label_en'               => 'sometimes|nullable|string|max:100',
             'level'                  => ['sometimes', 'integer', 'min:1', Rule::unique('contractor_grades', 'level')->ignore($contractorGrade->id)],
             'eligible_field_codes'   => 'sometimes|nullable|array',
             'eligible_field_codes.*' => 'integer',

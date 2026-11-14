@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
-import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import api from '@/plugins/axios'
 import {
   AlertTriangle,
@@ -15,6 +15,7 @@ import {
   FileText,
   Hash,
   IdCard,
+  Languages,
   Link2,
   QrCode,
   RefreshCw,
@@ -33,6 +34,7 @@ interface VerifyResult {
   state_label: string
   found: boolean
   contractor_name?: string
+  contractor_name_en?: string | null
   membership_number?: string
   serial_number?: string
   type_label?: string
@@ -42,12 +44,79 @@ interface VerifyResult {
 }
 
 const route = useRoute()
+const router = useRouter()
+
+// اللغة: ?lang=en (رمز QR على الشهادة الإنجليزية بيفتح الصفحة بالإنجليزي)، وزر للتبديل
+type Lang = 'ar' | 'en'
+const lang = ref<Lang>(route.query.lang === 'en' ? 'en' : 'ar')
+const isEn = computed(() => lang.value === 'en')
+watch(() => route.query.lang, v => { lang.value = v === 'en' ? 'en' : 'ar' })
+
+function toggleLang() {
+  const next: Lang = isEn.value ? 'ar' : 'en'
+  lang.value = next
+  router.replace({ query: { ...route.query, lang: next === 'en' ? 'en' : undefined } })
+}
+
+const I18N = {
+  ar: {
+    home: 'الرئيسية', crumb: 'التحقق من شهادة', crumbAria: 'مسار الصفحة', badge: 'النظام الرسمي للتحقق',
+    title: 'التحقق من شهادة العضوية',
+    sub: 'تأكد خلال ثوانٍ من أن الشهادة صادرة فعلاً عن اتحاد المقاولين الفلسطينيين وما زالت سارية.',
+    serialLabel: 'الرقم التسلسلي للشهادة', paste: 'لصق', pasteTitle: 'لصق من الحافظة',
+    checking: 'جاري التحقق...', check: 'تحقق من الشهادة',
+    hint: 'تجده أسفل الشهادة بجانب رمز QR — حروف لاتينية، ولا يهم حجم الأحرف أو وجود شرطات.',
+    errTitle: 'تعذّر الاتصال بالنظام',
+    errDesc: 'لم نتمكن من الوصول إلى خادم التحقق. تأكد من اتصالك بالإنترنت ثم حاول مرة أخرى.',
+    retry: 'إعادة المحاولة',
+    daysLeftPre: 'تبقّى على انتهاء الصلاحية', day: 'يوم', days: 'يوماً', endsToday: 'تنتهي صلاحيتها اليوم',
+    company: 'اسم الشركة / المقاول', membership: 'رقم العضوية', type: 'نوع الشهادة', issued: 'تاريخ الإصدار',
+    validUntil: 'تاريخ انتهاء الصلاحية', revokedAt: 'تاريخ الإلغاء',
+    copy: 'نسخ', copied: 'تم النسخ', verifyLink: 'رابط التحقق',
+    sealTitle: 'تحقق صادر عن النظام الرسمي للاتحاد', sealSub: 'قراءة مباشرة من قاعدة بيانات الاتحاد',
+    again: 'التحقق من شهادة أخرى', stepsAria: 'طريقة التحقق',
+    s1t: 'امسح الرمز أو انسخ الرقم', s1d: 'على كل شهادة رمز QR ورقم تسلسلي أسفلها. الماسح يفتح هذه الصفحة ويتحقق فوراً.',
+    s2t: 'ابحث في سجل الاتحاد', s2d: 'نقرأ الرقم من قاعدة بيانات الاتحاد مباشرة دون أي بيانات مخزّنة مؤقتاً.',
+    s3t: 'اعرف حالة الشهادة', s3d: 'سارية، منتهية، ملغاة أو غير موجودة، مع بيانات الشركة وتاريخَي الإصدار والانتهاء.',
+    switchLang: 'English', logoAlt: 'اتحاد المقاولين الفلسطينيين', membershipType: 'شهادة عضوية',
+  },
+  en: {
+    home: 'Home', crumb: 'Certificate verification', crumbAria: 'Breadcrumb', badge: 'Official verification system',
+    title: 'Verify a Membership Certificate',
+    sub: 'Confirm in seconds that a certificate was issued by the Palestinian Contractors Union and is still valid.',
+    serialLabel: 'Certificate serial number', paste: 'Paste', pasteTitle: 'Paste from clipboard',
+    checking: 'Verifying...', check: 'Verify certificate',
+    hint: 'Printed at the bottom of the certificate next to the QR code — Latin letters; case and dashes do not matter.',
+    errTitle: 'Could not reach the system',
+    errDesc: 'We could not reach the verification server. Check your internet connection and try again.',
+    retry: 'Try again',
+    daysLeftPre: 'Time left until expiry:', day: 'day', days: 'days', endsToday: 'It expires today',
+    company: 'Company / contractor name', membership: 'Membership number', type: 'Certificate type', issued: 'Issue date',
+    validUntil: 'Expiry date', revokedAt: 'Revocation date',
+    copy: 'Copy', copied: 'Copied', verifyLink: 'Verification link',
+    sealTitle: 'Verified by the Union\'s official system', sealSub: 'Read live from the Union database',
+    again: 'Verify another certificate', stepsAria: 'How verification works',
+    s1t: 'Scan the code or copy the number', s1d: 'Every certificate carries a QR code and a serial number at the bottom. Scanning opens this page and verifies instantly.',
+    s2t: 'We search the Union register', s2d: 'The number is read directly from the Union database, never from a cache.',
+    s3t: 'See the certificate status', s3d: 'Valid, expired, revoked or not found, with the company details and the issue and expiry dates.',
+    switchLang: 'العربية', logoAlt: 'Palestinian Contractors Union', membershipType: 'Membership certificate',
+  },
+} as const
+
+const t = computed(() => I18N[lang.value])
 const serial = ref('')
 const isLoading = ref(false)
 const result = ref<VerifyResult | null>(null)
 const failed = ref(false)
 const checkedAt = ref<Date | null>(null)
 const copied = ref<'serial' | 'link' | null>(null)
+
+const STATE_META_EN: Record<VerifyState, { tone: 'ok' | 'warn' | 'bad'; title: string; desc: string }> = {
+  valid: { tone: 'ok', title: 'Valid certificate', desc: 'This certificate was officially issued by the Palestinian Contractors Union and is still valid.' },
+  expired: { tone: 'warn', title: 'Expired certificate', desc: 'This certificate is genuine and was issued by the Union, but its validity period has ended.' },
+  revoked: { tone: 'bad', title: 'Revoked certificate', desc: 'This certificate has been revoked by the Union and is no longer valid.' },
+  not_found: { tone: 'bad', title: 'Certificate not found', desc: 'This serial number is not registered. Check that you typed it exactly as printed at the bottom of the certificate, or scan its QR code.' },
+}
 
 const STATE_META: Record<VerifyState, { tone: 'ok' | 'warn' | 'bad'; title: string; desc: string }> = {
   valid: { tone: 'ok', title: 'شهادة سارية', desc: 'الشهادة صادرة رسمياً عن اتحاد المقاولين الفلسطينيين وما زالت صالحة.' },
@@ -56,7 +125,14 @@ const STATE_META: Record<VerifyState, { tone: 'ok' | 'warn' | 'bad'; title: stri
   not_found: { tone: 'bad', title: 'شهادة غير موجودة', desc: 'الرقم التسلسلي غير مسجّل في النظام. تأكد من كتابته كما هو أسفل الشهادة، أو امسح رمز QR الموجود عليها.' },
 }
 
-const meta = computed(() => (result.value ? STATE_META[result.value.state] : null))
+const meta = computed(() => (result.value ? (isEn.value ? STATE_META_EN : STATE_META)[result.value.state] : null))
+
+// اسم الشركة: بالإنجليزي إذا الصفحة إنجليزية وللمقاول اسم إنجليزي
+const companyName = computed(() =>
+  (isEn.value && result.value?.contractor_name_en) || result.value?.contractor_name)
+const typeLabel = computed(() =>
+  isEn.value && result.value?.type_label ? I18N.en.membershipType : result.value?.type_label)
+const locale = computed(() => (isEn.value ? 'en-GB' : 'ar-PS-u-nu-latn'))
 
 const daysLeft = computed(() => {
   const until = result.value?.valid_until
@@ -68,13 +144,13 @@ const daysLeft = computed(() => {
 
 const checkedAtLabel = computed(() =>
   checkedAt.value
-    ? checkedAt.value.toLocaleString('ar-PS-u-nu-latn', { dateStyle: 'long', timeStyle: 'short' })
+    ? checkedAt.value.toLocaleString(locale.value, { dateStyle: 'long', timeStyle: 'short' })
     : '')
 
 function fmtDate(d?: string | null) {
   if (!d) return '—'
 
-  return new Date(`${d}T00:00:00`).toLocaleDateString('ar-PS-u-nu-latn', { year: 'numeric', month: 'long', day: 'numeric' })
+  return new Date(`${d}T00:00:00`).toLocaleDateString(locale.value, { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
 async function copyText(text: string, what: 'serial' | 'link') {
@@ -89,7 +165,7 @@ async function copyText(text: string, what: 'serial' | 'link') {
 function shareLink() {
   const s = result.value?.serial_number
   if (!s) return
-  copyText(`${window.location.origin}/verify?serial=${encodeURIComponent(s)}`, 'link')
+  copyText(`${window.location.origin}/verify?serial=${encodeURIComponent(s)}${isEn.value ? '&lang=en' : ''}`, 'link')
 }
 
 async function pasteFromClipboard() {
@@ -139,20 +215,23 @@ onMounted(() => {
 </script>
 
 <template>
-  <div dir="rtl" class="vp">
+  <div :dir="isEn ? 'ltr' : 'rtl'" :lang="lang" class="vp" :class="{ 'vp--en': isEn }">
     <!-- ═══ Hero ═══ -->
     <header class="vp-hero">
       <div class="vp-hero-glow vp-hero-glow--a" />
       <div class="vp-hero-glow vp-hero-glow--b" />
       <div class="pub-cont vp-hero-inner">
-        <nav class="vp-crumb" aria-label="مسار الصفحة">
-          <RouterLink to="/landing">الرئيسية</RouterLink>
+        <nav class="vp-crumb" :aria-label="t.crumbAria">
+          <RouterLink to="/landing">{{ t.home }}</RouterLink>
           <span>/</span>
-          <span>التحقق من شهادة</span>
+          <span>{{ t.crumb }}</span>
         </nav>
-        <div class="vp-hero-badge"><ShieldCheck :size="16" /> النظام الرسمي للتحقق</div>
-        <h1 class="vp-title">التحقق من شهادة العضوية</h1>
-        <p class="vp-sub">تأكد خلال ثوانٍ من أن الشهادة صادرة فعلاً عن اتحاد المقاولين الفلسطينيين وما زالت سارية.</p>
+        <button type="button" class="vp-lang" @click="toggleLang">
+          <Languages :size="16" /> {{ t.switchLang }}
+        </button>
+        <div class="vp-hero-badge"><ShieldCheck :size="16" /> {{ t.badge }}</div>
+        <h1 class="vp-title">{{ t.title }}</h1>
+        <p class="vp-sub">{{ t.sub }}</p>
       </div>
       <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </header>
@@ -160,7 +239,7 @@ onMounted(() => {
     <main class="pub-cont vp-main">
       <!-- ═══ Search ═══ -->
       <form class="vp-search" role="search" @submit.prevent="verify">
-        <label for="serial" class="vp-label">الرقم التسلسلي للشهادة</label>
+        <label for="serial" class="vp-label">{{ t.serialLabel }}</label>
         <div class="vp-field" :class="{ 'is-busy': isLoading }">
           <TextCursorInput :size="20" class="vp-field-icon" />
           <input
@@ -176,20 +255,20 @@ onMounted(() => {
             spellcheck="false"
             enterkeyhint="search"
           >
-          <button type="button" class="vp-paste" title="لصق من الحافظة" @click="pasteFromClipboard">
-            <Clipboard :size="18" /><span>لصق</span>
+          <button type="button" class="vp-paste" :title="t.pasteTitle" @click="pasteFromClipboard">
+            <Clipboard :size="18" /><span>{{ t.paste }}</span>
           </button>
         </div>
         <button type="submit" class="vp-btn" :disabled="isLoading || !serial.trim()">
           <span v-if="isLoading" class="vp-spin" aria-hidden="true" />
           <Search v-else :size="20" />
-          <span>{{ isLoading ? 'جاري التحقق...' : 'تحقق من الشهادة' }}</span>
+          <span>{{ isLoading ? t.checking : t.check }}</span>
         </button>
-        <p class="vp-hint">تجده أسفل الشهادة بجانب رمز QR — حروف لاتينية، ولا يهم حجم الأحرف أو وجود شرطات.</p>
+        <p class="vp-hint">{{ t.hint }}</p>
       </form>
 
       <!-- ═══ Loading skeleton ═══ -->
-      <section v-if="isLoading" class="vp-card vp-skel" aria-busy="true" aria-label="جاري التحقق">
+      <section v-if="isLoading" class="vp-card vp-skel" aria-busy="true" :aria-label="t.checking">
         <div class="sk sk-band" />
         <div class="sk sk-line w60" />
         <div class="sk sk-line w90" />
@@ -201,9 +280,9 @@ onMounted(() => {
       <!-- ═══ Connection error ═══ -->
       <section v-else-if="failed" class="vp-card vp-error" role="alert">
         <AlertTriangle :size="40" />
-        <h2>تعذّر الاتصال بالنظام</h2>
-        <p>لم نتمكن من الوصول إلى خادم التحقق. تأكد من اتصالك بالإنترنت ثم حاول مرة أخرى.</p>
-        <button type="button" class="vp-btn vp-btn--ghost" @click="verify"><RefreshCw :size="18" /> إعادة المحاولة</button>
+        <h2>{{ t.errTitle }}</h2>
+        <p>{{ t.errDesc }}</p>
+        <button type="button" class="vp-btn vp-btn--ghost" @click="verify"><RefreshCw :size="18" /> {{ t.retry }}</button>
       </section>
 
       <!-- ═══ Result ═══ -->
@@ -215,7 +294,7 @@ onMounted(() => {
             <XCircle v-else :size="40" />
           </div>
           <div class="vp-status-text">
-            <span class="vp-pill"><BadgeCheck :size="14" /> {{ result.state_label }}</span>
+            <span class="vp-pill"><BadgeCheck :size="14" /> {{ isEn ? meta.title : result.state_label }}</span>
             <h2>{{ meta.title }}</h2>
             <p>{{ meta.desc }}</p>
           </div>
@@ -225,43 +304,43 @@ onMounted(() => {
           <div v-if="daysLeft !== null" class="vp-days">
             <CalendarCheck :size="18" />
             <span>
-              <template v-if="daysLeft > 0">تبقّى على انتهاء الصلاحية <b>{{ daysLeft }}</b> {{ daysLeft === 1 ? 'يوم' : 'يوماً' }}</template>
-              <template v-else>تنتهي صلاحيتها اليوم</template>
+              <template v-if="daysLeft > 0">{{ t.daysLeftPre }} <b>{{ daysLeft }}</b> {{ daysLeft === 1 ? t.day : t.days }}</template>
+              <template v-else>{{ t.endsToday }}</template>
             </span>
           </div>
 
           <div class="vp-company">
             <span class="vp-ico"><Building2 :size="22" /></span>
             <div>
-              <small>اسم الشركة / المقاول</small>
-              <strong>{{ result.contractor_name }}</strong>
+              <small>{{ t.company }}</small>
+              <strong>{{ companyName }}</strong>
             </div>
           </div>
 
           <div class="vp-grid">
             <div class="vp-cell">
               <span class="vp-ico"><IdCard :size="18" /></span>
-              <small>رقم العضوية</small>
+              <small>{{ t.membership }}</small>
               <strong dir="ltr">{{ result.membership_number }}</strong>
             </div>
             <div class="vp-cell">
               <span class="vp-ico"><FileText :size="18" /></span>
-              <small>نوع الشهادة</small>
-              <strong>{{ result.type_label }}</strong>
+              <small>{{ t.type }}</small>
+              <strong>{{ typeLabel }}</strong>
             </div>
             <div class="vp-cell">
               <span class="vp-ico"><CalendarCheck :size="18" /></span>
-              <small>تاريخ الإصدار</small>
+              <small>{{ t.issued }}</small>
               <strong>{{ fmtDate(result.issued_at) }}</strong>
             </div>
             <div class="vp-cell">
               <span class="vp-ico"><CalendarClock :size="18" /></span>
-              <small>تاريخ انتهاء الصلاحية</small>
+              <small>{{ t.validUntil }}</small>
               <strong>{{ fmtDate(result.valid_until) }}</strong>
             </div>
             <div v-if="result.state === 'revoked'" class="vp-cell vp-cell--wide">
               <span class="vp-ico"><XCircle :size="18" /></span>
-              <small>تاريخ الإلغاء</small>
+              <small>{{ t.revokedAt }}</small>
               <strong>{{ fmtDate(result.revoked_at) }}</strong>
             </div>
           </div>
@@ -269,18 +348,18 @@ onMounted(() => {
           <div class="vp-serial">
             <span class="vp-ico"><Hash :size="18" /></span>
             <div class="vp-serial-body">
-              <small>الرقم التسلسلي للشهادة</small>
+              <small>{{ t.serialLabel }}</small>
               <strong dir="ltr">{{ result.serial_number }}</strong>
             </div>
             <button type="button" class="vp-chip" @click="copyText(result.serial_number!, 'serial')">
               <ClipboardCheck v-if="copied === 'serial'" :size="16" />
               <Clipboard v-else :size="16" />
-              {{ copied === 'serial' ? 'تم النسخ' : 'نسخ' }}
+              {{ copied === 'serial' ? t.copied : t.copy }}
             </button>
             <button type="button" class="vp-chip" @click="shareLink">
               <ClipboardCheck v-if="copied === 'link'" :size="16" />
               <Link2 v-else :size="16" />
-              {{ copied === 'link' ? 'تم النسخ' : 'رابط التحقق' }}
+              {{ copied === 'link' ? t.copied : t.verifyLink }}
             </button>
           </div>
         </template>
@@ -288,34 +367,34 @@ onMounted(() => {
         <footer class="vp-seal">
           <ShieldCheck :size="20" />
           <div>
-            <strong>تحقق صادر عن النظام الرسمي للاتحاد</strong>
-            <small>قراءة مباشرة من قاعدة بيانات الاتحاد · {{ checkedAtLabel }}</small>
+            <strong>{{ t.sealTitle }}</strong>
+            <small>{{ t.sealSub }} · {{ checkedAtLabel }}</small>
           </div>
-          <img src="/images/landing/logo-white.png" alt="اتحاد المقاولين الفلسطينيين" class="vp-seal-logo">
+          <img src="/images/landing/logo-white.png" :alt="t.logoAlt" class="vp-seal-logo">
         </footer>
 
-        <button type="button" class="vp-again" @click="reset">التحقق من شهادة أخرى</button>
+        <button type="button" class="vp-again" @click="reset">{{ t.again }}</button>
       </section>
 
       <!-- ═══ Idle: how it works ═══ -->
-      <section v-else class="vp-steps" aria-label="طريقة التحقق">
+      <section v-else class="vp-steps" :aria-label="t.stepsAria">
         <article class="vp-step">
           <span class="vp-step-n">1</span>
           <QrCode :size="26" />
-          <h3>امسح الرمز أو انسخ الرقم</h3>
-          <p>على كل شهادة رمز QR ورقم تسلسلي أسفلها. الماسح يفتح هذه الصفحة ويتحقق فوراً.</p>
+          <h3>{{ t.s1t }}</h3>
+          <p>{{ t.s1d }}</p>
         </article>
         <article class="vp-step">
           <span class="vp-step-n">2</span>
           <Search :size="26" />
-          <h3>ابحث في سجل الاتحاد</h3>
-          <p>نقرأ الرقم من قاعدة بيانات الاتحاد مباشرة دون أي بيانات مخزّنة مؤقتاً.</p>
+          <h3>{{ t.s2t }}</h3>
+          <p>{{ t.s2d }}</p>
         </article>
         <article class="vp-step">
           <span class="vp-step-n">3</span>
           <ShieldCheck :size="26" />
-          <h3>اعرف حالة الشهادة</h3>
-          <p>سارية، منتهية، ملغاة أو غير موجودة، مع بيانات الشركة وتاريخَي الإصدار والانتهاء.</p>
+          <h3>{{ t.s3t }}</h3>
+          <p>{{ t.s3d }}</p>
         </article>
       </section>
     </main>
@@ -344,6 +423,13 @@ onMounted(() => {
   padding: .3rem .8rem; border-radius: 999px; font-size: .8rem; font-weight: 700; color: #ffd54f; margin-bottom: .9rem; }
 .vp-title { color: #fff !important; font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 900; letter-spacing: -.01em; text-shadow: 0 4px 24px rgba(0,0,0,.25); margin: 0 0 .6rem; line-height: 1.25; }
 .vp-sub { margin: 0 auto; max-width: 600px; color: rgba(255,255,255,.82); font-size: 1.02rem; line-height: 1.7; }
+
+/* زر اللغة */
+.vp-lang { display: inline-flex; align-items: center; gap: .4rem; background: transparent; color: #fff; cursor: pointer;
+  border: 1px solid rgba(255,255,255,.35); padding: .3rem .85rem; border-radius: 999px; font: inherit; font-size: .82rem;
+  font-weight: 700; margin-bottom: .9rem; transition: background .2s; }
+.vp-lang:hover { background: rgba(255,255,255,.12); }
+.vp--en { font-family: 'Inter', 'Tajawal', sans-serif; }
 
 /* Layout */
 .vp-main { max-width: 780px; margin: -3.6rem auto 0; position: relative; z-index: 2; padding-bottom: 4rem; }

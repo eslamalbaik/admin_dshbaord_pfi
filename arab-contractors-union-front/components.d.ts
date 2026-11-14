@@ -28,6 +28,7 @@ declare module 'vue' {
     CardStatisticsHorizontal: typeof import('./resources/ts/@core/components/cards/CardStatisticsHorizontal.vue')['default']
     CardStatisticsVertical: typeof import('./resources/ts/@core/components/cards/CardStatisticsVertical.vue')['default']
     CardStatisticsVerticalSimple: typeof import('./resources/ts/@core/components/CardStatisticsVerticalSimple.vue')['default']
+    CertificateEnglishFields: typeof import('./resources/ts/components/CertificateEnglishFields.vue')['default']
     CertificatePreviewDialog: typeof import('./resources/ts/components/dialogs/CertificatePreviewDialog.vue')['default']
     ConfirmDialog: typeof import('./resources/ts/components/dialogs/ConfirmDialog.vue')['default']
     ContractorFieldHistoryDialog: typeof import('./resources/ts/components/ContractorFieldHistoryDialog.vue')['default']
