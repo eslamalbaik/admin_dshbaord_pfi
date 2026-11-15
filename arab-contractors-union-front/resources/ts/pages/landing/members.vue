@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import PublicSocialIcon from '@/components/PublicSocialIcon.vue'
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import api from '@/plugins/axios'
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { Search, Award, Filter, ChevronDown, ChevronLeft, Phone, ChevronUp, Building2, X, Hash, CalendarDays, MapPin, Layers, CircleCheck, HardHat, Route, Droplets, Zap, Wrench, Factory } from 'lucide-vue-next'
+import { Search, Award, Filter, ChevronDown, ChevronLeft, ChevronUp, Building2, X, Hash, CalendarDays, MapPin, Layers, CircleCheck, HardHat, Route, Droplets, Zap, Wrench, Factory } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
@@ -108,12 +109,11 @@ function fieldIcon(name: string) {
   return Wrench
 }
 
-const phoneDigits = (p: string) => p.replace(/[^\d+]/g, '')
 // واتساب بدها الرقم دولي بدون + أو أصفار: 0597… → 970597…
 const waNumber = (p: string) => {
   const d = p.replace(/\D/g, '')
 
-  return d.startsWith('00') ? d.slice(2) : d.startsWith('0') ? `970${d.slice(1)}` : d
+  return d.startsWith('00') ? d.slice(2) : d.startsWith('0') ? `970${d.slice(1)}` : d.length === 9 ? `970${d}` : d
 }
 
 const selectedGroups = computed(() => (selected.value ? groupFields(selected.value) : []))
@@ -309,6 +309,7 @@ onMounted(async () => {
                   <CircleCheck v-if="selected.membership_status === 'active'" :size="15" />
                   {{ selected.status_label }}
                 </span>
+                <a v-if="selected.phone" :href="`https://wa.me/${waNumber(selected.phone)}`" target="_blank" rel="noopener noreferrer" class="mm-wa" aria-label="تواصل عبر واتساب" title="تواصل عبر واتساب"><PublicSocialIcon name="whatsapp" :size="20" /></a>
               </div>
               <button type="button" class="mm-close" aria-label="إغلاق" @click="closeMember"><X :size="22" :stroke-width="2.5" /></button>
             </div>
@@ -322,16 +323,6 @@ onMounted(async () => {
                 <div v-if="selected.member_since" class="mm-info-item">
                   <span class="mm-info-ico"><CalendarDays :size="20" :stroke-width="2.2" /></span>
                   <div><span class="mm-lbl">تاريخ المنح</span><span class="mm-val">{{ selected.member_since }}</span></div>
-                </div>
-                <div v-if="selected.phone" class="mm-info-item">
-                  <span class="mm-info-ico"><Phone :size="20" :stroke-width="2.2" /></span>
-                  <div>
-                    <span class="mm-lbl">رقم التواصل</span>
-                    <span class="mm-val mm-phone" dir="ltr">
-                      <a :href="`tel:${phoneDigits(selected.phone)}`">{{ selected.phone }}</a>
-                      <a :href="`https://wa.me/${waNumber(selected.phone)}`" target="_blank" rel="noopener noreferrer" class="mm-wa">واتساب</a>
-                    </span>
-                  </div>
                 </div>
                 <div v-if="selected.city" class="mm-info-item">
                   <span class="mm-info-ico"><MapPin :size="20" :stroke-width="2.2" /></span>
@@ -470,10 +461,8 @@ onMounted(async () => {
 .mm-count { display: inline-flex; align-items: center; gap: .4rem; font-size: .85rem; font-weight: 800; color: #1a237e; }
 .mm-caret { transition: transform .2s; }
 .mm-caret.open { transform: rotate(180deg); }
-.mm-phone { display: flex; align-items: center; gap: .6rem; }
-.mm-phone a { color: inherit; text-decoration: none; }
-.mm-phone a:hover { text-decoration: underline; }
-.mm-wa { font-size: .78rem; font-weight: 800; color: #11903a !important; background: #e3f6e8; border-radius: 999px; padding: .15rem .6rem; }
+.mm-wa { display: inline-grid; place-items: center; width: 36px; height: 36px; margin-top: .5rem; border-radius: 50%; background: #25d366; color: #fff; transition: transform .2s, box-shadow .2s; }
+.mm-wa:hover { transform: scale(1.1); box-shadow: 0 4px 12px rgba(37, 211, 102, .45); }
 .mm-grades { display: flex; flex-wrap: wrap; gap: .4rem; }
 .mm-specs { list-style: none; }
 .mm-spec { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .6rem 1rem .6rem 1rem; padding-right: 2.6rem; position: relative; }

@@ -3,12 +3,13 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/plugins/axios'
 import PublicNewsTicker from '@/components/PublicNewsTicker.vue'
+import PublicSocialIcon from '@/components/PublicSocialIcon.vue'
 import LoginGuideVideoDialog from '@/components/LoginGuideVideoDialog.vue'
 import { MotionDirective } from '@vueuse/motion'
 import { vHoverCard } from '@/utils/hoverCard'
 import {
   ArrowLeft, Award, Bookmark, Building2, CalendarDays, ChevronLeft, ChevronRight, Clock,
-  FileText, Hourglass, Layers, Loader2, MapPin, Phone, Play, Search, SearchX, ShieldCheck, UserCheck,
+  FileText, Hourglass, Layers, Loader2, MapPin, Play, Search, SearchX, ShieldCheck, UserCheck,
 } from 'lucide-vue-next'
 
 definePage({
@@ -189,6 +190,13 @@ const news = ref<NewsCard[]>([0, 1, 2].map(sampleNews))
 const newsPage = ref(0)
 const newsPages = computed(() => Math.max(1, Math.ceil(news.value.length / 3)))
 const visibleNews = computed(() => news.value.slice(newsPage.value * 3, newsPage.value * 3 + 3))
+
+// واتساب بدها الرقم دولي بدون + أو أصفار: 0597… ← 970597…
+const waNumber = (p: string) => {
+  const d = p.replace(/\D/g, '')
+
+  return d.startsWith('00') ? d.slice(2) : d.startsWith('0') ? `970${d.slice(1)}` : d.length === 9 ? `970${d}` : d
+}
 
 // ─── Data loading ────────────────────────────────────────────────────────────
 async function loadHome() {
@@ -387,7 +395,7 @@ onMounted(() => {
                 </div>
                 <div v-if="c.city || c.phone" class="dcard-meta">
                   <span v-if="c.city" class="dcard-city"><MapPin :size="15" /> {{ c.city }}</span>
-                  <a v-if="c.phone" :href="`tel:${c.phone.replace(/[^\d+]/g, '')}`" class="dcard-phone" dir="ltr"><Phone :size="14" /> {{ c.phone }}</a>
+                  <a v-if="c.phone" :href="`https://wa.me/${waNumber(c.phone)}`" target="_blank" rel="noopener noreferrer" class="dcard-wa" aria-label="تواصل عبر واتساب" title="تواصل عبر واتساب"><PublicSocialIcon name="whatsapp" :size="18" /></a>
                 </div>
                 <div v-if="c.fields.length" class="dcard-fields">
                   <span v-for="f in c.fields" :key="f.name" class="dfield">
@@ -711,8 +719,8 @@ onMounted(() => {
 .dcard:hover { transform: translateY(-3px); box-shadow: 0 14px 32px rgba(10, 10, 60, .2); }
 .dcard-head { padding-bottom: 12px; border-bottom: 1px solid #eceef3; }
 .dcard-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
-.dcard-phone { display: inline-flex; align-items: center; gap: 6px; color: var(--navy); font-size: 13px; font-weight: 700; text-decoration: none; background: var(--navy-soft); border-radius: 999px; padding: 4px 12px; transition: background .2s, color .2s; }
-.dcard-phone:hover { background: var(--navy); color: #fff; }
+.dcard-wa { margin-inline-start: auto; display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #25d366; color: #fff; transition: transform .2s, box-shadow .2s; }
+.dcard-wa:hover { transform: scale(1.1); box-shadow: 0 4px 12px rgba(37, 211, 102, .45); }
 .dcard-city { display: flex; align-items: center; gap: 6px; color: var(--muted) !important; font-size: 13px !important; margin: 0 !important; line-height: 1.4 !important; }
 .dcard-city svg { color: var(--orange); }
 .dcard-fields { display: flex; flex-wrap: wrap; gap: 6px; }
