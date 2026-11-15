@@ -64,6 +64,19 @@ const cardGrades = (m: Member) => [...new Set(m.fields.flatMap(f => f.grades))]
 
 interface FieldGroup { name: string; grades: string[]; specs: { name: string; grade: string | null }[] }
 
+// تطبيع الاسم العربي للمقارنة فقط: "الأبنية" = "ابنيه"، "الميــاه/المجــارى" = "مياه مجاري"
+function normName(s: string) {
+  return (s || '')
+    .replace(/[\u0640\u064B-\u0652]/g, '') // تطويل وتشكيل
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .split(/[\s/\\,،\-–—_()]+/)
+    .filter(Boolean)
+    .map(w => (w.length > 4 && w.startsWith('وال') ? w.slice(3) : w.length > 3 && w.startsWith('ال') ? w.slice(2) : w))
+    .join('')
+}
+
 // الاختصاصات فرع من المجالات: نجمّع كل اختصاص تحت مجاله.
 // إن رجّع الـ API الاختصاصات داخل المجال نستخدمها، وإلا نطابقها مع شجرة المجالات من /filters.
 function groupFields(m: Member): FieldGroup[] {
@@ -71,20 +84,36 @@ function groupFields(m: Member): FieldGroup[] {
     return m.fields.map(f => ({ name: f.name, grades: f.grades, specs: f.specializations ?? [] }))
 
   const left = [...m.specializations]
-  const groups: FieldGroup[] = m.fields.map(f => {
-    const opt = fieldOptions.value.find(o => o.label === f.name)
-    const labels = new Set(opt?.specializations.map(s => s.label) ?? [])
-    const specs: FieldGroup['specs'] = []
+  const groups: FieldGroup[] = m.fields.map(f => ({ name: f.name, grades: f.grades, specs: [] }))
+  const groupKeys = groups.map(g => normName(g.name))
 
+  // نحط كل اختصاص بأول مجال (من مجالات الشركة) بيحقق الشرط
+  const assign = (match: (spec: string, gi: number) => boolean) => {
     for (let i = 0; i < left.length;) {
-      if (labels.has(left[i].name))
-        specs.push(...left.splice(i, 1))
+      const spec = normName(left[i].name)
+      const gi = groups.findIndex((_, k) => match(spec, k))
+      if (gi >= 0)
+        groups[gi].specs.push(...left.splice(i, 1))
       else
         i++
     }
+  }
 
-    return { name: f.name, grades: f.grades, specs }
+  // ١) شجرة المجالات من /filters — بأسماء مطبّعة (ال التعريف، الهمزات، التطويل، المسافات)
+  // لأن اسم المجال/الاختصاص ممكن يختلف بحرف بين قاعدة الإنتاج وقاعدة الستيجنج
+  const treeSpecs = groupKeys.map(key => {
+    const opt = fieldOptions.value.find(o => normName(o.label) === key)
+
+    return new Set(opt?.specializations.map(s => normName(s.label)) ?? [])
   })
+  assign((spec, gi) => treeSpecs[gi].has(spec))
+
+  // ٢) الاختصاص اللي اسمه نفس اسم المجال: "الطرق" ← طرق، "الأبنية" ← ابنية، "كهروميكانيك" ← كهروميكانيك
+  assign((spec, gi) => !!spec && !!groupKeys[gi] && (spec === groupKeys[gi] || spec.includes(groupKeys[gi]) || groupKeys[gi].includes(spec)))
+
+  // ٣) الاختصاص التابع (حسب الشجرة) لمجال اسمه قريب من مجال الشركة
+  assign((spec, gi) => !!groupKeys[gi] && fieldOptions.value.some(o => o.specializations.some(s => normName(s.label) === spec)
+    && (normName(o.label).includes(groupKeys[gi]) || groupKeys[gi].includes(normName(o.label)))))
 
   if (left.length) {
     if (groups.length === 1)
