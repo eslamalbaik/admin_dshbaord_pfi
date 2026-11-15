@@ -8,6 +8,7 @@ use App\Models\SupportTicket;
 use App\Models\User;
 use App\Notifications\SupportTicketContractorRepliedNotification;
 use App\Notifications\SupportTicketCreatedNotification;
+use App\Notifications\SupportTicketStatusNotification;
 use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -129,6 +130,8 @@ class SupportTicketController extends Controller
         if ($admins->isNotEmpty()) {
             Notification::send($admins, new SupportTicketCreatedNotification($ticket));
         }
+
+        $this->notifyContractor($ticket, 'received');
 
         return $this->success(
             $this->format($ticket),
@@ -302,6 +305,21 @@ class SupportTicketController extends Controller
         );
     }
 
+    /** إشعار المقاول بحالة تذكرته؛ فشله ما يوقف الطلب. */
+    private function notifyContractor(SupportTicket $ticket, string $event): void
+    {
+        try {
+            $ticket->contractor?->notify(new SupportTicketStatusNotification($ticket, $event));
+        }
+        catch (\Throwable $e) {
+            Log::warning('Failed to send support-ticket status notification', [
+                'ticket_id' => $ticket->id,
+                'event'     => $event,
+                'error'     => $e->getMessage(),
+            ]);
+        }
+    }
+
     /** PATCH /api/v1/dashboard/support-tickets/{ticket}/status */
     public function updateStatus(Request $request, SupportTicket $ticket)
     {
@@ -312,6 +330,11 @@ class SupportTicketController extends Controller
         $oldStatus = $ticket->getOriginal('status');
 
         $ticket->update(['status' => $data['status']]);
+
+        // "تم الرد" بدون إشعار (قرار الإدارة)، و"مفتوحة" إعادة فتح داخلية
+        if ($oldStatus !== $data['status'] && in_array($data['status'], ['in_progress', 'closed'], true)) {
+            $this->notifyContractor($ticket, $data['status']);
+        }
 
         AuditLogService::record(Auth::user(), 'support_ticket.status_changed', $ticket, ['old_status' => $oldStatus, 'new_status' => $data['status']]);
 

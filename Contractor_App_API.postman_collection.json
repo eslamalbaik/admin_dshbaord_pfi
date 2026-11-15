@@ -3095,7 +3095,7 @@
 								"support-tickets"
 							]
 						},
-						"description": "**POST** `/api/v1/contractor/support-tickets`\n\nيرسل المقاول طلب دعم/شكوى. whatsapp_phone مطلوب (رقم تواصل — ممكن يكون مختلف عن رقم الحساب المسجَّل). category: technical|complaint|inquiry|suggestion|other. attachment اختياري (صورة/PDF حتى 5MB).",
+						"description": "**POST** `/api/v1/contractor/support-tickets`\n\nيرسل المقاول طلب دعم/شكوى. whatsapp_phone مطلوب (رقم تواصل — ممكن يكون مختلف عن رقم الحساب المسجَّل). category: technical|complaint|inquiry|suggestion|other. attachment اختياري (صورة/PDF حتى 5MB).\n\nبعد الإنشاء يوصل المقاول إشعار (type: support_ticket_status) \"تم استلام تذكرتك\"، ولاحقاً إشعار عند تحويل التذكرة إلى قيد المعالجة أو إغلاقها. رد الإدارة نفسه بدون إشعار.",
 						"body": {
 							"mode": "formdata",
 							"formdata": [

@@ -2,7 +2,7 @@
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import api from '@/plugins/axios'
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { Search, Award, Filter, ChevronLeft, ChevronUp, Building2, X, Hash, CalendarDays, MapPin, Layers, CircleCheck, HardHat, Route, Droplets, Zap, Wrench, Factory } from 'lucide-vue-next'
+import { Search, Award, Filter, ChevronDown, ChevronLeft, ChevronUp, Building2, X, Hash, CalendarDays, MapPin, Layers, CircleCheck, HardHat, Route, Droplets, Zap, Wrench, Factory } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
@@ -108,6 +108,15 @@ function fieldIcon(name: string) {
 }
 
 const selectedGroups = computed(() => (selected.value ? groupFields(selected.value) : []))
+
+// قائمة الاختصاصات لكل مجال بتنفتح/بتنسكر بالضغط على راس المجال
+const openFields = ref(new Set<number>())
+function toggleField(i: number) {
+  const next = new Set(openFields.value)
+  next.has(i) ? next.delete(i) : next.add(i)
+  openFields.value = next
+}
+watch(selected, () => { openFields.value = new Set() })
 
 function openMember(m: Member) {
   selected.value = m
@@ -314,14 +323,19 @@ onMounted(async () => {
               <h3 class="mm-sec-title"><Layers :size="22" /> <span>التصنيف: المجالات والاختصاصات</span></h3>
               <div v-if="selectedGroups.length" class="mm-fields">
                 <div v-for="(f, i) in selectedGroups" :key="i" class="mm-field">
-                  <div class="mm-field-head">
+                  <component
+                    :is="f.specs.length ? 'button' : 'div'" class="mm-field-head" :class="{ clickable: f.specs.length }"
+                    :type="f.specs.length ? 'button' : undefined" :aria-expanded="f.specs.length ? openFields.has(i) : undefined"
+                    @click="f.specs.length && toggleField(i)"
+                  >
                     <span class="mm-field-ico"><component :is="fieldIcon(f.name)" :size="22" :stroke-width="2.2" /></span>
                     <span class="mm-field-name">{{ f.name }}</span>
                     <span v-if="!f.specs.length" class="mm-grades">
                       <span v-for="g in f.grades" :key="g" class="mm-grade"><ChevronUp :size="14" :stroke-width="3" /> {{ g }}</span>
                     </span>
-                  </div>
-                  <ul v-if="f.specs.length" class="mm-specs">
+                    <span v-else class="mm-count">{{ f.specs.length }} اختصاص <ChevronDown :size="18" :stroke-width="3" class="mm-caret" :class="{ open: openFields.has(i) }" /></span>
+                  </component>
+                  <ul v-if="f.specs.length && openFields.has(i)" class="mm-specs">
                     <li v-for="(s, j) in f.specs" :key="j" class="mm-spec">
                       <span class="mm-spec-name">{{ s.name }}</span>
                       <span v-if="s.grade" class="mm-grade"><ChevronUp :size="14" :stroke-width="3" /> {{ s.grade }}</span>
@@ -432,6 +446,11 @@ onMounted(async () => {
 .mm-field-head { display: flex; align-items: center; flex-wrap: wrap; gap: .85rem; padding: 0 0 0 1rem; background: #e8ecfb; min-height: 52px; }
 .mm-field-ico { width: 54px; align-self: stretch; min-height: 52px; background: #d3dbf8; color: #1a237e; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .mm-field-name { flex: 1; font-size: 1.02rem; font-weight: 800; color: #0d1b3e; overflow-wrap: anywhere; min-width: 0; padding: .6rem 0; }
+.mm-field-head.clickable { width: 100%; border: 0; font: inherit; text-align: start; cursor: pointer; }
+.mm-field-head.clickable:hover { background: #dfe5fb; }
+.mm-count { display: inline-flex; align-items: center; gap: .4rem; font-size: .85rem; font-weight: 800; color: #1a237e; }
+.mm-caret { transition: transform .2s; }
+.mm-caret.open { transform: rotate(180deg); }
 .mm-grades { display: flex; flex-wrap: wrap; gap: .4rem; }
 .mm-specs { list-style: none; }
 .mm-spec { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .6rem 1rem .6rem 1rem; padding-right: 2.6rem; position: relative; }

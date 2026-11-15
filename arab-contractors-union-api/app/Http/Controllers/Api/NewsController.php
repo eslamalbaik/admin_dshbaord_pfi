@@ -9,14 +9,55 @@ use App\Models\News;
 use App\Services\AuditLogService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 
 class NewsController extends Controller
 {
     use ApiResponseTrait, HandlesMediaUploads;
 
+    /** رابط API الإنتاج للبيئات التجريبية (NEWS_SOURCE_URL، أو تلقائياً على api.pcuorg.cloud)؛ null = قاعدة هالبيئة. */
+    public static function sourceUrl(Request $request): ?string
+    {
+        $url = env('NEWS_SOURCE_URL') ?: ($request->getHost() === 'api.pcuorg.cloud' ? 'https://api-production.pcuorg.cloud' : null);
+
+        return $url ? rtrim($url, '/') : null;
+    }
+
+    /**
+     * قراءة أخبار الإنتاج العامة (للقراءة فقط) وتمريرها كما هي. null = فشل الاتصال، فنرجع لقاعدة هالبيئة.
+     */
+    private function fromSource(Request $request, string $path)
+    {
+        $source = self::sourceUrl($request);
+        if (! $source) {
+            return null;
+        }
+
+        $query = $request->query();
+        ksort($query);
+        $key = 'news_remote_' . md5($source . $path . json_encode($query));
+
+        $res = Cache::remember($key, 300, function () use ($source, $path, $query) {
+            try {
+                $r = Http::timeout(10)->acceptJson()->get("$source/api/v1/$path", $query);
+            } catch (\Throwable) {
+                return null;
+            }
+
+            return $r->ok() || $r->status() === 404 ? ['status' => $r->status(), 'body' => $r->json()] : null;
+        });
+
+        return $res ? response()->json($res['body'], $res['status']) : null;
+    }
+
     // GET /api/v1/news
     public function index(Request $request)
     {
+        if ($remote = $this->fromSource($request, 'news')) {
+            return $remote;
+        }
+
         $query = News::published()->latest('published_at');
 
         if ($request->filled('search'))
@@ -30,8 +71,12 @@ class NewsController extends Controller
     }
 
     // GET /api/v1/news/latest
-    public function latest()
+    public function latest(Request $request)
     {
+        if ($remote = $this->fromSource($request, 'news/latest')) {
+            return $remote;
+        }
+
         $news = News::published()
             ->latest('published_at')
             ->select(['id', 'title', 'slug', 'excerpt', 'image', 'video_url', 'external_url', 'gallery', 'published_at'])
@@ -42,8 +87,12 @@ class NewsController extends Controller
     }
 
     // GET /api/v1/news/{id}  — also accepts the slug for backwards compatibility
-    public function show(string $identifier)
+    public function show(Request $request, string $identifier)
     {
+        if ($remote = $this->fromSource($request, 'news/' . rawurlencode($identifier))) {
+            return $remote;
+        }
+
         $news = News::published()
             ->with('author:id,name')
             ->when(

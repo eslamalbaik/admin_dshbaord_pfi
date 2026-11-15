@@ -24,7 +24,7 @@ class LandingController extends Controller
      * GET /api/v1/landing/home
      * كل بيانات الصفحة الرئيسية في استجابة واحدة (كاش 10 دقائق).
      */
-    public function home()
+    public function home(Request $request)
     {
         $items = Cache::remember('landing_home', 600, function () {
             return [
@@ -62,6 +62,7 @@ class LandingController extends Controller
                     'members_count' => Contractor::where('status', 'active')->count(),
                     'tenders_open'  => Tender::where('status', 'open')->count(),
                     'news_count'    => News::published()->count(),
+                    'specializations_count' => \App\Models\ContractorSpecialization::where('is_active', true)->count(),
                     // أرقام تسويقية يحدّثها الأدمن من الإعدادات
                     'years'         => (int) Setting::get('stat_years', '30'),
                     'projects'      => (int) Setting::get('stat_projects', '5000'),
@@ -84,6 +85,29 @@ class LandingController extends Controller
                     ->values(),
             ];
         });
+
+        // البيئات التجريبية: آخر الأخبار من الإنتاج (قراءة فقط) بدل قاعدة هالبيئة
+        if ($source = NewsController::sourceUrl($request)) {
+            $remote = Cache::remember('landing_news_remote_' . md5($source), 300, function () use ($source) {
+                try {
+                    $r = \Illuminate\Support\Facades\Http::timeout(10)->acceptJson()->get("$source/api/v1/news", ['per_page' => 6]);
+                } catch (\Throwable) {
+                    return null;
+                }
+
+                return $r->ok() ? collect($r->json('items') ?? [])->map(fn ($n) => [
+                    'id'           => $n['id'] ?? null,
+                    'title'        => $n['title'] ?? '',
+                    'slug'         => $n['slug'] ?? null,
+                    'excerpt'      => $n['excerpt'] ?? '',
+                    'image_url'    => $n['image'] ?? null,
+                    'published_at' => $n['published_at'] ?? null,
+                ])->values()->all() : null;
+            });
+            if ($remote) {
+                $items['latest_news'] = $remote;
+            }
+        }
 
         return $this->success($items);
     }

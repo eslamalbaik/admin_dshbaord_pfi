@@ -85,18 +85,18 @@ import PublicFooter from '@/components/PublicFooter.vue'
 /* hero content is centered, both across and down the (shorter) banner */
 .lp-layout .lp-page .page-hero,
 .lp-layout .lp-page .page-header,
-.lp-layout .lp-page .vp-hero { display: flex; flex-direction: column; justify-content: center; text-align: center; }
+.lp-layout .lp-page .vp-hero { display: flex; flex-direction: column; justify-content: center; text-align: start; }
 .lp-layout .lp-page .page-hero-inner,
 .lp-layout .lp-page .page-header > .container,
 .lp-layout .lp-page .vp-hero-inner { width: 100%; }
-.lp-layout .lp-page .page-breadcrumb { justify-content: center; }
-.lp-layout .lp-page .page-hero-desc { margin-inline: auto; }
+.lp-layout .lp-page .page-breadcrumb { justify-content: flex-start; }
+.lp-layout .lp-page .page-hero-desc { margin-inline: 0; }
 /* titles on the news/events header were navy-on-light */
 .lp-layout .lp-page .page-header .page-title { color: #fff; text-shadow: 0 3px 18px rgba(0, 0, 40, .45); }
-.lp-layout .lp-page .page-header .page-desc { color: rgba(255, 255, 255, .86); margin-inline: auto; max-width: 600px; }
-.lp-layout .lp-page .vp-hero-inner { text-align: center; align-items: center; }
-.lp-layout .lp-page .vp-crumb { justify-content: center; }
-.lp-layout .lp-page .vp-sub { margin-inline: auto; }
+.lp-layout .lp-page .page-header .page-desc { color: rgba(255, 255, 255, .86); margin-inline: 0; max-width: 600px; }
+.lp-layout .lp-page .vp-hero-inner { text-align: start; align-items: flex-start; }
+.lp-layout .lp-page .vp-crumb { justify-content: flex-start; }
+.lp-layout .lp-page .vp-sub { margin-inline: 0; }
 @media (max-width: 760px) {
   .lp-layout .lp-page .page-hero,
   .lp-layout .lp-page .page-header,

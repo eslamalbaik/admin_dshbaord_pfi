@@ -7,8 +7,8 @@ import LoginGuideVideoDialog from '@/components/LoginGuideVideoDialog.vue'
 import { MotionDirective } from '@vueuse/motion'
 import { vHoverCard } from '@/utils/hoverCard'
 import {
-  ArrowLeft, Award, Bookmark, Building2, CalendarDays, ChevronLeft, ChevronRight, Clock, FileSignature,
-  FileText, Hourglass, Loader2, MapPin, Play, Search, SearchX, ShieldCheck, UserCheck,
+  ArrowLeft, Award, Bookmark, Building2, CalendarDays, ChevronLeft, ChevronRight, Clock,
+  FileText, Hourglass, Layers, Loader2, MapPin, Play, Search, SearchX, ShieldCheck, UserCheck,
 } from 'lucide-vue-next'
 
 definePage({
@@ -85,13 +85,12 @@ const aboutFeatures = [
   { icon: FileText, title: 'تصفح العطاءات', desc: 'منصة موحدة ومحدثة تتيح للمقاولين تصفح كافة العطاءات والمناقصات المطروحة من الجهات الحكومية والدولية بسهولة وشفافية.' },
   { icon: ShieldCheck, title: 'التمثيل والتنمية الوطنية', desc: 'حماية حقوق شركات المقاولات والتعاون مع الشركاء المحليين بدعم جهود اعادة الإعمار، وتمثيل مصالحها أمام الجهات الرسمية.' },
 ]
-const activeFeature = ref(0)
 
-const unionStats = ref({ years: 30 })
+const unionStats = ref({ years: 30, specializations: 0 })
 const stats = computed(() => [
   { icon: Building2, value: '+350', label: 'شركة مقاولات مصنفة', tone: 'navy' },
   { icon: Award, value: '5', label: 'مجالات تصنيف معتمدة', tone: 'orange' },
-  { icon: FileSignature, value: '+1200', label: 'عطاءات وأخبار', tone: 'navy' },
+  { icon: Layers, value: unionStats.value.specializations ? String(unionStats.value.specializations) : '+40', label: 'اختصاصات معتمدة', tone: 'navy' },
   { icon: CalendarDays, value: `+${unionStats.value.years}`, label: 'عاما من القيادة الوطنية', tone: 'orange' },
 ])
 
@@ -197,6 +196,7 @@ async function loadHome() {
     const r = await api.get('/api/v1/landing/home')
     const home = r.data.items ?? {}
     if (home.stats?.years) unionStats.value.years = home.stats.years
+    if (home.stats?.specializations_count) unionStats.value.specializations = home.stats.specializations_count
     const items = home.latest_news ?? []
     if (items.length) {
       news.value = items.map((n: any) => ({
@@ -279,9 +279,8 @@ onMounted(() => {
           </h2>
           <div class="features">
             <article
-              v-for="(f, i) in aboutFeatures" :key="f.title"
-              class="feature" :class="{ active: activeFeature === i }"
-              @mouseenter="activeFeature = i"
+              v-for="f in aboutFeatures" :key="f.title"
+              class="feature"
             >
               <span class="feature-icon"><component :is="f.icon" :size="22" /></span>
               <div>
@@ -605,7 +604,7 @@ onMounted(() => {
 .about-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 56px; align-items: start; }
 .about .eyebrow { margin-bottom: 22px; }
 /* .lp h2 resets margins, so this needs the extra .lp to win */
-.lp .about-heading { max-width: 640px; font-size: clamp(21px, 1.8vw, 26px); font-weight: 800; line-height: 1.75; margin-bottom: 40px; }
+.lp .about-heading { max-width: 640px; font-size: clamp(21px, 1.8vw, 26px); font-weight: 800; line-height: 1.5; margin-bottom: 40px; }
 .features { display: flex; flex-direction: column; gap: 18px; margin-bottom: 36px; }
 .feature {
   display: flex; align-items: center; gap: 22px; padding: 26px 26px; border-radius: 14px; background: #f4f5f9;
@@ -614,9 +613,6 @@ onMounted(() => {
 .feature h3 { font-size: 17px; font-weight: 800; margin-bottom: 10px; }
 .feature p { color: var(--muted); font-size: 14px; line-height: 1.8; }
 .feature-icon { width: 52px; height: 52px; border-radius: 10px; display: grid; place-items: center; flex-shrink: 0; background: #e3e3f1; color: var(--navy); transition: background .25s, color .25s; }
-.feature.active { background: var(--navy); color: #fff; }
-.feature.active p { color: rgba(255, 255, 255, .82); }
-.feature.active .feature-icon { background: var(--orange); color: #fff; }
 .about-btn { float: left; padding: 14px 26px; font-size: 15px; }
 .about-visual { position: relative; padding: 14px 20px 0 0; }
 .about-frame { position: absolute; top: 0; right: 0; left: 30px; bottom: 36px; border: 1.5px solid var(--orange); border-radius: 18px; }

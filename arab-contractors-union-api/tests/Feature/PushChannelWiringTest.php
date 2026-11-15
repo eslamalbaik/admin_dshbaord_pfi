@@ -51,6 +51,7 @@ class PushChannelWiringTest extends TestCase
             'payment confirmed'  => [fn () => new PaymentConfirmedNotification(new Payment(['amount' => 100]))],
             'payment rejected'   => [fn () => new PaymentRejectedNotification(new Payment(['amount' => 100]))],
             'penalty added'      => [fn () => new PenaltyAddedNotification(new Penalty(['amount' => 40, 'reason' => 'مخالفة', 'status' => 'unpaid']))],
+            'support ticket status' => [fn () => new \App\Notifications\SupportTicketStatusNotification(new \App\Models\SupportTicket(['subject' => 'مشكلة']), 'received')],
             'complete profile'   => [fn () => new CompleteProfileNotification()],
             'certificate status' => [fn () => new CertificateRequestStatusNotification(new CertificateRequest(['status' => 'issued']))],
             'expiry reminder'    => [fn () => new MembershipExpiryReminderNotification(new Membership(), 7)],
