@@ -165,7 +165,7 @@ class LandingController extends Controller
             ->filter(fn ($m) => $gradeLabel === null || collect($m['fields'] ?? [])->contains(fn ($x) => in_array($gradeLabel, $x['grades'] ?? [], true)))
             ->filter(fn ($m) => $q === '' || str_contains($m['name'] ?? '', $q)
                 || in_array($m['membership_number'] ?? '', [$q, MembershipNumber::normalize($q)], true))
-            ->map(fn ($m) => $m + ['logo_url' => null, 'member_since' => null, 'specializations' => []])
+            ->map(fn ($m) => $m + ['phone' => null, 'logo_url' => null, 'member_since' => null, 'specializations' => []])
             ->values();
 
         return $this->paginated(new LengthAwarePaginator(
@@ -202,7 +202,7 @@ class LandingController extends Controller
         $query = Contractor::query()
             ->whereIn('status', ['active', 'expired', 'suspended'])
             ->whereNotIn('membership_number', self::HIDDEN_FROM_DIRECTORY)
-            ->select(['id', 'name', 'membership_number', 'city', 'status', 'specialties', 'logo', 'registration_date', 'created_at']);
+            ->select(['id', 'name', 'membership_number', 'city', 'phone', 'status', 'specialties', 'logo', 'registration_date', 'created_at']);
 
         if ($search !== '') {
             $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $search) . '%';
@@ -236,6 +236,7 @@ class LandingController extends Controller
                 'name'              => $c->name,
                 'membership_number' => $c->membership_number,
                 'city'              => $c->city,
+                'phone'             => $c->phone ?: null,
                 'logo_url'          => $c->logo ? $c->logo_url : null,
                 'member_since'      => $since ? (int) \Carbon\Carbon::parse($since)->year : null,
                 'membership_status' => $memberStatus,

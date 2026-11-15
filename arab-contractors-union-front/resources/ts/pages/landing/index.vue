@@ -8,7 +8,7 @@ import { MotionDirective } from '@vueuse/motion'
 import { vHoverCard } from '@/utils/hoverCard'
 import {
   ArrowLeft, Award, Bookmark, Building2, CalendarDays, ChevronLeft, ChevronRight, Clock,
-  FileText, Hourglass, Layers, Loader2, MapPin, Play, Search, SearchX, ShieldCheck, UserCheck,
+  FileText, Hourglass, Layers, Loader2, MapPin, Phone, Play, Search, SearchX, ShieldCheck, UserCheck,
 } from 'lucide-vue-next'
 
 definePage({
@@ -124,7 +124,7 @@ function openTender(t: TenderCard) {
 }
 
 // ─── Directory search ────────────────────────────────────────────────────────
-interface DirectoryItem { name: string; membership_number: string; city: string | null; membership_status: string; status_label: string; fields: { name: string; grades: string[] }[] }
+interface DirectoryItem { name: string; membership_number: string; city: string | null; phone?: string | null; membership_status: string; status_label: string; fields: { name: string; grades: string[] }[] }
 const searchQuery = ref('')
 const directory = ref<DirectoryItem[]>([])
 const directoryTotal = ref(0)
@@ -295,7 +295,7 @@ onMounted(() => {
         </div>
         <div v-reveal-side :delay="150" class="about-visual">
           <span class="about-frame" />
-          <img src="/images/landing/home-about-hq.webp" alt="مقر اتحاد المقاولين الفلسطينيين" width="397" height="595" loading="lazy">
+          <img src="/images/landing/home-about-hq-v2.webp" alt="مقر اتحاد المقاولين الفلسطينيين" width="397" height="595" loading="lazy">
         </div>
       </div>
 
@@ -385,7 +385,10 @@ onMounted(() => {
                   </div>
                   <span class="dstatus" :class="`dstatus-${c.membership_status}`"><i />{{ c.status_label }}</span>
                 </div>
-                <p v-if="c.city" class="dcard-city"><MapPin :size="15" /> {{ c.city }}</p>
+                <div v-if="c.city || c.phone" class="dcard-meta">
+                  <span v-if="c.city" class="dcard-city"><MapPin :size="15" /> {{ c.city }}</span>
+                  <a v-if="c.phone" :href="`tel:${c.phone.replace(/[^\d+]/g, '')}`" class="dcard-phone" dir="ltr"><Phone :size="14" /> {{ c.phone }}</a>
+                </div>
                 <div v-if="c.fields.length" class="dcard-fields">
                   <span v-for="f in c.fields" :key="f.name" class="dfield">
                     {{ f.name }}<b v-if="f.grades.length"> · {{ f.grades.join('، ') }}</b>
@@ -704,6 +707,12 @@ onMounted(() => {
 .dstatus-active { background: #e3f6e8; color: var(--green); }
 .dstatus-expired { background: #fff1dc; color: var(--orange); }
 .dstatus-suspended { background: #fde8ea; color: #d6142b; }
+.dcard { box-shadow: 0 8px 24px rgba(10, 10, 60, .12); transition: transform .2s, box-shadow .2s; }
+.dcard:hover { transform: translateY(-3px); box-shadow: 0 14px 32px rgba(10, 10, 60, .2); }
+.dcard-head { padding-bottom: 12px; border-bottom: 1px solid #eceef3; }
+.dcard-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.dcard-phone { display: inline-flex; align-items: center; gap: 6px; color: var(--navy); font-size: 13px; font-weight: 700; text-decoration: none; background: var(--navy-soft); border-radius: 999px; padding: 4px 12px; transition: background .2s, color .2s; }
+.dcard-phone:hover { background: var(--navy); color: #fff; }
 .dcard-city { display: flex; align-items: center; gap: 6px; color: var(--muted) !important; font-size: 13px !important; margin: 0 !important; line-height: 1.4 !important; }
 .dcard-city svg { color: var(--orange); }
 .dcard-fields { display: flex; flex-wrap: wrap; gap: 6px; }

@@ -2,7 +2,7 @@
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import api from '@/plugins/axios'
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { Search, Award, Filter, ChevronDown, ChevronLeft, ChevronUp, Building2, X, Hash, CalendarDays, MapPin, Layers, CircleCheck, HardHat, Route, Droplets, Zap, Wrench, Factory } from 'lucide-vue-next'
+import { Search, Award, Filter, ChevronDown, ChevronLeft, Phone, ChevronUp, Building2, X, Hash, CalendarDays, MapPin, Layers, CircleCheck, HardHat, Route, Droplets, Zap, Wrench, Factory } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
@@ -11,6 +11,7 @@ interface Member {
   name: string
   membership_number: string
   city: string | null
+  phone?: string | null
   logo_url: string | null
   member_since: number | null
   membership_status: 'active' | 'expired' | 'suspended'
@@ -105,6 +106,14 @@ function fieldIcon(name: string) {
   if (/صناع|ميكانيك/.test(name)) return Factory
 
   return Wrench
+}
+
+const phoneDigits = (p: string) => p.replace(/[^\d+]/g, '')
+// واتساب بدها الرقم دولي بدون + أو أصفار: 0597… → 970597…
+const waNumber = (p: string) => {
+  const d = p.replace(/\D/g, '')
+
+  return d.startsWith('00') ? d.slice(2) : d.startsWith('0') ? `970${d.slice(1)}` : d
 }
 
 const selectedGroups = computed(() => (selected.value ? groupFields(selected.value) : []))
@@ -314,6 +323,16 @@ onMounted(async () => {
                   <span class="mm-info-ico"><CalendarDays :size="20" :stroke-width="2.2" /></span>
                   <div><span class="mm-lbl">تاريخ المنح</span><span class="mm-val">{{ selected.member_since }}</span></div>
                 </div>
+                <div v-if="selected.phone" class="mm-info-item">
+                  <span class="mm-info-ico"><Phone :size="20" :stroke-width="2.2" /></span>
+                  <div>
+                    <span class="mm-lbl">رقم التواصل</span>
+                    <span class="mm-val mm-phone" dir="ltr">
+                      <a :href="`tel:${phoneDigits(selected.phone)}`">{{ selected.phone }}</a>
+                      <a :href="`https://wa.me/${waNumber(selected.phone)}`" target="_blank" rel="noopener noreferrer" class="mm-wa">واتساب</a>
+                    </span>
+                  </div>
+                </div>
                 <div v-if="selected.city" class="mm-info-item">
                   <span class="mm-info-ico"><MapPin :size="20" :stroke-width="2.2" /></span>
                   <div><span class="mm-lbl">المدينة</span><span class="mm-val">{{ selected.city }}</span></div>
@@ -451,6 +470,10 @@ onMounted(async () => {
 .mm-count { display: inline-flex; align-items: center; gap: .4rem; font-size: .85rem; font-weight: 800; color: #1a237e; }
 .mm-caret { transition: transform .2s; }
 .mm-caret.open { transform: rotate(180deg); }
+.mm-phone { display: flex; align-items: center; gap: .6rem; }
+.mm-phone a { color: inherit; text-decoration: none; }
+.mm-phone a:hover { text-decoration: underline; }
+.mm-wa { font-size: .78rem; font-weight: 800; color: #11903a !important; background: #e3f6e8; border-radius: 999px; padding: .15rem .6rem; }
 .mm-grades { display: flex; flex-wrap: wrap; gap: .4rem; }
 .mm-specs { list-style: none; }
 .mm-spec { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .6rem 1rem .6rem 1rem; padding-right: 2.6rem; position: relative; }
