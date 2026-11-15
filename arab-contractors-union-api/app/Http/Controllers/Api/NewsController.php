@@ -64,7 +64,7 @@ class NewsController extends Controller
             $query->where('title', 'like', '%' . $request->search . '%');
 
         $paginator = $query
-            ->select(['id', 'title', 'slug', 'excerpt', 'image', 'video_url', 'external_url', 'gallery', 'published_at'])
+            ->select(['id', 'title', 'slug', 'excerpt', 'image', 'video_url', 'external_url', 'gallery', 'convened_at', 'published_at'])
             ->paginate($request->integer('per_page', 9));
 
         return $this->paginated($paginator);
@@ -79,7 +79,7 @@ class NewsController extends Controller
 
         $news = News::published()
             ->latest('published_at')
-            ->select(['id', 'title', 'slug', 'excerpt', 'image', 'video_url', 'external_url', 'gallery', 'published_at'])
+            ->select(['id', 'title', 'slug', 'excerpt', 'image', 'video_url', 'external_url', 'gallery', 'convened_at', 'published_at'])
             ->limit(3)
             ->get();
 
