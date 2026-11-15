@@ -199,4 +199,15 @@ class NewsAdminTest extends TestCase
     {
         $this->postJson('/api/v1/admin/news', ['title' => 'x', 'body' => 'y'])->assertStatus(401);
     }
+
+    public function test_public_news_list_and_latest_return_convened_at(): void
+    {
+        News::create([
+            'title' => 'خبر', 'slug' => 'khabar', 'body' => 'نص',
+            'is_published' => true, 'published_at' => now()->subHour(), 'convened_at' => '2026-10-20',
+        ]);
+
+        $this->getJson('/api/v1/news')->assertOk()->assertJsonPath('items.0.convened_at', '2026-10-20');
+        $this->getJson('/api/v1/news/latest')->assertOk()->assertJsonPath('items.0.convened_at', '2026-10-20');
+    }
 }
