@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import api from '@/plugins/axios'
 import { RefreshCw, SendHorizontal, X } from 'lucide-vue-next'
 
@@ -21,6 +21,26 @@ const loaded = ref(false)
 const failed = ref(false)
 const messages = ref<Msg[]>([{ id: 1, from: 'bot', text: GREETING }])
 const bodyEl = ref<HTMLElement | null>(null)
+
+// فقاعة الترحيب: بتظهر لما الماوس/التركيز يكون على صورة الروبوت، ومرة وحدة تلقائياً لكل زيارة (بتختفي بعد ثواني)
+const tip = ref(false)
+let tipTimer: ReturnType<typeof setTimeout> | undefined
+function showTip(auto = false) {
+  if (open.value) return
+  tip.value = true
+  clearTimeout(tipTimer)
+  if (auto) tipTimer = setTimeout(() => { tip.value = false }, 6000)
+}
+function hideTip() { clearTimeout(tipTimer); tip.value = false }
+onMounted(() => {
+  try {
+    if (sessionStorage.getItem('asst_tip_seen')) return
+    sessionStorage.setItem('asst_tip_seen', '1')
+  }
+  catch { /* التخزين غير متاح: بنكمّل عادي */ }
+  tipTimer = setTimeout(() => showTip(true), 4000)
+})
+onBeforeUnmount(() => clearTimeout(tipTimer))
 let seq = 1
 
 const suggestions = computed(() => faqs.value.slice(0, 4))
@@ -36,6 +56,7 @@ async function loadFaqs() {
 }
 
 function toggle() {
+  hideTip()
   open.value = !open.value
   if (open.value) { loadFaqs(); scrollDown() }
 }
@@ -59,7 +80,7 @@ function push(m: Omit<Msg, 'id'>) {
 }
 
 // ── مطابقة عربية بسيطة: توحيد الحروف، حذف التشكيل و"ال"، وتجاهل كلمات الوصل ──
-const STOP = new Set(['ما', 'ماذا', 'هل', 'كيف', 'متى', 'اين', 'في', 'من', 'الى', 'على', 'عن', 'هو', 'هي', 'هذا', 'هذه', 'ان', 'او', 'و', 'لا', 'نعم', 'انا', 'اريد', 'ابغى', 'بدي', 'عايز', 'ممكن', 'يمكن', 'يمكنني', 'لو', 'كم', 'ذلك', 'التي', 'الذي', 'لدي', 'عندي', 'مع', 'بعد', 'قبل', 'اذا', 'ايضا'])
+const STOP = new Set(['ما', 'ماذا', 'هل', 'كيف', 'متى', 'اين', 'في', 'من', 'الى', 'على', 'عن', 'هو', 'هي', 'هذا', 'هذه', 'ان', 'او', 'و', 'لا', 'نعم', 'انا', 'اريد', 'ابغى', 'بدي', 'عايز', 'ممكن', 'يمكن', 'يمكنني', 'لو', 'كم', 'ذلك', 'التي', 'الذي', 'لدي', 'عندي', 'مع', 'بعد', 'قبل', 'اذا', 'ايضا', 'اتحاد', 'الاتحاد', 'للاتحاد', 'مقاولين', 'فلسطين', 'فلسطيني', 'فلسطينيين', 'شركه', 'شركات'])
 
 function norm(t: string) {
   return t
@@ -166,7 +187,7 @@ function answer(text: string) {
     .sort((a, b) => b.s - a.s)
 
   const best = ranked[0]
-  if (best && best.s >= 3)
+  if (best && best.s >= 6)
     return push({ from: 'bot', text: best.f.answer })
 
   if (pageHint(text)) return
@@ -185,7 +206,7 @@ function answer(text: string) {
 /** جواب الذكاء الاصطناعي من الخادم (Gemini)؛ null لو مش متاح أو فشل، فنجاوب محلياً من الأسئلة الشائعة */
 async function askAi(text: string, history: { role: 'user' | 'bot'; text: string }[]) {
   try {
-    const r = await api.post('/api/v1/assistant/chat', { message: text, history }, { timeout: 15000 })
+    const r = await api.post('/api/v1/assistant/chat', { message: text, history }, { timeout: 40000 })
 
     return r.data?.available && r.data.reply ? String(r.data.reply) : null
   }
@@ -270,7 +291,14 @@ function ask(f: Faq) {
       </section>
     </Transition>
 
-    <button type="button" class="asst-fab" :class="{ 'is-open': open }" :aria-label="open ? 'إغلاق المساعد' : 'فتح المساعد الافتراضي'" :aria-expanded="open" @click="toggle">
+    <Transition name="asst-tip">
+      <div v-if="tip && !open" class="asst-tip" role="tooltip">
+        <strong>مرحباً بك! 👋</strong>
+        <span>أنا المساعد الافتراضي لاتحاد المقاولين الفلسطينيين، يسعدني مساعدتك في أي سؤال.</span>
+      </div>
+    </Transition>
+
+    <button type="button" class="asst-fab" @mouseenter="showTip()" @mouseleave="hideTip" @focus="showTip()" @blur="hideTip" :class="{ 'is-open': open }" :aria-label="open ? 'إغلاق المساعد' : 'فتح المساعد الافتراضي'" :aria-expanded="open" @click="toggle">
       <span v-if="!open" class="asst-fab-ring" />
       <svg v-if="!open" class="asst-robot" viewBox="0 0 64 64" aria-hidden="true">
         <circle cx="32" cy="32" r="30" fill="#e8f3ff" />
@@ -332,6 +360,11 @@ function ask(f: Faq) {
 .asst-send:not(:disabled):hover { transform: scale(1.06); }
 .asst-foot { margin: 0; padding: .35rem 1rem .7rem; text-align: center; font-size: .72rem; color: #9aa3b5; }
 
+.asst-tip { position: absolute; right: 0; bottom: 84px; width: 250px; display: flex; flex-direction: column; gap: .2rem; background: #fff; color: #1f2a44; border-radius: 16px; padding: .8rem 1rem; box-shadow: 0 14px 36px rgba(0, 0, 60, .24); border: 1px solid #e3e7f1; font-size: .88rem; line-height: 1.7; pointer-events: none; }
+.asst-tip strong { color: #00006e; font-size: .95rem; }
+.asst-tip::after { content: ''; position: absolute; bottom: -7px; right: 26px; width: 14px; height: 14px; background: #fff; border-right: 1px solid #e3e7f1; border-bottom: 1px solid #e3e7f1; transform: rotate(45deg); }
+.asst-tip-enter-active, .asst-tip-leave-active { transition: opacity .25s ease, transform .25s ease; }
+.asst-tip-enter-from, .asst-tip-leave-to { opacity: 0; transform: translateY(8px); }
 .asst-pop-enter-active, .asst-pop-leave-active { transition: opacity .22s ease, transform .22s ease; transform-origin: bottom right; }
 .asst-pop-enter-from, .asst-pop-leave-to { opacity: 0; transform: translateY(12px) scale(.96); }
 @media (max-width: 560px) {

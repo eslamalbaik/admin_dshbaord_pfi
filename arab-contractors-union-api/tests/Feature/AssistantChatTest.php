@@ -61,4 +61,35 @@ class AssistantChatTest extends TestCase
         $this->postJson('/api/v1/assistant/chat', ['message' => ''])->assertStatus(422);
         $this->postJson('/api/v1/assistant/chat', ['message' => str_repeat('ا', 301)])->assertStatus(422);
     }
+
+    public function test_falls_back_to_the_next_model_when_the_first_is_overloaded(): void
+    {
+        config(['services.gemini.key' => 'test-key', 'services.gemini.model' => 'model-a', 'services.gemini.fallbacks' => ['model-b']]);
+
+        Http::fake([
+            'generativelanguage.googleapis.com/v1beta/models/model-a:*' => Http::response(['error' => 'busy'], 503),
+            'generativelanguage.googleapis.com/v1beta/models/model-b:*' => Http::response([
+                'candidates' => [['content' => ['parts' => [['text' => 'جواب من البديل']]]]],
+            ]),
+        ]);
+
+        $this->postJson('/api/v1/assistant/chat', ['message' => 'من هو أمين الصندوق؟'])
+            ->assertOk()->assertJson(['available' => true, 'reply' => 'جواب من البديل']);
+    }
+
+    public function test_site_knowledge_is_sent_to_the_model(): void
+    {
+        config(['services.gemini.key' => 'test-key']);
+        Http::fake(['generativelanguage.googleapis.com/*' => Http::response([
+            'candidates' => [['content' => ['parts' => [['text' => 'ok']]]]],
+        ])]);
+
+        $this->postJson('/api/v1/assistant/chat', ['message' => 'من هم أعضاء مجلس الإدارة؟'])->assertOk();
+
+        Http::assertSent(function ($req) {
+            $sys = $req['systemInstruction']['parts'][0]['text'];
+
+            return str_contains($sys, 'مجلس الإدارة') && str_contains($sys, 'خدمات الاتحاد') && str_contains($sys, 'info@pcu.org.ps');
+        });
+    }
 }

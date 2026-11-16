@@ -73,7 +73,9 @@ return [
     // المفتاح بيننحط بـ.env على الخادم فقط ولا بينحط أبداً بالواجهة.
     'gemini' => [
         'key'   => env('GEMINI_API_KEY'),
-        'model' => env('GEMINI_MODEL', 'gemini-2.0-flash'),
+        // أسماء النماذج بتتغير: بنجرّب الأساسي ثم البدائل لو كان مشغولاً (503) أو مسحوباً (404). القائمة الحالية: GET /v1beta/models
+        'model'     => env('GEMINI_MODEL', 'gemini-flash-lite-latest'),
+        'fallbacks' => array_filter(explode(',', (string) env('GEMINI_FALLBACK_MODELS', 'gemini-3.1-flash-lite,gemini-3.8-flash'))),
     ],
 
     // Firebase Cloud Messaging — log للتجربة إلى أن يُرفَع ملف اعتماد Service Account
