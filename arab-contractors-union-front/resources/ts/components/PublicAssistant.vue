@@ -8,7 +8,8 @@ import { RefreshCw, SendHorizontal, X } from 'lucide-vue-next'
  * ببحث نصي بسيط على الكلمات (بدون ذكاء اصطناعي خارجي). لو ما لقى جواب قريب بيقترح أقرب الأسئلة وبيحوّل لصفحة التواصل.
  */
 interface Faq { id: number; question: string; answer: string }
-interface Msg { id: number; from: 'bot' | 'user'; text: string; faqs?: Faq[]; link?: boolean }
+interface PageLink { label: string; to: string }
+interface Msg { id: number; from: 'bot' | 'user'; text: string; faqs?: Faq[]; link?: boolean; links?: PageLink[] }
 
 const GREETING = 'مرحباً! كيف يمكنني مساعدتك اليوم؟'
 
@@ -40,6 +41,7 @@ function toggle() {
 }
 
 function reset() {
+  lastBotAskedMore = false
   seq = 1
   messages.value = [{ id: 1, from: 'bot', text: GREETING }]
   typing.value = false
@@ -88,6 +90,75 @@ function score(q: string[], f: Faq) {
   return s
 }
 
+// ── محادثة بسيطة: تحية، شكر، وداع، تعريف بالمساعد، بيانات التواصل، وتوجيه لصفحات الموقع ──
+const CONTACT_LINK: PageLink = { label: 'تواصل معنا', to: '/landing/contact-us' }
+const PAGES: { words: string[]; text: string; link: PageLink }[] = [
+  { words: ['عطاء', 'عطاءات', 'مناقصه', 'مناقصات'], text: 'يمكنك تصفّح العطاءات والمناقصات المطروحة ومتابعة مواعيد إغلاقها من بوابة العطاءات.', link: { label: 'بوابة العطاءات', to: '/landing/public-tenders' } },
+  { words: ['تدريب', 'دوره', 'دورات', 'ورشه', 'ورش'], text: 'تجد البرامج والدورات التدريبية للاتحاد في صفحة التدريب وبناء القدرات.', link: { label: 'التدريب وبناء القدرات', to: '/landing/training-center' } },
+  { words: ['تحقق', 'التحقق', 'صحه', 'صلاحيه'], text: 'للتحقق من صحة شهادة صادرة عن الاتحاد استخدم صفحة التحقق من الشهادة.', link: { label: 'التحقق من شهادة', to: '/landing/verify-certificate' } },
+  { words: ['دليل', 'شركات', 'مقاول', 'مقاولين', 'مقاولات'], text: 'يمكنك البحث عن الشركات المسجلة والمصنفة لدى الاتحاد في دليل شركات المقاولات.', link: { label: 'دليل شركات المقاولات', to: '/landing/members' } },
+  { words: ['خدمات', 'خدمه'], text: 'تجد خدمات الاتحاد (العضوية، التصنيف، العطاءات، التدريب وغيرها) في صفحة الخدمات الإلكترونية.', link: { label: 'الخدمات الإلكترونية', to: '/landing/services' } },
+  { words: ['اخبار', 'خبر', 'تعميم', 'تعاميم', 'اعلان', 'اعلانات'], text: 'آخر أخبار الاتحاد وتعاميمه في المركز الإعلامي.', link: { label: 'الأخبار', to: '/landing/news' } },
+  { words: ['دخول', 'تسجيل الدخول', 'حسابي', 'بوابه'], text: 'يمكن للأعضاء تسجيل الدخول إلى بوابة المقاولين لمتابعة العضوية والطلبات والشهادات.', link: { label: 'تسجيل الدخول', to: '/contractor/login' } },
+]
+
+function words(text: string) {
+  return norm(text).split(/\s+/).filter(Boolean)
+}
+
+/** كلمة كاملة أو عبارة (بعد التوحيد) موجودة بالنص */
+function has(text: string, list: string[]) {
+  const t = ` ${words(text).join(' ')} `
+
+  return list.some(x => t.includes(` ${norm(x)} `))
+}
+
+let lastBotAskedMore = false
+
+function smallTalk(text: string): boolean {
+  const n = words(text)
+  const short = n.length <= 6
+  const asked = lastBotAskedMore
+  lastBotAskedMore = false
+
+  if (short && has(text, ['شكرا', 'شكرا لك', 'مشكور', 'يعطيك العافيه', 'تسلم', 'يسلمو', 'ممنون']))
+    return lastBotAskedMore = true, push({ from: 'bot', text: 'العفو! هل تريد معرفة شيء آخر عن الاتحاد؟' }), true
+
+  if (short && has(text, ['مع السلامه', 'وداعا', 'باي', 'الى اللقاء', 'تصبح على خير', 'سلام']) && !has(text, ['السلام عليكم']))
+    return push({ from: 'bot', text: 'مع السلامة! يسعدنا خدمتك دائماً، ولا تتردد بالعودة متى أحببت.' }), true
+
+  if (short && has(text, ['السلام عليكم', 'مرحبا', 'اهلا', 'هلا', 'هاي', 'صباح الخير', 'مساء الخير', 'اهلين', 'يسعد صباحك', 'يسعد مساك']))
+    return push({ from: 'bot', text: has(text, ['السلام عليكم']) ? 'وعليكم السلام ورحمة الله! أنا المساعد الافتراضي لاتحاد المقاولين الفلسطينيين، كيف أستطيع مساعدتك؟' : 'أهلاً بك! أنا المساعد الافتراضي لاتحاد المقاولين الفلسطينيين، تفضّل بسؤالك عن العضوية أو التصنيف أو الخدمات.', faqs: suggestions.value }), true
+
+  if (has(text, ['من انت', 'مين انت', 'شو انت', 'ما انت', 'ما اسمك', 'شو اسمك', 'ماذا تفعل', 'شو بتعمل', 'شو بتقدر', 'ماذا تستطيع', 'كيف تساعدني', 'ساعدني', 'مساعده', 'مساعدة']))
+    return push({ from: 'bot', text: 'أنا المساعد الافتراضي (نسخة تجريبية) لاتحاد المقاولين الفلسطينيين. أجيب عن أسئلتك حول العضوية والتصنيف والخدمات والعطاءات، وأدلّك على الصفحة المناسبة في الموقع. جرّب أحد هذه الأسئلة:', faqs: suggestions.value }), true
+
+  if (has(text, ['رقمكم', 'رقم الهاتف', 'رقم الجوال', 'هاتف', 'تلفون', 'جوال', 'موبايل', 'اتصال', 'اتصل', 'ايميل', 'بريد', 'عنوانكم', 'وين', 'اين', 'مقر', 'مكانكم', 'دوام', 'ساعات', 'مواعيد', 'تواصل', 'واتساب', 'واتس']))
+    return push({
+      from: 'bot',
+      text: 'بيانات التواصل مع الاتحاد:\nمقر غزة: الرمال\nالجوال: +970597233422\nالبريد: info@pcu.org.ps\nفرع رام الله (الضفة الغربية): شارع الإرسال، البريد: info@pcu.ps\nأوقات الدوام: الأحد - الخميس، 8 ص - 4 م',
+      links: [CONTACT_LINK],
+    }), true
+
+  // رد قصير على سؤال "هل تريد شيئاً آخر؟"
+  if (asked && n.length <= 3 && has(text, ['نعم', 'ايوه', 'اه', 'ايه', 'اكيد', 'طبعا']))
+    return push({ from: 'bot', text: 'تفضّل، اكتب سؤالك أو اختر أحد الأسئلة الشائعة:', faqs: suggestions.value }), true
+
+  if (asked && n.length <= 3 && has(text, ['لا', 'كلا', 'لا شكرا', 'يكفي']))
+    return push({ from: 'bot', text: 'حسناً، أنا هنا إن احتجت أي مساعدة أخرى.' }), true
+
+  return false
+}
+
+/** سؤال عن موضوع له صفحة بالموقع (عطاءات، تدريب...) وما لقينا له جواب بالأسئلة الشائعة */
+function pageHint(text: string): boolean {
+  const hit = PAGES.find(pg => has(text, pg.words))
+  if (!hit) return false
+  push({ from: 'bot', text: hit.text, links: [hit.link] })
+
+  return true
+}
+
 function answer(text: string) {
   const q = tokens(text)
   const ranked = faqs.value
@@ -97,6 +168,8 @@ function answer(text: string) {
   const best = ranked[0]
   if (best && best.s >= 3)
     return push({ from: 'bot', text: best.f.answer })
+
+  if (pageHint(text)) return
 
   const related = ranked.filter(r => r.s > 0).slice(0, 3).map(r => r.f)
   push({
@@ -116,7 +189,7 @@ async function send(text = input.value) {
   push({ from: 'user', text: t })
   typing.value = true
   await loadFaqs()
-  setTimeout(() => { answer(t); typing.value = false }, 450)
+  setTimeout(() => { if (!smallTalk(t)) answer(t); typing.value = false }, 450)
 }
 
 function ask(f: Faq) {
@@ -146,6 +219,9 @@ function ask(f: Faq) {
               <button v-for="f in m.faqs" :key="f.id" type="button" class="asst-chip" @click="ask(f)">{{ f.question }}</button>
             </div>
             <RouterLink v-if="m.link" to="/landing/contact-us" class="asst-contact" @click="open = false">تواصل معنا</RouterLink>
+            <div v-if="m.links?.length" class="asst-links">
+              <RouterLink v-for="l in m.links" :key="l.to" :to="l.to" class="asst-contact" @click="open = false">{{ l.label }}</RouterLink>
+            </div>
           </template>
 
           <div v-if="messages.length === 1 && suggestions.length" class="asst-chips">
@@ -195,7 +271,7 @@ function ask(f: Faq) {
 
 .asst-panel { position: absolute; right: 0; bottom: 84px; width: min(370px, calc(100vw - 32px)); height: min(540px, calc(100vh - 130px)); display: flex; flex-direction: column; background: #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 24px 60px rgba(0, 0, 60, .32); }
 .asst-head { display: flex; align-items: center; gap: .5rem; padding: .9rem 1rem; background: linear-gradient(135deg, #00004f, #00006e 60%, #1a1a8f); color: #fff; }
-.asst-title { flex: 1; margin: 0; text-align: start; font-size: .98rem; font-weight: 800; }
+.asst-title { flex: 1; margin: 0; text-align: start; font-size: .98rem; font-weight: 800; color: #fff !important; }
 .asst-icon-btn { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .14); color: #fff; cursor: pointer; transition: background .2s; }
 .asst-icon-btn:hover { background: rgba(255, 255, 255, .28); }
 
@@ -209,6 +285,7 @@ function ask(f: Faq) {
 .asst-chip { text-align: start; border: 1.5px solid #c5cae9; background: #fff; color: #00006e; border-radius: 12px; padding: .5rem .8rem; font-family: inherit; font-size: .85rem; font-weight: 700; line-height: 1.6; cursor: pointer; transition: background .2s, border-color .2s; }
 .asst-chip:hover { background: #eef0fb; border-color: #00006e; }
 .asst-contact { align-self: flex-start; background: #f5a623; color: #1b1300; border-radius: 999px; padding: .4rem 1.1rem; font-size: .85rem; font-weight: 800; text-decoration: none; }
+.asst-links { display: flex; flex-wrap: wrap; gap: .4rem; align-self: flex-start; }
 .asst-note { font-size: .78rem; color: #9aa3b5; text-align: center; margin: 0; }
 .asst-typing { display: inline-flex; gap: 5px; padding: .8rem 1rem; }
 .asst-typing i { width: 7px; height: 7px; border-radius: 50%; background: #9aa3b5; animation: asst-dot 1s ease-in-out infinite; }

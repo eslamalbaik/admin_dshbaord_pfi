@@ -85,7 +85,7 @@ onUnmounted(stopPartners)
 const appSlides: { img: string; alt: string; text: [string, string, string] }[] = [
   { img: '/images/landing/app/news.webp', alt: 'أخبار الاتحاد وتعاميمه في التطبيق', text: ['', 'أخبار الاتحاد وتعاميمه', '.. تصلك أولاً بأول'] },
   { img: '/images/landing/app/finance.webp', alt: 'الملف المالي في التطبيق', text: ['', 'متابعتك المالية واضحة', '.. وإشعار السداد من جوالك'] },
-  { img: '/images/landing/app/certificates.webp', alt: 'الشهادات في التطبيق', text: ['اطلب ', 'شهادة تصنيفك', ' وحمّلها بدقيقتين'] },
+  { img: '/images/landing/app/certificates.webp', alt: 'الشهادات في التطبيق', text: ['اطلب ', 'شهادة عضويتك', ' وحمّلها بدقيقتين'] },
   { img: '/images/landing/app/tenders.webp', alt: 'العطاءات في التطبيق', text: ['تابع ', 'العطاءات المطروحة', ' وتفاصيلها.. فرصك أقرب إليك'] },
 ]
 const slideIdx = ref(0)
