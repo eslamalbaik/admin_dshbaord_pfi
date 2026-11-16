@@ -8,7 +8,7 @@ import LoginGuideVideoDialog from '@/components/LoginGuideVideoDialog.vue'
 import { MotionDirective } from '@vueuse/motion'
 import { vHoverCard } from '@/utils/hoverCard'
 import {
-  ArrowLeft, Award, Bookmark, Building2, CalendarDays, ChevronLeft, ChevronRight, Clock,
+  ArrowLeft, Award, BadgeCheck, Bookmark, Building2, CalendarDays, ChevronLeft, ChevronRight, Clock,
   FileText, Hourglass, Layers, Loader2, MapPin, Play, Search, SearchX, ShieldCheck, UserCheck,
 } from 'lucide-vue-next'
 
@@ -110,10 +110,10 @@ const aboutFeatures = [
 const unionStats = ref({ years: 30, specializations: 0 })
 // الأرقام بتعدّ من صفر لقيمتها أول ما القسم يبين بالشاشة (ومرة ثانية لو تغيّرت القيمة بعد وصول بيانات الـ API)
 const stats = computed(() => [
-  { icon: Building2, num: 350, prefix: '+', label: 'شركة مقاولات مصنفة', tone: 'navy' },
-  { icon: Award, num: 5, prefix: '', label: 'مجالات تصنيف معتمدة', tone: 'orange' },
-  { icon: Layers, num: unionStats.value.specializations || 40, prefix: unionStats.value.specializations ? '' : '+', label: 'اختصاصات معتمدة', tone: 'navy' },
-  { icon: CalendarDays, num: unionStats.value.years, prefix: '+', label: 'عاما من القيادة الوطنية', tone: 'orange' },
+  { icon: Building2, num: 350, suffix: '+', label: 'شركة مقاولات مصنفة', tone: 'navy' },
+  { icon: Award, num: 5, suffix: '', label: 'مجالات تصنيف معتمدة', tone: 'orange' },
+  { icon: Layers, num: unionStats.value.specializations || 40, suffix: unionStats.value.specializations ? '' : '+', label: 'اختصاصاً معتمداً', tone: 'navy' },
+  { icon: CalendarDays, num: unionStats.value.years, suffix: '+', label: 'عاماً من العمل المؤسسي والمهني', tone: 'orange' },
 ])
 const statsEl = ref<HTMLElement | null>(null)
 const statShown = ref<number[]>([0, 0, 0, 0])
@@ -230,7 +230,8 @@ watch(searchQuery, (q) => {
 onUnmounted(() => clearTimeout(directoryTimer))
 
 // ─── News ────────────────────────────────────────────────────────────────────
-interface NewsCard { key: string; title: string; excerpt: string; image: string; date: string; to: string }
+interface NewsCard { key: string; title: string; excerpt: string; image: string; date: string; to: string; category?: string | null }
+const NEWS_CATEGORY: Record<string, string> = { union: 'أخبار الاتحاد', local: 'أخبار محلية', international: 'أخبار دولية' }
 const NEWS_PLACEHOLDER = '/images/landing/home-news.webp'
 const sampleNews = (i: number): NewsCard => ({
   key: `sample-${i}`,
@@ -268,6 +269,7 @@ async function loadHome() {
         image: n.image_url || NEWS_PLACEHOLDER,
         date: n.published_at ? String(n.published_at).slice(0, 10) : '',
         to: `/landing/news/${n.id}`,
+        category: n.category ?? null,
       }))
     }
   }
@@ -365,7 +367,7 @@ onMounted(() => {
         <div ref="statsEl" v-reveal class="stats">
           <div v-for="(s, i) in stats" :key="s.label" class="stat" :class="`stat-${s.tone}`" :style="{ '--d': `${i * 90}ms` }">
             <span class="stat-icon"><component :is="s.icon" :size="26" :stroke-width="1.8" /></span>
-            <strong><span class="stat-num" dir="ltr">{{ s.prefix }}{{ statShown[i] }}</span></strong>
+            <strong><span class="stat-num" dir="ltr">{{ statShown[i] }}{{ s.suffix }}</span></strong>
             <span class="stat-label">{{ s.label }}</span>
           </div>
         </div>
@@ -434,25 +436,25 @@ onMounted(() => {
             <SearchX :size="22" /> لا توجد شركة مسجلة بهذا الاسم أو رقم العضوية
           </div>
           <div v-else-if="directory.length" class="directory-results">
-            <p class="directory-count">{{ directoryTotal }} نتيجة لـ "{{ directorySearched }}"</p>
+            <p class="directory-count"><b>{{ directoryTotal }}</b> نتيجة لـ "{{ directorySearched }}"</p>
             <div class="directory-grid">
-              <article v-for="c in directory" :key="c.membership_number" class="dcard">
+              <article v-for="(c, ci) in directory" :key="c.membership_number" class="dcard" :class="`dcard-${c.membership_status}`" :style="{ animationDelay: `${(ci % 6) * 70}ms` }">
+                <span class="dstatus" :class="`dstatus-${c.membership_status}`"><i />{{ c.status_label }}</span>
                 <div class="dcard-head">
-                  <span class="dcard-logo"><Building2 :size="20" /></span>
-                  <div class="dcard-title">
-                    <h3>{{ c.name }}</h3>
-                    <span class="dcard-num">رقم العضوية: <b dir="ltr">{{ c.membership_number }}</b></span>
+                  <span class="dcard-logo"><Building2 :size="26" :stroke-width="1.8" /></span>
+                  <h3>{{ c.name }}</h3>
+                  <span class="dcard-num"><BadgeCheck :size="14" /> رقم العضوية <b dir="ltr">{{ c.membership_number }}</b></span>
+                </div>
+                <div v-if="c.fields.length" class="dcard-fields">
+                  <span class="dcard-fields-h">المجالات والتصنيف</span>
+                  <div v-for="f in c.fields" :key="f.name" class="dfield">
+                    <span class="dfield-name">{{ f.name }}</span>
+                    <span v-if="f.grades.length" class="dfield-grades"><b v-for="g in f.grades" :key="g">{{ g }}</b></span>
                   </div>
-                  <span class="dstatus" :class="`dstatus-${c.membership_status}`"><i />{{ c.status_label }}</span>
                 </div>
                 <div v-if="c.city || c.phone" class="dcard-meta">
                   <span v-if="c.city" class="dcard-city"><MapPin :size="15" /> {{ c.city }}</span>
-                  <a v-if="c.phone" :href="`https://wa.me/${waNumber(c.phone)}`" target="_blank" rel="noopener noreferrer" class="dcard-wa" aria-label="تواصل عبر واتساب" title="تواصل عبر واتساب"><PublicSocialIcon name="whatsapp" :size="18" /></a>
-                </div>
-                <div v-if="c.fields.length" class="dcard-fields">
-                  <span v-for="f in c.fields" :key="f.name" class="dfield">
-                    {{ f.name }}<b v-if="f.grades.length"> · {{ f.grades.join('، ') }}</b>
-                  </span>
+                  <a v-if="c.phone" :href="`https://wa.me/${waNumber(c.phone)}`" target="_blank" rel="noopener noreferrer" class="dcard-wa" aria-label="تواصل عبر واتساب" title="تواصل عبر واتساب"><PublicSocialIcon name="whatsapp" :size="17" /> واتساب</a>
                 </div>
               </article>
             </div>
@@ -483,11 +485,14 @@ onMounted(() => {
 
         <div class="cards-grid">
           <article v-for="(n, i) in visibleNews" :key="n.key" v-reveal v-hover-card :delay="i * 120" class="news-card">
-            <div class="hc-media"><img :src="n.image" :alt="n.title" class="news-img" loading="lazy"></div>
+            <div class="hc-media news-media">
+              <img :src="n.image" :alt="n.title" class="news-img" loading="lazy">
+              <span v-if="n.category && NEWS_CATEGORY[n.category]" class="news-cat">{{ NEWS_CATEGORY[n.category] }}</span>
+            </div>
             <div class="news-body">
-              <span v-if="n.date" class="news-date">{{ n.date }}</span>
-              <h3 class="hc-title">{{ n.title }}</h3>
-              <p class="clamp-2">{{ n.excerpt }}</p>
+              <span v-if="n.date" class="news-date"><CalendarDays :size="14" /> {{ fmtDate(n.date) }}</span>
+              <h3 class="hc-title clamp-2">{{ n.title }}</h3>
+              <p class="clamp-3">{{ n.excerpt }}</p>
               <RouterLink :to="n.to" class="read-more">أقرأ المزيد <ArrowLeft :size="16" class="hc-arrow" /></RouterLink>
             </div>
           </article>
@@ -767,32 +772,43 @@ onMounted(() => {
 
 .directory-state { display: flex; align-items: center; gap: 10px; margin-top: 26px; font-weight: 700; color: rgba(255, 255, 255, .9); }
 .directory-results { width: 100%; max-width: 1000px; margin-top: 28px; }
-.directory-count { font-size: 14px !important; margin-bottom: 14px !important; color: rgba(255, 255, 255, .8) !important; }
-.directory-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; text-align: right; }
-.dcard { background: #fff; color: var(--ink); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px; animation: dcard-in .45s ease both; }
-@keyframes dcard-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
-.dcard-head { display: flex; align-items: flex-start; gap: 10px; }
-.dcard-logo { width: 40px; height: 40px; border-radius: 10px; background: var(--navy-soft); color: var(--navy); display: grid; place-items: center; flex-shrink: 0; }
-.dcard-title { flex: 1; min-width: 0; }
-.dcard h3 { font-size: 15px; font-weight: 800; line-height: 1.45; }
-.dcard-num { font-size: 12px; color: var(--muted); }
-.dcard-num b { color: var(--navy); }
-.dstatus { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
+.directory-count { font-size: 14px !important; margin-bottom: 18px !important; color: rgba(255, 255, 255, .85) !important; }
+.directory-count b { color: var(--yellow); font-size: 16px; }
+/* النتيجة الواحدة/الاثنتين بتتوسّط، مش بتلزق بطرف الشبكة */
+.directory-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 320px)); justify-content: center; gap: 18px; text-align: right; }
+.dcard {
+  --st: var(--green);
+  position: relative; overflow: hidden; background: #fff; color: var(--ink); border-radius: 20px; padding: 26px 20px 18px;
+  display: flex; flex-direction: column; align-items: stretch; gap: 14px; animation: dcard-in .5s ease both;
+  box-shadow: 0 12px 30px rgba(10, 10, 60, .2); transition: transform .25s, box-shadow .25s;
+}
+.dcard::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 5px; background: linear-gradient(90deg, var(--st), color-mix(in srgb, var(--st) 55%, #fff)); }
+.dcard:hover { transform: translateY(-5px); box-shadow: 0 20px 44px rgba(10, 10, 60, .32); }
+.dcard-expired { --st: var(--orange); }
+.dcard-suspended { --st: #d6142b; }
+.dstatus { position: absolute; top: 16px; inset-inline-start: 14px; display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
 .dstatus i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .dstatus-active { background: #e3f6e8; color: var(--green); }
 .dstatus-expired { background: #fff1dc; color: var(--orange); }
 .dstatus-suspended { background: #fde8ea; color: #d6142b; }
-.dcard { box-shadow: 0 8px 24px rgba(10, 10, 60, .12); transition: transform .2s, box-shadow .2s; }
-.dcard:hover { transform: translateY(-3px); box-shadow: 0 14px 32px rgba(10, 10, 60, .2); }
-.dcard-head { padding-bottom: 12px; border-bottom: 1px solid #eceef3; }
-.dcard-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
-.dcard-wa { margin-inline-start: auto; display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #25d366; color: #fff; transition: transform .2s, box-shadow .2s; }
-.dcard-wa:hover { transform: scale(1.1); box-shadow: 0 4px 12px rgba(37, 211, 102, .45); }
-.dcard-city { display: flex; align-items: center; gap: 6px; color: var(--muted) !important; font-size: 13px !important; margin: 0 !important; line-height: 1.4 !important; }
+.dcard-head { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding-top: 14px; padding-bottom: 14px; border-bottom: 1px dashed #dfe2ea; }
+.dcard-logo { width: 62px; height: 62px; border-radius: 18px; display: grid; place-items: center; color: #fff; background: linear-gradient(145deg, var(--navy), #2a2aa8); box-shadow: 0 10px 22px rgba(0, 0, 110, .3); }
+.dcard h3 { font-size: 16.5px; font-weight: 800; line-height: 1.5; color: var(--ink); }
+.dcard-num { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); background: var(--navy-soft); border-radius: 999px; padding: 3px 12px; }
+.dcard-num svg { color: var(--navy); }
+.dcard-num b { color: var(--navy); font-weight: 800; }
+.dcard-fields { display: flex; flex-direction: column; gap: 8px; }
+.dcard-fields-h { font-size: 12px; font-weight: 800; color: var(--muted); }
+.dfield { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #f6f7fb; border: 1px solid #e6e8ef; border-radius: 12px; padding: 8px 12px; }
+.dfield-name { font-size: 13px; font-weight: 700; color: var(--ink); }
+.dfield-grades { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+.dfield-grades b { background: var(--orange-soft); color: var(--orange); border-radius: 8px; padding: 2px 9px; font-size: 11.5px; font-weight: 800; }
+.dcard-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 12px; border-top: 1px dashed #dfe2ea; }
+.dcard-city { display: flex; align-items: center; gap: 6px; color: var(--muted) !important; font-size: 13px !important; font-weight: 700; margin: 0 !important; line-height: 1.4 !important; }
 .dcard-city svg { color: var(--orange); }
-.dcard-fields { display: flex; flex-wrap: wrap; gap: 6px; }
-.dfield { background: #f4f5f8; border: 1px solid #e3e5eb; border-radius: 8px; padding: 3px 9px; font-size: 12px; font-weight: 600; }
-.dfield b { color: var(--orange); font-weight: 700; }
+.dcard-wa { display: inline-flex; align-items: center; gap: 7px; background: #25d366; color: #fff; border-radius: 999px; padding: 7px 16px; font-size: 13px; font-weight: 800; transition: transform .2s, box-shadow .2s; }
+.dcard-wa:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(37, 211, 102, .45); }
+@keyframes dcard-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 .directory-more { margin-top: 18px; display: inline-flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, .12); color: #fff; border: 1px solid rgba(255, 255, 255, .5); border-radius: 10px; padding: 10px 22px; font-weight: 700; cursor: pointer; }
 .directory-more:hover { background: rgba(255, 255, 255, .2); }
 .spin { animation: spin 1s linear infinite; }
@@ -802,8 +818,12 @@ onMounted(() => {
 .news-card { border: 1px solid #dfe2ea; border-radius: 14px; overflow: hidden; background: #fff; display: flex; flex-direction: column; }
 .news-img { width: 100%; height: 198px; object-fit: cover; display: block; }
 .news-body { padding: 22px 16px 22px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
-.news-date { color: #5b6474; font-size: 12px; font-weight: 700; }
-.read-more { display: inline-flex; align-items: center; gap: 10px; color: var(--navy); font-weight: 800; font-size: 15px; margin-top: auto; padding-top: 6px; }
+.news-media { position: relative; }
+.news-cat { position: absolute; top: 12px; inset-inline-start: 12px; background: var(--navy); color: #fff; border-radius: 999px; padding: 4px 13px; font-size: 12px; font-weight: 800; box-shadow: 0 6px 14px rgba(0, 0, 110, .35); }
+.news-date { display: inline-flex; align-items: center; gap: 6px; color: #5b6474; font-size: 12.5px; font-weight: 700; }
+.news-date svg { color: var(--orange); }
+.clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.read-more { display: flex; align-items: center; gap: 10px; color: var(--navy); font-weight: 800; font-size: 15px; margin-top: auto; padding-top: 14px; border-top: 1px solid #eceef3; }
 
 /* ══ APP ══ */
 .app-wrap { padding-top: 140px; padding-bottom: 88px; }
@@ -845,7 +865,7 @@ onMounted(() => {
   .about-visual { max-width: 420px; margin: 0 auto; }
   .about-btn { float: none; }
   .stats { grid-template-columns: repeat(2, 1fr); }
-  .cards-grid, .directory-grid { grid-template-columns: repeat(2, 1fr); }
+  .cards-grid { grid-template-columns: repeat(2, 1fr); }
   .app { grid-template-columns: 1fr; padding: 40px 28px 0; text-align: center; }
   .app-text p { margin-inline: auto; }
   .app-arrow { display: none; }
@@ -862,7 +882,8 @@ onMounted(() => {
   .feature { padding: 18px; gap: 14px; }
   .stats { grid-template-columns: 1fr 1fr; gap: 12px; padding: 14px; margin-top: 48px; }
   .stat { padding: 20px 8px 18px; }
-  .cards-grid, .directory-grid { grid-template-columns: 1fr; }
+  .cards-grid { grid-template-columns: 1fr; }
+  .directory-grid { grid-template-columns: 1fr; }
   .section { padding-top: 100px; }
   .directory { margin-top: 100px; }
   .dcard-head { flex-wrap: wrap; }

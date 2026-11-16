@@ -106,7 +106,13 @@ class NewsController extends Controller
             )
             ->firstOrFail();
 
-        return $this->success($news->toArray());
+        // الخبر السابق (الأقدم) والتالي (الأحدث) لأزرار التنقل أسفل الخبر
+        $pick = ['id', 'title', 'slug'];
+        $data = $news->toArray();
+        $data['previous'] = News::published()->where('published_at', '<', $news->published_at)->latest('published_at')->first($pick);
+        $data['next'] = News::published()->where('published_at', '>', $news->published_at)->oldest('published_at')->first($pick);
+
+        return $this->success($data);
     }
 
     // GET /api/v1/admin/news

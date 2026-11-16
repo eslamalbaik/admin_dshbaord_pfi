@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import { ref, watch, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import api from '@/plugins/axios'
-import { Search, Inbox, Play, Images, Megaphone, Users, Building2, Landmark, Info, ListChecks, Workflow, Sparkles } from 'lucide-vue-next'
+import { Search, Inbox, Play, Images, CalendarDays, FolderOpen, Newspaper, Megaphone, Users, Building2, Landmark, Info, ListChecks, Workflow, Sparkles } from 'lucide-vue-next'
 import { vHoverCard } from '@/utils/hoverCard'
 
 definePage({
@@ -19,6 +19,7 @@ interface NewsItem {
   title: string
   slug: string
   excerpt: string | null
+  category?: 'union' | 'local' | 'international' | null
   image: string | null
   video_url: string | null
   gallery: string[] | null
@@ -34,6 +35,7 @@ interface Pagination {
 }
 
 const router = useRouter()
+const route = useRoute()
 
 // قسم التعاميم والإعلانات الرسمية: من يخاطب، وما الذي يصدر فيه
 const circularAudience = [
@@ -60,6 +62,16 @@ const categoryTabs = [
   { value: 'international', label: 'أخبار دولية' },
 ]
 const category = ref('')
+const CATEGORY_LABEL: Record<string, string> = { union: 'أخبار الاتحاد', local: 'أخبار محلية', international: 'أخبار دولية' }
+
+// آخر الأخبار بالشريط الجانبي
+const latest = ref<NewsItem[]>([])
+async function fetchLatest() {
+  try {
+    const res = await api.get('/api/v1/news/latest')
+    latest.value = (res.data.items ?? []).slice(0, 5)
+  } catch { latest.value = [] }
+}
 function selectCategory(v: string) {
   category.value = v
   currentPage.value = 1
@@ -110,7 +122,14 @@ watch(search, () => {
   }, 400)
 })
 
-onMounted(fetchNews)
+onMounted(() => {
+  // روابط الشريط الجانبي بصفحة الخبر: ?category=local أو ?search=كلمة
+  const qc = String(route.query.category ?? '')
+  if (categoryTabs.some(t => t.value && t.value === qc)) category.value = qc
+  if (route.query.search) search.value = String(route.query.search)
+  fetchNews()
+  fetchLatest()
+})
 </script>
 
 <template>
@@ -160,99 +179,120 @@ onMounted(fetchNews)
       </div>
     </section>
 
-    <!-- Filters -->
-    <div class="filters-bar">
-      <div class="container filters-inner">
-        <div class="cat-tabs" role="tablist">
-          <button v-for="t in categoryTabs" :key="t.value" type="button" role="tab" class="cat-tab" :class="{ active: category === t.value }" :aria-selected="category === t.value" @click="selectCategory(t.value)">{{ t.label }}</button>
-        </div>
-        <!-- Search -->
-        <div class="search-wrap">
-          <Search :size="15" class="search-icon" />
-          <input
-            v-model="search"
-            type="text"
-            placeholder="ابحث في الأخبار..."
-            class="search-input"
-          />
-        </div>
-      </div>
-    </div>
-
     <!-- Content -->
     <div class="container content-area">
+      <div class="news-layout">
+        <div class="news-main">
 
-      <!-- Loading skeleton -->
-      <div v-if="isLoading" class="news-grid">
-        <div v-for="n in 6" :key="n" class="news-card skeleton">
-          <div class="skeleton-img" />
-          <div class="skeleton-body">
-            <div class="skeleton-line short" />
-            <div class="skeleton-line" />
-            <div class="skeleton-line" />
-            <div class="skeleton-line medium" />
+        <!-- Loading skeleton -->
+        <div v-if="isLoading" class="news-grid">
+          <div v-for="n in 6" :key="n" class="news-card skeleton">
+            <div class="skeleton-img" />
+            <div class="skeleton-body">
+              <div class="skeleton-line short" />
+              <div class="skeleton-line" />
+              <div class="skeleton-line" />
+              <div class="skeleton-line medium" />
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- News grid -->
-      <div v-else-if="news.length > 0" class="news-grid">
-        <RouterLink
-          v-for="item in news"
-          :key="item.id"
-          v-hover-card
-          :to="`/landing/news/${item.slug}`"
-          class="news-card"
-        >
-          <div class="news-img-wrap hc-media">
-            <img v-if="item.image" :src="item.image" :alt="item.title" class="news-img" />
-            <div v-else class="news-img-placeholder">📰</div>
-            <span v-if="item.video_url" class="news-video-badge"><Play :size="22" fill="white" /></span>
-            <span v-if="item.gallery && item.gallery.length > 0" class="news-gallery-badge">
-              <Images :size="13" /> {{ item.gallery.length + (item.image ? 1 : 0) }}
+        <!-- News list -->
+        <div v-else-if="news.length > 0" class="news-grid">
+          <RouterLink
+            v-for="item in news"
+            :key="item.id"
+            :to="`/landing/news/${item.slug}`"
+            class="news-card"
+          >
+            <div class="news-img-wrap">
+              <img v-if="item.image" :src="item.image" :alt="item.title" class="news-img" loading="lazy" />
+              <div v-else class="news-img-placeholder">📰</div>
+              <span v-if="item.video_url" class="news-video-badge"><Play :size="22" fill="white" /></span>
+              <span v-if="item.gallery && item.gallery.length > 0" class="news-gallery-badge">
+                <Images :size="13" /> {{ item.gallery.length + (item.image ? 1 : 0) }}
+              </span>
+            </div>
+            <div class="news-body">
+              <div class="news-meta">
+                <span v-if="item.category && CATEGORY_LABEL[item.category]" class="news-cat">{{ CATEGORY_LABEL[item.category] }}</span>
+                <span class="news-date"><CalendarDays :size="14" /> {{ formatDate(item.published_at) }}</span>
+              </div>
+              <h2 class="news-title">{{ item.title }}</h2>
+              <p v-if="item.excerpt" class="news-excerpt">{{ item.excerpt }}</p>
+              <div class="news-foot"><span class="news-read-more">اقرأ المزيد <span class="hc-arrow">←</span></span></div>
+            </div>
+          </RouterLink>
+        </div>
+
+        <!-- Empty state -->
+        <div v-else class="empty-state">
+          <div class="empty-icon"><Inbox :size="56" /></div>
+          <h3>لا توجد نتائج</h3>
+          <p>لم يتم العثور على أخبار تطابق بحثك. حاول تغيير الفلتر أو كلمة البحث.</p>
+        </div>
+
+        <!-- Pagination -->
+        <div v-if="pagination && pagination.last_page > 1" class="pagination">
+          <button
+            class="page-btn"
+            :disabled="currentPage === 1"
+            @click="goToPage(currentPage - 1)"
+          >
+            ←
+          </button>
+          <button
+            v-for="page in pagination.last_page"
+            :key="page"
+            class="page-btn"
+            :class="{ active: page === currentPage }"
+            @click="goToPage(page)"
+          >
+            {{ page }}
+          </button>
+          <button
+            class="page-btn"
+            :disabled="currentPage === pagination.last_page"
+            @click="goToPage(currentPage + 1)"
+          >
+            →
+          </button>
+        </div>
+    
+        </div>
+
+      <aside class="news-aside">
+        <section class="aside-card">
+          <h3 class="aside-h">ابحث في الأخبار</h3>
+          <div class="search-wrap">
+            <Search :size="15" class="search-icon" />
+            <input v-model="search" type="text" placeholder="ابحث..." class="search-input" />
+          </div>
+        </section>
+
+        <section class="aside-card">
+          <h3 class="aside-h">التصنيفات</h3>
+          <ul class="aside-cats">
+            <li v-for="t in categoryTabs" :key="t.value">
+              <button type="button" class="aside-cat" :class="{ active: category === t.value }" @click="selectCategory(t.value)">
+                <FolderOpen :size="15" /> {{ t.label }}
+              </button>
+            </li>
+          </ul>
+        </section>
+
+        <section v-if="latest.length" class="aside-card">
+          <h3 class="aside-h">آخر الأخبار</h3>
+          <RouterLink v-for="n in latest" :key="n.id" :to="`/landing/news/${n.slug}`" class="aside-post">
+            <img v-if="n.image" :src="n.image" :alt="n.title" class="aside-thumb" loading="lazy" />
+            <span v-else class="aside-thumb aside-thumb-ph"><Newspaper :size="20" /></span>
+            <span class="aside-post-body">
+              <span class="aside-post-date">{{ formatDate(n.published_at) }}</span>
+              <span class="aside-post-title">{{ n.title }}</span>
             </span>
-          </div>
-          <div class="news-body">
-            <p class="news-date">{{ formatDate(item.published_at) }}</p>
-            <h2 class="news-title hc-title">{{ item.title }}</h2>
-            <p v-if="item.excerpt" class="news-excerpt">{{ item.excerpt }}</p>
-            <span class="news-read-more">اقرأ المزيد <span class="hc-arrow" style="display:inline-block">←</span></span>
-          </div>
-        </RouterLink>
-      </div>
-
-      <!-- Empty state -->
-      <div v-else class="empty-state">
-        <div class="empty-icon"><Inbox :size="56" /></div>
-        <h3>لا توجد نتائج</h3>
-        <p>لم يتم العثور على أخبار تطابق بحثك. حاول تغيير الفلتر أو كلمة البحث.</p>
-      </div>
-
-      <!-- Pagination -->
-      <div v-if="pagination && pagination.last_page > 1" class="pagination">
-        <button
-          class="page-btn"
-          :disabled="currentPage === 1"
-          @click="goToPage(currentPage - 1)"
-        >
-          ←
-        </button>
-        <button
-          v-for="page in pagination.last_page"
-          :key="page"
-          class="page-btn"
-          :class="{ active: page === currentPage }"
-          @click="goToPage(page)"
-        >
-          {{ page }}
-        </button>
-        <button
-          class="page-btn"
-          :disabled="currentPage === pagination.last_page"
-          @click="goToPage(currentPage + 1)"
-        >
-          →
-        </button>
+          </RouterLink>
+        </section>
+      </aside>
       </div>
     </div>
 
@@ -398,12 +438,14 @@ onMounted(fetchNews)
 
 /* Content */
 .content-area { padding: 2.5rem 1.5rem 4rem; }
+.news-layout { display: grid; grid-template-columns: 1fr 300px; gap: 1.75rem; align-items: start; }
+.news-main { min-width: 0; }
 
 /* News grid */
 .news-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
 }
 
 .news-card {
@@ -570,14 +612,13 @@ onMounted(fetchNews)
 
 /* Responsive */
 @media (max-width: 900px) {
-  .news-grid { grid-template-columns: repeat(2, 1fr); }
+  .news-layout { grid-template-columns: 1fr; }
+  .news-aside { order: -1; position: static; }
   .filters-inner { flex-direction: column; align-items: stretch; }
   .search-input { min-width: auto; width: 100%; }
 }
 
-@media (max-width: 600px) {
-  .news-grid { grid-template-columns: 1fr; }
-}
+
 
 /* Official circulars & announcements */
 .circ-sec { padding: 2.25rem 0 0; }
@@ -609,4 +650,37 @@ onMounted(fetchNews)
 .cat-tab { border: 1.5px solid #c5cae9; background: #fff; color: #1a237e; border-radius: 50px; padding: .4rem 1.1rem; font-size: .88rem; font-weight: 700; font-family: inherit; cursor: pointer; transition: all .2s; }
 .cat-tab:hover { background: #e8eaf6; }
 .cat-tab.active { background: #1a237e; border-color: #1a237e; color: #fff; }
+/* post card (blog style): wide image, meta row, title, excerpt, read more */
+.news-card { padding: 1rem; border-radius: 20px; box-shadow: 0 6px 22px rgba(13, 27, 75, .06); transition: box-shadow .25s, transform .25s; }
+.news-card:hover { box-shadow: 0 14px 36px rgba(13, 27, 75, .13); transform: translateY(-3px); }
+.news-card .news-img-wrap { aspect-ratio: 16 / 7; height: auto; border-radius: 14px; overflow: hidden; }
+.news-card .news-body { padding: 1.1rem .5rem .4rem; }
+.news-meta { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; margin-bottom: .6rem; }
+.news-cat { background: #1a237e; color: #fff; border-radius: 999px; padding: .2rem .9rem; font-size: .78rem; font-weight: 800; }
+.news-card .news-date { display: inline-flex; align-items: center; gap: .35rem; margin: 0; color: #6b7280; font-size: .85rem; }
+.news-card .news-date svg { color: #e65100; }
+.news-card .news-title { font-size: 1.4rem; line-height: 1.6; margin-bottom: .5rem; }
+.news-foot { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #eceef3; }
+
+/* sidebar */
+.news-aside { display: flex; flex-direction: column; gap: 1.25rem; position: sticky; top: 130px; }
+.aside-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; padding: 1.1rem 1.1rem 1.2rem; box-shadow: 0 6px 22px rgba(13, 27, 75, .05); }
+.aside-h { font-size: 1rem; font-weight: 800; color: #0d1b3e; padding-bottom: .7rem; margin: 0 0 .9rem; border-bottom: 1px solid #eceef3; position: relative; }
+.aside-h::after { content: ''; position: absolute; bottom: -1px; right: 0; width: 38px; height: 3px; background: linear-gradient(90deg, #f9a825, #e65100); border-radius: 3px; }
+.aside-card .search-wrap { width: 100%; background: #f8f9fc; }
+.aside-card .search-input { width: 100%; min-width: 0; }
+.aside-cats { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .35rem; }
+.aside-cat { width: 100%; display: flex; align-items: center; gap: .55rem; border: 0; background: transparent; padding: .55rem .75rem; border-radius: 10px; font-family: inherit; font-size: .92rem; font-weight: 700; color: #374151; cursor: pointer; text-align: start; transition: background .2s, color .2s; }
+.aside-cat svg { color: #e65100; }
+.aside-cat:hover { background: #f1f3fb; }
+.aside-cat.active { background: #1a237e; color: #fff; }
+.aside-cat.active svg { color: #f9a825; }
+.aside-post { display: flex; gap: .75rem; align-items: center; text-decoration: none; color: inherit; padding: .6rem 0; border-bottom: 1px solid #f0f1f6; }
+.aside-post:last-child { border-bottom: 0; padding-bottom: 0; }
+.aside-thumb { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; flex-shrink: 0; }
+.aside-thumb-ph { display: grid; place-items: center; background: #e8eaf6; color: #1a237e; }
+.aside-post-body { display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
+.aside-post-date { font-size: .74rem; color: #9aa3b5; font-weight: 700; }
+.aside-post-title { font-size: .88rem; font-weight: 700; line-height: 1.55; color: #0d1b3e; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.aside-post:hover .aside-post-title { color: #1a237e; }
 </style>

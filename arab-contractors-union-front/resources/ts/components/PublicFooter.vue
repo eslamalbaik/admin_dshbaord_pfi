@@ -29,8 +29,8 @@ const legalLinks = [
 ]
 
 const branches = {
-  gaza: { address: 'غزة - الرمال', phone: '+970597233422' },
-  westbank: { address: 'رام الله - شارع الإرسال', phone: '+970-2-2987654' },
+  gaza: { address: 'غزة - الرمال', phone: '+970597233422', email: 'info@pcu.org.ps' },
+  westbank: { address: 'رام الله - شارع الإرسال', phone: '+970-2-2987654', email: 'info@pcu.ps' },
 }
 const branch = ref<keyof typeof branches>('gaza')
 </script>
@@ -74,7 +74,7 @@ const branch = ref<keyof typeof branches>('gaza')
         </div>
         <p class="pub-footer-contact"><span class="pub-fco-ico"><MapPin :size="20" /></span>{{ branches[branch].address }}</p>
         <p class="pub-footer-contact"><span class="pub-fco-ico"><Phone :size="20" /></span><span dir="ltr">{{ branches[branch].phone }}</span></p>
-        <p class="pub-footer-contact"><span class="pub-fco-ico"><Mail :size="20" /></span>info@pcu.org.ps</p>
+        <p class="pub-footer-contact"><span class="pub-fco-ico"><Mail :size="20" /></span>{{ branches[branch].email }}</p>
         <p class="pub-footer-contact"><span class="pub-fco-ico"><Clock :size="20" /></span>الاحد - الخميس : 8ص - 4م</p>
       </div>
     </div>

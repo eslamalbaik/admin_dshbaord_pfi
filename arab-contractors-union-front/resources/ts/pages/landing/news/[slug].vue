@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import api from '@/plugins/axios'
-import { Search } from 'lucide-vue-next'
+import { CalendarDays, ChevronLeft, ChevronRight, FolderOpen, Newspaper, Search, UserRound } from 'lucide-vue-next'
 
 definePage({
   meta: {
@@ -24,9 +24,20 @@ interface NewsDetail {
   video_url: string | null
   external_url: string | null
   gallery: string[] | null
+  category?: 'union' | 'local' | 'international' | null
   published_at: string
   author?: { id: number; name: string }
+  previous?: { id: number; title: string; slug: string } | null
+  next?: { id: number; title: string; slug: string } | null
 }
+
+interface LatestItem { id: number; title: string; slug: string; image: string | null; published_at: string }
+const CATEGORY_LABEL: Record<string, string> = { union: 'أخبار الاتحاد', local: 'أخبار محلية', international: 'أخبار دولية' }
+const latest = ref<LatestItem[]>([])
+const searchText = ref('')
+const router = useRouter()
+function goSearch() { router.push({ path: '/landing/news', query: searchText.value.trim() ? { search: searchText.value.trim() } : {} }) }
+function shortDate(d: string) { return new Date(d).toLocaleDateString('ar-PS', { year: 'numeric', month: 'long', day: 'numeric' }) }
 
 const news = ref<NewsDetail | null>(null)
 const isLoading = ref(true)
@@ -61,6 +72,10 @@ onMounted(async () => {
   } finally {
     isLoading.value = false
   }
+  try {
+    const r = await api.get('/api/v1/news/latest')
+    latest.value = (r.data.items ?? []).slice(0, 5)
+  } catch { latest.value = [] }
 })
 </script>
 
@@ -89,61 +104,99 @@ onMounted(async () => {
 
     <!-- Article -->
     <template v-else-if="news">
-
-      <!-- Hero image -->
-      <div v-if="news.image" class="article-hero">
-        <img :src="news.image" :alt="news.title" class="hero-img" />
-        <div class="hero-overlay" />
-      </div>
-
       <div class="container article-wrap">
-        <article class="article">
+        <div class="detail-layout">
+          <article class="article-col">
+            <!-- Meta -->
+            <div class="article-meta">
+              <span v-if="news.category && CATEGORY_LABEL[news.category]" class="article-cat">{{ CATEGORY_LABEL[news.category] }}</span>
+              <span class="article-date"><CalendarDays :size="14" /> {{ formatDate(news.published_at) }}</span>
+              <span v-if="news.author" class="article-author"><UserRound :size="14" /> بواسطة {{ news.author.name }}</span>
+            </div>
 
-          <!-- Meta -->
-          <div class="article-meta">
-            <span class="article-date">{{ formatDate(news.published_at) }}</span>
-            <span v-if="news.author" class="article-author">بقلم: {{ news.author.name }}</span>
-          </div>
+            <h1 class="article-title">{{ news.title }}</h1>
 
-          <!-- Title -->
-          <h1 class="article-title">{{ news.title }}</h1>
+            <!-- Main image -->
+            <div v-if="news.image" class="article-cover">
+              <img :src="news.image" :alt="news.title" />
+            </div>
 
-          <!-- Excerpt -->
-          <p v-if="news.excerpt" class="article-excerpt">{{ news.excerpt }}</p>
+            <!-- Content card -->
+            <div class="article-card">
+              <p v-if="news.excerpt" class="article-excerpt">{{ news.excerpt }}</p>
 
-          <!-- Video -->
-          <div v-if="news.video_url" class="article-video">
-            <iframe
-              v-if="youtubeEmbedUrl(news.video_url)"
-              :src="youtubeEmbedUrl(news.video_url)!"
-              frameborder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowfullscreen
-            />
-            <a v-else :href="news.video_url" target="_blank" rel="noopener" class="video-fallback-link">مشاهدة الفيديو ↗</a>
-          </div>
+              <div v-if="news.video_url" class="article-video">
+                <iframe
+                  v-if="youtubeEmbedUrl(news.video_url)"
+                  :src="youtubeEmbedUrl(news.video_url)!"
+                  frameborder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowfullscreen
+                />
+                <a v-else :href="news.video_url" target="_blank" rel="noopener" class="video-fallback-link">مشاهدة الفيديو ↗</a>
+              </div>
 
-          <!-- External link -->
-          <a v-if="news.external_url" :href="news.external_url" target="_blank" rel="noopener" class="article-external-link">
-            رابط ذو صلة ↗
-          </a>
+              <a v-if="news.external_url" :href="news.external_url" target="_blank" rel="noopener" class="article-external-link">
+                رابط ذو صلة ↗
+              </a>
 
-          <!-- Gallery — الصورة الرئيسية أول صورة بالشريط أيضاً، وقابل للتنقل بالسحب على اللمس -->
-          <div v-if="allImages.length > 1" class="article-gallery">
-            <img v-for="(img, i) in allImages" :key="i" :src="img" :alt="`${news.title} - ${i + 1}`" />
-          </div>
+              <div v-if="allImages.length > 1" class="article-gallery">
+                <img v-for="(img, i) in allImages" :key="i" :src="img" :alt="`${news.title} - ${i + 1}`" />
+              </div>
 
-          <!-- Divider -->
-          <hr class="article-divider" />
+              <div class="article-body" v-html="news.body" />
+            </div>
 
-          <!-- Body -->
-          <div class="article-body" v-html="news.body" />
+            <!-- Previous / next -->
+            <nav v-if="news.previous || news.next" class="article-nav" aria-label="التنقل بين الأخبار">
+              <RouterLink v-if="news.previous" :to="`/landing/news/${news.previous.slug}`" class="nav-card">
+                <span class="nav-label"><ChevronRight :size="14" /> الخبر السابق</span>
+                <span class="nav-title">{{ news.previous.title }}</span>
+              </RouterLink>
+              <span v-else />
+              <RouterLink v-if="news.next" :to="`/landing/news/${news.next.slug}`" class="nav-card nav-next">
+                <span class="nav-label">الخبر التالي <ChevronLeft :size="14" /></span>
+                <span class="nav-title">{{ news.next.title }}</span>
+              </RouterLink>
+            </nav>
 
-          <!-- Share + Back -->
-          <div class="article-footer">
-            <RouterLink to="/landing/news" class="btn-back-article">← العودة لقائمة الأخبار</RouterLink>
-          </div>
-        </article>
+            <div class="article-footer">
+              <RouterLink to="/landing/news" class="btn-back-article">← العودة لقائمة الأخبار</RouterLink>
+            </div>
+          </article>
+
+          <aside class="detail-aside">
+            <section class="aside-card">
+              <h3 class="aside-h">ابحث في الأخبار</h3>
+              <form class="aside-search" @submit.prevent="goSearch">
+                <Search :size="15" />
+                <input v-model="searchText" type="text" placeholder="ابحث..." />
+              </form>
+            </section>
+
+            <section class="aside-card">
+              <h3 class="aside-h">التصنيفات</h3>
+              <ul class="aside-cats">
+                <li><RouterLink to="/landing/news" class="aside-cat"><FolderOpen :size="15" /> كل الأخبار</RouterLink></li>
+                <li v-for="(label, key) in CATEGORY_LABEL" :key="key">
+                  <RouterLink :to="{ path: '/landing/news', query: { category: key } }" class="aside-cat" :class="{ active: news.category === key }"><FolderOpen :size="15" /> {{ label }}</RouterLink>
+                </li>
+              </ul>
+            </section>
+
+            <section v-if="latest.length" class="aside-card">
+              <h3 class="aside-h">آخر الأخبار</h3>
+              <RouterLink v-for="n in latest" :key="n.id" :to="`/landing/news/${n.slug}`" class="aside-post">
+                <img v-if="n.image" :src="n.image" :alt="n.title" class="aside-thumb" loading="lazy" />
+                <span v-else class="aside-thumb aside-thumb-ph"><Newspaper :size="20" /></span>
+                <span class="aside-post-body">
+                  <span class="aside-post-date">{{ shortDate(n.published_at) }}</span>
+                  <span class="aside-post-title">{{ n.title }}</span>
+                </span>
+              </RouterLink>
+            </section>
+          </aside>
+        </div>
       </div>
     </template>
 
@@ -404,5 +457,51 @@ onMounted(async () => {
 @media (max-width: 600px) {
   .article { padding: 1.5rem; }
   .article-hero { height: 250px; }
+}
+/* ── blog-style detail layout ── */
+.news-detail-page .container.article-wrap { max-width: 1200px; padding-top: 2.5rem; }
+.detail-layout { display: grid; grid-template-columns: 1fr 300px; gap: 1.75rem; align-items: start; }
+.article-col { min-width: 0; display: flex; flex-direction: column; gap: 1.25rem; }
+.article-col .article-meta { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; margin: 0; }
+.article-cat { background: #1a237e; color: #fff; border-radius: 999px; padding: .2rem .9rem; font-size: .78rem; font-weight: 800; }
+.article-col .article-date, .article-col .article-author { display: inline-flex; align-items: center; gap: .35rem; }
+.article-col .article-date svg, .article-col .article-author svg { color: #e65100; }
+.article-col .article-title { font-size: clamp(1.5rem, 2.6vw, 2.1rem); line-height: 1.6; margin: 0; }
+.article-cover { border-radius: 20px; overflow: hidden; box-shadow: 0 10px 30px rgba(13, 27, 75, .12); background: #e5e7eb; }
+.article-cover img { display: block; width: 100%; max-height: 520px; object-fit: cover; }
+.article-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 20px; padding: 1.75rem 1.9rem; box-shadow: 0 6px 22px rgba(13, 27, 75, .05); }
+.article-card .article-excerpt { margin-top: 0; }
+.article-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.nav-card { display: flex; flex-direction: column; gap: .4rem; background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 1rem 1.2rem; text-decoration: none; color: inherit; transition: box-shadow .25s, transform .25s, border-color .25s; }
+.nav-card:hover { box-shadow: 0 12px 28px rgba(13, 27, 75, .12); transform: translateY(-2px); border-color: #c5cae9; }
+.nav-next { text-align: start; }
+.nav-label { display: inline-flex; align-items: center; gap: .3rem; font-size: .78rem; font-weight: 700; color: #9aa3b5; }
+.nav-title { font-size: .95rem; font-weight: 800; color: #0d1b3e; line-height: 1.6; }
+.detail-aside { display: flex; flex-direction: column; gap: 1.25rem; position: sticky; top: 130px; }
+.aside-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; padding: 1.1rem 1.1rem 1.2rem; box-shadow: 0 6px 22px rgba(13, 27, 75, .05); }
+.aside-h { font-size: 1rem; font-weight: 800; color: #0d1b3e; padding-bottom: .7rem; margin: 0 0 .9rem; border-bottom: 1px solid #eceef3; position: relative; }
+.aside-h::after { content: ''; position: absolute; bottom: -1px; right: 0; width: 38px; height: 3px; background: linear-gradient(90deg, #f9a825, #e65100); border-radius: 3px; }
+.aside-search { display: flex; align-items: center; gap: .5rem; border: 1.5px solid #e0e0e0; border-radius: 10px; padding: .45rem .8rem; background: #f8f9fc; color: #757575; }
+.aside-search:focus-within { border-color: #1a237e; }
+.aside-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-family: inherit; font-size: .9rem; }
+.aside-cats { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .35rem; }
+.aside-cat { display: flex; align-items: center; gap: .55rem; padding: .55rem .75rem; border-radius: 10px; font-size: .92rem; font-weight: 700; color: #374151; text-decoration: none; transition: background .2s, color .2s; }
+.aside-cat svg { color: #e65100; }
+.aside-cat:hover { background: #f1f3fb; }
+.aside-cat.active { background: #1a237e; color: #fff; }
+.aside-cat.active svg { color: #f9a825; }
+.aside-post { display: flex; gap: .75rem; align-items: center; text-decoration: none; color: inherit; padding: .6rem 0; border-bottom: 1px solid #f0f1f6; }
+.aside-post:last-child { border-bottom: 0; padding-bottom: 0; }
+.aside-thumb { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; flex-shrink: 0; }
+.aside-thumb-ph { display: grid; place-items: center; background: #e8eaf6; color: #1a237e; }
+.aside-post-body { display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
+.aside-post-date { font-size: .74rem; color: #9aa3b5; font-weight: 700; }
+.aside-post-title { font-size: .88rem; font-weight: 700; line-height: 1.55; color: #0d1b3e; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.aside-post:hover .aside-post-title { color: #1a237e; }
+@media (max-width: 900px) {
+  .detail-layout { grid-template-columns: 1fr; }
+  .detail-aside { position: static; }
+  .article-nav { grid-template-columns: 1fr; }
+  .article-card { padding: 1.25rem; }
 }
 </style>

@@ -77,6 +77,7 @@ class LandingController extends Controller
                         'title'        => $n->title,
                         'slug'         => $n->slug,
                         'excerpt'      => $n->excerpt,
+                        'category'     => $n->category,
                         // $n->image مُحلَّل مسبقاً لرابط كامل عبر accessor بـHasPublicMediaUrls —
                         // تمريره مجدداً عبر Storage::url() كان ينتج رابطاً مضاعفاً مكسوراً
                         'image_url'    => $n->image,
@@ -100,6 +101,7 @@ class LandingController extends Controller
                     'title'        => $n['title'] ?? '',
                     'slug'         => $n['slug'] ?? null,
                     'excerpt'      => $n['excerpt'] ?? '',
+                    'category'     => $n['category'] ?? null,
                     'image_url'    => $n['image'] ?? null,
                     'published_at' => $n['published_at'] ?? null,
                 ])->values()->all() : null;
