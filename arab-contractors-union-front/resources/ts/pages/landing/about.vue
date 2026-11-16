@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
-import PublicCommitteeGrid from '@/components/PublicCommitteeGrid.vue'
 import { Award, ChevronLeft, Eye, GraduationCap, Handshake, Scale, Shield, Target, Users } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
@@ -28,8 +27,6 @@ const values = [
 const facts = [
   { num: '١٩٩٤', label: 'سنة تأسيس الاتحاد' },
   { num: '٧', label: 'أعضاء مجلس الإدارة' },
-  { num: '٩', label: 'لجان داخلية' },
-  { num: '٣', label: 'لجان خارجية' },
 ]
 
 </script>
@@ -157,17 +154,6 @@ const facts = [
             <p class="value-desc">{{ v.desc }}</p>
           </article>
         </div>
-      </div>
-    </section>
-
-    <!-- Committees -->
-    <section class="pub-section bg-soft">
-      <div class="pub-cont">
-        <div class="pub-sec-header-c">
-          <div class="pub-sec-label">اللجان</div>
-          <h2 class="pub-sec-h center">اللجان الداخلية للاتحاد</h2>
-        </div>
-        <PublicCommitteeGrid />
       </div>
     </section>
 

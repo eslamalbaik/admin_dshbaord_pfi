@@ -3,7 +3,7 @@ import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import { ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/plugins/axios'
-import { Search, Inbox, Play, Images } from 'lucide-vue-next'
+import { Search, Inbox, Play, Images, Megaphone, Users, Building2, Landmark, Info, ListChecks, Workflow, Sparkles } from 'lucide-vue-next'
 import { vHoverCard } from '@/utils/hoverCard'
 
 definePage({
@@ -34,6 +34,19 @@ interface Pagination {
 }
 
 const router = useRouter()
+
+// قسم التعاميم والإعلانات الرسمية: من يخاطب، وما الذي يصدر فيه
+const circularAudience = [
+  { icon: Users, label: 'أعضاء الهيئة العامة' },
+  { icon: Building2, label: 'شركات المقاولات' },
+  { icon: Landmark, label: 'الجهات المعنية والمهتمون بخدمات الاتحاد' },
+]
+const circularContents = [
+  { icon: Info, label: 'المعلومات' },
+  { icon: ListChecks, label: 'التعليمات' },
+  { icon: Workflow, label: 'الإجراءات' },
+  { icon: Sparkles, label: 'الفرص والأنشطة' },
+]
 
 const news = ref<NewsItem[]>([])
 const pagination = ref<Pagination | null>(null)
@@ -100,6 +113,39 @@ onMounted(fetchNews)
       </div>
       <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
+
+    <!-- Official circulars & announcements -->
+    <section class="circ-sec" aria-labelledby="circ-title">
+      <div class="container">
+        <div class="circ-card">
+          <div class="circ-icon"><Megaphone :size="34" :stroke-width="1.8" /></div>
+          <div class="circ-main">
+            <span class="circ-label">الاتحاد يخاطبكم</span>
+            <h2 id="circ-title" class="circ-title">التعاميم والإعلانات الرسمية</h2>
+            <p class="circ-text">
+              هذا القسم مخصص لإبلاغ أعضاء الهيئة العامة وشركات المقاولات والجهات المعنية بالمعلومات والتعليمات والإجراءات والفرص والأنشطة التي يصدرها الاتحاد.
+            </p>
+            <p class="circ-text circ-sub">
+              يخاطب بالدرجة الأولى الأعضاء والشركات والمنتسبين والمهتمين بخدمات الاتحاد.
+            </p>
+          </div>
+          <div class="circ-side">
+            <div class="circ-group">
+              <h3>يخاطب</h3>
+              <ul>
+                <li v-for="a in circularAudience" :key="a.label"><component :is="a.icon" :size="16" /> {{ a.label }}</li>
+              </ul>
+            </div>
+            <div class="circ-group">
+              <h3>يتضمن</h3>
+              <div class="circ-chips">
+                <span v-for="c in circularContents" :key="c.label" class="circ-chip"><component :is="c.icon" :size="14" /> {{ c.label }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <!-- Filters -->
     <div class="filters-bar">
@@ -515,5 +561,30 @@ onMounted(fetchNews)
 
 @media (max-width: 600px) {
   .news-grid { grid-template-columns: 1fr; }
+}
+
+/* Official circulars & announcements */
+.circ-sec { padding: 2.25rem 0 0; }
+.circ-card {
+  position: relative; overflow: hidden; display: grid; grid-template-columns: auto 1.5fr 1fr; gap: 2rem; align-items: center;
+  background: linear-gradient(135deg, #f5f7ff 0%, #fff 60%); border: 1.5px solid #c5cae9; border-radius: 20px; padding: 2rem 2.25rem;
+  box-shadow: 0 10px 30px rgba(13, 27, 75, .07);
+}
+.circ-card::before { content: ''; position: absolute; top: 0; bottom: 0; right: 0; width: 6px; background: linear-gradient(180deg, #f9a825, #e65100); }
+.circ-icon { width: 76px; height: 76px; border-radius: 20px; display: grid; place-items: center; color: #fff; background: linear-gradient(145deg, #1a237e, #283593); box-shadow: 0 10px 22px rgba(26, 35, 126, .3); }
+.circ-label { display: inline-block; background: #fff4dc; color: #b26a00; border: 1px solid #ffe0a3; border-radius: 50px; padding: .2rem .9rem; font-size: .75rem; font-weight: 700; margin-bottom: .55rem; }
+.circ-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 900; color: #0d1b3e; margin: 0 0 .6rem; }
+.circ-text { color: #4b5563; font-size: .98rem; line-height: 1.95; margin: 0; }
+.circ-sub { color: #6b7280; font-size: .9rem; margin-top: .35rem; }
+.circ-side { display: flex; flex-direction: column; gap: 1.1rem; border-inline-start: 1.5px dashed #c5cae9; padding-inline-start: 1.75rem; }
+.circ-group h3 { font-size: .8rem; font-weight: 800; color: #1a237e; margin: 0 0 .5rem; }
+.circ-group ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .4rem; }
+.circ-group li { display: flex; align-items: center; gap: .5rem; font-size: .88rem; color: #374151; font-weight: 600; }
+.circ-group li svg { color: #e65100; flex-shrink: 0; }
+.circ-chips { display: flex; flex-wrap: wrap; gap: .45rem; }
+.circ-chip { display: inline-flex; align-items: center; gap: .35rem; background: #e8eaf6; color: #1a237e; border-radius: 50px; padding: .3rem .8rem; font-size: .8rem; font-weight: 700; }
+@media (max-width: 960px) {
+  .circ-card { grid-template-columns: 1fr; gap: 1.25rem; padding: 1.5rem 1.4rem; }
+  .circ-side { border-inline-start: 0; padding-inline-start: 0; border-top: 1.5px dashed #c5cae9; padding-top: 1.1rem; }
 }
 </style>

@@ -80,11 +80,26 @@ function stopPartners() {
 }
 onUnmounted(stopPartners)
 
+// ─── ومضات التطبيق: كل عبارة 3.5 ثانية بتلاشي ناعم، والأخيرة هي الرسالة الختامية ──
+// كل عبارة = [قبل, كلمة مفتاحية, بعد]
+const appFlashes: [string, string, string][] = [
+  ['', 'عضويتك الرقمية', '... بين يديك.'],
+  ['تابع ', 'تصنيف شركتك', ' بسهولة.'],
+  ['إشعارات ', 'الاتحاد وتعاميمه', ' تصلك أولاً بأول.'],
+  ['', 'العطاءات والمناقصات', '... فرصك أقرب إليك.'],
+  ['', 'خدماتك الإلكترونية', '... أسرع وأسهل.'],
+  ['', 'اتحادك معك', ' .. أينما كنت وفي أي وقت.'],
+]
+const flashIdx = ref(0)
+let flashTimer: ReturnType<typeof setInterval> | undefined
+onMounted(() => { flashTimer = setInterval(() => { flashIdx.value = (flashIdx.value + 1) % appFlashes.length }, 3500) })
+onUnmounted(() => { if (flashTimer) clearInterval(flashTimer) })
+
 // ─── About ───────────────────────────────────────────────────────────────────
 const aboutFeatures = [
-  { icon: UserCheck, title: 'التصنيف والاعتماد الرسمي', desc: 'متابعة درجات التصنيف المهني والتسجيل المعتمد للمقاولين مع مراجعة مؤهلات الشركة وخبراتها وقدراتها لتحديد الدرجة المناسبة لها' },
-  { icon: FileText, title: 'تصفح العطاءات', desc: 'منصة موحدة ومحدثة تتيح للمقاولين تصفح كافة العطاءات والمناقصات المطروحة من الجهات الحكومية والدولية بسهولة وشفافية.' },
-  { icon: ShieldCheck, title: 'التمثيل والتنمية الوطنية', desc: 'حماية حقوق شركات المقاولات والتعاون مع الشركاء المحليين بدعم جهود اعادة الإعمار، وتمثيل مصالحها أمام الجهات الرسمية.' },
+  { icon: UserCheck, title: 'التصنيف والتسجيل المهني للمقاولين', desc: 'إدارة إجراءات تصنيف وتسجيل شركات المقاولات، وتقييم مؤهلاتها وخبراتها وإمكاناتها الفنية والإدارية والمالية، لتحديد فئة التصنيف المناسبة وفق المعايير والأنظمة المعتمدة.' },
+  { icon: FileText, title: 'تصفّح العطاءات والمناقصات', desc: 'منصة إلكترونية تتيح للمقاولين الاطلاع على فرص العطاءات والمناقصات المطروحة من الجهات الحكومية والمؤسسات الدولية، ومتابعتها بسهولة وشفافية، بما يعزز فرص الوصول إلى مشاريع الأعمال.' },
+  { icon: ShieldCheck, title: 'التمثيل والدفاع عن مصالح المقاولين', desc: 'تمثيل شركات المقاولات والدفاع عن حقوقها ومصالحها أمام الجهات الرسمية والمؤسسات المحلية والدولية، وتعزيز الشراكات والتنسيق مع مختلف الأطراف لدعم تطوير القطاع والمشاركة الفاعلة في جهود التعافي وإعادة الإعمار.' },
 ]
 
 const unionStats = ref({ years: 30, specializations: 0 })
@@ -253,17 +268,17 @@ onMounted(() => {
       <img src="/images/landing/home-hero.webp" alt="" class="hero-img">
       <div class="hero-shade" />
       <div class="container hero-inner">
-        <span v-enter class="hero-badge"><i />الجهة الرسمية لتصنيف واعتماد المقاولين، غزة</span>
+        <span v-enter class="hero-badge"><i />اتحاد المقاولين الفلسطينيين | المظلة المهنية والوطنية لقطاع المقاولات</span>
         <h1 v-enter :delay="120" class="hero-title">
-          تمكين <span class="accent">وتطوير</span> شركات<br>
-          <span class="accent">المقاولات</span> الوطنية
+          نحو قطاع مقاولات فلسطيني<br>
+          أكثر <span class="accent">كفاءةً</span> وقدرةً على <span class="accent">المنافسة</span>
         </h1>
         <p v-enter :delay="240" class="hero-desc">
-          نقدم منظومة خدمات الكترونية وتصنيفية متكاملة لجميع المقاولين المسجلين لضمان كفاءة التنفيذ والارتقاء بالقوة الانتاجية
+          نعمل على تمثيل شركات المقاولات وتطوير قدراتها الفنية والإدارية، وتعزيز جاهزيتها للمشاركة الفاعلة في مشاريع التعافي وإعادة الإعمار، وبناء الشراكات المحلية والدولية وفق أفضل المعايير والممارسات المهنية.
         </p>
         <div v-enter :delay="360" class="hero-actions">
           <RouterLink to="/landing/members" class="hero-btn hero-btn-solid">
-            استكشف دليل المقاولين <ChevronLeft :size="18" />
+            تصفّح دليل شركات المقاولات <ChevronLeft :size="18" />
           </RouterLink>
           <button type="button" class="hero-btn hero-btn-ghost" @click="loginVideoOpen = true">
             <span class="play"><Play :size="14" fill="currentColor" /></span> كيف تسجّل دخولك
@@ -283,7 +298,7 @@ onMounted(() => {
         <div v-reveal class="about-text">
           <span class="eyebrow"><i />عن الاتحاد</span>
           <h2 class="about-heading">
-            تأسس الاتحاد ليشكل الكيان الرسمي الجامع لشركات المقاولات الوطنية، وتسهيل الوصول للعطاءات والمناقصات بمرونة واحترافية عالية.
+            تأسس الاتحاد ليكون المظلة المهنية والوطنية الجامعة لشركات المقاولات الفلسطينية، والمدافع عن مصالحها، والمساهم في تنظيم وتطوير قطاع المقاولات، وتعزيز قدراته التنافسية، وتيسير وصول الشركات إلى فرص الأعمال والعطاءات والمناقصات، وفق معايير مهنية ومؤسسية عالية.
           </h2>
           <div class="features">
             <article
@@ -298,7 +313,7 @@ onMounted(() => {
             </article>
           </div>
           <RouterLink to="/landing/services" class="btn-navy about-btn">
-            تعرف على كل خدماتنا الالكترونية <ChevronLeft :size="18" />
+            تعرّف على كل خدماتنا الإلكترونية <ChevronLeft :size="18" />
           </RouterLink>
         </div>
         <div v-reveal-side :delay="150" class="about-visual">
@@ -366,9 +381,9 @@ onMounted(() => {
         <img src="/images/landing/home-directory.webp" alt="" class="directory-img" loading="lazy">
         <div class="directory-shade" />
         <div class="directory-inner">
-          <span class="eyebrow eyebrow-dark"><i />الاستعلام المباشر</span>
-          <h2>دليل شركات المقاولات <span class="accent">المعتمدة</span></h2>
-          <p>ابحث عن الشركات المرخصة والمسجلة رسميا لدى اتحاد المقاولين للتحقق من التصنيف والدرجة الاعتمادية</p>
+          <span class="eyebrow eyebrow-dark"><i />خدمة الاستعلام عن شركات المقاولات</span>
+          <h2>دليل شركات المقاولات <span class="accent">المسجلة والمصنفة</span></h2>
+          <p>ابحث عن شركات المقاولات المسجلة لدى الاتحاد، واطّلع على بياناتها وتصنيفها المهني ودرجة تصنيفها وفق السجلات المعتمدة</p>
           <form class="directory-search" @submit.prevent="searchDirectory">
             <Search :size="18" class="directory-search-icon" />
             <input v-model="searchQuery" type="text" placeholder="ابحث باسم الشركة أو رقم العضوية...">
@@ -449,9 +464,13 @@ onMounted(() => {
         <span class="ball ball-white" />
         <span class="ball ball-orange" />
         <div class="app-text">
-          <span class="eyebrow"><i />التطبيق الرسمي - اتحاد المقاولين الفلسطينيين</span>
-          <h2>خدمات الاتحاد كلها<br><span class="underlined navy">بتطبيق واحد</span></h2>
-          <p>عضويتك الرقمية , اشعاراتك والعطاءات الجديدة بين ايديك بأي وقت</p>
+          <span class="eyebrow"><i />التطبيق الذكي الرسمي لاتحاد المقاولين الفلسطينيين</span>
+          <h2>خدماتك في <span class="underlined navy">تطبيق واحد</span></h2>
+          <Transition name="flash" mode="out-in">
+            <p :key="flashIdx" class="app-flash">
+              <template v-for="(part, pi) in appFlashes[flashIdx]" :key="pi"><b v-if="pi === 1">{{ part }}</b><template v-else>{{ part }}</template></template>
+            </p>
+          </Transition>
           <a href="#" class="store" aria-label="Google Play">
             <svg width="28" height="30" viewBox="0 0 36 40" aria-hidden="true"><path d="M2 2l19 18L2 38c-.8-.4-1.2-1.2-1.2-2.2V4.2C.8 3.2 1.2 2.4 2 2z" fill="#2196f3" /><path d="M27.5 13.7L21 20 2 2c.3-.2.7-.2 1.1-.2.5 0 1 .1 1.4.4z" fill="#4caf50" /><path d="M27.5 26.3L4.5 37.8c-.4.3-.9.4-1.4.4-.4 0-.8 0-1.1-.2l19-18z" fill="#f44336" /><path d="M34 20c0 1-.5 1.9-1.4 2.4l-5.1 3.9L21 20l6.5-6.3 5.1 3.9c.9.5 1.4 1.4 1.4 2.4z" fill="#ffc107" /></svg>
             <span><small>حمل من</small>Google Play</span>
@@ -751,6 +770,11 @@ onMounted(() => {
 .app-text h2 { font-size: clamp(28px, 2.8vw, 40px); font-weight: 800; line-height: 1.5; margin-bottom: 26px; }
 .app-text .navy { color: var(--navy); }
 .app-text p { color: var(--muted); font-size: 17px; font-weight: 700; line-height: 1.9; max-width: 380px; margin-bottom: 26px; }
+.app-text p.app-flash { font-family: 'Cairo', 'Tajawal', sans-serif; font-size: clamp(21px, 1.9vw, 23px); font-weight: 600; color: #606a7c; min-height: 3.8em; max-width: 420px; }
+.app-flash b { color: var(--navy); font-weight: 700; }
+.flash-enter-active, .flash-leave-active { transition: opacity .6s ease; }
+.flash-enter-from, .flash-leave-to { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .flash-enter-active, .flash-leave-active { transition: none; } }
 .store {
   display: inline-flex; align-items: center; gap: 12px; background: #000; color: #fff; border-radius: 10px;
   padding: 10px 20px; direction: ltr;

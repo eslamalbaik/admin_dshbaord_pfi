@@ -6,9 +6,10 @@ import { Clock, Mail, MapPin, Phone } from 'lucide-vue-next'
 
 const unionLinks = [
   { label: 'الرئيسية', href: '/landing' },
-  { label: 'الخدمات الالكترونية', href: '/landing/services' },
   { label: 'عن الاتحاد', href: '/landing/about' },
-  { label: 'المركز الاعلامي', href: '/landing/news' },
+  { label: 'الخدمات الإلكترونية', href: '/landing/services' },
+  { label: 'دليل شركات المقاولات', href: '/landing/members' },
+  { label: 'المركز الإعلامي', href: '/landing/news' },
   { label: 'تواصل معنا', href: '/landing/contact-us' },
 ]
 
@@ -46,7 +47,7 @@ const branch = ref<keyof typeof branches>('gaza')
           </div>
         </div>
         <p class="pub-footer-bio">
-          الممثل الرسمي لقطاع المقاولات في فلسطين منذ أكثر من ثلاثة عقود، نعمل على تطوير القطاع وحماية حقوق الأعضاء.
+          اتحاد المقاولين الفلسطينيين: المظلة المهنية والوطنية الجامعة لشركات المقاولات الفلسطينية، نعمل على تمثيل مصالحها، وتطوير قدراتها، وتعزيز دورها في التنمية الوطنية وإعادة الإعمار، وحماية حقوق أعضائها منذ تأسيس الاتحاد عام 1994.
         </p>
         <div class="pub-footer-social">
           <a v-for="s in PUBLIC_SOCIAL_LINKS" :key="s.key" :href="s.href" target="_blank" rel="noopener noreferrer" class="pub-fsoc" :aria-label="s.label">
@@ -60,8 +61,8 @@ const branch = ref<keyof typeof branches>('gaza')
         <RouterLink v-for="l in unionLinks" :key="l.label" :to="l.href" class="pub-footer-link">{{ l.label }}</RouterLink>
       </nav>
 
-      <nav class="pub-footer-col" aria-label="الخدمات الالكترونية">
-        <h4 class="pub-footer-col-h">الخدمات الالكترونية</h4>
+      <nav class="pub-footer-col" aria-label="الخدمات الإلكترونية">
+        <h4 class="pub-footer-col-h">الخدمات الإلكترونية</h4>
         <RouterLink v-for="l in serviceLinks" :key="l.label" :to="l.href" class="pub-footer-link">{{ l.label }}</RouterLink>
       </nav>
 

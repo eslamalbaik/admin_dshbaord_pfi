@@ -30,7 +30,7 @@ onMounted(async () => {
 // ~ constant reading speed whatever the number/length of headlines
 const duration = computed(() => {
   const chars = items.value.reduce((sum, i) => sum + i.title.length, 0)
-  return `${Math.max(25, Math.round(chars * 0.28))}s`
+  return `${Math.max(20, Math.round(chars * 0.224))}s`
 })
 </script>
 

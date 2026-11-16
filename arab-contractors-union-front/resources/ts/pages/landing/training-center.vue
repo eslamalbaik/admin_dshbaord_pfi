@@ -29,11 +29,12 @@ const levelBg: Record<string,string> = { مبتدئ:'#e8f5e9', متوسط:'#fff8
           <RouterLink to="/landing">الرئيسية</RouterLink><span>/</span><span>التدريب وبناء القدرات</span>
         </div>
         <h1 class="page-hero-title">التدريب وبناء القدرات</h1>
-        <p class="page-hero-desc">برامج تدريبية متخصصة لرفع كفاءة العاملين في قطاع المقاولات وفق المعايير الدولية</p>
+        <p class="page-hero-desc">برامج تدريبية وتأهيلية متخصصة لتطوير الكفاءات المهنية والمؤسسية لشركات المقاولات، ورفع جاهزيتها للمنافسة وتنفيذ مشاريع إعادة الإعمار وفق المعايير والممارسات الدولية.</p>
         <div class="hero-stats">
           <div class="hs-item"><span class="hs-num">+١٥٠</span><span class="hs-lbl">دورة سنوياً</span></div>
           <div class="hs-item"><span class="hs-num">+٣٠٠٠</span><span class="hs-lbl">متدرب سنوياً</span></div>
           <div class="hs-item"><span class="hs-num">٤٠+</span><span class="hs-lbl">مدرب معتمد</span></div>
+          <div class="hs-item"><span class="hs-num">+٤٥</span><span class="hs-lbl">شركة مستفيدة</span></div>
         </div>
       </div>
       <div class="pub-follow-slot"><PublicSocialFollow /></div>
@@ -44,7 +45,7 @@ const levelBg: Record<string,string> = { مبتدئ:'#e8f5e9', متوسط:'#fff8
       <div class="pub-cont">
         <div class="sec-header-split">
           <div>
-            <div class="pub-sec-label">الدورات المتاحة</div>
+            <div class="pub-sec-label">برامجنا التدريبية</div>
             <h2 class="pub-sec-h">الدورات التدريبية القادمة</h2>
           </div>
         </div>

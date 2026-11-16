@@ -1175,3 +1175,67 @@ Instead, each production repo should carry a short pointer file — no plan cont
 - **"Code complete" is not "fixed" on this project** — TASK-16 closed five sub-issues; four came back three days later in TASK-17. One (#1/#3) was genuinely incomplete: its server prerequisite was left unchecked while the code half was marked done, and the code half is worthless without it. The others may simply not be live: a frontend build failure restores the previous `dist/` while the workflow reports success, and `git log` inside `/var/www/pcuorg/{api,front}` is vestigial. **Definition of done should include a post-deploy check against the live environment, not just a green test suite** — and a task should not be recorded as done while a prerequisite step in its own breakdown is unchecked.
 - **Verify which endpoint a contractor-app report came from before diagnosing it** — TASK-16 got this wrong twice in the same batch, in opposite directions: #7 assumed the app used the approval queue when it used the direct write (TASK-17 #6), and #6 assumed a restored nav link exposed real rows when that page reads a table nothing in the app writes to (TASK-17 #5). "The backend exists and the panel shows nothing" has at least three distinct causes — no consumer, no producer, and a gate that refuses the write — and they need different fixes.
 - **Response-shape drift between `ApiResponseTrait` and the frontend** — `paginated()` emits `{items, meta}`, but pages keep reading `data.data`/`data.total` (`penalties.vue` is the third found doing it, and there it leaves a non-array in `:items` so the table renders nothing). Worth a one-pass sweep of every `api.get` against a paginated endpoint, or a typed helper that makes the shape impossible to get wrong.
+
+---
+
+## TASK-18 — مراجعة لغوية ومهنية للـ landing (ملف الاتحاد) — 📋 STATUS: PLANNED (staging فقط)
+
+**المصدر:** `مراجعة لغوية ومهنية للموقع الالكتروني للاتحاد.docx` (2026-11-16).
+**النطاق:** صفحات `/landing/*` فقط، والنشر على staging (الـ push لـ`feature/arab-contractors-union`، وبعد سؤال المستخدم عن البيئة). لا شيء على الإنتاج.
+**الملفات الأساسية:** `resources/ts/pages/landing/*.vue`، `components/PublicNavbar.vue`، `components/PublicFooter.vue`، `layouts/landing.vue`، و`LandingController.php` عند الحاجة لحقول جديدة.
+
+### أ. نصوص فقط (جاهزة للتنفيذ فورًا، بدون backend)
+
+| # | الملاحظة | الملف | الإجراء |
+|---|---|---|---|
+| A1 | نصوص الـ hero والرسالة التعريفية والعبارات الثلاث (التصنيف، العطاءات، التمثيل) | `index.vue` | استبدال النصوص بالصياغة المقترحة في الملف |
+| A2 | شريط الصفحة الأولى بطيء، يحتاج سرعة 1.25 | `index.vue` (ticker / `PublicNewsTicker.vue`) | رفع السرعة 1.25x |
+| A3 | ومضات التطبيق الذكي (6 عبارات): كل عبارة 3–4 ثوانٍ، Fade، خط Cairo SemiBold، 21–23px، لون `#606A7C`، كلمات مفتاحية أزرق/ذهبي، وتنتهي بـ«اتحادك معك .. أينما كنت» | `index.vue` (قسم التطبيق) | مكوّن دوران نصوص بسيط |
+| A4 | الفوتر: وصف العمود الأول (منذ 1994)، ترتيب روابط العمود الثاني (الرئيسية، عن الاتحاد، الخدمات الإلكترونية، دليل شركات المقاولات، المركز الإعلامي، تواصل معنا) | `PublicFooter.vue` | تعديل `unionLinks` والنص |
+| A5 | سطر الحقوق: إضافة «إمكانية الوصول» و«خريطة الموقع (اختياري)» | `PublicFooter.vue` | روابط/صفحات بسيطة، والخريطة اختيارية |
+| A6 | صفحة الخدمات: تعديل العناوين والأوصاف والنقاط الثمانية (تسجيل العضوية، تجديد العضوية والاشتراكات، التصنيف وإصدار الشهادات، الاستشارات القانونية، التدريب والتأهيل، التحكيم وتسوية النزاعات، المناقصات والعطاءات، الدراسات والأبحاث والتقارير) | `services.vue` | استبدال مصفوفة `services` بالنص المقترح حرفيًا |
+| A7 | ترتيب بطاقات الخدمات صفّين: الصف الأول (تسجيل، تجديد، تصنيف، مناقصات)، الصف الثاني (تدريب، تحكيم، استشارات قانونية، دراسات) | `services.vue` | إعادة ترتيب المصفوفة + شبكة 4 أعمدة |
+| A8 | «التدريب وبناء القدرات»: نص الوصف الجديد، تغيير «الدورات المتاحة» إلى «برامجنا التدريبية»، إضافة «شركات مستفيدة» تحت الأرقام | `training-center.vue` | نصوص + تسمية |
+| A9 | تعاميم وإعلانات رسمية: فقرة التعريف (تخاطب الأعضاء والشركات والمنتسبين) | `news/index.vue` أو صفحة التعاميم الحالية | نص |
+| A10 | حذف ما يخص اللجان من صفحة «عن الاتحاد» (مذكورة في صفحة اللجان) | `about.vue` | حذف القسم |
+
+### ب. تغييرات بنيوية في الواجهة (بدون backend، أو بتعديل بسيط)
+
+| # | الملاحظة | الإجراء |
+|---|---|---|
+| B1 | **قائمة التنقل:** «التدريب» و«التشريعات» و«مكتبة الملفات» ليست خدمات إلكترونية | إعادة تنظيم `PublicNavbar.vue`: نقلها لقائمة مناسبة (مثلًا ضمن «عن الاتحاد» أو قائمة «المعرفة والتدريب»). **قرار مطلوب من المستخدم** |
+| B2 | دمج «اجتماعيات» داخل «المركز الإعلامي» + إضافة «بيانات وتعميمات» | `PublicNavbar.vue`: حذف قائمة اجتماعيات وجعل تعازي/تهاني/شهداء المهنة تحت المركز الإعلامي |
+| B3 | تقسيم الأخبار (أخبار الاتحاد، محلية، دولية) والفعاليات (فعاليات الاتحاد، محلية، دولية) والاجتماعيات (تهاني، تعازي، شهداء المهنة، عامة) | تبويبات في `news/index.vue` و`events/index.vue`؛ **يتطلب عمود `category` في جدولي news/events** (migration + حقل في نموذج الإدارة + فلتر في `LandingController`) |
+| B4 | «الأخبار والفعاليات غير فعالة» | **يحتاج تحقق أولًا:** أعيد إنتاج المشكلة على staging (الروابط/الصفحات الفارغة/البيانات). التشخيص قبل أي تعديل |
+| B5 | الدورات: تبويبان على نفس السطر («الدورات الجارية» و«الدورات المنفذة والأرشيف التدريبي») مع نفس التصميم الحالي | `training-center.vue`: تبويبات تعرض البطاقات أسفلها |
+| B6 | بطاقة الدورة: اسم، المدرب (الاسم والمؤهلات والخبرات)، المدة بالساعات، التاريخ من–إلى، النمط (حضوري/إلكتروني/مدمج)، الفئة المستهدفة، حالة التسجيل (مفتوح/مكتمل/انتهى)، زر التسجيل | `training-center.vue`؛ **غالبًا حقول جديدة في backend** (trainer_bio، mode، audience، registration_status). قبل البدء: فحص جدول الدورات الحالي |
+| B7 | التواريخ تُعرض «من — إلى» (تتكرر في بوابة العطاءات) | `public-tenders.vue` + الدورات + الفعاليات |
+| B8 | عند التنقل بين الأرقام (pagination) تعود الصفحة لأولها بدل البقاء في مكانها | إضافة `scrollIntoView`/`window.scrollTo` عند تغيير الصفحة (الأخبار، العطاءات، الأعضاء) |
+| B9 | صفحة «مجلس الإدارة/الأعضاء»: أيقونة لكل عضو تفتح نافذة تعريف (5–7 أسطر) | `board.vue`: نافذة Dialog؛ **النصوص من «عبد» لاحقًا**، فنضيف حقل `bio` ونترك الفراغ يخفي الأيقونة |
+| B10 | «أعضاء الاتحاد» لا تفتح: المطلوب قوائم مع فلاتر بحث عن مقاول بعينه، **بدون تنزيل** نتائج البحث | `members.vue` (518 سطر): **فحص أولًا لماذا لا تفتح** (route/API)، ثم فلاتر، مع التأكد أن الـ API لا يصدّر Excel/CSV |
+| B11 | رقم الهاتف بمقدمة الدولة، وللضفة يتغير الإيميل وساعات الدوام، كتابة «الضفة الغربية» للزوار من خارج فلسطين، روابط الاتصال بغزة فقط | `PublicFooter.vue` (`branches`) و`contact-us.vue` و`PublicNavbar.vue` (الشريط الأزرق). الأرقام: `0597233422` ← `+970597233422` |
+| B12 | **الشركاء:** تفعيل الشعارات كروابط، وإضافة شعارات جديدة، وتصنيفهم لاحقًا (استراتيجيون، دوليون وأمميون، حكوميون ووطنيون، أكاديميون ومهنيون، داعمون ومانحون) | `index.vue` (`partners`): إضافة `url`؛ الشعارات الجديدة **تنتظر الملفات من العميل**. التصنيف مؤجل (مرحلة لاحقة) |
+| B13 | الأرقام: «تعديل الأرقام لتكون ( )» غير مكتمل في الملف | **سؤال للعميل**: ما الشكل المطلوب؟ (اقتراح: أرقام إنجليزية أو إضافة «+») |
+
+### ج. ما ينقص ولا نستطيع تنفيذه بدون العميل
+
+1. نصوص تعريف أعضاء المجلس (5–7 أسطر لكل عضو) — مطلوبة من «عبد».
+2. شعارات الشركاء الجدد وروابط مواقعهم.
+3. تفاصيل الضفة الغربية: الإيميل وساعات الدوام الحقيقية.
+4. معنى «تعديل الأرقام لتكون ( )» (B13).
+5. مكان نقل «التدريب» و«التشريعات» و«المكتبة» (B1).
+
+### د. ترتيب التنفيذ المقترح (على staging)
+
+1. **دفعة 1 — نصوص فقط (A1–A10):** أقل مخاطرة، ملفات frontend فقط، دفعة واحدة.
+2. **دفعة 2 — تنقل وفوتر (B1, B2, B8, B11, B12-روابط):** frontend فقط.
+3. **دفعة 3 — تشخيص (B4, B10):** نفحص على staging لماذا لا تعمل الأخبار والأعضاء قبل أي كود.
+4. **دفعة 4 — تغييرات تحتاج backend (B3, B5, B6, B9):** migrations + حقول إدارة + API. **ملاحظة:** الـ migration تعمل `migrate --force` على `pcuorg` تلقائيًا عند الـ push.
+5. **دفعة 5 — مؤجل لحين وصول المواد (ج).**
+
+### هـ. التحقق
+
+- `npm run typecheck` و`npm run lint` و`npm run build` (في worktree شغّل `npm run build:icons` أولًا).
+- تدقيق RTL على الصفحات المعدّلة، وعرض الموبايل لشبكة الخدمات (4 أعمدة) وتبويبات الدورات.
+- بعد النشر: التأكد من تحديث الـ `dist` فعلًا (النشر الأخضر لا يعني أن الـ front تحدّث، راجع ذاكرة «PCU frontend deploy silent rollback»).
+- لا تلمس `production`، ولا تشغّل `git push` قبل سؤال المستخدم عن البيئة.
