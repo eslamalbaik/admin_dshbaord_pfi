@@ -94,7 +94,6 @@ const branch = ref<keyof typeof branches>('gaza')
 </template>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
 
 .pub-footer { background: #000068; color: #fff; font-family: 'Tajawal', 'Cairo', sans-serif; }
 .pub-footer p { margin: 0; }

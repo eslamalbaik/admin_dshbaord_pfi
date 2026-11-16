@@ -166,7 +166,9 @@ export const setupGuards = (router: _RouterTyped<RouteNamedMap & { [key: string]
   // afterEach بيتنادى كمان للتنقل الملغى أو المحوَّل، أما فشل تحميل الصفحة نفسها فبيروح لـonError
   router.afterEach(to => {
     document.title = resolveDocumentTitle(to.name)
-    routeLoading.done()
+
+    // الموقع العام: الشعار يكمّل تجميعه بسرعة (≈1.1 ثانية) بدل 2 ثانية المخصّصة للداشبورد
+    routeLoading.done(to.path.startsWith('/landing') ? 1100 : undefined)
   })
 
   router.onError(() => routeLoading.done())

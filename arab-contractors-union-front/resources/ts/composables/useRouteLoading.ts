@@ -28,13 +28,13 @@ function start() {
   }, SHOW_DELAY_MS)
 }
 
-function done() {
+function done(minVisible = MIN_VISIBLE_MS) {
   clearTimeout(showTimer)
   showTimer = undefined
   if (!isRouteLoading.value)
     return
 
-  const remaining = MIN_VISIBLE_MS - (Date.now() - shownAt)
+  const remaining = minVisible - (Date.now() - shownAt)
 
   hideTimer = setTimeout(() => {
     isRouteLoading.value = false

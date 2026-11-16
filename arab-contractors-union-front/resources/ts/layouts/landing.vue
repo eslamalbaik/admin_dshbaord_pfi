@@ -1,6 +1,24 @@
 <script setup lang="ts">
 import PublicNavbar from '@/components/PublicNavbar.vue'
 import PublicFooter from '@/components/PublicFooter.vue'
+import AppLoadingIndicator from '@/components/AppLoadingIndicator.vue'
+import { onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+
+// بعد ما تستقر الصفحة الأولى، نحمّل بالخلفية باقي صفحات /landing (chunks) فالتنقل بينها يصير شبه فوري
+const router = useRouter()
+onMounted(() => {
+  const preload = () => {
+    for (const r of router.getRoutes()) {
+      if (!r.path.startsWith('/landing')) continue
+      const loader = (r.components as Record<string, unknown> | null | undefined)?.default
+      if (typeof loader === 'function') (loader as () => Promise<unknown>)().catch(() => {})
+    }
+  }
+  const idle = (window as any).requestIdleCallback as undefined | ((cb: () => void, o?: { timeout: number }) => void)
+  if (idle) idle(preload, { timeout: 4000 })
+  else setTimeout(preload, 2500)
+})
 
 // صورة الهيرو لكل صفحة داخلية (الرئيسية لها هيرو خاص فيها). الصفحات غير المذكورة بتبقى على الصورة العامة.
 const HERO_IMAGES: Record<string, string> = {
@@ -26,6 +44,7 @@ function heroStyle(path: string) {
 
 <template>
   <div dir="rtl" class="lp-layout">
+    <AppLoadingIndicator />
     <PublicNavbar />
     <!-- each public page fades/slides in when navigating from the header (off for reduced motion) -->
     <RouterView v-slot="{ Component, route }">
@@ -40,7 +59,6 @@ function heroStyle(path: string) {
 </template>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
 /* Base/Global Styles for the public pages nested layout */
 .lp-layout {
   min-height: 100vh;
