@@ -130,7 +130,10 @@ watch(searchQ, () => {
   }, 400)
 })
 
-watch(page, fetchTenders)
+watch(page, () => {
+  fetchTenders()
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+})
 
 async function fetchSelected() {
   const id = Number(route.query.id)

@@ -29,7 +29,7 @@ const legalLinks = [
 ]
 
 const branches = {
-  gaza: { address: 'غزة - الرمال', phone: '0597233422' },
+  gaza: { address: 'غزة - الرمال', phone: '+970597233422' },
   westbank: { address: 'رام الله - شارع الإرسال', phone: '+970-2-2987654' },
 }
 const branch = ref<keyof typeof branches>('gaza')
@@ -70,7 +70,7 @@ const branch = ref<keyof typeof branches>('gaza')
         <h4 class="pub-footer-col-h">تواصل معنا</h4>
         <div class="pub-branch-toggle" role="tablist">
           <button :class="{ active: branch === 'gaza' }" @click="branch = 'gaza'">غزة</button>
-          <button :class="{ active: branch === 'westbank' }" @click="branch = 'westbank'">الضفة</button>
+          <button :class="{ active: branch === 'westbank' }" @click="branch = 'westbank'">الضفة الغربية</button>
         </div>
         <p class="pub-footer-contact"><span class="pub-fco-ico"><MapPin :size="20" /></span>{{ branches[branch].address }}</p>
         <p class="pub-footer-contact"><span class="pub-fco-ico"><Phone :size="20" /></span><span dir="ltr">{{ branches[branch].phone }}</span></p>

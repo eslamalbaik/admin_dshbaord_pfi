@@ -21,7 +21,7 @@ async function submit() {
 const contacts = [
   { icon: MapPin,  label: 'العنوان',         value: 'رام الله، فلسطين — شارع الإرسال، مبنى الاتحاد' },
   { icon: Phone,   label: 'هاتف المقر',      value: '+970 2 000 0000', href: 'tel:+97020000000' },
-  { icon: Phone,   label: 'رقم الجوال',      value: '0597233422', href: 'tel:0597233422' },
+  { icon: Phone,   label: 'رقم الجوال',      value: '+970 597 233 422', href: 'tel:+970597233422' },
   { icon: Mail,    label: 'البريد الإلكتروني', value: 'info@pcu.org.ps', href: 'mailto:info@pcu.org.ps' },
   { icon: Clock,   label: 'ساعات العمل',      value: 'الأحد — الخميس: ٨ص — ٤م' },
 ]

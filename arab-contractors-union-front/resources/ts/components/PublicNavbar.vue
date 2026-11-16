@@ -17,7 +17,7 @@ defineProps<{
 // same contact details as PublicFooter.vue — keep them in sync
 const contact = {
   email: 'info@pcu.org.ps',
-  phone: '0597233422',
+  phone: '+970597233422',
   address: 'غزة - الرمال',
 }
 
@@ -36,28 +36,18 @@ const navLinks = [
       { label: 'مجلس الإدارة', href: '/landing/board' },
       { label: 'اللجان', href: '/landing/committees' },
       { label: 'أعضاء الاتحاد', href: '/landing/members' },
-    ],
-  },
-  {
-    label: 'الخدمات الالكترونية', href: '#',
-    children: [
-      { label: 'خدمات الاتحاد', href: '/landing/services' },
-      { label: 'بوابة العطاءات', href: '/landing/public-tenders' },
-      { label: 'التدريب', href: '/landing/training-center' },
       { label: 'التشريعات', href: '/landing/legislation' },
       { label: 'مكتبة الملفات', href: '/landing/library' },
     ],
   },
+  { label: 'خدمات الاتحاد', href: '/landing/services' },
+  { label: 'التدريب وبناء القدرات', href: '/landing/training-center' },
+  { label: 'المناقصات والعطاءات', href: '/landing/public-tenders' },
   {
-    label: 'المركز الاعلامي', href: '#',
+    label: 'المركز الإعلامي', href: '#',
     children: [
       { label: 'الأخبار', href: '/landing/news' },
       { label: 'الفعاليات', href: '/landing/events' },
-    ],
-  },
-  {
-    label: 'اجتماعيات', href: '#',
-    children: [
       { label: 'تعازي', href: '/landing/condolences' },
       { label: 'تهاني', href: '/landing/congratulations' },
       { label: 'شهداء المهنة', href: '/landing/martyrs' },

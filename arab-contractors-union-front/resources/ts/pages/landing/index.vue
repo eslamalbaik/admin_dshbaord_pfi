@@ -47,12 +47,12 @@ const vEnter = MotionDirective({
 })
 
 // ─── Partners strip ──────────────────────────────────────────────────────────
-const partners = [
+const partners: { logo: string; label: string; url?: string }[] = [
   { logo: '/images/partners/ministry-public-works.png', label: 'وزارة الأشغال العامة والإسكان' },
   { logo: '/images/partners/engineers-association.png', label: 'نقابة المهندسين - فرع غزة' },
   { logo: '/images/partners/palestinian-housing-council.png', label: 'المجلس الفلسطيني للإسكان' },
   { logo: '/images/partners/gaza-chamber-commerce.png', label: 'غرفة تجارة وصناعة محافظة غزة' },
-  { logo: '/images/partners/undp.png', label: 'برنامج الأمم المتحدة الإنمائي UNDP' },
+  { logo: '/images/partners/undp.png', label: 'برنامج الأمم المتحدة الإنمائي UNDP', url: 'https://www.undp.org' },
 ]
 
 // كاروسيل الشعارات: السهمين بيحرّكوا شعار واحد، وبيلفّ من الآخر للأول. بيتحرك لحاله كل 3 ثواني إلا لما الماوس فوقه.
@@ -493,9 +493,9 @@ onMounted(() => {
         <div class="partners-carousel">
           <button class="arrow" aria-label="السابق" @click="slidePartners(-1)"><ChevronRight :size="18" /></button>
           <div ref="partnersTrack" class="partners-track">
-            <span v-for="p in partners" :key="p.label" class="partner" :title="p.label">
+            <component :is="p.url ? 'a' : 'span'" v-for="p in partners" :key="p.label" class="partner" :title="p.label" v-bind="p.url ? { href: p.url, target: '_blank', rel: 'noopener noreferrer' } : {}">
               <img :src="p.logo" :alt="p.label" loading="lazy">
-            </span>
+            </component>
           </div>
           <button class="arrow" aria-label="التالي" @click="slidePartners(1)"><ChevronLeft :size="18" /></button>
         </div>
