@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
-import { ClipboardCheck, Award, FileCheck, Scale, GraduationCap, ShieldCheck, Megaphone, ChartColumn, ChevronLeft, Check } from 'lucide-vue-next'
+import { ClipboardCheck, Award, FileCheck, Scale, GraduationCap, ShieldCheck, Megaphone, ChartColumn, Check } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
@@ -84,9 +84,6 @@ const services = [
             <ul class="svc-features">
               <li v-for="f in s.features" :key="f"><Check :size="13" :stroke-width="3" class="svc-check" /> {{ f }}</li>
             </ul>
-            <button type="button" class="svc-btn">
-              طلب الخدمة <ChevronLeft :size="14" :stroke-width="3" />
-            </button>
           </article>
         </div>
       </div>
@@ -151,14 +148,6 @@ const services = [
 .svc-features { position: relative; list-style: none; display: flex; flex-direction: column; gap: .45rem; margin-bottom: 1.25rem; flex: 1; }
 .svc-features li { display: flex; align-items: center; gap: .5rem; font-size: .8rem; color: #374151; }
 .svc-check { flex-shrink: 0; color: var(--c); }
-.svc-btn {
-  display: flex; align-items: center; justify-content: center; gap: .4rem; width: 100%;
-  background: var(--c); color: #fff; border: none; border-radius: 10px; padding: .7rem;
-  font-size: .88rem; font-weight: 700; font-family: 'Tajawal', sans-serif; cursor: pointer;
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--c) 35%, transparent);
-  transition: filter .2s, transform .2s;
-}
-.svc-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
 
 .cta-section { background: linear-gradient(145deg, #0d1b4b, #1a237e); padding: 4rem 0; }
 .cta-inner { text-align: center; }

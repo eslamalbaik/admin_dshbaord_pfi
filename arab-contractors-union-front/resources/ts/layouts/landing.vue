@@ -1,6 +1,27 @@
 <script setup lang="ts">
 import PublicNavbar from '@/components/PublicNavbar.vue'
 import PublicFooter from '@/components/PublicFooter.vue'
+
+// صورة الهيرو لكل صفحة داخلية (الرئيسية لها هيرو خاص فيها). الصفحات غير المذكورة بتبقى على الصورة العامة.
+const HERO_IMAGES: Record<string, string> = {
+  '/landing/about': 'about',
+  '/landing/board': 'board',
+  '/landing/committees': 'committees',
+  '/landing/members': 'members',
+  '/landing/services': 'services',
+  '/landing/training-center': 'training',
+  '/landing/legislation': 'legislation',
+  '/landing/library': 'library',
+  '/landing/public-tenders': 'tenders',
+  '/landing/news': 'news',
+  '/landing/events': 'events',
+  '/landing/condolences': 'condolences',
+  '/landing/congratulations': 'congratulations',
+}
+function heroStyle(path: string) {
+  const name = HERO_IMAGES[path.replace(/\/+$/, '')]
+  return name ? { '--hero-img': `url('/images/landing/heroes/${name}.webp')` } : undefined
+}
 </script>
 
 <template>
@@ -9,7 +30,7 @@ import PublicFooter from '@/components/PublicFooter.vue'
     <!-- each public page fades/slides in when navigating from the header (off for reduced motion) -->
     <RouterView v-slot="{ Component, route }">
       <Transition name="lp-page" mode="out-in">
-        <div :key="route.path" class="lp-page">
+        <div :key="route.path" class="lp-page" :style="heroStyle(route.path)">
           <component :is="Component" />
         </div>
       </Transition>
@@ -63,7 +84,7 @@ import PublicFooter from '@/components/PublicFooter.vue'
   background-color: #000068;
   background-image:
     linear-gradient(260deg, rgba(0, 0, 90, .8) 0%, rgba(0, 0, 120, .6) 42%, rgba(0, 0, 120, .28) 75%, rgba(0, 0, 90, .18) 100%),
-    url('/images/landing/inner-hero.webp');
+    var(--hero-img, url('/images/landing/inner-hero.webp'));
   background-size: cover; background-position: center 38%; background-repeat: no-repeat;
   border-bottom: 0;
   text-align: start;
@@ -103,7 +124,7 @@ import PublicFooter from '@/components/PublicFooter.vue'
   .lp-layout .lp-page .vp-hero {
     background-image:
       linear-gradient(180deg, rgba(0, 0, 90, .75) 0%, rgba(0, 0, 120, .55) 60%, rgba(0, 0, 90, .5) 100%),
-      url('/images/landing/inner-hero-sm.webp');
+      var(--hero-img, url('/images/landing/inner-hero-sm.webp'));
     background-position: 62% center;
   }
   .lp-layout .lp-page .page-hero,

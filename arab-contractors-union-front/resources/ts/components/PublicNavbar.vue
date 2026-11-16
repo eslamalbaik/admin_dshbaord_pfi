@@ -36,12 +36,17 @@ const navLinks = [
       { label: 'مجلس الإدارة', href: '/landing/board' },
       { label: 'اللجان', href: '/landing/committees' },
       { label: 'أعضاء الاتحاد', href: '/landing/members' },
+    ],
+  },
+  {
+    label: 'خدمات الاتحاد', href: '#',
+    children: [
+      { label: 'خدمات الاتحاد', href: '/landing/services' },
+      { label: 'التدريب وبناء القدرات', href: '/landing/training-center' },
       { label: 'التشريعات', href: '/landing/legislation' },
       { label: 'مكتبة الملفات', href: '/landing/library' },
     ],
   },
-  { label: 'خدمات الاتحاد', href: '/landing/services' },
-  { label: 'التدريب وبناء القدرات', href: '/landing/training-center' },
   { label: 'المناقصات والعطاءات', href: '/landing/public-tenders' },
   {
     label: 'المركز الإعلامي', href: '#',
