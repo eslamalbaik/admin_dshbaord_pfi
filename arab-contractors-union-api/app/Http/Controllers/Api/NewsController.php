@@ -16,10 +16,10 @@ class NewsController extends Controller
 {
     use ApiResponseTrait, HandlesMediaUploads;
 
-    /** رابط API الإنتاج للبيئات التجريبية (NEWS_SOURCE_URL، أو تلقائياً على api.pcuorg.cloud)؛ null = قاعدة هالبيئة. */
+    /** مصدر أخبار خارجي اختياري (NEWS_SOURCE_URL)؛ بدونه (الافتراضي، ومنه staging) الأخبار من قاعدة هالبيئة نفسها. */
     public static function sourceUrl(Request $request): ?string
     {
-        $url = env('NEWS_SOURCE_URL') ?: ($request->getHost() === 'api.pcuorg.cloud' ? 'https://api-production.pcuorg.cloud' : null);
+        $url = env('NEWS_SOURCE_URL');
 
         return $url ? rtrim($url, '/') : null;
     }

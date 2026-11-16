@@ -268,7 +268,7 @@ onMounted(() => {
       <img src="/images/landing/home-hero.webp" alt="" class="hero-img">
       <div class="hero-shade" />
       <div class="container hero-inner">
-        <span v-enter class="hero-badge"><i />اتحاد المقاولين الفلسطينيين | المظلة المهنية والوطنية لقطاع المقاولات</span>
+        <span v-enter class="hero-badge"><i />المظلة المهنية والوطنية لقطاع المقاولات</span>
         <h1 v-enter :delay="120" class="hero-title">
           نحو قطاع مقاولات فلسطيني<br>
           أكثر <span class="accent">كفاءةً</span> وقدرةً على <span class="accent">المنافسة</span>
@@ -634,7 +634,7 @@ onMounted(() => {
 .about-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 56px; align-items: start; }
 .about .eyebrow { margin-bottom: 22px; }
 /* .lp h2 resets margins, so this needs the extra .lp to win */
-.lp .about-heading { max-width: 640px; font-size: clamp(21px, 1.8vw, 26px); font-weight: 800; line-height: 1.5; margin-bottom: 40px; }
+.lp .about-heading { max-width: 640px; font-size: clamp(16px, 1.25vw, 18px); font-weight: 700; line-height: 1.9; margin-bottom: 40px; }
 .features { display: flex; flex-direction: column; gap: 18px; margin-bottom: 36px; }
 .feature {
   display: flex; align-items: center; gap: 22px; padding: 26px 26px; border-radius: 14px; background: #f4f5f9;
