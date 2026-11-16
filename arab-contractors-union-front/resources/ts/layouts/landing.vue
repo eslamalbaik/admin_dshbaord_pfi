@@ -2,6 +2,7 @@
 import PublicNavbar from '@/components/PublicNavbar.vue'
 import PublicFooter from '@/components/PublicFooter.vue'
 import AppLoadingIndicator from '@/components/AppLoadingIndicator.vue'
+import PublicAssistant from '@/components/PublicAssistant.vue'
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -55,6 +56,7 @@ function heroStyle(path: string) {
       </Transition>
     </RouterView>
     <PublicFooter />
+    <PublicAssistant />
   </div>
 </template>
 

@@ -126,6 +126,7 @@ class DashboardPermissions
                 'settings.terms'          => ['label' => 'الشروط والأحكام وسياسة الخصوصية', 'actions' => self::CRUD],
                 'settings.app'            => ['label' => 'إعدادات التطبيق', 'actions' => [self::VIEW, self::UPDATE]],
                 'settings.pages'          => ['label' => 'الصفحات الديناميكية', 'actions' => self::CRUD],
+                'settings.faqs'           => ['label' => 'الأسئلة الشائعة والمساعد الافتراضي', 'actions' => self::CRUD],
                 'settings.lookups'        => ['label' => 'المجالات والاختصاصات والدرجات', 'actions' => self::CRUD],
                 'settings.governorates'   => ['label' => 'المحافظات والمدن', 'actions' => self::CRUD],
                 'settings.country_codes'  => ['label' => 'مقدمات الدول وأعلامها', 'actions' => self::CRUD],

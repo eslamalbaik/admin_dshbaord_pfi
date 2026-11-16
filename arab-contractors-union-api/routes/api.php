@@ -223,6 +223,11 @@ Route::prefix('v1')->group(function () {
     Route::get('privacy-policy', [TermsController::class, 'publicPrivacy']);
 
     // --------------------------------------------------------
+    //  FAQs — Public (no auth) — بتغذّي المساعد الافتراضي
+    // --------------------------------------------------------
+    Route::get('faqs', [\App\Http\Controllers\Api\FaqController::class, 'public']);
+
+    // --------------------------------------------------------
     //  Legal Library — Public (no auth)
     // --------------------------------------------------------
     Route::get('legal-files', [LegalFileController::class, 'publicIndex']);
@@ -394,6 +399,11 @@ Route::prefix('v1')->group(function () {
             Route::post('dashboard/terms',         [TermsController::class, 'store'])->middleware('perm:settings.terms');
             Route::put('dashboard/terms/{term}',   [TermsController::class, 'update'])->middleware('perm:settings.terms');
             Route::delete('dashboard/terms/{term}',[TermsController::class, 'destroy'])->middleware('perm:settings.terms');
+
+            Route::get('dashboard/faqs',          [\App\Http\Controllers\Api\FaqController::class, 'index'])->middleware('perm:settings.faqs');
+            Route::post('dashboard/faqs',         [\App\Http\Controllers\Api\FaqController::class, 'store'])->middleware('perm:settings.faqs');
+            Route::put('dashboard/faqs/{faq}',    [\App\Http\Controllers\Api\FaqController::class, 'update'])->middleware('perm:settings.faqs');
+            Route::delete('dashboard/faqs/{faq}', [\App\Http\Controllers\Api\FaqController::class, 'destroy'])->middleware('perm:settings.faqs');
         });
 
         // --------------------------------------------------------

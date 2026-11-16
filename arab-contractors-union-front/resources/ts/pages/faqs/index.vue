@@ -9,7 +9,7 @@ const queryClient = useQueryClient()
 
 const { data, isLoading } = useQuery({
   queryKey: ['faqs'],
-  queryFn: async () => (await api.get('/api/dashboard/faqs')).data,
+  queryFn: async () => (await api.get('/api/v1/dashboard/faqs')).data,
 })
 const faqs = computed(() => data.value ?? [])
 
@@ -26,14 +26,14 @@ const openEdit = (f: any) => { isEditing.value = true; editingId.value = f.id; f
 const saveMutation = useMutation({
   mutationFn: async () => {
     if (isEditing.value)
-      return (await api.put(`/api/dashboard/faqs/${editingId.value}`, form.value)).data
-    return (await api.post('/api/dashboard/faqs', form.value)).data
+      return (await api.put(`/api/v1/dashboard/faqs/${editingId.value}`, form.value)).data
+    return (await api.post('/api/v1/dashboard/faqs', form.value)).data
   },
   onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['faqs'] }); isFormOpen.value = false },
   onError: (e: any) => { formError.value = e?.response?.data?.message || 'Failed to save FAQ.' },
 })
 const deleteMutation = useMutation({
-  mutationFn: async (id: number) => (await api.delete(`/api/dashboard/faqs/${id}`)).data,
+  mutationFn: async (id: number) => (await api.delete(`/api/v1/dashboard/faqs/${id}`)).data,
   onSuccess: () => queryClient.invalidateQueries({ queryKey: ['faqs'] }),
 })
 const confirmDelete = (f: any) => { if (confirm('Delete this FAQ?')) deleteMutation.mutate(f.id) }

@@ -37,6 +37,12 @@ const canOpen = (routeName: string) => canAccessRoute(authStore.user, routeName)
               :to="{ name: 'settings-terms' }"
             />
             <VListItem
+              v-if="canOpen('faqs')"
+              prepend-icon="tabler-help-circle"
+              title="الأسئلة الشائعة والمساعد"
+              :to="{ name: 'faqs' }"
+            />
+            <VListItem
               v-if="canOpen('settings-privacy-policy')"
               prepend-icon="tabler-shield-lock"
               title="سياسة الخصوصية"

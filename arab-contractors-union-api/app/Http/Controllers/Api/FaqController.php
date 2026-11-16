@@ -17,19 +17,28 @@ class FaqController extends Controller
         'sort'        => 'nullable|integer|min:0',
     ];
 
-    /** GET /api/dashboard/faqs */
+    /** GET /api/v1/faqs — Public: الأسئلة الشائعة المفعّلة (بتغذّي المساعد الافتراضي) */
+    public function public()
+    {
+        return response()->json(
+            Faq::where('is_active', true)->orderBy('sort')->orderBy('id')
+                ->get(['id', 'question', 'question_en', 'answer', 'answer_en', 'sort'])
+        );
+    }
+
+    /** GET /api/v1/dashboard/faqs */
     public function index()
     {
         return response()->json(Faq::orderBy('sort')->orderBy('id')->get());
     }
 
-    /** POST /api/dashboard/faqs */
+    /** POST /api/v1/dashboard/faqs */
     public function store(Request $request)
     {
         return response()->json(Faq::create($request->validate($this->rules)), 201);
     }
 
-    /** PUT /api/dashboard/faqs/{faq} */
+    /** PUT /api/v1/dashboard/faqs/{faq} */
     public function update(Request $request, Faq $faq)
     {
         $faq->update($request->validate($this->rules));
@@ -37,7 +46,7 @@ class FaqController extends Controller
         return response()->json($faq);
     }
 
-    /** DELETE /api/dashboard/faqs/{faq} */
+    /** DELETE /api/v1/dashboard/faqs/{faq} */
     public function destroy(Faq $faq)
     {
         $faq->delete();

@@ -22,6 +22,7 @@ function getStoredUser(): NavUser {
 /** الصفحات اللي بتنفتح من داخل صفحة الإعدادات (pages/settings/index.vue) */
 const SETTINGS_INNER_ROUTES = [
   'settings-terms',
+  'faqs',
   'settings-privacy-policy',
   'settings-app-settings',
   'settings-exchange-rates',
