@@ -103,12 +103,46 @@ const aboutFeatures = [
 ]
 
 const unionStats = ref({ years: 30, specializations: 0 })
+// الأرقام بتعدّ من صفر لقيمتها أول ما القسم يبين بالشاشة (ومرة ثانية لو تغيّرت القيمة بعد وصول بيانات الـ API)
 const stats = computed(() => [
-  { icon: Building2, value: '+350', label: 'شركة مقاولات مصنفة', tone: 'navy' },
-  { icon: Award, value: '5', label: 'مجالات تصنيف معتمدة', tone: 'orange' },
-  { icon: Layers, value: unionStats.value.specializations ? String(unionStats.value.specializations) : '+40', label: 'اختصاصات معتمدة', tone: 'navy' },
-  { icon: CalendarDays, value: `+${unionStats.value.years}`, label: 'عاما من القيادة الوطنية', tone: 'orange' },
+  { icon: Building2, num: 350, prefix: '+', label: 'شركة مقاولات مصنفة', tone: 'navy' },
+  { icon: Award, num: 5, prefix: '', label: 'مجالات تصنيف معتمدة', tone: 'orange' },
+  { icon: Layers, num: unionStats.value.specializations || 40, prefix: unionStats.value.specializations ? '' : '+', label: 'اختصاصات معتمدة', tone: 'navy' },
+  { icon: CalendarDays, num: unionStats.value.years, prefix: '+', label: 'عاما من القيادة الوطنية', tone: 'orange' },
 ])
+const statsEl = ref<HTMLElement | null>(null)
+const statShown = ref<number[]>([0, 0, 0, 0])
+let statsStarted = false
+let statsRaf = 0
+function countStats() {
+  cancelAnimationFrame(statsRaf)
+  const from = [...statShown.value]
+  const to = stats.value.map(x => x.num)
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { statShown.value = to; return }
+  const t0 = performance.now()
+  const dur = 1800
+  const tick = (now: number) => {
+    const t = Math.min(1, (now - t0) / dur)
+    const e = 1 - Math.pow(1 - t, 3) // easeOutCubic
+    statShown.value = to.map((v, i) => Math.round(from[i] + (v - from[i]) * e))
+    if (t < 1) statsRaf = requestAnimationFrame(tick)
+  }
+  statsRaf = requestAnimationFrame(tick)
+}
+watch(() => stats.value.map(x => x.num).join(), () => { if (statsStarted) countStats() })
+let statsObserver: IntersectionObserver | undefined
+onMounted(() => {
+  if (!statsEl.value) return
+  statsObserver = new IntersectionObserver((entries) => {
+    if (entries.some(e => e.isIntersecting) && !statsStarted) {
+      statsStarted = true
+      countStats()
+      statsObserver?.disconnect()
+    }
+  }, { threshold: 0.35 })
+  statsObserver.observe(statsEl.value)
+})
+onUnmounted(() => { cancelAnimationFrame(statsRaf); statsObserver?.disconnect() })
 
 // ─── Tenders ─────────────────────────────────────────────────────────────────
 interface TenderCard { id: number | null; title: string; desc: string; category: string; image: string; closingSoon: boolean; deadline: string }
@@ -323,13 +357,11 @@ onMounted(() => {
       </div>
 
       <div class="container">
-        <div v-reveal class="stats">
-          <div v-for="s in stats" :key="s.label" class="stat" :class="`stat-${s.tone}`">
-            <span class="stat-icon"><component :is="s.icon" :size="20" /></span>
-            <div>
-              <strong>{{ s.value }}</strong>
-              <span>{{ s.label }}</span>
-            </div>
+        <div ref="statsEl" v-reveal class="stats">
+          <div v-for="(s, i) in stats" :key="s.label" class="stat" :class="`stat-${s.tone}`" :style="{ '--d': `${i * 90}ms` }">
+            <span class="stat-icon"><component :is="s.icon" :size="26" :stroke-width="1.8" /></span>
+            <strong><span class="stat-num" dir="ltr">{{ s.prefix }}{{ statShown[i] }}</span></strong>
+            <span class="stat-label">{{ s.label }}</span>
           </div>
         </div>
       </div>
@@ -587,7 +619,7 @@ onMounted(() => {
   margin-bottom: 26px; backdrop-filter: blur(4px);
 }
 .hero-badge i { width: 9px; height: 9px; border-radius: 50%; background: var(--yellow); }
-.hero .hero-title { font-size: clamp(34px, 4vw, 56px); font-weight: 800; line-height: 1.5; margin-bottom: 22px; color: #fff; }
+.hero .hero-title { font-size: clamp(28px, 3.2vw, 44px); font-weight: 800; line-height: 1.5; margin-bottom: 22px; color: #fff; }
 .hero .hero-desc { max-width: 540px; font-size: clamp(17px, 1.45vw, 21px); font-weight: 700; line-height: 2; margin-bottom: 40px; }
 .hero-actions { display: flex; gap: 16px; flex-wrap: wrap; }
 .hero-btn {
@@ -652,19 +684,27 @@ onMounted(() => {
 }
 
 .stats {
-  display: grid; grid-template-columns: repeat(4, 1fr); background: #fff; border: 1px solid #dfe2ea;
-  border-radius: 18px; padding: 26px 20px; margin-top: 72px;
+  position: relative; overflow: hidden; display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-top: 72px; padding: 22px;
+  border-radius: 24px; background: linear-gradient(135deg, #00004f 0%, #00006e 55%, #1a1a8f 100%);
+  box-shadow: 0 22px 50px rgba(0, 0, 110, .25);
 }
-.stat { display: flex; align-items: center; justify-content: center; gap: 16px; }
-.stat + .stat { border-inline-start: 1px solid var(--line); }
-.stat div { display: flex; flex-direction: column; gap: 4px; }
-.stat strong { font-size: 24px; font-weight: 800; direction: ltr; text-align: right; }
-.stat span:not(.stat-icon) { color: var(--muted); font-size: 14px; font-weight: 700; }
-.stat-icon { width: 48px; height: 48px; border-radius: 10px; display: grid; place-items: center; }
-.stat-navy strong { color: var(--navy); }
-.stat-navy .stat-icon { background: var(--navy-soft); color: var(--navy); }
-.stat-orange strong { color: var(--orange); }
-.stat-orange .stat-icon { background: var(--orange-soft); color: var(--orange); }
+.stats::before, .stats::after { content: ''; position: absolute; border-radius: 50%; pointer-events: none; }
+.stats::before { width: 260px; height: 260px; top: -120px; inset-inline-start: -60px; background: radial-gradient(circle, rgba(255, 182, 26, .25), transparent 70%); }
+.stats::after { width: 220px; height: 220px; bottom: -110px; inset-inline-end: -40px; background: radial-gradient(circle, rgba(255, 255, 255, .12), transparent 70%); }
+.stat {
+  position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px;
+  padding: 26px 14px 22px; border-radius: 18px; background: rgba(255, 255, 255, .07); border: 1px solid rgba(255, 255, 255, .14);
+  backdrop-filter: blur(4px); transition: transform .3s ease, background .3s ease;
+}
+.stat:hover { transform: translateY(-6px); background: rgba(255, 255, 255, .12); }
+.stat::after { content: ''; position: absolute; bottom: 0; left: 24%; right: 24%; height: 3px; border-radius: 3px 3px 0 0; background: linear-gradient(90deg, var(--orange), var(--yellow)); opacity: .9; }
+.stat-icon { width: 58px; height: 58px; border-radius: 16px; display: grid; place-items: center; margin-bottom: 6px; background: #fff; box-shadow: 0 8px 20px rgba(0, 0, 0, .2); }
+.stat strong { font-size: clamp(34px, 3.2vw, 46px); font-weight: 900; line-height: 1.1; color: #fff; direction: ltr; font-variant-numeric: tabular-nums; }
+.stat-num { display: inline-block; }
+.stat-label { color: rgba(255, 255, 255, .8); font-size: 14.5px; font-weight: 700; }
+.stat-navy .stat-icon { color: var(--navy); }
+.stat-orange .stat-icon { color: var(--orange); }
+.stat-orange strong { color: var(--yellow); }
 
 /* ══ CARDS ══ */
 .cards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
@@ -790,8 +830,7 @@ onMounted(() => {
   .about-grid { grid-template-columns: 1fr; gap: 40px; }
   .about-visual { max-width: 420px; margin: 0 auto; }
   .about-btn { float: none; }
-  .stats { grid-template-columns: repeat(2, 1fr); row-gap: 22px; }
-  .stat:nth-child(3) { border-inline-start: none; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
   .cards-grid, .directory-grid { grid-template-columns: repeat(2, 1fr); }
   .app { grid-template-columns: 1fr; padding: 40px 28px 0; text-align: center; }
   .app-text p { margin-inline: auto; }
@@ -807,9 +846,8 @@ onMounted(() => {
   .partner { min-width: 130px; }
   .partner img { height: 60px; max-width: 150px; }
   .feature { padding: 18px; gap: 14px; }
-  .stats { grid-template-columns: 1fr; }
-  .stat { justify-content: flex-start; }
-  .stat + .stat { border-inline-start: none; border-top: 1px solid var(--line); padding-top: 18px; }
+  .stats { grid-template-columns: 1fr 1fr; gap: 12px; padding: 14px; margin-top: 48px; }
+  .stat { padding: 20px 8px 18px; }
   .cards-grid, .directory-grid { grid-template-columns: 1fr; }
   .section { padding-top: 100px; }
   .directory { margin-top: 100px; }

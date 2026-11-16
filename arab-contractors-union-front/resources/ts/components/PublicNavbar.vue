@@ -41,7 +41,7 @@ const navLinks = [
   {
     label: 'خدمات الاتحاد', href: '#',
     children: [
-      { label: 'خدمات الاتحاد', href: '/landing/services' },
+      { label: 'الخدمات الإلكترونية', href: '/landing/services' },
       { label: 'التدريب وبناء القدرات', href: '/landing/training-center' },
       { label: 'التشريعات', href: '/landing/legislation' },
       { label: 'مكتبة الملفات', href: '/landing/library' },
