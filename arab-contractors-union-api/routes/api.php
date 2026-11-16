@@ -226,6 +226,7 @@ Route::prefix('v1')->group(function () {
     //  FAQs — Public (no auth) — بتغذّي المساعد الافتراضي
     // --------------------------------------------------------
     Route::get('faqs', [\App\Http\Controllers\Api\FaqController::class, 'public']);
+    Route::post('assistant/chat', [\App\Http\Controllers\Api\AssistantController::class, 'chat'])->middleware('throttle:20,1');
 
     // --------------------------------------------------------
     //  Legal Library — Public (no auth)

@@ -69,6 +69,13 @@ return [
         ],
     ],
 
+    // المساعد الافتراضي بالموقع العام (Google Gemini، طبقة مجانية للتجربة). بدون مفتاح بيشتغل المساعد بالأسئلة الشائعة فقط.
+    // المفتاح بيننحط بـ.env على الخادم فقط ولا بينحط أبداً بالواجهة.
+    'gemini' => [
+        'key'   => env('GEMINI_API_KEY'),
+        'model' => env('GEMINI_MODEL', 'gemini-2.0-flash'),
+    ],
+
     // Firebase Cloud Messaging — log للتجربة إلى أن يُرفَع ملف اعتماد Service Account
     'firebase' => [
         'credentials' => env('FIREBASE_CREDENTIALS'),

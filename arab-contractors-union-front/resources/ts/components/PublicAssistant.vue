@@ -182,14 +182,44 @@ function answer(text: string) {
   })
 }
 
+/** جواب الذكاء الاصطناعي من الخادم (Gemini)؛ null لو مش متاح أو فشل، فنجاوب محلياً من الأسئلة الشائعة */
+async function askAi(text: string, history: { role: 'user' | 'bot'; text: string }[]) {
+  try {
+    const r = await api.post('/api/v1/assistant/chat', { message: text, history }, { timeout: 15000 })
+
+    return r.data?.available && r.data.reply ? String(r.data.reply) : null
+  }
+  catch { return null }
+}
+
+/** تطابق قوي مع سؤال شائع: نجاوب منه مباشرة بدون استهلاك حصة الذكاء الاصطناعي */
+function strongFaq(text: string) {
+  const q = tokens(text)
+  if (!q.length) return null
+  const best = faqs.value.map(f => ({ f, s: score(q, f) })).sort((a, b) => b.s - a.s)[0]
+
+  return best && best.s >= 6 ? best.f : null
+}
+
 async function send(text = input.value) {
   const t = text.trim()
   if (!t || typing.value) return
   input.value = ''
+  // آخر رسائل قبل هذا السؤال (للسياق)
+  const history = messages.value.slice(-6).map(m => ({ role: m.from, text: m.text.slice(0, 600) }))
   push({ from: 'user', text: t })
   typing.value = true
   await loadFaqs()
-  setTimeout(() => { if (!smallTalk(t)) answer(t); typing.value = false }, 450)
+
+  if (smallTalk(t)) { setTimeout(() => { typing.value = false }, 400); return }
+
+  const strong = strongFaq(t)
+  if (strong) { setTimeout(() => { push({ from: 'bot', text: strong.answer }); typing.value = false }, 400); return }
+
+  const ai = await askAi(t, history)
+  if (ai) push({ from: 'bot', text: ai })
+  else answer(t)
+  typing.value = false
 }
 
 function ask(f: Faq) {
