@@ -80,8 +80,9 @@ export const setupGuards = (router: _RouterTyped<RouteNamedMap & { [key: string]
   // شعار الاتحاد المتحرّك أثناء التنقل بين الصفحات (AppLoadingIndicator) بدل شريط NProgress
   const routeLoading = useRouteLoading()
 
-  router.beforeEach(async to => {
-    routeLoading.start()
+  router.beforeEach(async (to, from) => {
+    // الموقع العام: الشعار يظهر فوراً عند الانتقال بين صفحاتين مختلفتين (مش عند تغيير الـquery بنفس الصفحة)
+    routeLoading.start(to.path.startsWith('/landing') && to.path !== from.path && from.name ? 0 : undefined)
 
     /*
      * Public routes: accessible by everyone without any restrictions.

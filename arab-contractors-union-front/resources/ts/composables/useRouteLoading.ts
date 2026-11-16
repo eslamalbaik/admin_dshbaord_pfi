@@ -16,16 +16,24 @@ let showTimer: ReturnType<typeof setTimeout> | undefined
 let hideTimer: ReturnType<typeof setTimeout> | undefined
 let shownAt = 0
 
-function start() {
+function start(delay = SHOW_DELAY_MS) {
   clearTimeout(hideTimer)
   if (isRouteLoading.value || showTimer)
     return
+
+  // delay = 0: يظهر فوراً (الموقع العام، حتى مع التنقل السريع المحمّل مسبقاً)
+  if (delay === 0) {
+    shownAt = Date.now()
+    isRouteLoading.value = true
+
+    return
+  }
 
   showTimer = setTimeout(() => {
     showTimer = undefined
     shownAt = Date.now()
     isRouteLoading.value = true
-  }, SHOW_DELAY_MS)
+  }, delay)
 }
 
 function done(minVisible = MIN_VISIBLE_MS) {
