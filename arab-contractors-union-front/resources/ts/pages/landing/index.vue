@@ -80,20 +80,25 @@ function stopPartners() {
 }
 onUnmounted(stopPartners)
 
-// ─── ومضات التطبيق: كل عبارة 3.5 ثانية بتلاشي ناعم، والأخيرة هي الرسالة الختامية ──
+// ─── سلايدر التطبيق: كل 4 ثواني بتتبدل العبارة مع صورة الجوال المناسبة (بتلاشي ناعم)، والخطوط الصغيرة بتبيّن مكانك ──
 // كل عبارة = [قبل, كلمة مفتاحية, بعد]
-const appFlashes: [string, string, string][] = [
-  ['', 'عضويتك الرقمية', '... بين يديك.'],
-  ['تابع ', 'تصنيف شركتك', ' بسهولة.'],
-  ['إشعارات ', 'الاتحاد وتعاميمه', ' تصلك أولاً بأول.'],
-  ['', 'العطاءات والمناقصات', '... فرصك أقرب إليك.'],
-  ['', 'خدماتك الإلكترونية', '... أسرع وأسهل.'],
-  ['', 'اتحادك معك', ' .. أينما كنت وفي أي وقت.'],
+const appSlides: { img: string; alt: string; text: [string, string, string] }[] = [
+  { img: '/images/landing/app/news.webp', alt: 'أخبار الاتحاد وتعاميمه في التطبيق', text: ['', 'أخبار الاتحاد وتعاميمه', '.. تصلك أولاً بأول'] },
+  { img: '/images/landing/app/finance.webp', alt: 'الملف المالي في التطبيق', text: ['', 'متابعتك المالية واضحة', '.. وإشعار السداد من جوالك'] },
+  { img: '/images/landing/app/certificates.webp', alt: 'الشهادات في التطبيق', text: ['اطلب ', 'شهادة تصنيفك', ' وحمّلها بدقيقتين'] },
+  { img: '/images/landing/app/tenders.webp', alt: 'العطاءات في التطبيق', text: ['تابع ', 'العطاءات المطروحة', ' وتفاصيلها.. فرصك أقرب إليك'] },
 ]
-const flashIdx = ref(0)
-let flashTimer: ReturnType<typeof setInterval> | undefined
-onMounted(() => { flashTimer = setInterval(() => { flashIdx.value = (flashIdx.value + 1) % appFlashes.length }, 3500) })
-onUnmounted(() => { if (flashTimer) clearInterval(flashTimer) })
+const slideIdx = ref(0)
+let slideTimer: ReturnType<typeof setInterval> | undefined
+function startSlides() {
+  stopSlides()
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  slideTimer = setInterval(() => { slideIdx.value = (slideIdx.value + 1) % appSlides.length }, 4000)
+}
+function stopSlides() { if (slideTimer) clearInterval(slideTimer) }
+function goSlide(i: number) { slideIdx.value = i; startSlides() }
+onMounted(startSlides)
+onUnmounted(stopSlides)
 
 // ─── About ───────────────────────────────────────────────────────────────────
 const aboutFeatures = [
@@ -497,12 +502,15 @@ onMounted(() => {
         <span class="ball ball-orange" />
         <div class="app-text">
           <span class="eyebrow"><i />التطبيق الذكي الرسمي لاتحاد المقاولين الفلسطينيين</span>
-          <h2>خدماتك في <span class="underlined navy">تطبيق واحد</span></h2>
+          <h2>اتحادك معك أينما كنت<br><span class="underlined navy">خدماتك في تطبيق واحد</span></h2>
           <Transition name="flash" mode="out-in">
-            <p :key="flashIdx" class="app-flash">
-              <template v-for="(part, pi) in appFlashes[flashIdx]" :key="pi"><b v-if="pi === 1">{{ part }}</b><template v-else>{{ part }}</template></template>
+            <p :key="slideIdx" class="app-flash">
+              {{ appSlides[slideIdx].text[0] }}<b>{{ appSlides[slideIdx].text[1] }}</b>{{ appSlides[slideIdx].text[2] }}
             </p>
           </Transition>
+          <div class="app-dots" role="tablist" aria-label="شرائح التطبيق">
+            <button v-for="(sl, i) in appSlides" :key="sl.img" type="button" role="tab" class="app-dot" :class="{ active: i === slideIdx }" :aria-selected="i === slideIdx" :aria-label="`الشريحة ${i + 1}`" @click="goSlide(i)" />
+          </div>
           <a href="#" class="store" aria-label="Google Play">
             <svg width="28" height="30" viewBox="0 0 36 40" aria-hidden="true"><path d="M2 2l19 18L2 38c-.8-.4-1.2-1.2-1.2-2.2V4.2C.8 3.2 1.2 2.4 2 2z" fill="#2196f3" /><path d="M27.5 13.7L21 20 2 2c.3-.2.7-.2 1.1-.2.5 0 1 .1 1.4.4z" fill="#4caf50" /><path d="M27.5 26.3L4.5 37.8c-.4.3-.9.4-1.4.4-.4 0-.8 0-1.1-.2l19-18z" fill="#f44336" /><path d="M34 20c0 1-.5 1.9-1.4 2.4l-5.1 3.9L21 20l6.5-6.3 5.1 3.9c.9.5 1.4 1.4 1.4 2.4z" fill="#ffc107" /></svg>
             <span><small>حمل من</small>Google Play</span>
@@ -512,8 +520,8 @@ onMounted(() => {
           <path d="M405 66C330 82 230 84 175 74c-40-7-50-34-15-40 40-7 75 12 55 30-25 22-120 10-200-34" stroke="#1f3f8f" stroke-width="2.5" stroke-linecap="round" />
           <path d="M18 18l-4 15 15 3" stroke="#1f3f8f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
         </svg>
-        <div class="app-visual">
-          <img src="/images/landing/home-app-phones.webp" alt="تطبيق اتحاد المقاولين الفلسطينيين" loading="lazy">
+        <div class="app-visual" @mouseenter="stopSlides" @mouseleave="startSlides">
+          <img v-for="(sl, i) in appSlides" :key="sl.img" :src="sl.img" :alt="sl.alt" class="app-phone" :class="{ on: i === slideIdx }" :loading="i ? 'lazy' : undefined">
         </div>
       </section>
     </div>
@@ -807,10 +815,10 @@ onMounted(() => {
 .ball-white { width: 58px; height: 58px; left: 70px; top: 18px; background: radial-gradient(circle at 35% 30%, #fff, #e3e6ee); box-shadow: 0 8px 18px rgba(15, 23, 60, .08); }
 .ball-orange { width: 150px; height: 150px; left: -40px; bottom: -70px; background: radial-gradient(circle at 35% 30%, #fde3b8, #e6a24a 70%); }
 .app-text { position: relative; z-index: 1; padding-inline-start: 0; }
-.app-text h2 { font-size: clamp(28px, 2.8vw, 40px); font-weight: 800; line-height: 1.5; margin-bottom: 26px; }
+.app-text h2 { font-size: clamp(26px, 2.6vw, 38px); font-weight: 800; line-height: 1.5; margin-bottom: 26px; }
 .app-text .navy { color: var(--navy); }
 .app-text p { color: var(--muted); font-size: 17px; font-weight: 700; line-height: 1.9; max-width: 380px; margin-bottom: 26px; }
-.app-text p.app-flash { font-family: 'Cairo', 'Tajawal', sans-serif; font-size: clamp(21px, 1.9vw, 23px); font-weight: 600; color: #606a7c; min-height: 3.8em; max-width: 420px; }
+.app-text p.app-flash { font-family: 'Cairo', 'Tajawal', sans-serif; font-size: clamp(21px, 1.9vw, 23px); font-weight: 600; color: #606a7c; min-height: 3.2em; max-width: 420px; margin-bottom: 16px; }
 .app-flash b { color: var(--navy); font-weight: 700; }
 .flash-enter-active, .flash-leave-active { transition: opacity .6s ease; }
 .flash-enter-from, .flash-leave-to { opacity: 0; }
@@ -823,7 +831,13 @@ onMounted(() => {
 .store small { font-size: 12px; direction: rtl; }
 .app-arrow { position: absolute; left: 31%; top: 60%; width: 34%; max-width: 420px; pointer-events: none; }
 .app-visual { position: relative; z-index: 1; }
-.app-visual img { width: 100%; max-width: 400px; display: block; margin-inline: auto; }
+.app-visual { display: grid; }
+.app-phone { grid-area: 1 / 1; width: 100%; max-width: 460px; display: block; margin-inline: auto; opacity: 0; transform: translateY(14px) scale(.98); transition: opacity .7s ease, transform .7s ease; }
+.app-phone.on { opacity: 1; transform: none; }
+.app-dots { display: flex; gap: 8px; margin: 0 0 26px; }
+.app-dot { width: 26px; height: 5px; border: 0; padding: 0; border-radius: 5px; background: #cfd5e3; cursor: pointer; transition: width .3s ease, background .3s ease; }
+.app-dot.active { width: 46px; background: var(--navy); }
+@media (prefers-reduced-motion: reduce) { .app-phone { transition: none; } }
 
 /* ══ Responsive ══ */
 @media (max-width: 1000px) {
