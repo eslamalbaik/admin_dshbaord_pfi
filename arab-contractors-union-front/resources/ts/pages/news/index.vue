@@ -64,6 +64,7 @@ const emptyForm = () => ({
   video_url: '',
   external_url: '',
   convened_at: '',
+  category: 'union',
   publishMode: 'now' as PublishMode,
   published_at: '',
 })
@@ -234,6 +235,7 @@ const openEdit = (item: any) => {
     video_url: item.video_url ?? '',
     external_url: item.external_url ?? '',
     convened_at: item.convened_at ? item.convened_at.substring(0, 10) : '',
+    category: item.category ?? 'union',
     publishMode: !item.is_published
       ? 'draft'
       : (item.published_at && new Date(item.published_at) > new Date() ? 'schedule' : 'now'),
@@ -342,6 +344,7 @@ const saveNews = async () => {
     if (form.value.external_url) fd.append('external_url', form.value.external_url)
     // عند التعديل نرسله حتى لو فارغ ليتمكن الأدمن من مسحه
     if (form.value.convened_at || isEditing.value) fd.append('convened_at', form.value.convened_at)
+    fd.append('category', form.value.category)
     if (mode === 'schedule')
       fd.append('published_at', form.value.published_at)
     // خبر كان مسودة/مجدول وصار "نشر مباشرة": تاريخ نشره يصير وقت الحفظ
@@ -605,6 +608,16 @@ const deleteNews = async () => {
             </VCol>
             <VCol cols="12" md="6">
               <VTextField v-model="form.external_url" label="رابط خارجي (اختياري)" prepend-inner-icon="tabler-external-link" dir="ltr" />
+            </VCol>
+
+            <VCol cols="12" md="6">
+              <VSelect
+                v-model="form.category"
+                label="تصنيف الخبر"
+                :items="[{ title: 'أخبار الاتحاد', value: 'union' }, { title: 'أخبار محلية', value: 'local' }, { title: 'أخبار دولية', value: 'international' }]"
+                prepend-inner-icon="tabler-tag"
+                style="font-family:Cairo,sans-serif"
+              />
             </VCol>
 
             <VCol cols="12" md="6">

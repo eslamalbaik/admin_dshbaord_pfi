@@ -178,8 +178,11 @@ class EventController extends Controller
         if ($request->filled('search'))
             $query->where('title', 'like', '%' . $request->search . '%');
 
+        if ($request->filled('event_type') && in_array($request->event_type, Event::EVENT_TYPES, true))
+            $query->where('event_type', $request->event_type);
+
         $paginator = $query
-            ->select(['id', 'title', 'slug', 'excerpt', 'image', 'video_url', 'external_url', 'gallery', 'published_at', 'event_date', DB::raw(self::PUBLIC_LOCATION_COLUMN)])
+            ->select(['id', 'title', 'slug', 'excerpt', 'event_type', 'image', 'video_url', 'external_url', 'gallery', 'published_at', 'event_date', DB::raw(self::PUBLIC_LOCATION_COLUMN)])
             ->paginate($request->integer('per_page', 9));
 
         return $this->paginated($paginator);

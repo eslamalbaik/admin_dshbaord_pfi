@@ -210,4 +210,29 @@ class NewsAdminTest extends TestCase
         $this->getJson('/api/v1/news')->assertOk()->assertJsonPath('items.0.convened_at', '2026-10-20');
         $this->getJson('/api/v1/news/latest')->assertOk()->assertJsonPath('items.0.convened_at', '2026-10-20');
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    //  category — union / local / international tabs on the public site
+    // ─────────────────────────────────────────────────────────────────────
+
+    public function test_category_defaults_to_union_and_public_list_filters_by_it(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/news', ['title' => 'خبر الاتحاد', 'body' => 'نص', 'is_published' => true])->assertCreated();
+        $this->postJson('/api/v1/admin/news', ['title' => 'خبر دولي', 'body' => 'نص', 'category' => 'international', 'is_published' => true])->assertCreated();
+
+        $this->assertSame('union', News::where('title', 'خبر الاتحاد')->value('category'));
+
+        $res = $this->getJson('/api/v1/news?category=international')->assertOk();
+        $this->assertSame(['خبر دولي'], collect($res->json('items'))->pluck('title')->all());
+    }
+
+    public function test_store_rejects_unknown_category(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/news', ['title' => 'x', 'body' => 'نص', 'category' => 'sports'])
+            ->assertStatus(422)->assertJsonValidationErrors(['category']);
+    }
 }

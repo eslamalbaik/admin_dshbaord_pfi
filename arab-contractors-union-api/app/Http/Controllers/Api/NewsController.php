@@ -11,6 +11,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\Rule;
 
 class NewsController extends Controller
 {
@@ -63,8 +64,11 @@ class NewsController extends Controller
         if ($request->filled('search'))
             $query->where('title', 'like', '%' . $request->search . '%');
 
+        if ($request->filled('category') && in_array($request->category, News::CATEGORIES, true))
+            $query->where('category', $request->category);
+
         $paginator = $query
-            ->select(['id', 'title', 'slug', 'excerpt', 'image', 'video_url', 'external_url', 'gallery', 'convened_at', 'published_at'])
+            ->select(['id', 'title', 'slug', 'excerpt', 'category', 'image', 'video_url', 'external_url', 'gallery', 'convened_at', 'published_at'])
             ->paginate($request->integer('per_page', 9));
 
         return $this->paginated($paginator);
@@ -134,6 +138,7 @@ class NewsController extends Controller
             'is_published' => 'boolean',
             // تاريخ الانعقاد (تاريخ الحدث/الاجتماع الذي يتناوله الخبر) — اختياري وقد يكون بالماضي
             'convened_at'  => 'nullable|date',
+            'category'     => ['nullable', Rule::in(News::CATEGORIES)],
             // لازم اليوم أو بعده عند الإنشاء (REQ-10 #2) — التعديل يبقى بلا قيد (نفس نمط
             // Tenders/Announcement/Event) حتى لا يُمنع تصحيح خبر قديم تاريخ نشره بالماضي فعلياً.
             'published_at' => 'nullable|date|after_or_equal:today',
@@ -175,6 +180,7 @@ class NewsController extends Controller
             'remove_gallery.*' => 'string',
             'is_published'     => 'boolean',
             'convened_at'      => 'nullable|date',
+            'category'         => ['nullable', Rule::in(News::CATEGORIES)],
             'publish_now'      => 'boolean',
             // تاريخ جديد لازم يكون اليوم أو بعده (بالتوقيت المحلي) — نفس قيد الإنشاء. التاريخ المحفوظ
             // أصلاً يمرّ حتى لو أقدم، حتى ما ينمنع حفظ تعديل على خبر قديم بدون ما يتغيّر تاريخه.

@@ -13,8 +13,10 @@ class News extends Model
 
     protected $table = 'news';
 
+    public const CATEGORIES = ['union', 'local', 'international'];
+
     protected $fillable = [
-        'title', 'slug', 'excerpt', 'body',
+        'title', 'slug', 'excerpt', 'category', 'body',
         'image', 'video_url', 'external_url', 'gallery',
         'is_published', 'convened_at',
         'published_at', 'created_by',

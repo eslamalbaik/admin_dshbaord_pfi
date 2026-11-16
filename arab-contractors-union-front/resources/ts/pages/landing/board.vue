@@ -1,11 +1,17 @@
 <script setup lang="ts">
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
-import { Building2, Mail, Phone } from 'lucide-vue-next'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { Building2, Info, Mail, Phone, X } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
 // المصدر: التقرير الإداري لاتحاد المقاولين (المحافظات الجنوبية) وكشف أعضاء مجلس الإدارة
-const boardMembers = [
+interface BoardMember {
+  name: string; position: string; subPosition?: string; company: string; bio: string
+  details?: string // تعريف موسّع 5–7 أسطر (يُضاف لاحقاً من الاتحاد)
+  photo: string; phone: string; email: string
+}
+const boardMembers: BoardMember[] = [
   {
     name: 'م. سهيل هاشم السقا',
     position: 'نقيب المقاولين الفلسطينيين — المحافظات الجنوبية',
@@ -71,6 +77,20 @@ const boardMembers = [
     email: 'emadabumatar04@gmail.com',
   },
 ]
+
+// نافذة التعريف بالعضو: بتعرض details (5–7 أسطر) لو موجودة، وإلا النبذة المختصرة bio
+const selected = ref<BoardMember | null>(null)
+function openMember(m: BoardMember) {
+  selected.value = m
+  document.body.style.overflow = 'hidden'
+}
+function closeMember() {
+  selected.value = null
+  document.body.style.overflow = ''
+}
+function onKey(e: KeyboardEvent) { if (e.key === 'Escape' && selected.value) closeMember() }
+onMounted(() => window.addEventListener('keydown', onKey))
+onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); document.body.style.overflow = '' })
 </script>
 
 <template>
@@ -121,6 +141,8 @@ const boardMembers = [
           <h2 class="pres-title">{{ boardMembers[0].subPosition }}</h2>
           <p class="pres-bio">{{ boardMembers[0].bio }}</p>
 
+          <button type="button" class="info-btn" aria-label="التعريف بالعضو" @click="openMember(boardMembers[0])"><Info :size="16" /> التعريف بالعضو</button>
+
           <div class="pres-contacts">
             <span class="pres-contact"><Building2 :size="15" /> {{ boardMembers[0].company }}</span>
             <a :href="`tel:${boardMembers[0].phone}`" class="pres-contact"><Phone :size="15" /> <span dir="ltr">{{ boardMembers[0].phone }}</span></a>
@@ -145,10 +167,25 @@ const boardMembers = [
           <p class="m-bio">{{ m.bio }}</p>
           <a :href="`tel:${m.phone}`" class="m-contact"><Phone :size="13" /> {{ m.phone }}</a>
           <a :href="`mailto:${m.email}`" class="m-contact"><Mail :size="13" /> {{ m.email }}</a>
+          <button type="button" class="info-btn info-btn-sm" aria-label="التعريف بالعضو" @click="openMember(m)"><Info :size="15" /> التعريف بالعضو</button>
           <span class="m-corner" />
         </article>
       </div>
     </div>
+
+    <!-- نافذة التعريف بالعضو -->
+    <Teleport to="body">
+      <div v-if="selected" class="bm-overlay" dir="rtl" role="dialog" aria-modal="true" :aria-label="selected.name" @click.self="closeMember">
+        <div class="bm-dialog">
+          <button type="button" class="bm-close" aria-label="إغلاق" @click="closeMember"><X :size="18" /></button>
+          <img :src="selected.photo" :alt="selected.name" class="bm-photo">
+          <span class="bm-pill">{{ selected.position || 'رئيس مجلس الإدارة' }}</span>
+          <h3 class="bm-name">{{ selected.name }}</h3>
+          <p v-if="selected.company" class="bm-company"><Building2 :size="14" /> {{ selected.company }}</p>
+          <p class="bm-text">{{ selected.details || selected.bio }}</p>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -271,4 +308,16 @@ const boardMembers = [
   .members-grid { grid-template-columns: 1fr; }
   .members-heading h3 { font-size: 1.25rem; }
 }
+
+.info-btn { display: inline-flex; align-items: center; gap: .4rem; border: 1.5px solid #c5cae9; background: #f5f7ff; color: #1a237e; border-radius: 50px; padding: .4rem 1rem; font-size: .82rem; font-weight: 700; font-family: inherit; cursor: pointer; margin: .5rem 0; transition: all .2s; }
+.info-btn:hover { background: #1a237e; border-color: #1a237e; color: #fff; }
+.info-btn-sm { padding: .3rem .8rem; font-size: .78rem; }
+.bm-overlay { position: fixed; inset: 0; z-index: 2000; background: rgba(13, 27, 62, .6); display: grid; place-items: center; padding: 1rem; font-family: 'Tajawal', 'Cairo', sans-serif; }
+.bm-dialog { position: relative; background: #fff; border-radius: 20px; width: min(520px, 100%); max-height: 90vh; overflow-y: auto; padding: 2rem 1.75rem 1.75rem; text-align: center; box-shadow: 0 24px 60px rgba(0, 0, 0, .3); }
+.bm-close { position: absolute; top: .9rem; inset-inline-start: .9rem; width: 34px; height: 34px; border-radius: 50%; border: 0; background: #eef0f7; color: #1a237e; cursor: pointer; display: grid; place-items: center; }
+.bm-photo { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 4px solid #e8eaf6; margin-bottom: .8rem; }
+.bm-pill { display: inline-block; background: #fff4dc; color: #b26a00; border: 1px solid #ffe0a3; border-radius: 50px; padding: .2rem .9rem; font-size: .75rem; font-weight: 700; }
+.bm-name { font-size: 1.3rem; font-weight: 900; color: #0d1b3e; margin: .6rem 0 .3rem; }
+.bm-company { display: inline-flex; align-items: center; gap: .4rem; color: #6b7280; font-size: .88rem; margin-bottom: .8rem; }
+.bm-text { color: #4b5563; font-size: .98rem; line-height: 2; text-align: start; white-space: pre-line; }
 </style>

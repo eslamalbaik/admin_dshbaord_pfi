@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
-import { GraduationCap, Clock, Users, Calendar, ChevronLeft, ShieldCheck, ChartBar, FileText, BookOpen } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import { GraduationCap, Clock, Users, Calendar, ChevronLeft, ShieldCheck, ChartBar, FileText, BookOpen, UserRound, Monitor, Target, Inbox } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
-const courses = [
+// بيانات الدورات حالياً ثابتة هون. كل دورة ممكن تحمل: phase (current | archive)، trainer، mode، audience، status (open | full | closed).
+// الحقول الاختيارية ما بتنعرض إلا لو موجودة، لحد ما تنربط الصفحة بلوحة التحكم.
+type Phase = 'current' | 'archive'
+type RegStatus = 'open' | 'full' | 'closed'
+const regLabel: Record<RegStatus, string> = { open: 'التسجيل مفتوح', full: 'اكتمل العدد', closed: 'انتهى التسجيل' }
+const courseList = [
   { icon: ShieldCheck, color:'#c62828', bg:'#fce4ec', title:'السلامة والصحة المهنية في مواقع البناء', duration:'٣ أيام', level:'مبتدئ', seats:25, date:'١٥ يوليو ٢٠٢٤', certified:true, desc:'دورة شاملة في معايير السلامة المهنية وفق المعايير الدولية OSHA لجميع العاملين في مواقع البناء.' },
   { icon: ChartBar,    color:'#1a237e', bg:'#e8eaf6', title:'إدارة المشاريع الإنشائية PMP',          duration:'٥ أيام', level:'متوسط', seats:20, date:'٢٢ يوليو ٢٠٢٤', certified:true, desc:'منهج متكامل في إدارة مشاريع الإنشاء وفق معايير PMI مع التطبيق العملي على دراسات الحالة.' },
   { icon: FileText,    color:'#e65100', bg:'#fff8e1', title:'عقود الفيديك FIDIC المحدثة',             duration:'٤ أيام', level:'متقدم', seats:15, date:'٥ أغسطس ٢٠٢٤', certified:true, desc:'دراسة وتحليل عقود الفيديك المحدثة ٢٠١٧ وكيفية التعامل معها في المشاريع الإنشائية الدولية.' },
@@ -14,6 +20,14 @@ const courses = [
   { icon: ChartBar,    color:'#0277bd', bg:'#e3f2fd', title:'إدارة سلسلة التوريد في الإنشاءات',      duration:'٢ أيام', level:'متوسط', seats:22, date:'٩ سبتمبر ٢٠٢٤', certified:false, desc:'تخطيط وإدارة سلسلة توريد مواد البناء وتحسين الكفاءة وخفض التكاليف اللوجستية.' },
   { icon: GraduationCap, color:'#558b2f', bg:'#f1f8e9', title:'القيادة وإدارة فرق العمل الإنشائية', duration:'٢ أيام', level:'متقدم', seats:16, date:'١٦ سبتمبر ٢٠٢٤', certified:false, desc:'مهارات القيادة وإدارة الفرق متعددة التخصصات في بيئة العمل الإنشائية.' },
 ]
+const courses = courseList.map(c => ({ phase: 'current' as Phase, trainer: '', mode: '', audience: '', status: '' as RegStatus | '', ...c }))
+
+const tab = ref<Phase>('current')
+const tabs: { value: Phase; label: string }[] = [
+  { value: 'current', label: 'الدورات الجارية' },
+  { value: 'archive', label: 'الدورات المنفذة والأرشيف التدريبي' },
+]
+const shownCourses = computed(() => courses.filter(c => c.phase === tab.value))
 
 const levelColor: Record<string,string> = { مبتدئ:'#2e7d32', متوسط:'#e65100', متقدم:'#c62828' }
 const levelBg: Record<string,string> = { مبتدئ:'#e8f5e9', متوسط:'#fff8e1', متقدم:'#fce4ec' }
@@ -46,11 +60,15 @@ const levelBg: Record<string,string> = { مبتدئ:'#e8f5e9', متوسط:'#fff8
         <div class="sec-header-split">
           <div>
             <div class="pub-sec-label">برامجنا التدريبية</div>
-            <h2 class="pub-sec-h">الدورات التدريبية القادمة</h2>
+            <h2 class="pub-sec-h">{{ tab === 'current' ? 'الدورات التدريبية القادمة' : 'الدورات المنفذة والأرشيف التدريبي' }}</h2>
+          </div>
+          <div class="course-tabs" role="tablist">
+            <button v-for="t in tabs" :key="t.value" type="button" role="tab" class="course-tab" :class="{ active: tab === t.value }" :aria-selected="tab === t.value" @click="tab = t.value">{{ t.label }}</button>
           </div>
         </div>
-        <div class="courses-grid">
-          <div v-for="c in courses" :key="c.title" class="course-card">
+        <div v-if="!shownCourses.length" class="course-empty"><Inbox :size="44" /><p>لا توجد دورات في هذا القسم حالياً.</p></div>
+        <div v-else class="courses-grid">
+          <div v-for="c in shownCourses" :key="c.title" class="course-card">
             <div class="course-header" :style="`background:${c.bg};border-color:${c.color}`">
               <div class="course-icon" :style="`background:${c.color}20;color:${c.color};border-color:${c.color}`">
                 <component :is="c.icon" :size="24" />
@@ -61,12 +79,18 @@ const levelBg: Record<string,string> = { مبتدئ:'#e8f5e9', متوسط:'#fff8
               <div class="course-level" :style="`background:${levelBg[c.level]};color:${levelColor[c.level]}`">{{ c.level }}</div>
               <h3 class="course-title">{{ c.title }}</h3>
               <p class="course-desc">{{ c.desc }}</p>
+              <ul v-if="c.trainer || c.mode || c.audience || c.status" class="course-extra">
+                <li v-if="c.trainer"><UserRound :size="13" /> <b>المدرب:</b> {{ c.trainer }}</li>
+                <li v-if="c.mode"><Monitor :size="13" /> <b>النمط:</b> {{ c.mode }}</li>
+                <li v-if="c.audience"><Target :size="13" /> <b>الفئة المستهدفة:</b> {{ c.audience }}</li>
+                <li v-if="c.status"><span class="reg-badge" :class="`reg-${c.status}`">{{ regLabel[c.status] }}</span></li>
+              </ul>
               <div class="course-meta">
                 <span><Clock :size="13" /> {{ c.duration }}</span>
                 <span><Users :size="13" /> {{ c.seats }} مقعداً</span>
                 <span><Calendar :size="13" /> {{ c.date }}</span>
               </div>
-              <button class="course-register" :style="`background:${c.color}`">
+              <button class="course-register" :style="`background:${c.color}`" :disabled="c.status === 'full' || c.status === 'closed'" :class="{ disabled: c.status === 'full' || c.status === 'closed' }">
                 سجّل الآن <ChevronLeft :size="14" />
               </button>
             </div>
@@ -139,4 +163,19 @@ const levelBg: Record<string,string> = { مبتدئ:'#e8f5e9', متوسط:'#fff8
 @media (max-width: 1100px) { .courses-grid { grid-template-columns: repeat(3,1fr); } }
 @media (max-width: 800px) { .courses-grid { grid-template-columns: repeat(2,1fr); } }
 @media (max-width: 500px) { .courses-grid { grid-template-columns: 1fr; } }
+
+.course-tabs { display: flex; gap: .5rem; flex-wrap: nowrap; }
+.course-tab { border: 1.5px solid #c5cae9; background: #fff; color: #1a237e; border-radius: 50px; padding: .5rem 1.2rem; font-size: .88rem; font-weight: 700; font-family: inherit; cursor: pointer; transition: all .2s; white-space: nowrap; }
+.course-tab:hover { background: #e8eaf6; }
+.course-tab.active { background: #1a237e; border-color: #1a237e; color: #fff; }
+.course-empty { text-align: center; color: #9aa3b5; padding: 3rem 0; }
+.course-empty p { margin-top: .6rem; }
+.course-extra { list-style: none; display: flex; flex-direction: column; gap: .35rem; margin: .6rem 0; font-size: .82rem; color: #4b5563; }
+.course-extra li { display: flex; align-items: center; gap: .4rem; }
+.reg-badge { border-radius: 50px; padding: .15rem .75rem; font-size: .75rem; font-weight: 800; }
+.reg-open { background: #e8f5e9; color: #2e7d32; }
+.reg-full { background: #fff8e1; color: #e65100; }
+.reg-closed { background: #f3f4f6; color: #6b7280; }
+.course-register.disabled { opacity: .5; cursor: not-allowed; }
+@media (max-width: 700px) { .course-tabs { flex-wrap: wrap; } }
 </style>

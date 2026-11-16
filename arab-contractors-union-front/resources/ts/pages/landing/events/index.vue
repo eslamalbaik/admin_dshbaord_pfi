@@ -38,6 +38,19 @@ const pagination = ref<Pagination | null>(null)
 const isLoading = ref(false)
 const search = ref('')
 const currentPage = ref(1)
+// فعاليات الاتحاد = event_type local ("محلية للاتحاد")، ومحلية = institutional ("مؤسسات")، ودولية = international
+const categoryTabs = [
+  { value: '', label: 'الكل' },
+  { value: 'local', label: 'فعاليات الاتحاد' },
+  { value: 'institutional', label: 'فعاليات محلية' },
+  { value: 'international', label: 'فعاليات دولية' },
+]
+const eventType = ref('')
+function selectCategory(v: string) {
+  eventType.value = v
+  currentPage.value = 1
+  fetchEvents()
+}
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('ar-PS', {
@@ -50,6 +63,7 @@ async function fetchEvents() {
   try {
     const params: Record<string, any> = { page: currentPage.value, per_page: 9 }
     if (search.value.trim()) params.search = search.value.trim()
+    if (eventType.value) params.event_type = eventType.value
 
     const res = await api.get('/api/v1/events', { params })
     events.value = res.data.items ?? []
@@ -100,6 +114,9 @@ onMounted(fetchEvents)
     <!-- Filters -->
     <div class="filters-bar">
       <div class="container filters-inner">
+        <div class="cat-tabs" role="tablist">
+          <button v-for="t in categoryTabs" :key="t.value" type="button" role="tab" class="cat-tab" :class="{ active: eventType === t.value }" :aria-selected="eventType === t.value" @click="selectCategory(t.value)">{{ t.label }}</button>
+        </div>
         <!-- Search -->
         <div class="search-wrap">
           <Search :size="15" class="search-icon" />
@@ -254,7 +271,7 @@ onMounted(fetchEvents)
 .filters-inner {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
 }
@@ -486,4 +503,10 @@ onMounted(fetchEvents)
 @media (max-width: 600px) {
   .news-grid { grid-template-columns: 1fr; }
 }
+
+/* category tabs */
+.cat-tabs { display: flex; gap: .5rem; flex-wrap: wrap; }
+.cat-tab { border: 1.5px solid #c5cae9; background: #fff; color: #1a237e; border-radius: 50px; padding: .4rem 1.1rem; font-size: .88rem; font-weight: 700; font-family: inherit; cursor: pointer; transition: all .2s; }
+.cat-tab:hover { background: #e8eaf6; }
+.cat-tab.active { background: #1a237e; border-color: #1a237e; color: #fff; }
 </style>

@@ -53,6 +53,18 @@ const pagination = ref<Pagination | null>(null)
 const isLoading = ref(false)
 const search = ref('')
 const currentPage = ref(1)
+const categoryTabs = [
+  { value: '', label: 'الكل' },
+  { value: 'union', label: 'أخبار الاتحاد' },
+  { value: 'local', label: 'أخبار محلية' },
+  { value: 'international', label: 'أخبار دولية' },
+]
+const category = ref('')
+function selectCategory(v: string) {
+  category.value = v
+  currentPage.value = 1
+  fetchNews()
+}
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('ar-PS', {
@@ -65,6 +77,7 @@ async function fetchNews() {
   try {
     const params: Record<string, any> = { page: currentPage.value, per_page: 9 }
     if (search.value.trim()) params.search = search.value.trim()
+    if (category.value) params.category = category.value
 
     const res = await api.get('/api/v1/news', { params })
     news.value = res.data.items ?? []
@@ -150,6 +163,9 @@ onMounted(fetchNews)
     <!-- Filters -->
     <div class="filters-bar">
       <div class="container filters-inner">
+        <div class="cat-tabs" role="tablist">
+          <button v-for="t in categoryTabs" :key="t.value" type="button" role="tab" class="cat-tab" :class="{ active: category === t.value }" :aria-selected="category === t.value" @click="selectCategory(t.value)">{{ t.label }}</button>
+        </div>
         <!-- Search -->
         <div class="search-wrap">
           <Search :size="15" class="search-icon" />
@@ -587,4 +603,10 @@ onMounted(fetchNews)
   .circ-card { grid-template-columns: 1fr; gap: 1.25rem; padding: 1.5rem 1.4rem; }
   .circ-side { border-inline-start: 0; padding-inline-start: 0; border-top: 1.5px dashed #c5cae9; padding-top: 1.1rem; }
 }
+
+/* category tabs */
+.cat-tabs { display: flex; gap: .5rem; flex-wrap: wrap; }
+.cat-tab { border: 1.5px solid #c5cae9; background: #fff; color: #1a237e; border-radius: 50px; padding: .4rem 1.1rem; font-size: .88rem; font-weight: 700; font-family: inherit; cursor: pointer; transition: all .2s; }
+.cat-tab:hover { background: #e8eaf6; }
+.cat-tab.active { background: #1a237e; border-color: #1a237e; color: #fff; }
 </style>
