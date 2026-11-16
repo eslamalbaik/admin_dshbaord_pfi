@@ -21,7 +21,7 @@ interface Member {
   specializations: { name: string; grade: string | null }[]
 }
 
-const PER_PAGE = 24
+const PER_PAGE = 50
 
 const searchQ = ref('')
 const filterStatus = ref('')
@@ -170,33 +170,57 @@ function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape' && selected.value) closeMember()
 }
 
+const loadingMore = ref(false)
+
+async function fetchPage(p: number, id: number) {
+  const r = await api.get('/api/v1/contractors-directory', {
+    params: {
+      search: searchQ.value.trim() || undefined,
+      status: filterStatus.value || undefined,
+      field: filterField.value || undefined,
+      specialization: filterSpec.value || undefined,
+      grade: filterGrade.value || undefined,
+      page: p,
+      per_page: PER_PAGE,
+    },
+  })
+  if (id !== requestId) return null
+
+  return r.data
+}
+
+// أول 50 بتنعرض فوراً، وبعدها باقي الشركات بتنضاف تلقائياً بالخلفية (صفحة صفحة) بدون ما الزائر يضغط شي
 async function load(p = 1) {
   const id = ++requestId
   loading.value = true
+  loadingMore.value = false
   try {
-    const r = await api.get('/api/v1/contractors-directory', {
-      params: {
-        search: searchQ.value.trim() || undefined,
-        status: filterStatus.value || undefined,
-        field: filterField.value || undefined,
-        specialization: filterSpec.value || undefined,
-        grade: filterGrade.value || undefined,
-        page: p,
-        per_page: PER_PAGE,
-      },
-    })
-    if (id !== requestId) return
-    const items: Member[] = r.data.items ?? []
+    const first = await fetchPage(p, id)
+    if (!first) return
+    const items: Member[] = first.items ?? []
     members.value = p === 1 ? items : [...members.value, ...items]
-    total.value = r.data.meta?.total ?? items.length
-    page.value = r.data.meta?.current_page ?? p
-    lastPage.value = r.data.meta?.last_page ?? p
+    total.value = first.meta?.total ?? items.length
+    page.value = first.meta?.current_page ?? p
+    lastPage.value = first.meta?.last_page ?? p
+    loading.value = false
+
+    while (page.value < lastPage.value && id === requestId) {
+      loadingMore.value = true
+      const next = await fetchPage(page.value + 1, id)
+      if (!next) return
+      members.value = [...members.value, ...(next.items ?? [])]
+      page.value = next.meta?.current_page ?? page.value + 1
+      lastPage.value = next.meta?.last_page ?? lastPage.value
+    }
   }
   catch {
-    if (id === requestId) { members.value = []; total.value = 0; lastPage.value = 1 }
+    if (id === requestId) {
+      // فشلت صفحة بالنص: بنخلي زر "عرض المزيد" يكمّل من حيث وقفنا
+      if (!members.value.length) { total.value = 0; lastPage.value = 1 }
+    }
   }
   finally {
-    if (id === requestId) loading.value = false
+    if (id === requestId) { loading.value = false; loadingMore.value = false }
   }
 }
 
@@ -274,7 +298,10 @@ onMounted(async () => {
           </div>
         </div>
 
-        <p class="results-count">عُثر على <strong>{{ total }}</strong> شركة</p>
+        <p v-if="!(loading && !members.length)" class="results-count">
+          عُثر على <strong>{{ total }}</strong> شركة
+          <span v-if="loadingMore" class="results-more"><i class="results-spin" /> جارٍ تحميل بقية الشركات ({{ members.length }} / {{ total }})</span>
+        </p>
 
         <div class="members-grid">
           <button
@@ -305,7 +332,9 @@ onMounted(async () => {
           </button>
         </div>
 
-        <div v-if="loading && !members.length" class="empty-state"><p>جارٍ التحميل...</p></div>
+        <div v-if="loading && !members.length" class="members-grid members-skeleton" aria-busy="true">
+          <div v-for="n in 9" :key="n" class="member-skel" />
+        </div>
 
         <div v-if="!loading && !members.length" class="empty-state">
           <Search :size="48" />
@@ -313,10 +342,8 @@ onMounted(async () => {
           <button v-if="hasFilters" @click="reset">إعادة تعيين الفلاتر</button>
         </div>
 
-        <div v-if="page < lastPage" class="load-more-wrap">
-          <button class="load-more" :disabled="loading" @click="load(page + 1)">
-            {{ loading ? 'جارٍ التحميل...' : 'عرض المزيد' }}
-          </button>
+        <div v-if="page < lastPage && !loading && !loadingMore" class="load-more-wrap">
+          <button class="load-more" @click="load(page + 1)">عرض المزيد</button>
         </div>
       </div>
     </section>
@@ -543,4 +570,9 @@ onMounted(async () => {
   .mm-spec-name { font-size: .88rem; }
   .mm-grade { min-width: 84px; font-size: .78rem; padding: .25rem .6rem; }
 }
+.results-more { display: inline-flex; align-items: center; gap: .5rem; margin-inline-start: .9rem; font-size: .82rem; color: #6b7280; font-weight: 600; }
+.results-spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #c5cae9; border-top-color: #1a237e; animation: mspin .8s linear infinite; }
+@keyframes mspin { to { transform: rotate(360deg); } }
+.member-skel { height: 170px; border-radius: 16px; background: linear-gradient(90deg, #eef0f6 25%, #f7f8fc 50%, #eef0f6 75%); background-size: 200% 100%; animation: mskel 1.3s ease-in-out infinite; }
+@keyframes mskel { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 </style>

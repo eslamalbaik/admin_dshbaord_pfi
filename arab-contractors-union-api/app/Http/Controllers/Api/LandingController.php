@@ -132,15 +132,24 @@ class LandingController extends Controller
     private function remoteDirectory(string $source, array $f)
     {
         $all = Cache::remember('directory_remote_' . md5($source), 600, function () use ($source) {
-            $items = [];
-            for ($p = 1; $p <= 40; $p++) {
-                $r = \Illuminate\Support\Facades\Http::timeout(15)->get("$source/api/v1/contractors-directory", ['per_page' => 24, 'page' => $p]);
-                if (! $r->ok()) {
-                    break;
-                }
-                $items = array_merge($items, $r->json('items') ?? []);
-                if ($p >= (int) $r->json('meta.last_page', 1)) {
-                    break;
+            $url = "$source/api/v1/contractors-directory";
+            $first = \Illuminate\Support\Facades\Http::timeout(15)->get($url, ['per_page' => 60, 'page' => 1]);
+            if (! $first->ok()) {
+                return [];
+            }
+
+            $items = $first->json('items') ?? [];
+            $last = min((int) $first->json('meta.last_page', 1), 40);
+            if ($last > 1) {
+                // باقي الصفحات بالتوازي بدل واحدة ورا الثانية (كان أبطأ جزء بتحميل صفحة الأعضاء على staging)
+                $responses = \Illuminate\Support\Facades\Http::pool(fn ($pool) => collect(range(2, $last))
+                    ->map(fn ($p) => $pool->as((string) $p)->timeout(15)->get($url, ['per_page' => 60, 'page' => $p]))
+                    ->all());
+                foreach (range(2, $last) as $p) {
+                    $r = $responses[(string) $p] ?? null;
+                    if ($r instanceof \Illuminate\Http\Client\Response && $r->ok()) {
+                        $items = array_merge($items, $r->json('items') ?? []);
+                    }
                 }
             }
 
