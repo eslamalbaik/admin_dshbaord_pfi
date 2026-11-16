@@ -2,20 +2,30 @@
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import { computed } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import axios from 'axios'
+import api from '@/plugins/axios'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
 const { data, isLoading } = useQuery({
   queryKey: ['public-terms'],
   queryFn: async () => {
-    const res = await axios.get('/api/v1/terms')
+    // api (مش axios الخام): الـbaseURL بيوجّه الطلب لـAPI اللوحة، مش لموقع الواجهة نفسه
+    const res = await api.get('/api/v1/terms')
     return res.data
   },
   staleTime: 5 * 60 * 1000,
 })
 
-const sections = computed(() => data.value ?? [])
+interface LegalSection { id: number; title: string; body: string; updated_at?: string | null }
+const sections = computed<LegalSection[]>(() => (Array.isArray(data.value) ? data.value : []))
+
+// آخر تحديث = أحدث تعديل لأي بند من لوحة التحكم
+const lastUpdated = computed(() => {
+  const times = sections.value.map(x => (x.updated_at ? new Date(x.updated_at).getTime() : 0)).filter(Boolean)
+  if (!times.length) return ''
+
+  return new Date(Math.max(...times)).toLocaleDateString('ar-PS', { year: 'numeric', month: 'long', day: 'numeric' })
+})
 </script>
 
 <template>
@@ -30,7 +40,7 @@ const sections = computed(() => data.value ?? [])
           <span>الشروط والأحكام</span>
         </div>
         <h1 class="page-hero-title">الشروط والأحكام</h1>
-        <p class="page-hero-desc">آخر تحديث: ١ يناير ٢٠٢٤</p>
+        <p v-if="lastUpdated" class="page-hero-desc">آخر تحديث: {{ lastUpdated }}</p>
       </div>
       <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>

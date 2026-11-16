@@ -28,7 +28,7 @@ class TermsController extends Controller
                 ->where('is_active', true)
                 ->orderBy('sort')
                 ->orderBy('id')
-                ->get(['id', 'title', 'title_en', 'body', 'body_en', 'sort'])
+                ->get(['id', 'title', 'title_en', 'body', 'body_en', 'sort', 'updated_at'])
         );
     }
 
@@ -40,7 +40,7 @@ class TermsController extends Controller
                 ->where('is_active', true)
                 ->orderBy('sort')
                 ->orderBy('id')
-                ->get(['id', 'title', 'title_en', 'body', 'body_en', 'sort'])
+                ->get(['id', 'title', 'title_en', 'body', 'body_en', 'sort', 'updated_at'])
         );
     }
 

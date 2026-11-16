@@ -312,7 +312,7 @@ onMounted(() => {
         <span v-enter class="hero-badge"><i />المظلة المهنية والوطنية لقطاع المقاولات</span>
         <h1 v-enter :delay="120" class="hero-title">
           نحو قطاع مقاولات فلسطيني<br>
-          أكثر <span class="accent">كفاءةً</span> وقدرةً على <span class="accent">المنافسة</span>
+          أكثر <span class="accent">كفاءة</span> وقدرة على <span class="accent">المنافسة</span>
         </h1>
         <p v-enter :delay="240" class="hero-desc">
           نعمل على تمثيل شركات المقاولات وتطوير قدراتها الفنية والإدارية، وتعزيز جاهزيتها للمشاركة الفاعلة في مشاريع التعافي وإعادة الإعمار، وبناء الشراكات المحلية والدولية وفق أفضل المعايير والممارسات المهنية.
