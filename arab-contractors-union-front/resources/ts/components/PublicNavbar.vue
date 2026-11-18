@@ -17,7 +17,7 @@ defineProps<{
 // same contact details as PublicFooter.vue — keep them in sync
 const contact = {
   email: 'info@pcu.org.ps',
-  phone: '+970597233422',
+  phone: '+970 597 233 422',
   address: 'غزة - الرمال',
 }
 
@@ -179,7 +179,7 @@ onMounted(() => {
     <div class="pub-topbar">
       <div class="pub-container pub-topbar-inner">
         <a :href="`mailto:${contact.email}`" class="pub-tb-item"><Mail :size="15" /><span>{{ contact.email }}</span></a>
-        <a :href="`tel:${contact.phone}`" class="pub-tb-item"><Phone :size="15" /><span dir="ltr">{{ contact.phone }}</span></a>
+        <a :href="`tel:${contact.phone.replace(/\s/g, '')}`" class="pub-tb-item"><Phone :size="15" /><span dir="ltr">{{ contact.phone }}</span></a>
         <span class="pub-tb-item pub-tb-address"><MapPin :size="15" /><span>{{ contact.address }}</span></span>
         <div class="pub-tb-social">
           <a v-for="s in PUBLIC_SOCIAL_LINKS" :key="s.key" :href="s.href" target="_blank" rel="noopener noreferrer" class="pub-tb-soc" :aria-label="s.label">

@@ -29,7 +29,7 @@ const legalLinks = [
 ]
 
 const branches = {
-  gaza: { address: 'غزة - الرمال', phone: '+970597233422', email: 'info@pcu.org.ps' },
+  gaza: { address: 'غزة - الرمال', phone: '+970 597 233 422', email: 'info@pcu.org.ps' },
   westbank: { address: 'رام الله - شارع الإرسال', phone: '+970-2-2987654', email: 'info@pcu.ps' },
 }
 const branch = ref<keyof typeof branches>('gaza')

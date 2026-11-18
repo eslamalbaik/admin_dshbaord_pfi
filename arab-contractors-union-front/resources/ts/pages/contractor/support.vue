@@ -53,7 +53,7 @@ function openWhatsApp() {
     ? `مرحباً، أنا ${contractor.value.name} (رقم العضوية: ${contractor.value.membership_number}) بحاجة إلى دعم فني.`
     : 'مرحباً، بحاجة إلى دعم فني.'
   const encoded = encodeURIComponent(message)
-  window.open(`https://wa.me/970200000000?text=${encoded}`, '_blank')
+  window.open(`https://wa.me/970597233422?text=${encoded}`, '_blank')
 }
 
 // ─── تذاكر الدعم الفني ───
@@ -252,8 +252,8 @@ onMounted(async () => {
           <div class="qc-card">
             <Phone :size="24" class="qc-icon" />
             <div>
-              <p class="qc-label">الهاتف</p>
-              <a href="tel:+97020000000" class="qc-value">+970 2 000 0000</a>
+              <p class="qc-label">الجوال</p>
+              <a href="tel:+970597233422" class="qc-value" dir="ltr">+970 597 233 422</a>
             </div>
           </div>
           <div class="qc-card">

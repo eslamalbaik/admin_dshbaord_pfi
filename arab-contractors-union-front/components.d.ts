@@ -56,6 +56,7 @@ declare module 'vue' {
     PublicAssistant: typeof import('./resources/ts/components/PublicAssistant.vue')['default']
     PublicCommitteeGrid: typeof import('./resources/ts/components/PublicCommitteeGrid.vue')['default']
     PublicFooter: typeof import('./resources/ts/components/PublicFooter.vue')['default']
+    PublicHqMap: typeof import('./resources/ts/components/PublicHqMap.vue')['default']
     PublicLoginButton: typeof import('./resources/ts/components/PublicLoginButton.vue')['default']
     PublicNavbar: typeof import('./resources/ts/components/PublicNavbar.vue')['default']
     PublicNewsTicker: typeof import('./resources/ts/components/PublicNewsTicker.vue')['default']
