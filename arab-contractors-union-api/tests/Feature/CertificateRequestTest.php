@@ -24,6 +24,14 @@ class CertificateRequestTest extends TestCase
         Storage::fake('public');
     }
 
+    /** الموافقة النهائية: رفع الشهادة الموقّعة لطلب مولَّد بانتظار التوقيع */
+    private function signAndIssue(int $id): \Illuminate\Testing\TestResponse
+    {
+        return $this->post("/api/v1/dashboard/certificate-requests/{$id}/issue", [
+            'certificate' => UploadedFile::fake()->create('signed.pdf', 50, 'application/pdf'),
+        ], ['Accept' => 'application/json']);
+    }
+
     private function createContractor(array $attrs = []): Contractor
     {
         return Contractor::create(array_merge([
@@ -349,7 +357,8 @@ class CertificateRequestTest extends TestCase
 
         $response->assertStatus(201)
             ->assertJsonPath('items.type', 'membership')
-            ->assertJsonPath('items.status', 'issued');
+            ->assertJsonPath('items.status', 'approved')
+            ->assertJsonPath('items.awaiting_signature', true);
 
         $certRequest = CertificateRequest::firstWhere('contractor_id', $contractor->id);
         Storage::disk('public')->assertExists($certRequest->certificate_path);
@@ -412,18 +421,71 @@ class CertificateRequestTest extends TestCase
         $certRequest = $contractor->certificateRequests()->create(['type' => 'membership', 'status' => 'approved']);
         $this->actingAsAdmin();
 
+        // التوليد: الشهادة بتضل عند الأدمن بانتظار التوقيع — لا إشعار ولا رابط للمقاول
         $this->postJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}/issue")
             ->assertOk()
+            ->assertJsonPath('items.status', 'approved')
+            ->assertJsonPath('items.awaiting_signature', true)
+            ->assertJsonPath('items.status_label', 'بانتظار التوقيع')
+            ->assertJsonPath('items.delivery', null);
+
+        $certRequest->refresh();
+        $draftPath = $certRequest->certificate_path;
+        Storage::disk('public')->assertExists($draftPath);
+        $this->assertNotNull($certRequest->serial_number);
+        $this->assertSame(0, $contractor->notifications()->count());
+
+        Sanctum::actingAs($contractor, ['*']);
+        $mine = collect($this->getJson('/api/v1/contractor/certificate-requests')->json('items.requests'))->firstWhere('id', $certRequest->id);
+        $this->assertNull($mine['certificate_url']);
+
+        // الموافقة النهائية: رفع الموقّعة → صدرت ووصل الإشعار
+        $this->actingAsAdmin();
+        $this->signAndIssue($certRequest->id)
+            ->assertOk()
             ->assertJsonPath('items.status', 'issued')
+            ->assertJsonPath('items.awaiting_signature', false)
             ->assertJsonStructure(['items' => ['delivery' => ['notified_at', 'notification_read_at', 'has_device', 'viewed_at', 'views_count']]]);
 
         $certRequest->refresh();
-        $this->assertSame('issued', $certRequest->status);
-        Storage::disk('public')->assertExists($certRequest->certificate_path);
-        // الإشعار وصل لصندوق المقاول (الطابور sync بالاختبار)
+        $this->assertNotSame($draftPath, $certRequest->certificate_path);
+        Storage::disk('public')->assertMissing($draftPath);
         $this->assertNotNull(
             $this->getJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}")->json('items.delivery.notified_at')
         );
+    }
+
+    public function test_regenerating_an_issued_certificate_sends_it_back_for_signature(): void
+    {
+        $contractor = $this->createCompliantContractor();
+        $certRequest = $contractor->certificateRequests()->create(['type' => 'membership', 'status' => 'approved']);
+        $this->actingAsAdmin();
+        $this->postJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}/issue")->assertOk();
+        $this->signAndIssue($certRequest->id)->assertOk();
+
+        $this->postJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}/regenerate", ['decision_number' => '09/2024'])
+            ->assertOk()
+            ->assertJsonPath('items.status', 'approved')
+            ->assertJsonPath('items.awaiting_signature', true);
+
+        Sanctum::actingAs($contractor, ['*']);
+        $mine = collect($this->getJson('/api/v1/contractor/certificate-requests')->json('items.requests'))->firstWhere('id', $certRequest->id);
+        $this->assertNull($mine['certificate_url']);
+    }
+
+    public function test_direct_issue_waits_for_signature_without_notifying(): void
+    {
+        $contractor = $this->createCompliantContractor();
+        $this->actingAsAdmin();
+
+        $id = $this->postJson('/api/v1/dashboard/certificate-requests/issue-membership', ['contractor_id' => $contractor->id])
+            ->assertCreated()
+            ->assertJsonPath('items.awaiting_signature', true)
+            ->json('items.id');
+        $this->assertSame(0, $contractor->notifications()->count());
+
+        $this->signAndIssue($id)->assertOk()->assertJsonPath('items.status', 'issued');
+        $this->assertSame(1, $contractor->notifications()->count());
     }
 
     public function test_issued_membership_certificate_returns_expiry_date_to_the_app(): void
@@ -434,7 +496,8 @@ class CertificateRequestTest extends TestCase
         $pending     = $contractor->certificateRequests()->create(['type' => 'good_standing', 'status' => 'pending']);
         $this->actingAsAdmin();
 
-        $this->postJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}/issue")
+        $this->postJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}/issue")->assertOk();
+        $this->signAndIssue($certRequest->id)
             ->assertOk()
             ->assertJsonPath('items.expiry_date', '2026-12-31');
 
@@ -460,6 +523,8 @@ class CertificateRequestTest extends TestCase
         $this->actingAsAdmin();
 
         $this->postJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}/issue", ['valid_until' => '2027-06-30'])
+            ->assertOk();
+        $this->signAndIssue($certRequest->id)
             ->assertOk()
             ->assertJsonPath('items.expiry_date', '2027-06-30');
 
@@ -482,6 +547,7 @@ class CertificateRequestTest extends TestCase
         $certRequest = $contractor->certificateRequests()->create(['type' => 'membership', 'status' => 'approved']);
         $this->actingAsAdmin();
         $this->postJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}/issue")->assertOk();
+        $this->signAndIssue($certRequest->id)->assertOk();
 
         Sanctum::actingAs($contractor, ['*']);
         $url = collect($this->getJson('/api/v1/contractor/certificate-requests')->json('items.requests'))
@@ -614,7 +680,7 @@ class CertificateRequestTest extends TestCase
 
         $this->postJson("/api/v1/dashboard/certificate-requests/{$certRequest->id}/issue")
             ->assertOk()
-            ->assertJsonPath('items.status', 'issued');
+            ->assertJsonPath('items.awaiting_signature', true);
     }
 
     /** الغرامات ما بتمنع شهادة العضوية (قرار 2026-10-14)، بس بتضل ظاهرة بالمتطلبات */
@@ -636,7 +702,7 @@ class CertificateRequestTest extends TestCase
         $this->actingAsAdmin();
         $this->postJson("/api/v1/dashboard/certificate-requests/{$id}/issue")
             ->assertOk()
-            ->assertJsonPath('items.status', 'issued');
+            ->assertJsonPath('items.awaiting_signature', true);
     }
 
     /** الشهادة الصادرة بتضل ظاهرة بعد ذمّة جديدة أو طلب تاني، والطلب التاني مسموح */
@@ -648,6 +714,7 @@ class CertificateRequestTest extends TestCase
 
         $this->actingAsAdmin();
         $this->postJson("/api/v1/dashboard/certificate-requests/{$id}/issue")->assertOk();
+        $this->signAndIssue($id)->assertOk();
 
         Sanctum::actingAs($contractor, ['*']);
         $second = $this->postJson('/api/v1/contractor/certificate-requests', ['type' => 'membership'])->assertCreated()->json('items.id');
