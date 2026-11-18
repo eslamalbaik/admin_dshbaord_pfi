@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// خريطة مقر الاتحاد في غزة: Leaflet + بلاطات CARTO Voyager (مجانية بدون مفتاح API).
+// خريطة مقر الاتحاد في غزة: Leaflet + بلاطات OpenStreetMap (مجانية بدون مفتاح API).
 // المؤشر أحمر بشكل مبنى، والنافذة المنبثقة فيها العنوان وأوقات الدوام (مفتوح/مغلق الآن) ورابط الاتجاهات.
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import 'leaflet/dist/leaflet.css'
@@ -56,10 +56,10 @@ onMounted(async () => {
   const L = (await import('leaflet')).default
   if (!el.value) return
   map = L.map(el.value, { center: [HQ.lat, HQ.lng], zoom: 16, scrollWheelZoom: false, zoomControl: true, attributionControl: true })
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    subdomains: 'abcd',
-    maxZoom: 20,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions" target="_blank">CARTO</a>',
+  // CARTO basemaps صارت تطلب API key، فبنستخدم بلاطات OpenStreetMap الرسمية (مجانية مع ذكر المصدر)
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>',
   }).addTo(map)
 
   const icon = L.divIcon({
