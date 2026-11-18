@@ -100,10 +100,10 @@ const branch = ref<keyof typeof branches>('gaza')
 .pub-container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
 .pub-footer-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, .8fr) minmax(0, .9fr) minmax(0, 1fr); gap: 40px; padding: 40px 24px 30px; }
 
-.pub-footer-id { display: flex; align-items: center; gap: 18px; margin-bottom: 20px; }
-.pub-footer-logo { height: 84px; width: auto; }
-.pub-footer-name { font-size: 1.15rem; font-weight: 500; margin-bottom: 8px !important; }
-.pub-footer-en { font-size: 1.05rem; color: rgba(255, 255, 255, .85); direction: ltr; text-align: left; line-height: 1.5; }
+.pub-footer-id { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+.pub-footer-logo { height: 60px; width: auto; }
+.pub-footer-name { font-size: .95rem; font-weight: 500; margin-bottom: 4px !important; }
+.pub-footer-en { font-size: .82rem; color: rgba(255, 255, 255, .85); direction: ltr; text-align: left; line-height: 1.4; }
 .pub-footer-bio { font-size: 1.15rem; line-height: 1.75; margin-bottom: 26px !important; }
 .pub-footer-social { display: flex; gap: 14px; justify-content: flex-start; }
 .pub-fsoc {
@@ -146,6 +146,7 @@ const branch = ref<keyof typeof branches>('gaza')
 }
 @media (max-width: 600px) {
   .pub-footer-grid { grid-template-columns: 1fr; gap: 28px; }
+  .pub-footer-logo { height: 52px; }
   .pub-footer-social { justify-content: flex-start; }
   .pub-footer-bottom { flex-direction: column; text-align: center; }
 }
