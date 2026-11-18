@@ -117,7 +117,7 @@ const refresh = () => {
 }
 
 // ─── بيانات شهادة العضوية: رقم وتاريخ قرار التصنيف (+ العنوان عند الإصدار) ───
-// بتنطلب بنافذة عند الموافقة على طلب عضوية وعند الإصدار التلقائي، زي صفحة شهادات
+// بتنطلب بنافذة عند الموافقة على طلب عضوية وعند توليد الشهادة، زي صفحة شهادات
 // العضوية. بتتعبّى من المحفوظ على الطلب (من الموافقة)، وإلا من ملف المقاول.
 const certFieldsOpen = ref(false)
 const certFieldsMode = ref<'approve' | 'issue' | 'regenerate'>('approve')
@@ -207,9 +207,8 @@ const rejectMutation = useMutation({
 const canAutoIssue = computed(() => detail.value?.type === 'membership')
 const needsFile = computed(() => !canAutoIssue.value || manualUpload.value)
 
-// شهادة العضوية المعلّقة: الموافقة والإصدار خطوة وحدة (زر «موافقة وإصدار الشهادة»)،
-// لأن الموافقة لحالها ما بتطلّع شهادة. الأنواع التانية بتضل خطوتين (PDF بيتجهّز برّا).
-const approveAndIssue = computed(() => canAutoIssue.value && detail.value?.status === 'pending')
+// ما في إصدار تلقائي مع الموافقة (طلب المالك 18/11): الموافقة بتقبل الطلب بس، والشهادة
+// ما بتطلع إلا لما الأدمن يضغط «توليد الشهادة» بإيده بعد الموافقة (أو يرفع PDF).
 
 const issueMutation = useMutation({
   mutationFn: async (fields: Record<string, string>) => {
@@ -521,7 +520,6 @@ function fmtDate(d: string | null) {
           <div class="d-flex flex-column">
           <div v-if="detail.status === 'pending'">
             <VDivider class="my-4" />
-            <template v-if="!canAutoIssue">
             <p class="text-body-2 font-weight-medium mb-2">قرار المراجعة:</p>
             <div class="d-flex gap-3 mb-4">
               <VBtn v-if="$can('services.certificate_requests', 'update')"
@@ -535,8 +533,12 @@ function fmtDate(d: string | null) {
                 موافقة
               </VBtn>
             </div>
-            </template>
-            <p v-else class="text-body-2 font-weight-medium mb-2">أو رفض الطلب:</p>
+            <p
+              v-if="canAutoIssue"
+              class="text-body-2 text-medium-emphasis mb-3"
+            >
+              الموافقة ما بتصدر الشهادة — بعدها بتضغط «توليد الشهادة» بإيدك.
+            </p>
             <VTextarea
               v-model="rejectReason"
               label="سبب الرفض (مطلوب عند الرفض)"
@@ -556,21 +558,16 @@ function fmtDate(d: string | null) {
             </VBtn>
           </div>
 
-          <div
-            v-if="detail.status === 'pending' || detail.status === 'approved'"
-            :class="{ 'order-first': approveAndIssue }"
-          >
+          <div v-if="detail.status === 'approved'">
             <VDivider class="my-4" />
             <p class="text-body-2 font-weight-medium mb-2">
-              <template v-if="approveAndIssue">قرار المراجعة:</template>
-              <template v-else>إصدار الشهادة<template v-if="!canAutoIssue"> (ملف PDF)</template>:</template>
+              إصدار الشهادة<template v-if="!canAutoIssue"> (ملف PDF)</template>:
             </p>
             <p
               v-if="canAutoIssue && !manualUpload"
               class="text-body-2 text-medium-emphasis mb-3"
             >
-              <template v-if="approveAndIssue">بتنقبل الطلب وبتتولّد الشهادة تلقائياً من بيانات ملف المقاول، وبيوصله إشعار إنها جاهزة — بدون رفع ملف.</template>
-              <template v-else>بتتولّد الشهادة تلقائياً من بيانات ملف المقاول وبتوصله إشعار بالتطبيق — بدون رفع ملف.</template>
+              بتراجع بيانات الشهادة وبتتولّد من ملف المقاول، وبيوصله إشعار بالتطبيق — بدون رفع ملف.
             </p>
             <VFileInput
               v-if="needsFile"
@@ -588,7 +585,7 @@ function fmtDate(d: string | null) {
                 :loading="issueMutation.isPending.value"
                 @click="onIssue"
               >
-                {{ approveAndIssue ? 'موافقة وإصدار الشهادة' : needsFile ? 'إصدار الشهادة' : 'إصدار الشهادة تلقائياً' }}
+                {{ needsFile ? 'إصدار الشهادة' : 'توليد الشهادة' }}
               </VBtn>
               <VBtn
                 v-if="canAutoIssue && $can('services.certificate_requests', 'update')"
@@ -596,7 +593,7 @@ function fmtDate(d: string | null) {
                 size="small"
                 @click="manualUpload = !manualUpload; certificateFile = null"
               >
-                {{ manualUpload ? 'رجوع للإصدار التلقائي' : 'أو ارفع ملف PDF يدوياً' }}
+                {{ manualUpload ? 'رجوع لتوليد الشهادة' : 'أو ارفع ملف PDF يدوياً' }}
               </VBtn>
             </div>
           </div>
@@ -611,22 +608,20 @@ function fmtDate(d: string | null) {
       </VCard>
     </VDialog>
 
-    <!-- ─── نافذة بيانات شهادة العضوية (عند الموافقة / الإصدار التلقائي) ─── -->
+    <!-- ─── نافذة بيانات شهادة العضوية (عند الموافقة / توليد الشهادة) ─── -->
     <VDialog v-model="certFieldsOpen" max-width="520">
       <VCard>
         <VCardItem>
           <VCardTitle class="d-flex align-center gap-2 text-wrap">
             <VIcon :icon="certFieldsMode === 'approve' ? 'tabler-check' : 'tabler-certificate'" :color="certFieldsMode === 'approve' ? 'info' : 'success'" />
-            {{ certFieldsMode === 'approve' ? 'الموافقة على طلب شهادة العضوية' : certFieldsMode === 'regenerate' ? 'تعديل بيانات الشهادة وإعادة إصدارها' : approveAndIssue ? 'موافقة وإصدار شهادة العضوية' : 'إصدار شهادة العضوية' }}
+            {{ certFieldsMode === 'approve' ? 'الموافقة على طلب شهادة العضوية' : certFieldsMode === 'regenerate' ? 'تعديل بيانات الشهادة وإعادة إصدارها' : 'توليد شهادة العضوية' }}
           </VCardTitle>
           <VCardSubtitle class="text-wrap">
             {{ certFieldsMode === 'approve'
               ? 'رقم وتاريخ قرار لجنة التصنيف — بينحفظوا على الطلب وبينطبعوا بالشهادة عند إصدارها.'
               : certFieldsMode === 'regenerate'
                 ? 'بتتولّد الشهادة من جديد بنفس الرقم بهذه البيانات، وبيتسجّل التعديل بسجل المحددات الهامة.'
-                : approveAndIssue
-                  ? 'بتنقبل الطلب وبتتولّد الشهادة PDF بهذه البيانات، وبيوصل للمقاول إشعار إنها جاهزة.'
-                  : 'بتتولّد الشهادة PDF بهذه البيانات وبيوصل للمقاول إشعار.' }}
+                : 'بتتولّد الشهادة PDF بهذه البيانات وبيوصل للمقاول إشعار.' }}
           </VCardSubtitle>
         </VCardItem>
 
@@ -700,7 +695,7 @@ function fmtDate(d: string | null) {
             :disabled="certFieldsLoading"
             @click="submitCertFields"
           >
-            {{ certFieldsMode === 'approve' ? 'موافقة' : certFieldsMode === 'regenerate' ? 'إعادة الإصدار' : approveAndIssue ? 'موافقة وإصدار' : 'إصدار الشهادة' }}
+            {{ certFieldsMode === 'approve' ? 'موافقة' : certFieldsMode === 'regenerate' ? 'إعادة الإصدار' : 'توليد الشهادة' }}
           </VBtn>
         </VCardActions>
       </VCard>
