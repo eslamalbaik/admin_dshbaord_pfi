@@ -43,7 +43,7 @@ const branch = ref<keyof typeof branches>('gaza')
           <img src="/images/landing/logo-white.png" alt="اتحاد المقاولين الفلسطينيين" class="pub-footer-logo">
           <div>
             <p class="pub-footer-name">اتحاد المقاولين الفلسطينيين</p>
-            <p class="pub-footer-en">Palestinian Contractor<br>Union - PCU</p>
+            <p class="pub-footer-en">Palestinian Contractor Union - PCU</p>
           </div>
         </div>
         <p class="pub-footer-bio">
@@ -103,7 +103,7 @@ const branch = ref<keyof typeof branches>('gaza')
 .pub-footer-id { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
 .pub-footer-logo { height: 60px; width: auto; }
 .pub-footer-name { font-size: .95rem; font-weight: 500; margin-bottom: 4px !important; }
-.pub-footer-en { font-size: .82rem; color: rgba(255, 255, 255, .85); direction: ltr; text-align: left; line-height: 1.4; }
+.pub-footer-en { font-size: .82rem; color: rgba(255, 255, 255, .85); direction: ltr; text-align: left; line-height: 1.4; white-space: nowrap; }
 .pub-footer-bio { font-size: 1.15rem; line-height: 1.75; margin-bottom: 26px !important; }
 .pub-footer-social { display: flex; gap: 14px; justify-content: flex-start; }
 .pub-fsoc {
