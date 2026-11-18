@@ -6,7 +6,6 @@ import { registerPlugins } from '@core/utils/plugins'
 // Styles
 import '@core-scss/template/index.scss'
 import '@styles/styles.scss'
-import '@styles/public-brand.css'
 import { VueQueryPlugin } from '@tanstack/vue-query'
 
 // Create vue app

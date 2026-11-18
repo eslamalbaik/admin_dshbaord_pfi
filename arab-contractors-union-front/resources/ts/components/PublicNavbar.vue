@@ -318,13 +318,13 @@ div, button { font-family: 'Tajawal', 'Cairo', sans-serif; }
 /* Sticky: the blue strip (40px / 34px) scrolls away, then the white bar stays pinned at the top.
    Negative top = strip height, so only the navbar remains visible. */
 .pub-header { position: sticky; top: -40px; z-index: 200; width: 100%; flex-shrink: 0; }
-.pub-header.is-scrolled .pub-navbar { box-shadow: 0 6px 24px rgba(var(--pcu-brand-deep-rgb), .1); }
+.pub-header.is-scrolled .pub-navbar { box-shadow: 0 6px 24px rgba(0, 0, 80, .1); }
 
 .pub-container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
 
 /* Blue contact strip above the navbar. Its height is part of --pub-nav-h in layouts/landing.vue. */
 /* positioned so page heroes (pulled up by --pub-nav-h) paint under it, not over it */
-.pub-topbar { position: relative; z-index: 201; background: var(--pcu-brand); color: #fff; }
+.pub-topbar { position: relative; z-index: 201; background: #00006e; color: #fff; }
 .pub-topbar-inner { display: flex; align-items: center; gap: 2rem; height: 40px; font-size: .88rem; }
 .pub-tb-item { display: inline-flex; align-items: center; gap: .45rem; color: rgba(255, 255, 255, .92); text-decoration: none; white-space: nowrap; transition: color .2s; }
 .pub-tb-item svg { color: #f5a623; flex-shrink: 0; }
@@ -335,7 +335,7 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
   display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%;
   color: #fff; background: rgba(255, 255, 255, .12); transition: background .2s, color .2s;
 }
-.pub-tb-soc:hover { background: #f5a623; color: var(--pcu-brand-ink); }
+.pub-tb-soc:hover { background: #f5a623; color: #00006e; }
 
 /* Full-width white bar at the top of every public page (scrolls with the page, not sticky).
    Its height is --pub-nav-h in layouts/landing.vue — keep them in sync (page heroes slide up under it). */
@@ -344,7 +344,7 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
   /* opaque, no backdrop-filter: older Chrome / GPU drivers can drop a blurred bar entirely */
   background: #fff;
   border-bottom: 1px solid #eceef3;
-  box-shadow: 0 2px 12px rgba(var(--pcu-brand-deep-rgb), .05);
+  box-shadow: 0 2px 12px rgba(0, 0, 80, .05);
   transition: box-shadow .3s, background .3s;
 }
 .pub-nb-inner { display: flex; align-items: center; gap: 1rem; height: 84px; }
@@ -379,7 +379,7 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
   cursor: pointer;
 }
 .pub-nav-link { font-family: 'Tajawal', sans-serif; font-size: .92rem; color: #2b2f3a; }
-.pub-nav-link:hover, .router-link-exact-active.pub-nav-link { color: var(--pcu-brand-ink); }
+.pub-nav-link:hover, .router-link-exact-active.pub-nav-link { color: #00006e; }
 .router-link-exact-active.pub-nav-link { font-weight: 700; }
 /* orange bar on the bottom edge of the header: grows in on hover / open menu, stays under the current page */
 .pub-nav-link::after {
@@ -387,7 +387,7 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
   transform: scaleX(0); transition: transform .3s cubic-bezier(.2, .8, .3, 1);
 }
 .pub-nav-link:hover::after, .pub-nav-btn.is-open::after, .router-link-exact-active.pub-nav-link::after { transform: scaleX(1); }
-.pub-nav-btn.is-open { color: var(--pcu-brand-ink); }
+.pub-nav-btn.is-open { color: #00006e; }
 .pub-member-pill {
   display: inline-flex; align-items: center; gap: .5rem; background: #e3f6e8; color: #11903a;
   border-radius: 14px; padding: .6rem 1.1rem; font-size: .95rem; font-weight: 600; white-space: nowrap;
@@ -400,7 +400,7 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
   position: absolute; top: calc(100% + .75rem); right: 0;
   background: #fff; border: 1px solid #eceef3; border-radius: 14px;
   padding: .5rem; min-width: 210px;
-  box-shadow: 0 16px 40px rgba(var(--pcu-brand-deep-rgb), .12);
+  box-shadow: 0 16px 40px rgba(0,0,80,.12);
   z-index: 300;
   animation: pub-dd-in .18s ease-out;
   transform-origin: top right;
@@ -437,19 +437,19 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
   transition: all .15s; white-space: nowrap;
 }
 .pub-dd-link + .pub-dd-link { margin-top: .15rem; }
-.pub-dd-link:hover { background: #f2f3fc; color: var(--pcu-brand-ink); border-inline-start-color: #d67a00; }
-.router-link-exact-active.pub-dd-link { background: #f2f3fc; color: var(--pcu-brand-ink); font-weight: 700; border-inline-start-color: #d67a00; }
+.pub-dd-link:hover { background: #f2f3fc; color: #000090; border-inline-start-color: #d67a00; }
+.router-link-exact-active.pub-dd-link { background: #f2f3fc; color: #000090; font-weight: 700; border-inline-start-color: #d67a00; }
 
 .pub-btn-register {
   display: flex; align-items: center; justify-content: center; gap: .5rem;
-  background: var(--pcu-brand);
+  background: #00006e;
   color: #fff; border: none; border-radius: 10px;
   min-height: 44px; padding: .45rem 1.3rem .45rem 1.5rem; font-size: .92rem; font-weight: 700;
   cursor: pointer; font-family: 'Tajawal', sans-serif; white-space: nowrap;
   flex-shrink: 0; text-decoration: none;
-  transition: all .25s; box-shadow: 0 4px 14px rgba(var(--pcu-brand-deep-rgb), .25);
+  transition: all .25s; box-shadow: 0 4px 14px rgba(13,27,75,.25);
 }
-.pub-btn-register:hover { background: var(--pcu-brand-deep); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(var(--pcu-brand-deep-rgb), .3); }
+.pub-btn-register:hover { background: #000090; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(13,27,75,.3); }
 
 .pub-hamburger { display: none; background: none; border: none; cursor: pointer; padding: 4px; color: #374151; flex-shrink: 0; margin-inline-start: auto; }
 
@@ -464,7 +464,7 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
   justify-content: space-between; background: none; border: none; cursor: pointer;
   font-family: 'Tajawal', sans-serif; width: 100%; text-align: right;
 }
-.pub-mob-link:hover { background: #e8eaf6; color: var(--pcu-brand-ink); }
+.pub-mob-link:hover { background: #e8eaf6; color: #1a237e; }
 /* grid 0fr → 1fr lets the sub-list grow to its real height smoothly (no fixed max-height) */
 .pub-mob-sub { display: grid; grid-template-rows: 1fr; margin-bottom: .25rem; }
 .pub-mob-sub-inner { min-height: 0; overflow: hidden; padding-inline-start: 1rem; display: flex; flex-direction: column; gap: .15rem; }
@@ -480,7 +480,7 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
 .pub-mob-leave-active { transition: opacity .15s ease-in, transform .15s ease-in; }
 .pub-mob-enter-from, .pub-mob-leave-to { opacity: 0; transform: translateY(-8px); }
 .pub-mob-sub-link { padding: .45rem .875rem; color: #6b7280; font-size: .84rem; text-decoration: none; border-radius: 7px; font-weight: 600; }
-.pub-mob-sub-link:hover { background: #e8eaf6; color: var(--pcu-brand-ink); }
+.pub-mob-sub-link:hover { background: #e8eaf6; color: #1a237e; }
 .pub-mob-cta { width: 100%; justify-content: center; margin-top: .75rem; border-radius: 9px; padding: .65rem 1.5rem; }
 
 .pub-nb-actions { display: flex; align-items: center; gap: 1.4rem; flex-shrink: 0; }
@@ -505,13 +505,13 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
 .pub-notif-item span { font-size: .72rem; color: #9ca3af; }
 .pub-nb-user { display: flex; align-items: center; gap: .6rem; position: relative; cursor: pointer; padding: .3rem .5rem; border-radius: 9px; transition: background .2s; }
 .pub-nb-user:hover { background: #f3f4f6; }
-.pub-nb-avatar { width: 46px; height: 46px; border-radius: 50%; background: var(--pcu-brand); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; font-weight: 700; flex-shrink: 0; }
-.pub-nb-name { font-size: .8rem; font-weight: 700; color: var(--pcu-brand-ink); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pub-nb-avatar { width: 46px; height: 46px; border-radius: 50%; background: #00006e; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; font-weight: 700; flex-shrink: 0; }
+.pub-nb-name { font-size: .8rem; font-weight: 700; color: #0d1b4b; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pub-nb-logout { background: transparent; border: 1.5px solid #e5e7eb; border-radius: 7px; padding: .3rem .75rem; font-size: .75rem; color: #6b7280; cursor: pointer; font-family: inherit; transition: all .2s; }
 .pub-nb-logout:hover { border-color: #c62828; color: #c62828; }
 
 .pub-user-dropdown { min-width: 200px; padding: .4rem; }
-.pub-dd-header { padding: .5rem .875rem .6rem; font-size: .8rem; font-weight: 800; color: var(--pcu-brand-ink); border-bottom: 1px solid #e5e7eb; margin-bottom: .35rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pub-dd-header { padding: .5rem .875rem .6rem; font-size: .8rem; font-weight: 800; color: #0d1b4b; border-bottom: 1px solid #e5e7eb; margin-bottom: .35rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pub-dd-btn { display: flex; align-items: center; gap: .55rem; width: 100%; background: none; border: none; cursor: pointer; font-family: inherit; text-align: right; }
 .pub-dd-btn.pub-dd-danger { color: #c62828; }
 .pub-dd-btn.pub-dd-danger:hover { background: #fce4ec; color: #c62828; }

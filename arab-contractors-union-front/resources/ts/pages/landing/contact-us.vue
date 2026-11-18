@@ -144,7 +144,7 @@ const inquiryTypes = ['استفسار عام','الانضمام والعضوية
     <!-- Map placeholder -->
     <div class="map-section">
       <div class="map-placeholder">
-        <MapPin :size="48" style="color:var(--pcu-brand);margin-bottom:.75rem" />
+        <MapPin :size="48" style="color:#1a237e;margin-bottom:.75rem" />
         <p>اتحاد المقاولين الفلسطينيين — غزة، الكتيبة، عمارة النجمة</p>
         <a href="https://maps.google.com" target="_blank" class="map-link">افتح في خرائط جوجل</a>
       </div>
@@ -158,8 +158,8 @@ const inquiryTypes = ['استفسار عام','الانضمام والعضوية
 .pub-page { font-family: 'Tajawal', 'Cairo', sans-serif; direction: rtl; color: #374151; background: #fff; }
 .pub-cont { max-width: 1240px; margin: 0 auto; padding: 0 1.5rem; }
 .pub-section { padding: 5rem 0; }
-.pub-sec-label { display: inline-block; background: #e8eaf6; color: var(--pcu-brand-ink); border: 1px solid #c5cae9; border-radius: 50px; padding: .28rem 1.1rem; font-size: .77rem; font-weight: 700; letter-spacing: .05em; margin-bottom: .65rem; }
-.page-hero { background: linear-gradient(145deg, var(--pcu-brand-deep) 0%, var(--pcu-brand) 60%, var(--pcu-brand-soft) 100%); margin-top: calc(-1 * var(--pub-nav-h, 114px)); padding: calc(var(--pub-nav-h, 114px) + 2.5rem) 0 3rem; position: relative; overflow: hidden; }
+.pub-sec-label { display: inline-block; background: #e8eaf6; color: #1a237e; border: 1px solid #c5cae9; border-radius: 50px; padding: .28rem 1.1rem; font-size: .77rem; font-weight: 700; letter-spacing: .05em; margin-bottom: .65rem; }
+.page-hero { background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); margin-top: calc(-1 * var(--pub-nav-h, 114px)); padding: calc(var(--pub-nav-h, 114px) + 2.5rem) 0 3rem; position: relative; overflow: hidden; }
 .page-hero-shapes { position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; }
 .ph-s { position: absolute; border-radius: 50%; }
 .ph-s1 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(249,168,37,.12), transparent 65%); top: -100px; left: 5%; }
@@ -176,10 +176,10 @@ const inquiryTypes = ['استفسار عام','الانضمام والعضوية
 
 .contact-details { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem; }
 .contact-item { display: flex; gap: 1rem; align-items: flex-start; }
-.contact-icon { width: 42px; height: 42px; border-radius: 12px; background: #e8eaf6; color: var(--pcu-brand-ink); display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1.5px solid #c5cae9; }
+.contact-icon { width: 42px; height: 42px; border-radius: 12px; background: #e8eaf6; color: #1a237e; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1.5px solid #c5cae9; }
 .contact-label { display: block; font-size: .75rem; color: #9ca3af; font-weight: 600; margin-bottom: .2rem; }
 .contact-value { font-size: .9rem; color: #374151; font-weight: 600; }
-.contact-value.link { color: var(--pcu-brand-ink); text-decoration: none; }
+.contact-value.link { color: #1a237e; text-decoration: none; }
 .contact-value.link:hover { color: #f9a825; }
 
 .social-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: .85rem; font-weight: 700; color: #6b7280; margin-bottom: .875rem; }
@@ -198,22 +198,22 @@ const inquiryTypes = ['استفسار عام','الانضمام والعضوية
 .form-group.full { grid-column: 1 / -1; }
 .form-group label { font-size: .85rem; font-weight: 700; color: #374151; }
 .form-input { border: 1.5px solid #e5e7eb; border-radius: 10px; padding: .7rem 1rem; font-size: .88rem; font-family: 'Tajawal', sans-serif; color: #374151; background: #fff; outline: none; transition: border-color .2s, box-shadow .2s; width: 100%; }
-.form-input:focus { border-color: var(--pcu-brand); box-shadow: 0 0 0 3px rgba(var(--pcu-brand-rgb), .08); }
+.form-input:focus { border-color: #1a237e; box-shadow: 0 0 0 3px rgba(26,35,126,.08); }
 .form-textarea { resize: vertical; min-height: 120px; }
-.form-submit { display: flex; align-items: center; justify-content: center; gap: .5rem; width: 100%; background: linear-gradient(135deg, var(--pcu-brand), var(--pcu-brand-deep)); color: #fff; border: none; border-radius: 12px; padding: 1rem; font-size: .95rem; font-weight: 800; cursor: pointer; font-family: 'Tajawal', sans-serif; transition: all .25s; }
-.form-submit:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(var(--pcu-brand-deep-rgb), .3); }
+.form-submit { display: flex; align-items: center; justify-content: center; gap: .5rem; width: 100%; background: linear-gradient(135deg, #1a237e, #0d1b4b); color: #fff; border: none; border-radius: 12px; padding: 1rem; font-size: .95rem; font-weight: 800; cursor: pointer; font-family: 'Tajawal', sans-serif; transition: all .25s; }
+.form-submit:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(13,27,75,.3); }
 .form-submit:disabled { opacity: .7; cursor: not-allowed; }
 
 .success-state { text-align: center; padding: 3rem 1rem; }
 .success-icon { color: #2e7d32; margin-bottom: 1.25rem; display: flex; justify-content: center; }
 .success-state h3 { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 1.4rem; font-weight: 900; color: #0d1b3e; margin-bottom: .65rem; }
 .success-state p { font-size: .95rem; color: #6b7280; margin-bottom: 2rem; line-height: 1.8; }
-.success-state button { background: #e8eaf6; color: var(--pcu-brand-ink); border: 1.5px solid #c5cae9; border-radius: 10px; padding: .7rem 1.5rem; font-size: .88rem; font-weight: 700; cursor: pointer; font-family: 'Tajawal', sans-serif; }
+.success-state button { background: #e8eaf6; color: #1a237e; border: 1.5px solid #c5cae9; border-radius: 10px; padding: .7rem 1.5rem; font-size: .88rem; font-weight: 700; cursor: pointer; font-family: 'Tajawal', sans-serif; }
 
 .map-section { height: 300px; background: #f3f4f6; }
 .map-placeholder { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #6b7280; text-align: center; }
 .map-placeholder p { font-size: .9rem; margin-bottom: .75rem; }
-.map-link { color: var(--pcu-brand-ink); font-weight: 700; font-size: .88rem; text-decoration: none; border-bottom: 2px solid var(--pcu-brand); }
+.map-link { color: #1a237e; font-weight: 700; font-size: .88rem; text-decoration: none; border-bottom: 2px solid #1a237e; }
 
 @media (max-width: 900px) { .contact-layout { grid-template-columns: 1fr; gap: 2rem; } }
 @media (max-width: 560px) { .form-grid { grid-template-columns: 1fr; } .form-group.full { grid-column: auto; } }
