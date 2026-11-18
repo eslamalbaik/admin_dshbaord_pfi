@@ -16,7 +16,7 @@ class AssistantConversationController extends Controller
         $source = $request->query('source');
 
         $q = AssistantConversation::query()
-            ->with('firstQuestion:id,assistant_conversation_id,text')
+            ->with('firstQuestion')
             ->withCount(['messages as questions_count' => fn ($m) => $m->where('role', 'user')])
             ->withCount(['messages as ai_answers_count' => fn ($m) => $m->where('source', 'ai')])
             ->withCount(['messages as unanswered_count' => fn ($m) => $m->where('source', 'fallback')])
