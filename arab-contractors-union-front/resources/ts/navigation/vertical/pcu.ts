@@ -23,6 +23,7 @@ function getStoredUser(): NavUser {
 const SETTINGS_INNER_ROUTES = [
   'settings-terms',
   'faqs',
+  'assistant-conversations',
   'settings-privacy-policy',
   'settings-app-settings',
   'settings-exchange-rates',

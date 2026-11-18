@@ -1,17 +1,45 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import api from '@/plugins/axios'
 import { RefreshCw, SendHorizontal, X } from 'lucide-vue-next'
+import AssistantAvatar from '@/components/AssistantAvatar.vue'
 
 /**
- * المساعد الافتراضي (نسخة تجريبية): بيجاوب من "الأسئلة الشائعة" المخزّنة بلوحة التحكم (GET /api/v1/faqs)
- * ببحث نصي بسيط على الكلمات (بدون ذكاء اصطناعي خارجي). لو ما لقى جواب قريب بيقترح أقرب الأسئلة وبيحوّل لصفحة التواصل.
+ * المساعد الافتراضي "سامي" (نسخة تجريبية): بيرد محلياً على التحية والتواصل والأسئلة الشائعة المطابقة (GET /api/v1/faqs)،
+ * وغير هيك بيسأل الخادم (Gemini). لو ما في جواب بيقترح أقرب الأسئلة وبيحوّل لصفحة التواصل.
+ * كل سؤال وجوابه بينحفظ بسجل المحادثات بلوحة التحكم (الردود المحلية عبر POST /api/v1/assistant/log).
  */
 interface Faq { id: number; question: string; answer: string }
 interface PageLink { label: string; to: string }
 interface Msg { id: number; from: 'bot' | 'user'; text: string; faqs?: Faq[]; link?: boolean; links?: PageLink[] }
 
-const GREETING = 'مرحباً! كيف يمكنني مساعدتك اليوم؟'
+const GREETING = 'مرحباً! أنا سامي، مساعدك الافتراضي. كيف يمكنني مساعدتك اليوم؟'
+type Source = 'faq' | 'smalltalk' | 'page' | 'fallback'
+
+const route = useRoute()
+
+// معرّف المحادثة بسجل المحادثات: بيتجدد مع "محادثة جديدة"
+function newSessionId() {
+  try { if (crypto?.randomUUID) return crypto.randomUUID() }
+  catch { /* متصفح قديم */ }
+
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
+}
+let sessionId = newSessionId()
+
+/** حفظ رد انجاب بالمتصفح بسجل المحادثات (بدون انتظار، والفشل ما بيأثر على الزائر) */
+function logLocal(question: string, replies: string[], source: Source) {
+  if (!replies.length) return
+  api.post('/api/v1/assistant/log', {
+    session_id: sessionId,
+    page: route.fullPath,
+    messages: [
+      { role: 'user', text: question.slice(0, 2000) },
+      ...replies.slice(0, 3).map(text => ({ role: 'bot', text: text.slice(0, 2000), source })),
+    ],
+  }).catch(() => {})
+}
 
 const open = ref(false)
 const input = ref('')
@@ -62,6 +90,7 @@ function toggle() {
 }
 
 function reset() {
+  sessionId = newSessionId()
   lastBotAskedMore = false
   seq = 1
   messages.value = [{ id: 1, from: 'bot', text: GREETING }]
@@ -149,10 +178,10 @@ function smallTalk(text: string): boolean {
     return push({ from: 'bot', text: 'مع السلامة! يسعدنا خدمتك دائماً، ولا تتردد بالعودة متى أحببت.' }), true
 
   if (short && has(text, ['السلام عليكم', 'مرحبا', 'اهلا', 'هلا', 'هاي', 'صباح الخير', 'مساء الخير', 'اهلين', 'يسعد صباحك', 'يسعد مساك']))
-    return push({ from: 'bot', text: has(text, ['السلام عليكم']) ? 'وعليكم السلام ورحمة الله! أنا المساعد الافتراضي لاتحاد المقاولين الفلسطينيين، كيف أستطيع مساعدتك؟' : 'أهلاً بك! أنا المساعد الافتراضي لاتحاد المقاولين الفلسطينيين، تفضّل بسؤالك عن العضوية أو التصنيف أو الخدمات.', faqs: suggestions.value }), true
+    return push({ from: 'bot', text: has(text, ['السلام عليكم']) ? 'وعليكم السلام ورحمة الله! أنا سامي، المساعد الافتراضي لاتحاد المقاولين الفلسطينيين، كيف أستطيع مساعدتك؟' : 'أهلاً بك! أنا سامي، المساعد الافتراضي لاتحاد المقاولين الفلسطينيين، تفضّل بسؤالك عن العضوية أو التصنيف أو الخدمات.', faqs: suggestions.value }), true
 
   if (has(text, ['من انت', 'مين انت', 'شو انت', 'ما انت', 'ما اسمك', 'شو اسمك', 'ماذا تفعل', 'شو بتعمل', 'شو بتقدر', 'ماذا تستطيع', 'كيف تساعدني', 'ساعدني', 'مساعده', 'مساعدة']))
-    return push({ from: 'bot', text: 'أنا المساعد الافتراضي (نسخة تجريبية) لاتحاد المقاولين الفلسطينيين. أجيب عن أسئلتك حول العضوية والتصنيف والخدمات والعطاءات، وأدلّك على الصفحة المناسبة في الموقع. جرّب أحد هذه الأسئلة:', faqs: suggestions.value }), true
+    return push({ from: 'bot', text: 'أنا سامي، المساعد الافتراضي (نسخة تجريبية) لاتحاد المقاولين الفلسطينيين. أجيب عن أسئلتك حول العضوية والتصنيف والخدمات والعطاءات، وأدلّك على الصفحة المناسبة في الموقع. جرّب أحد هذه الأسئلة:', faqs: suggestions.value }), true
 
   if (has(text, ['رقمكم', 'رقم الهاتف', 'رقم الجوال', 'هاتف', 'تلفون', 'جوال', 'موبايل', 'اتصال', 'اتصل', 'ايميل', 'بريد', 'عنوانكم', 'وين', 'اين', 'مقر', 'مكانكم', 'دوام', 'ساعات', 'مواعيد', 'تواصل', 'واتساب', 'واتس']))
     return push({
@@ -180,7 +209,7 @@ function pageHint(text: string): boolean {
   return true
 }
 
-function answer(text: string) {
+function answer(text: string): Source {
   const q = tokens(text)
   const ranked = faqs.value
     .map(f => ({ f, s: q.length ? score(q, f) : 0 }))
@@ -188,9 +217,9 @@ function answer(text: string) {
 
   const best = ranked[0]
   if (best && best.s >= 6)
-    return push({ from: 'bot', text: best.f.answer })
+    return push({ from: 'bot', text: best.f.answer }), 'faq'
 
-  if (pageHint(text)) return
+  if (pageHint(text)) return 'page'
 
   const related = ranked.filter(r => r.s > 0).slice(0, 3).map(r => r.f)
   push({
@@ -201,12 +230,14 @@ function answer(text: string) {
     faqs: related.length ? related : suggestions.value,
     link: true,
   })
+
+  return 'fallback'
 }
 
 /** جواب الذكاء الاصطناعي من الخادم (Gemini)؛ null لو مش متاح أو فشل، فنجاوب محلياً من الأسئلة الشائعة */
 async function askAi(text: string, history: { role: 'user' | 'bot'; text: string }[]) {
   try {
-    const r = await api.post('/api/v1/assistant/chat', { message: text, history }, { timeout: 40000 })
+    const r = await api.post('/api/v1/assistant/chat', { message: text, history, session_id: sessionId, page: route.fullPath }, { timeout: 40000 })
 
     return r.data?.available && r.data.reply ? String(r.data.reply) : null
   }
@@ -232,20 +263,28 @@ async function send(text = input.value) {
   typing.value = true
   await loadFaqs()
 
-  if (smallTalk(t)) { setTimeout(() => { typing.value = false }, 400); return }
+  // الردود اللي انضافت بعد سؤال الزائر (لسجل المحادثات)
+  const start = messages.value.length
+  const botReplies = () => messages.value.slice(start).filter(m => m.from === 'bot').map(m => m.text)
+
+  if (smallTalk(t)) { logLocal(t, botReplies(), 'smalltalk'); setTimeout(() => { typing.value = false }, 400); return }
 
   const strong = strongFaq(t)
-  if (strong) { setTimeout(() => { push({ from: 'bot', text: strong.answer }); typing.value = false }, 400); return }
+  if (strong) { logLocal(t, [strong.answer], 'faq'); setTimeout(() => { push({ from: 'bot', text: strong.answer }); typing.value = false }, 400); return }
 
   const ai = await askAi(t, history)
-  if (ai) push({ from: 'bot', text: ai })
-  else answer(t)
+  if (ai) { push({ from: 'bot', text: ai }) } // الخادم حفظها بالسجل
+  else {
+    const src = answer(t)
+    logLocal(t, botReplies(), src)
+  }
   typing.value = false
 }
 
 function ask(f: Faq) {
   if (typing.value) return
   push({ from: 'user', text: f.question })
+  logLocal(f.question, [f.answer], 'faq')
   typing.value = true
   setTimeout(() => { push({ from: 'bot', text: f.answer }); typing.value = false }, 350)
 }
@@ -258,13 +297,24 @@ function ask(f: Faq) {
         <header class="asst-head">
           <button type="button" class="asst-icon-btn" aria-label="إغلاق" @click="toggle"><X :size="18" /></button>
           <button type="button" class="asst-icon-btn" aria-label="محادثة جديدة" title="محادثة جديدة" @click="reset"><RefreshCw :size="16" /></button>
-          <h3 class="asst-title">المساعد الافتراضي : نسخة تجريبية</h3>
+          <div class="asst-who">
+            <span class="asst-head-avatar"><AssistantAvatar kind="bot" :size="42" /><i class="asst-online" /></span>
+            <div class="asst-who-text">
+              <small class="asst-kicker">دعم فني معك</small>
+              <h3 class="asst-title">سامي، مساعدك الافتراضي</h3>
+              <span class="asst-beta">نسخة تجريبية</span>
+            </div>
+          </div>
         </header>
 
         <div ref="bodyEl" class="asst-body">
           <template v-for="m in messages" :key="m.id">
-            <div class="asst-msg" :class="m.from === 'user' ? 'is-user' : 'is-bot'">
-              <p>{{ m.text }}</p>
+            <div class="asst-row" :class="m.from === 'user' ? 'is-user' : 'is-bot'">
+              <AssistantAvatar :kind="m.from" :size="30" />
+              <div class="asst-msg" :class="m.from === 'user' ? 'is-user' : 'is-bot'">
+                <span class="asst-name">{{ m.from === 'user' ? 'أنت' : 'سامي' }}</span>
+                <p>{{ m.text }}</p>
+              </div>
             </div>
             <div v-if="m.faqs?.length" class="asst-chips">
               <button v-for="f in m.faqs" :key="f.id" type="button" class="asst-chip" @click="ask(f)">{{ f.question }}</button>
@@ -280,39 +330,30 @@ function ask(f: Faq) {
           </div>
           <p v-if="failed && messages.length === 1" class="asst-note">تعذّر تحميل الأسئلة حالياً، يمكنك كتابة سؤالك أو المحاولة لاحقاً.</p>
 
-          <div v-if="typing" class="asst-msg is-bot asst-typing" aria-label="يكتب"><i /><i /><i /></div>
+          <div v-if="typing" class="asst-row is-bot">
+            <AssistantAvatar kind="bot" :size="30" />
+            <div class="asst-msg is-bot asst-typing" aria-label="سامي يكتب"><i /><i /><i /></div>
+          </div>
         </div>
 
         <form class="asst-form" @submit.prevent="send()">
           <input v-model="input" type="text" placeholder="ادخل سؤالك" maxlength="300" aria-label="سؤالك">
           <button type="submit" class="asst-send" :disabled="!input.trim() || typing" aria-label="إرسال"><SendHorizontal :size="18" /></button>
         </form>
-        <p class="asst-foot">يجيب من الأسئلة الشائعة للاتحاد · نسخة تجريبية</p>
+        <p class="asst-foot">سامي مساعد آلي وقد يخطئ أحياناً · نسخة تجريبية</p>
       </section>
     </Transition>
 
     <Transition name="asst-tip">
       <div v-if="tip && !open" class="asst-tip" role="tooltip">
         <strong>مرحباً بك! 👋</strong>
-        <span>أنا المساعد الافتراضي لاتحاد المقاولين الفلسطينيين، يسعدني مساعدتك في أي سؤال.</span>
+        <span>أنا سامي، المساعد الافتراضي لاتحاد المقاولين الفلسطينيين، يسعدني مساعدتك في أي سؤال.</span>
       </div>
     </Transition>
 
     <button type="button" class="asst-fab" @mouseenter="showTip()" @mouseleave="hideTip" @focus="showTip()" @blur="hideTip" :class="{ 'is-open': open }" :aria-label="open ? 'إغلاق المساعد' : 'فتح المساعد الافتراضي'" :aria-expanded="open" @click="toggle">
       <span v-if="!open" class="asst-fab-ring" />
-      <svg v-if="!open" class="asst-robot" viewBox="0 0 64 64" aria-hidden="true">
-        <circle cx="32" cy="32" r="30" fill="#e8f3ff" />
-        <line x1="32" y1="10" x2="32" y2="17" stroke="#00006e" stroke-width="2.4" stroke-linecap="round" />
-        <circle cx="32" cy="9" r="3" fill="#f5a623" />
-        <rect x="14" y="17" width="36" height="28" rx="11" fill="#00006e" />
-        <rect x="18.5" y="22" width="27" height="17" rx="8" fill="#a8e6ff" />
-        <circle cx="26" cy="30" r="3.2" fill="#00006e" /><circle cx="38" cy="30" r="3.2" fill="#00006e" />
-        <circle cx="27" cy="29" r="1" fill="#fff" /><circle cx="39" cy="29" r="1" fill="#fff" />
-        <path d="M27.5 34.5q4.5 3 9 0" fill="none" stroke="#00006e" stroke-width="1.8" stroke-linecap="round" />
-        <rect x="9" y="26" width="5" height="10" rx="2.5" fill="#f5a623" /><rect x="50" y="26" width="5" height="10" rx="2.5" fill="#f5a623" />
-        <path d="M20 47h24l2 9a3 3 0 0 1-3 3H21a3 3 0 0 1-3-3z" fill="#00006e" />
-        <circle cx="32" cy="52" r="2.6" fill="#f5a623" />
-      </svg>
+      <AssistantAvatar v-if="!open" kind="bot" :size="62" class="asst-robot" />
       <X v-else :size="26" />
     </button>
   </div>
@@ -329,21 +370,32 @@ function ask(f: Faq) {
 
 .asst-panel { position: absolute; right: 0; bottom: 84px; width: min(370px, calc(100vw - 32px)); height: min(540px, calc(100vh - 130px)); display: flex; flex-direction: column; background: #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 24px 60px rgba(0, 0, 60, .32); }
 .asst-head { display: flex; align-items: center; gap: .5rem; padding: .9rem 1rem; background: linear-gradient(135deg, #00004f, #00006e 60%, #1a1a8f); color: #fff; }
-.asst-title { flex: 1; margin: 0; text-align: start; font-size: .98rem; font-weight: 800; color: #fff !important; }
+.asst-who { flex: 1; display: flex; align-items: center; gap: .6rem; min-width: 0; }
+.asst-head-avatar { position: relative; flex: none; display: grid; padding: 2px; border-radius: 50%; background: #fff; box-shadow: 0 4px 12px rgba(0, 0, 0, .25); }
+.asst-online { position: absolute; bottom: 1px; left: 1px; width: 11px; height: 11px; border-radius: 50%; background: #22c55e; border: 2px solid #fff; }
+.asst-who-text { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; line-height: 1.35; }
+.asst-kicker { font-size: .72rem; font-weight: 700; color: #f5c46b; }
+.asst-title { margin: 0; text-align: start; font-size: .98rem; font-weight: 800; color: #fff !important; }
+.asst-beta { margin-top: 2px; font-size: .66rem; font-weight: 700; padding: 0 .45rem; border-radius: 999px; background: rgba(255, 255, 255, .16); color: #dfe3ff; }
 .asst-icon-btn { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .14); color: #fff; cursor: pointer; transition: background .2s; }
 .asst-icon-btn:hover { background: rgba(255, 255, 255, .28); }
 
 .asst-body { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: .7rem; background: #f6f8fc; }
-.asst-msg { max-width: 86%; padding: .65rem .9rem; border-radius: 14px; font-size: .92rem; line-height: 1.85; white-space: pre-line; animation: asst-in .3s ease both; }
+.asst-row { display: flex; align-items: flex-end; gap: .45rem; max-width: 92%; }
+.asst-row.is-bot { align-self: flex-start; }
+.asst-row.is-user { align-self: flex-end; flex-direction: row-reverse; }
+.asst-name { display: block; font-size: .7rem; font-weight: 800; opacity: .7; line-height: 1.4; }
+.asst-msg { min-width: 0; padding: .65rem .9rem; border-radius: 14px; font-size: .92rem; line-height: 1.85; white-space: pre-line; animation: asst-in .3s ease both; }
 .asst-msg p { margin: 0; }
-.asst-msg.is-bot { align-self: flex-start; background: #fff; color: #1f2a44; border: 1px solid #e3e7f1; border-top-right-radius: 4px; }
-.asst-msg.is-user { align-self: flex-end; background: #00006e; color: #fff; border-top-left-radius: 4px; }
+.asst-msg.is-bot { background: #fff; color: #1f2a44; border: 1px solid #e3e7f1; border-bottom-right-radius: 4px; }
+.asst-msg.is-user { background: #00006e; color: #fff; border-bottom-left-radius: 4px; }
 @keyframes asst-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-.asst-chips { display: flex; flex-direction: column; gap: .4rem; align-self: stretch; }
+.asst-chips { display: flex; flex-direction: column; gap: .4rem; align-self: stretch; margin-inline-start: 38px; }
 .asst-chip { text-align: start; border: 1.5px solid #c5cae9; background: #fff; color: #00006e; border-radius: 12px; padding: .5rem .8rem; font-family: inherit; font-size: .85rem; font-weight: 700; line-height: 1.6; cursor: pointer; transition: background .2s, border-color .2s; }
 .asst-chip:hover { background: #eef0fb; border-color: #00006e; }
-.asst-contact { align-self: flex-start; background: #f5a623; color: #1b1300; border-radius: 999px; padding: .4rem 1.1rem; font-size: .85rem; font-weight: 800; text-decoration: none; }
-.asst-links { display: flex; flex-wrap: wrap; gap: .4rem; align-self: flex-start; }
+.asst-contact { align-self: flex-start; margin-inline-start: 38px; background: #f5a623; color: #1b1300; border-radius: 999px; padding: .4rem 1.1rem; font-size: .85rem; font-weight: 800; text-decoration: none; }
+.asst-links { display: flex; flex-wrap: wrap; gap: .4rem; align-self: flex-start; margin-inline-start: 38px; }
+.asst-links .asst-contact { margin-inline-start: 0; }
 .asst-note { font-size: .78rem; color: #9aa3b5; text-align: center; margin: 0; }
 .asst-typing { display: inline-flex; gap: 5px; padding: .8rem 1rem; }
 .asst-typing i { width: 7px; height: 7px; border-radius: 50%; background: #9aa3b5; animation: asst-dot 1s ease-in-out infinite; }
