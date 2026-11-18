@@ -2,6 +2,7 @@
 import { PUBLIC_SOCIAL_LINKS } from '@/utils/publicSocialLinks'
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import PublicSocialIcon from '@/components/PublicSocialIcon.vue'
+import PublicHqMap from '@/components/PublicHqMap.vue'
 import { ref } from 'vue'
 import { MapPin, Phone, Mail, Clock, Send, CheckCircle } from 'lucide-vue-next'
 
@@ -39,8 +40,7 @@ async function submit() {
 
 const contacts = [
   { icon: MapPin,  label: 'العنوان',         value: 'غزة — الكتيبة — عمارة النجمة' },
-  { icon: Phone,   label: 'هاتف المقر',      value: '+970 2 000 0000', href: 'tel:+97020000000' },
-  { icon: Phone,   label: 'رقم الجوال',      value: '+970 597 233 422', href: 'tel:+970597233422' },
+  { icon: Phone,   label: 'رقم الجوال',      value: '+970 597 233 422', href: 'tel:+970597233422', ltr: true },
   { icon: Mail,    label: 'البريد الإلكتروني', value: 'info@pcu.org.ps', href: 'mailto:info@pcu.org.ps' },
   { icon: Clock,   label: 'ساعات العمل',      value: 'الأحد — الخميس: ٨ص — ٤م' },
 ]
@@ -74,7 +74,7 @@ const inquiryTypes = ['استفسار عام','الانضمام والعضوية
               <div class="contact-icon"><component :is="c.icon" :size="18" /></div>
               <div>
                 <span class="contact-label">{{ c.label }}</span>
-                <a v-if="c.href" :href="c.href" class="contact-value link">{{ c.value }}</a>
+                <a v-if="c.href" :href="c.href" class="contact-value link" :dir="c.ltr ? 'ltr' : undefined">{{ c.value }}</a>
                 <span v-else class="contact-value">{{ c.value }}</span>
               </div>
             </div>
@@ -141,14 +141,8 @@ const inquiryTypes = ['استفسار عام','الانضمام والعضوية
       </div>
     </section>
 
-    <!-- Map placeholder -->
-    <div class="map-section">
-      <div class="map-placeholder">
-        <MapPin :size="48" style="color:#1a237e;margin-bottom:.75rem" />
-        <p>اتحاد المقاولين الفلسطينيين — غزة، الكتيبة، عمارة النجمة</p>
-        <a href="https://maps.google.com" target="_blank" class="map-link">افتح في خرائط جوجل</a>
-      </div>
-    </div>
+    <!-- خريطة المقر -->
+    <PublicHqMap />
 
       </div>
 </template>
@@ -179,7 +173,8 @@ const inquiryTypes = ['استفسار عام','الانضمام والعضوية
 .contact-icon { width: 42px; height: 42px; border-radius: 12px; background: #e8eaf6; color: #1a237e; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1.5px solid #c5cae9; }
 .contact-label { display: block; font-size: .75rem; color: #9ca3af; font-weight: 600; margin-bottom: .2rem; }
 .contact-value { font-size: .9rem; color: #374151; font-weight: 600; }
-.contact-value.link { color: #1a237e; text-decoration: none; }
+.contact-value.link { color: #1a237e; text-decoration: none; unicode-bidi: isolate; }
+.contact-value[dir="ltr"] { display: inline-block; }
 .contact-value.link:hover { color: #f9a825; }
 
 .social-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: .85rem; font-weight: 700; color: #6b7280; margin-bottom: .875rem; }
@@ -210,10 +205,6 @@ const inquiryTypes = ['استفسار عام','الانضمام والعضوية
 .success-state p { font-size: .95rem; color: #6b7280; margin-bottom: 2rem; line-height: 1.8; }
 .success-state button { background: #e8eaf6; color: #1a237e; border: 1.5px solid #c5cae9; border-radius: 10px; padding: .7rem 1.5rem; font-size: .88rem; font-weight: 700; cursor: pointer; font-family: 'Tajawal', sans-serif; }
 
-.map-section { height: 300px; background: #f3f4f6; }
-.map-placeholder { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #6b7280; text-align: center; }
-.map-placeholder p { font-size: .9rem; margin-bottom: .75rem; }
-.map-link { color: #1a237e; font-weight: 700; font-size: .88rem; text-decoration: none; border-bottom: 2px solid #1a237e; }
 
 @media (max-width: 900px) { .contact-layout { grid-template-columns: 1fr; gap: 2rem; } }
 @media (max-width: 560px) { .form-grid { grid-template-columns: 1fr; } .form-group.full { grid-column: auto; } }
