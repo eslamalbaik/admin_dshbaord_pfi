@@ -36,7 +36,7 @@ defineProps<{
 
 <style scoped>
 .social-hero {
-  background: linear-gradient(145deg, #0a1440 0%, #1a237e 62%, #283593 100%);
+  background: linear-gradient(145deg, var(--pcu-brand-deep) 0%, var(--pcu-brand) 62%, var(--pcu-brand-soft) 100%);
   margin-top: calc(-1 * var(--pub-nav-h, 114px));
   padding: calc(var(--pub-nav-h, 114px) + 2.5rem) 0 5.5rem;
   position: relative;

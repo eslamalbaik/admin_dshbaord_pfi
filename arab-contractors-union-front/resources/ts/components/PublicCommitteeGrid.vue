@@ -23,9 +23,9 @@ const icons = [BadgeCheck, Scale, Presentation, Users, FileText, MessageSquare, 
 
 <style scoped>
 .cm-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
-.cm-card { --cc: #1a237e; --ct: #e8eef9; display: flex; flex-direction: column; background: linear-gradient(160deg, #fff 60%, #f7f9ff); border-radius: 18px; border-inline-start: 4px solid var(--cc); padding: 1.6rem 1.5rem 1.25rem; box-shadow: 0 4px 18px rgba(13,27,75,.08); transition: transform .25s, box-shadow .25s; }
+.cm-card { --cc: var(--pcu-brand); --ct: #e8eef9; display: flex; flex-direction: column; background: linear-gradient(160deg, #fff 60%, #f7f9ff); border-radius: 18px; border-inline-start: 4px solid var(--cc); padding: 1.6rem 1.5rem 1.25rem; box-shadow: 0 4px 18px rgba(var(--pcu-brand-deep-rgb), .08); transition: transform .25s, box-shadow .25s; }
 .cm-card.alt { --cc: #e8790a; --ct: #fdf1e0; background: linear-gradient(160deg, #fff 60%, #fffaf2); }
-.cm-card:hover { transform: translateY(-4px); box-shadow: 0 12px 28px rgba(13,27,75,.14); }
+.cm-card:hover { transform: translateY(-4px); box-shadow: 0 12px 28px rgba(var(--pcu-brand-deep-rgb), .14); }
 .cm-top { display: flex; align-items: center; gap: .9rem; margin-bottom: .9rem; }
 .cm-icon { width: 56px; height: 56px; border-radius: 14px; background: var(--ct); color: var(--cc); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .cm-name { margin: 0; font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 1.08rem; font-weight: 800; color: #0d1b3e; line-height: 1.5; }

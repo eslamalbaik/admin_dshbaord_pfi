@@ -6,7 +6,7 @@ definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false
 
 const services = [
   {
-    icon: ClipboardCheck, color: '#1a237e', bg: '#e8eaf6',
+    icon: ClipboardCheck, color: '#067cb8', bg: '#e8eaf6',
     title: 'تسجيل العضوية',
     desc: 'انضم إلى اتحاد المقاولين الفلسطينيين، واستفد من خدماته ومزاياه المهنية والمؤسسية المخصصة للأعضاء.',
     features: ['تقديم طلب العضوية إلكترونياً', 'متابعة حالة الطلب', 'استكمال إجراءات التسجيل', 'الحصول على شهادة العضوية'],
@@ -109,7 +109,7 @@ const services = [
 .pub-page { font-family: 'Tajawal', 'Cairo', sans-serif; direction: rtl; color: #374151; background: #fff; }
 .pub-cont { max-width: 1240px; margin: 0 auto; padding: 0 1.5rem; }
 .pub-section { padding: 5rem 0; }
-.page-hero { background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); margin-top: calc(-1 * var(--pub-nav-h, 114px)); padding: calc(var(--pub-nav-h, 114px) + 2.5rem) 0 3rem; position: relative; overflow: hidden; }
+.page-hero { background: linear-gradient(145deg, var(--pcu-brand-deep) 0%, var(--pcu-brand) 60%, var(--pcu-brand-soft) 100%); margin-top: calc(-1 * var(--pub-nav-h, 114px)); padding: calc(var(--pub-nav-h, 114px) + 2.5rem) 0 3rem; position: relative; overflow: hidden; }
 .page-hero-shapes { position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; }
 .ph-s { position: absolute; border-radius: 50%; }
 .ph-s1 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(249,168,37,.12), transparent 65%); top: -100px; left: 5%; }
@@ -126,10 +126,10 @@ const services = [
   background: linear-gradient(165deg, var(--bg) 0%, #fff 62%);
   border: 1.5px solid color-mix(in srgb, var(--c) 18%, #fff);
   border-radius: 18px; padding: 1.4rem 1.3rem 1.3rem;
-  box-shadow: 0 6px 20px rgba(13, 27, 75, .06);
+  box-shadow: 0 6px 20px rgba(var(--pcu-brand-deep-rgb), .06);
   transition: transform .25s, box-shadow .25s;
 }
-.svc-card:hover { transform: translateY(-5px); box-shadow: 0 16px 34px rgba(13, 27, 75, .13); }
+.svc-card:hover { transform: translateY(-5px); box-shadow: 0 16px 34px rgba(var(--pcu-brand-deep-rgb), .13); }
 .svc-corner {
   position: absolute; top: 0; left: 0; width: 90px; height: 90px; pointer-events: none;
   background: color-mix(in srgb, var(--c) 14%, #fff);
@@ -148,7 +148,7 @@ const services = [
 .svc-features li { display: flex; align-items: center; gap: .5rem; font-size: .8rem; color: #374151; }
 .svc-check { flex-shrink: 0; color: var(--c); }
 
-.cta-section { background: linear-gradient(145deg, #0d1b4b, #1a237e); padding: 4rem 0; }
+.cta-section { background: linear-gradient(145deg, var(--pcu-brand-deep), var(--pcu-brand)); padding: 4rem 0; }
 .cta-inner { text-align: center; }
 .cta-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 1.75rem; font-weight: 900; color: #fff; margin-bottom: .65rem; }
 .cta-sub { font-size: 1rem; color: rgba(255,255,255,.7); margin-bottom: 2rem; }

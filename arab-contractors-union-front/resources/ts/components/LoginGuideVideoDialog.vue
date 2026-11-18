@@ -295,14 +295,14 @@ onUnmounted(() => {
 
 <style scoped>
 .lgv-backdrop {
-  --navy: #00006e;
+  --navy: var(--pcu-brand);
   --navy-2: #0a1a9c;
   --yellow: #ffb61a;
   --orange: #d67a00;
 
   position: fixed; inset: 0; z-index: 3000;
   display: grid; place-items: center; padding: 20px 16px;
-  background: radial-gradient(circle at 50% 30%, rgba(10, 26, 156, .55), rgba(0, 0, 40, .82));
+  background: radial-gradient(circle at 50% 30%, rgba(var(--pcu-brand-rgb), .55), rgba(var(--pcu-brand-deep-rgb), .82));
   backdrop-filter: blur(6px);
   font-family: 'Tajawal', 'Cairo', sans-serif;
   overflow-y: auto;
@@ -310,7 +310,7 @@ onUnmounted(() => {
 .lgv-card {
   width: min(920px, 100%);
   background: #fff; border-radius: 22px; overflow: hidden;
-  box-shadow: 0 40px 90px rgba(0, 0, 50, .45), 0 0 0 1px rgba(255, 255, 255, .08);
+  box-shadow: 0 40px 90px rgba(var(--pcu-brand-deep-rgb), .45), 0 0 0 1px rgba(255, 255, 255, .08);
 }
 .lgv-head {
   position: relative; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
@@ -328,7 +328,7 @@ onUnmounted(() => {
 .lgv-head p { margin: 0; font-size: 14px; font-weight: 500; color: rgba(255, 255, 255, .85); line-height: 1.7; }
 .lgv-close {
   flex-shrink: 0; width: 40px; height: 40px; border-radius: 12px; border: 0; cursor: pointer;
-  display: grid; place-items: center; color: var(--navy); background: var(--yellow);
+  display: grid; place-items: center; color: var(--pcu-brand-ink); background: var(--yellow);
   transition: transform .2s, background .2s;
 }
 .lgv-close:hover { transform: rotate(90deg); background: #fff; }
@@ -339,7 +339,7 @@ onUnmounted(() => {
 .lgv-bar { padding: 18px 22px 22px; display: flex; flex-direction: column; gap: 14px; }
 .lgv-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .lgv-views {
-  display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: var(--navy);
+  display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: var(--pcu-brand-ink);
   background: #e8e8f6; border-radius: 999px; padding: 7px 16px;
 }
 .lgv-views b { font-size: 17px; font-weight: 800; }
@@ -352,7 +352,7 @@ onUnmounted(() => {
   border: 0; background: transparent; cursor: pointer; font: inherit; font-size: 13px; font-weight: 700;
   color: #5b6474; padding: 5px 11px; border-radius: 999px; direction: ltr; transition: background .2s, color .2s;
 }
-.lgv-speed button:hover { color: var(--navy); }
+.lgv-speed button:hover { color: var(--pcu-brand-ink); }
 .lgv-speed button.active { background: var(--navy); color: #fff; }
 
 .lgv-link {
@@ -372,7 +372,7 @@ onUnmounted(() => {
 .lgv-btn:hover { transform: translateY(-1px); }
 .lgv-btn-copy { background: var(--navy); color: #fff; }
 .lgv-btn-copy.done { background: #11903a; }
-.lgv-btn-share { background: var(--yellow); color: var(--navy); }
+.lgv-btn-share { background: var(--yellow); color: var(--pcu-brand-ink); }
 
 .lgv-share { display: flex; gap: 8px; flex-wrap: wrap; }
 .lgv-share a {

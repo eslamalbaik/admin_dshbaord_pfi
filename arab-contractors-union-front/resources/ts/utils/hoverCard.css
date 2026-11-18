@@ -27,7 +27,7 @@
   bottom: 0;
   z-index: 2;
   height: 3px;
-  background: linear-gradient(to left, #00006e, #d67a00);
+  background: linear-gradient(to left, var(--pcu-brand), #d67a00);
   scale: 0 1;
   transform-origin: right center;
   transition: scale .45s var(--hc-ease);
@@ -43,12 +43,12 @@
   .hc:hover {
     translate: 0 -6px;
     border-color: #c9cbe6 !important;
-    box-shadow: 0 16px 32px -14px rgba(0, 0, 110, .25);
+    box-shadow: 0 16px 32px -14px rgba(var(--pcu-brand-rgb), .25);
   }
 
   .hc:hover::after { scale: 1 1; }
   .hc:hover .hc-media img { scale: 1.04; }
-  .hc:hover .hc-title { color: #00006e; }
+  .hc:hover .hc-title { color: var(--pcu-brand-ink); }
   .hc:hover .hc-arrow { translate: -4px 0; }
 }
 
