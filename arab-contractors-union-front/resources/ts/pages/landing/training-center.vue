@@ -12,7 +12,7 @@ type RegStatus = 'open' | 'full' | 'closed'
 const regLabel: Record<RegStatus, string> = { open: 'التسجيل مفتوح', full: 'اكتمل العدد', closed: 'انتهى التسجيل' }
 const courseList = [
   { icon: ShieldCheck, color:'#c62828', bg:'#fce4ec', title:'السلامة والصحة المهنية في مواقع البناء', duration:'٣ أيام', level:'مبتدئ', seats:25, date:'١٥ يوليو ٢٠٢٤', certified:true, desc:'دورة شاملة في معايير السلامة المهنية وفق المعايير الدولية OSHA لجميع العاملين في مواقع البناء.' },
-  { icon: ChartBar,    color:'#1a237e', bg:'#e8eaf6', title:'إدارة المشاريع الإنشائية PMP',          duration:'٥ أيام', level:'متوسط', seats:20, date:'٢٢ يوليو ٢٠٢٤', certified:true, desc:'منهج متكامل في إدارة مشاريع الإنشاء وفق معايير PMI مع التطبيق العملي على دراسات الحالة.' },
+  { icon: ChartBar,    color:'#078fd3', bg:'#e8eaf6', title:'إدارة المشاريع الإنشائية PMP',          duration:'٥ أيام', level:'متوسط', seats:20, date:'٢٢ يوليو ٢٠٢٤', certified:true, desc:'منهج متكامل في إدارة مشاريع الإنشاء وفق معايير PMI مع التطبيق العملي على دراسات الحالة.' },
   { icon: FileText,    color:'#e65100', bg:'#fff8e1', title:'عقود الفيديك FIDIC المحدثة',             duration:'٤ أيام', level:'متقدم', seats:15, date:'٥ أغسطس ٢٠٢٤', certified:true, desc:'دراسة وتحليل عقود الفيديك المحدثة ٢٠١٧ وكيفية التعامل معها في المشاريع الإنشائية الدولية.' },
   { icon: ChartBar,    color:'#2e7d32', bg:'#e8f5e9', title:'تسعير المشاريع الإنشائية',               duration:'٣ أيام', level:'متوسط', seats:20, date:'١٢ أغسطس ٢٠٢٤', certified:false, desc:'أسس وأساليب تسعير الأعمال الإنشائية وإعداد العروض التنافسية وتحليل الكميات والتكاليف.' },
   { icon: ShieldCheck, color:'#6a1b9a', bg:'#f3e5f5', title:'إدارة المخاطر الإنشائية',               duration:'٢ أيام', level:'متقدم', seats:18, date:'١٩ أغسطس ٢٠٢٤', certified:false, desc:'أدوات ومنهجيات تحديد وتقييم وإدارة المخاطر في مشاريع البناء والبنية التحتية.' },
@@ -117,12 +117,12 @@ const levelBg: Record<string,string> = { مبتدئ:'#e8f5e9', متوسط:'#fff8
 .pub-page { font-family: 'Tajawal', 'Cairo', sans-serif; direction: rtl; color: #374151; background: #fff; }
 .pub-cont { max-width: 1240px; margin: 0 auto; padding: 0 1.5rem; }
 .pub-section { padding: 5rem 0; }
-.pub-sec-label { display: inline-block; background: #e8eaf6; color: #1a237e; border: 1px solid #c5cae9; border-radius: 50px; padding: .28rem 1.1rem; font-size: .77rem; font-weight: 700; letter-spacing: .05em; margin-bottom: .65rem; }
+.pub-sec-label { display: inline-block; background: #e8eaf6; color: var(--pcu-brand-ink); border: 1px solid #c5cae9; border-radius: 50px; padding: .28rem 1.1rem; font-size: .77rem; font-weight: 700; letter-spacing: .05em; margin-bottom: .65rem; }
 .pub-sec-h { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: clamp(1.6rem,3.5vw,2.3rem); font-weight: 900; color: #0d1b3e; padding-bottom: .7rem; position: relative; }
 .pub-sec-h::after { content: ''; position: absolute; bottom: 0; right: 0; width: 48px; height: 4px; background: linear-gradient(90deg,#f9a825,#e65100); border-radius: 2px; }
 .sec-header-split { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 2.5rem; flex-wrap: wrap; gap: 1rem; }
 
-.page-hero { background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); margin-top: calc(-1 * var(--pub-nav-h, 114px)); padding: calc(var(--pub-nav-h, 114px) + 2.5rem) 0 3rem; position: relative; overflow: hidden; }
+.page-hero { background: linear-gradient(145deg, var(--pcu-brand-deep) 0%, var(--pcu-brand) 60%, var(--pcu-brand-soft) 100%); margin-top: calc(-1 * var(--pub-nav-h, 114px)); padding: calc(var(--pub-nav-h, 114px) + 2.5rem) 0 3rem; position: relative; overflow: hidden; }
 .page-hero-shapes { position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; }
 .ph-s { position: absolute; border-radius: 50%; }
 .ph-s1 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(249,168,37,.12), transparent 65%); top: -100px; left: 5%; }
@@ -152,7 +152,7 @@ const levelBg: Record<string,string> = { مبتدئ:'#e8f5e9', متوسط:'#fff8
 .course-register { display: flex; align-items: center; justify-content: center; gap: .4rem; width: 100%; color: #fff; border: none; border-radius: 10px; padding: .7rem; font-size: .88rem; font-weight: 700; cursor: pointer; font-family: 'Tajawal', sans-serif; transition: all .2s; margin-top: auto; }
 .course-register:hover { filter: brightness(1.08); transform: translateY(-1px); }
 
-.cta-section { background: linear-gradient(145deg, #0d1b4b, #1a237e); padding: 5rem 0; }
+.cta-section { background: linear-gradient(145deg, var(--pcu-brand-deep), var(--pcu-brand)); padding: 5rem 0; }
 .cta-inner { text-align: center; }
 .cta-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 1.75rem; font-weight: 900; color: #fff; margin-bottom: .65rem; }
 .cta-sub { font-size: 1rem; color: rgba(255,255,255,.7); margin-bottom: 2rem; }
@@ -164,9 +164,9 @@ const levelBg: Record<string,string> = { مبتدئ:'#e8f5e9', متوسط:'#fff8
 @media (max-width: 500px) { .courses-grid { grid-template-columns: 1fr; } }
 
 .course-tabs { display: flex; gap: .5rem; flex-wrap: nowrap; }
-.course-tab { border: 1.5px solid #c5cae9; background: #fff; color: #1a237e; border-radius: 50px; padding: .5rem 1.2rem; font-size: .88rem; font-weight: 700; font-family: inherit; cursor: pointer; transition: all .2s; white-space: nowrap; }
+.course-tab { border: 1.5px solid #c5cae9; background: #fff; color: var(--pcu-brand-ink); border-radius: 50px; padding: .5rem 1.2rem; font-size: .88rem; font-weight: 700; font-family: inherit; cursor: pointer; transition: all .2s; white-space: nowrap; }
 .course-tab:hover { background: #e8eaf6; }
-.course-tab.active { background: #1a237e; border-color: #1a237e; color: #fff; }
+.course-tab.active { background: var(--pcu-brand); border-color: var(--pcu-brand); color: #fff; }
 .course-empty { text-align: center; color: #9aa3b5; padding: 3rem 0; }
 .course-empty p { margin-top: .6rem; }
 .course-extra { list-style: none; display: flex; flex-direction: column; gap: .35rem; margin: .6rem 0; font-size: .82rem; color: #4b5563; }

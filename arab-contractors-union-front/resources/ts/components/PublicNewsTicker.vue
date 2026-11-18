@@ -66,7 +66,7 @@ const duration = computed(() => {
 .nt {
   position: relative; z-index: 199;
   display: flex; align-items: stretch; height: 46px; overflow: hidden;
-  background: linear-gradient(90deg, #12147f 0%, #1a237e 45%, #2b3aa8 100%);
+  background: linear-gradient(90deg, var(--pcu-brand-deep) 0%, var(--pcu-brand) 45%, var(--pcu-brand-soft) 100%);
   border-bottom: 3px solid #f5a623;
   font-family: 'Tajawal', 'Cairo', sans-serif; color: #fff;
 }
@@ -81,14 +81,14 @@ const duration = computed(() => {
   position: relative; z-index: 2; flex-shrink: 0;
   display: flex; align-items: center; gap: .55rem;
   padding-inline: 1.6rem 2.4rem;
-  background: #f5a623; color: #00006e;
+  background: #f5a623; color: var(--pcu-brand-ink);
   clip-path: polygon(100% 0, 0 0, 22px 100%, 100% 100%);
   font-weight: 800; font-size: 1rem; white-space: nowrap;
 }
 /* dark slanted stripe between the label and the headlines */
 .nt-label::after {
   content: ''; position: absolute; top: 0; bottom: 0; left: 6px; width: 10px;
-  background: #00006e; transform: skewX(25deg);
+  background: var(--pcu-brand); transform: skewX(25deg);
 }
 .nt-live { display: inline-flex; animation: nt-pulse 1.6s ease-in-out infinite; }
 @keyframes nt-pulse { 50% { opacity: .35; } }
@@ -118,7 +118,7 @@ const duration = computed(() => {
   position: relative; z-index: 2; flex-shrink: 0;
   display: flex; align-items: center; gap: .3rem;
   padding-inline: 2.2rem 1.4rem;
-  background: #00006e; color: #fff; text-decoration: none;
+  background: var(--pcu-brand); color: #fff; text-decoration: none;
   clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
   font-size: .9rem; font-weight: 700; white-space: nowrap; transition: background .2s;
 }

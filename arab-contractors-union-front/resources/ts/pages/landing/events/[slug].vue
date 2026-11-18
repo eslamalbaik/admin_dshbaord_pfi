@@ -367,7 +367,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   background: #e0e7ff;
-  color: #1a237e;
+  color: var(--pcu-brand-ink);
 }
 
 .speaker-name { font-size: 0.88rem; color: #1a1a2e; }
@@ -435,7 +435,7 @@ onMounted(async () => {
 .article-body :deep(li) { margin-bottom: 0.4rem; }
 .article-body :deep(img) { max-width: 100%; border-radius: 12px; margin: 1rem 0; }
 .article-body :deep(blockquote) {
-  border-inline-start: 4px solid #1a237e;
+  border-inline-start: 4px solid var(--pcu-brand);
   padding-inline-start: 1rem;
   color: #424242;
   font-style: italic;
@@ -454,8 +454,8 @@ onMounted(async () => {
 .btn-back-article {
   display: inline-block;
   background: white;
-  color: #1a237e;
-  border: 2px solid #1a237e;
+  color: var(--pcu-brand-ink);
+  border: 2px solid var(--pcu-brand);
   border-radius: 10px;
   padding: 0.6rem 1.5rem;
   font-size: 0.9rem;
@@ -464,7 +464,7 @@ onMounted(async () => {
   transition: background 0.2s, color 0.2s;
 }
 
-.btn-back-article:hover { background: #1a237e; color: white; }
+.btn-back-article:hover { background: var(--pcu-brand); color: white; }
 
 /* Skeleton */
 .loading-wrap { padding: 2rem 1.5rem; }
@@ -492,7 +492,7 @@ onMounted(async () => {
 
 .btn-primary {
   display: inline-block;
-  background: #1a237e;
+  background: var(--pcu-brand);
   color: white;
   border-radius: 10px;
   padding: 0.75rem 2rem;

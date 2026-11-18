@@ -40,7 +40,7 @@ import { PUBLIC_SOCIAL_LINKS } from '@/utils/publicSocialLinks'
   background: rgba(255, 255, 255, .1); border: 1.5px solid rgba(255, 255, 255, .45);
   transition: background .2s, border-color .2s, color .2s, transform .2s;
 }
-.pub-follow-btn:hover { background: #f5a623; border-color: #f5a623; color: #00006e; transform: translateY(-3px); }
+.pub-follow-btn:hover { background: #f5a623; border-color: #f5a623; color: var(--pcu-brand-ink); transform: translateY(-3px); }
 .pub-follow-btn:focus-visible { outline: 2px solid #f5a623; outline-offset: 3px; }
 
 @media (max-width: 1000px) {

@@ -18,7 +18,7 @@ const types = [
 ]
 
 const files = [
-  { id:1,  type:'form',     title:'استمارة طلب تسجيل العضوية',          size:'٢٤٠ ك.ب', date:'يناير ٢٠٢٤',  downloads:1245, ext:'PDF', color:'#1a237e' },
+  { id:1,  type:'form',     title:'استمارة طلب تسجيل العضوية',          size:'٢٤٠ ك.ب', date:'يناير ٢٠٢٤',  downloads:1245, ext:'PDF', color:'#078fd3' },
   { id:2,  type:'form',     title:'نموذج طلب تجديد العضوية',            size:'١٨٠ ك.ب', date:'يناير ٢٠٢٤',  downloads:987,  ext:'PDF', color:'#c62828' },
   { id:3,  type:'form',     title:'استمارة طلب التصنيف ورفع الدرجة',    size:'٣٢٠ ك.ب', date:'مارس ٢٠٢٤',   downloads:654,  ext:'PDF', color:'#2e7d32' },
   { id:4,  type:'form',     title:'نموذج شكوى وتقديم نزاع',             size:'١٥٠ ك.ب', date:'فبراير ٢٠٢٤', downloads:348,  ext:'PDF', color:'#e65100' },
@@ -28,7 +28,7 @@ const files = [
   { id:8,  type:'report',   title:'تقرير قطاع المقاولات السنوي ٢٠٢٣',  size:'٤.٥ م.ب', date:'ديسمبر ٢٠٢٣', downloads:876,  ext:'PDF', color:'#558b2f' },
   { id:9,  type:'report',   title:'دراسة سوق العمل في الإنشاءات',       size:'٣.١ م.ب', date:'سبتمبر ٢٠٢٣', downloads:543,  ext:'PDF', color:'#f57f17' },
   { id:10, type:'circular', title:'تعميم رسوم التصنيف المحدّثة ٢٠٢٤',  size:'٩٠ ك.ب',  date:'يناير ٢٠٢٤',  downloads:2145, ext:'PDF', color:'#ad1457' },
-  { id:11, type:'circular', title:'قرار مجلس الإدارة رقم ٢٠٢٤/١ — الانتساب', size:'١٢٠ ك.ب', date:'فبراير ٢٠٢٤', downloads:1345, ext:'PDF', color:'#1a237e' },
+  { id:11, type:'circular', title:'قرار مجلس الإدارة رقم ٢٠٢٤/١ — الانتساب', size:'١٢٠ ك.ب', date:'فبراير ٢٠٢٤', downloads:1345, ext:'PDF', color:'#078fd3' },
   { id:12, type:'template', title:'نموذج عقد مقاولة باطن معياري',       size:'٤٥٠ ك.ب', date:'مارس ٢٠٢٤',   downloads:2345, ext:'DOCX', color:'#c62828' },
   { id:13, type:'template', title:'نموذج خطاب ضمان أداء',               size:'١٨٠ ك.ب', date:'يناير ٢٠٢٤',  downloads:1123, ext:'DOCX', color:'#2e7d32' },
 ]
@@ -101,7 +101,7 @@ const filteredFiles = computed(() => {
 .pub-page { font-family: 'Tajawal', 'Cairo', sans-serif; direction: rtl; color: #374151; background: #fff; }
 .pub-cont { max-width: 1240px; margin: 0 auto; padding: 0 1.5rem; }
 .pub-section { padding: 5rem 0; }
-.page-hero { background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); margin-top: calc(-1 * var(--pub-nav-h, 114px)); padding: calc(var(--pub-nav-h, 114px) + 2.5rem) 0 3rem; position: relative; overflow: hidden; }
+.page-hero { background: linear-gradient(145deg, var(--pcu-brand-deep) 0%, var(--pcu-brand) 60%, var(--pcu-brand-soft) 100%); margin-top: calc(-1 * var(--pub-nav-h, 114px)); padding: calc(var(--pub-nav-h, 114px) + 2.5rem) 0 3rem; position: relative; overflow: hidden; }
 .page-hero-shapes { position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; }
 .ph-s { position: absolute; border-radius: 50%; }
 .ph-s1 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(249,168,37,.12), transparent 65%); top: -100px; left: 5%; }
@@ -116,11 +116,11 @@ const filteredFiles = computed(() => {
 .search-wrap { position: relative; }
 .search-ico { position: absolute; top: 50%; right: 1rem; transform: translateY(-50%); color: #9ca3af; }
 .search-input { width: 100%; border: 1.5px solid #e5e7eb; border-radius: 10px; padding: .75rem 2.75rem .75rem 1rem; font-size: .9rem; font-family: 'Tajawal', sans-serif; color: #374151; background: #fff; outline: none; transition: border-color .2s; }
-.search-input:focus { border-color: #1a237e; }
+.search-input:focus { border-color: var(--pcu-brand); }
 .type-tabs { display: flex; gap: .5rem; flex-wrap: wrap; }
 .type-tab { padding: .5rem 1.1rem; border: 1.5px solid #e5e7eb; border-radius: 50px; font-size: .82rem; font-weight: 600; cursor: pointer; font-family: 'Tajawal', sans-serif; color: #6b7280; background: #fff; transition: all .2s; }
-.type-tab.active { background: #1a237e; color: #fff; border-color: #1a237e; }
-.type-tab:hover:not(.active) { border-color: #1a237e; color: #1a237e; }
+.type-tab.active { background: var(--pcu-brand); color: #fff; border-color: var(--pcu-brand); }
+.type-tab:hover:not(.active) { border-color: var(--pcu-brand); color: var(--pcu-brand-ink); }
 .results-count { font-size: .85rem; color: #9ca3af; margin-bottom: 1.25rem; }
 
 .files-grid { display: flex; flex-direction: column; gap: 1rem; }
@@ -134,7 +134,7 @@ const filteredFiles = computed(() => {
 .file-meta span { display: flex; align-items: center; gap: .3rem; font-size: .77rem; color: #9ca3af; }
 .file-actions { display: flex; gap: .5rem; flex-shrink: 0; }
 .file-btn-view { width: 36px; height: 36px; border-radius: 9px; background: #f3f4f6; color: #6b7280; border: 1.5px solid #e5e7eb; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .2s; }
-.file-btn-view:hover { background: #e8eaf6; color: #1a237e; }
+.file-btn-view:hover { background: #e8eaf6; color: var(--pcu-brand-ink); }
 .file-btn-dl { display: flex; align-items: center; gap: .4rem; border: none; border-radius: 9px; padding: .5rem 1rem; font-size: .82rem; font-weight: 700; color: #fff; cursor: pointer; font-family: 'Tajawal', sans-serif; transition: all .2s; white-space: nowrap; }
 .file-btn-dl:hover { filter: brightness(1.1); transform: translateY(-1px); }
 .empty-state { text-align: center; padding: 4rem 2rem; color: #9ca3af; }
