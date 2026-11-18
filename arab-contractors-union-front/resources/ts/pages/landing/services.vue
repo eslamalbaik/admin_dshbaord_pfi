@@ -6,7 +6,7 @@ definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false
 
 const services = [
   {
-    icon: ClipboardCheck, color: '#078fd3', bg: '#e8eaf6',
+    icon: ClipboardCheck, color: '#067cb8', bg: '#e8eaf6',
     title: 'تسجيل العضوية',
     desc: 'انضم إلى اتحاد المقاولين الفلسطينيين، واستفد من خدماته ومزاياه المهنية والمؤسسية المخصصة للأعضاء.',
     features: ['تقديم طلب العضوية إلكترونياً', 'متابعة حالة الطلب', 'استكمال إجراءات التسجيل', 'الحصول على شهادة العضوية'],

@@ -13,7 +13,7 @@ const categories = [
 ]
 
 const docs = [
-  { id:1, cat:'laws',      title:'قانون المقاولات الفلسطيني',                    year:'٢٠١٨', type:'PDF', pages:45, color:'#078fd3', bg:'#e8eaf6' },
+  { id:1, cat:'laws',      title:'قانون المقاولات الفلسطيني',                    year:'٢٠١٨', type:'PDF', pages:45, color:'#067cb8', bg:'#e8eaf6' },
   { id:2, cat:'laws',      title:'قانون الشراء العام',                          year:'٢٠١٩', type:'PDF', pages:32, color:'#c62828', bg:'#fce4ec' },
   { id:3, cat:'laws',      title:'قانون التسوية والتحكيم',                       year:'٢٠١٧', type:'PDF', pages:28, color:'#2e7d32', bg:'#e8f5e9' },
   { id:4, cat:'contracts', title:'عقد الفيديك الأحمر - إنشاء المشاريع',         year:'٢٠١٧', type:'PDF', pages:160, color:'#e65100', bg:'#fff8e1' },

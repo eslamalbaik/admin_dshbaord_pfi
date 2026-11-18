@@ -18,7 +18,7 @@ const types = [
 ]
 
 const files = [
-  { id:1,  type:'form',     title:'استمارة طلب تسجيل العضوية',          size:'٢٤٠ ك.ب', date:'يناير ٢٠٢٤',  downloads:1245, ext:'PDF', color:'#078fd3' },
+  { id:1,  type:'form',     title:'استمارة طلب تسجيل العضوية',          size:'٢٤٠ ك.ب', date:'يناير ٢٠٢٤',  downloads:1245, ext:'PDF', color:'#067cb8' },
   { id:2,  type:'form',     title:'نموذج طلب تجديد العضوية',            size:'١٨٠ ك.ب', date:'يناير ٢٠٢٤',  downloads:987,  ext:'PDF', color:'#c62828' },
   { id:3,  type:'form',     title:'استمارة طلب التصنيف ورفع الدرجة',    size:'٣٢٠ ك.ب', date:'مارس ٢٠٢٤',   downloads:654,  ext:'PDF', color:'#2e7d32' },
   { id:4,  type:'form',     title:'نموذج شكوى وتقديم نزاع',             size:'١٥٠ ك.ب', date:'فبراير ٢٠٢٤', downloads:348,  ext:'PDF', color:'#e65100' },
@@ -28,7 +28,7 @@ const files = [
   { id:8,  type:'report',   title:'تقرير قطاع المقاولات السنوي ٢٠٢٣',  size:'٤.٥ م.ب', date:'ديسمبر ٢٠٢٣', downloads:876,  ext:'PDF', color:'#558b2f' },
   { id:9,  type:'report',   title:'دراسة سوق العمل في الإنشاءات',       size:'٣.١ م.ب', date:'سبتمبر ٢٠٢٣', downloads:543,  ext:'PDF', color:'#f57f17' },
   { id:10, type:'circular', title:'تعميم رسوم التصنيف المحدّثة ٢٠٢٤',  size:'٩٠ ك.ب',  date:'يناير ٢٠٢٤',  downloads:2145, ext:'PDF', color:'#ad1457' },
-  { id:11, type:'circular', title:'قرار مجلس الإدارة رقم ٢٠٢٤/١ — الانتساب', size:'١٢٠ ك.ب', date:'فبراير ٢٠٢٤', downloads:1345, ext:'PDF', color:'#078fd3' },
+  { id:11, type:'circular', title:'قرار مجلس الإدارة رقم ٢٠٢٤/١ — الانتساب', size:'١٢٠ ك.ب', date:'فبراير ٢٠٢٤', downloads:1345, ext:'PDF', color:'#067cb8' },
   { id:12, type:'template', title:'نموذج عقد مقاولة باطن معياري',       size:'٤٥٠ ك.ب', date:'مارس ٢٠٢٤',   downloads:2345, ext:'DOCX', color:'#c62828' },
   { id:13, type:'template', title:'نموذج خطاب ضمان أداء',               size:'١٨٠ ك.ب', date:'يناير ٢٠٢٤',  downloads:1123, ext:'DOCX', color:'#2e7d32' },
 ]
