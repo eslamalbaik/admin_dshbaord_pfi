@@ -47,7 +47,8 @@ interface Tender {
 const searchQ = ref('')
 const filterStatus = ref('')
 const filterCategory = ref('')
-const filterUpdatedFrom = ref('')
+const filterDateFrom = ref('')
+const filterDateTo = ref('')
 const sort = ref('latest')
 
 const tenders = ref<Tender[]>([])
@@ -93,7 +94,8 @@ async function fetchTenders() {
     if (searchQ.value) params.set('search', searchQ.value)
     if (filterStatus.value) params.set('status', filterStatus.value)
     if (filterCategory.value) params.set('category', filterCategory.value)
-    if (filterUpdatedFrom.value) params.set('updated_from', filterUpdatedFrom.value)
+    if (filterDateFrom.value) params.set('created_from', filterDateFrom.value)
+    if (filterDateTo.value) params.set('created_to', filterDateTo.value)
     params.set('sort', sort.value)
     params.set('page', String(page.value))
 
@@ -117,7 +119,7 @@ async function fetchTenders() {
   }
 }
 
-watch([filterStatus, filterCategory, filterUpdatedFrom, sort], () => {
+watch([filterStatus, filterCategory, filterDateFrom, filterDateTo, sort], () => {
   page.value = 1
   fetchTenders()
 })
@@ -177,7 +179,8 @@ function resetFilters() {
   searchQ.value = ''
   filterStatus.value = ''
   filterCategory.value = ''
-  filterUpdatedFrom.value = ''
+  filterDateFrom.value = ''
+  filterDateTo.value = ''
   sort.value = 'latest'
 }
 
@@ -307,8 +310,14 @@ function openTender(t: Tender) {
             </select>
             <ChevronDown :size="15" class="sel-chev" />
           </div>
-          <div class="sel-wrap" title="آخر تحديث منذ تاريخ">
-            <input v-model="filterUpdatedFrom" type="date" class="filter-sel filter-date" />
+          <div class="sel-wrap date-wrap" title="تاريخ العطاء: من">
+            <span class="date-lbl">من</span>
+            <input v-model="filterDateFrom" type="date" :max="filterDateTo || undefined" class="filter-sel filter-date" aria-label="تاريخ العطاء من" />
+            <CalendarDays :size="15" class="sel-ico" />
+          </div>
+          <div class="sel-wrap date-wrap" title="تاريخ العطاء: إلى">
+            <span class="date-lbl">إلى</span>
+            <input v-model="filterDateTo" type="date" :min="filterDateFrom || undefined" class="filter-sel filter-date" aria-label="تاريخ العطاء إلى" />
             <CalendarDays :size="15" class="sel-ico" />
           </div>
           <button class="adv-btn" @click="resetFilters">
@@ -334,7 +343,14 @@ function openTender(t: Tender) {
             v-hover-card
             class="tender-card"
           >
-            <div class="tender-thumb hc-media">
+            <div
+              class="tender-thumb hc-media is-link"
+              role="link"
+              tabindex="0"
+              :aria-label="`عرض تفاصيل ${t.title}`"
+              @click="openTender(t)"
+              @keydown.enter="openTender(t)"
+            >
               <img :src="tenderImage(t)" :alt="t.title" loading="lazy">
             </div>
             <div class="tender-body">
@@ -409,10 +425,13 @@ function openTender(t: Tender) {
 .sel-wrap { position: relative; flex: 1 1 150px; }
 .filter-sel { width: 100%; appearance: none; -webkit-appearance: none; border: 1.5px solid #e5e9f2; border-radius: 50px; padding: .65rem 2.4rem .65rem 2.2rem; font-size: .85rem; font-family: 'Tajawal', sans-serif; color: #374151; background: #fff; outline: none; cursor: pointer; transition: border-color .2s; }
 .filter-sel:focus { border-color: #1a237e; }
-.filter-date { padding-left: 2.2rem; }
+.filter-date { padding-left: 2.2rem; padding-right: 2.6rem; }
+.sel-wrap.date-wrap { flex: 1 1 170px; }
+.date-lbl { position: absolute; top: 50%; right: .95rem; transform: translateY(-50%); font-size: .78rem; font-weight: 700; color: #1a237e; pointer-events: none; z-index: 1; }
 .sel-ico { position: absolute; top: 50%; right: .9rem; transform: translateY(-50%); color: #6b7280; pointer-events: none; }
 .sel-chev { position: absolute; top: 50%; left: .9rem; transform: translateY(-50%); color: #6b7280; pointer-events: none; }
 .sel-wrap:has(.filter-date) .sel-ico { right: auto; left: .9rem; }
+.date-wrap .filter-date { padding-right: 2.6rem; }
 .adv-btn { display: inline-flex; align-items: center; justify-content: center; gap: .45rem; background: linear-gradient(145deg, #1a237e, #0d1b4b); color: #fff; border: none; border-radius: 50px; padding: .7rem 1.5rem; font-size: .85rem; font-weight: 700; font-family: 'Tajawal', sans-serif; cursor: pointer; white-space: nowrap; box-shadow: 0 6px 16px rgba(13, 27, 75, .3); transition: transform .2s, filter .2s; }
 .adv-btn:hover { transform: translateY(-1px); filter: brightness(1.12); }
 .filter-reset { display: flex; align-items: center; gap: .4rem; background: #e8eaf6; color: #1a237e; border: 1.5px solid #c5cae9; border-radius: 9px; padding: .55rem 1rem; font-size: .83rem; font-weight: 600; cursor: pointer; font-family: 'Tajawal', sans-serif; }
@@ -428,6 +447,8 @@ function openTender(t: Tender) {
 .tender-card { display: flex; gap: 1.1rem; align-items: center; background: #fff; border-radius: 16px; padding: .7rem .9rem; box-shadow: 0 5px 20px rgba(26, 35, 126, .07); transition: transform .25s, box-shadow .25s; }
 .tender-card:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(26, 35, 126, .13); }
 .tender-thumb { width: 118px; height: 82px; flex-shrink: 0; border-radius: 12px; overflow: hidden; background: #eef2fa; }
+.tender-thumb.is-link { cursor: pointer; }
+.tender-thumb.is-link:focus-visible { outline: 2px solid #1a237e; outline-offset: 2px; }
 .tender-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .tender-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .7rem; }
 .tender-headline { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }

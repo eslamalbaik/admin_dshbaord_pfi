@@ -45,6 +45,7 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
   'marketplace-packages': 'marketplace.packages',
   'documents': 'documents.manage',
   'support-tickets': 'services.support_tickets',
+  'contact-messages': 'services.support_tickets',
   'certificate-requests': 'services.certificate_requests',
   'membership-certificates': 'services.membership_certificates',
   'news': 'content.news',

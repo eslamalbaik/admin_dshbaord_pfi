@@ -222,7 +222,8 @@ class ContractorController extends Controller
             'company_purposes'              => 'nullable|string',
             'authorized_person'             => ['nullable', 'string', 'max:255', 'not_regex:' . self::NO_DIGITS],
             'authorized_person_id_number'   => ['nullable', 'string', 'regex:' . self::ID_NUMBER_PATTERN],
-            'authorized_person_phone'       => ['nullable', 'string', new \App\Rules\DialCodePhone()],
+            // جوال المفوض إلزامي عند إنشاء مقاول من اللوحة (طلب المالك 17/11/2026)؛ بالتعديل يبقى اختيارياً لأن بعض السجلات القديمة بدونه
+            'authorized_person_phone'       => [$isUpdate ? 'nullable' : 'required', 'string', new \App\Rules\DialCodePhone()],
             'authorized_person_whatsapp'    => ['nullable', 'string', new \App\Rules\DialCodePhone()],
 
             // Files
@@ -345,6 +346,7 @@ class ContractorController extends Controller
             'address_en.regex'                  => 'العنوان بالإنجليزي يقبل حروفاً إنجليزية وأرقاماً فقط.',
             'phone.regex'                       => 'رقم الجوال يقبل أرقاماً فقط (9 إلى 15 رقماً).',
             'fax.regex'                         => 'الهاتف / الفاكس يقبل أرقاماً فقط (6 إلى 15 رقماً).',
+            'authorized_person_phone.required' => 'رقم جوال المفوض مطلوب.',
             'authorized_person_id_number.regex' => 'رقم هوية المفوض يجب أن يتكون من 9 أرقام فقط.',
             'mimes'    => 'يجب أن يكون ملف :attribute من نوع: :values.',
         ] + \App\Support\UploadLimits::documentMessages(Contractor::DOCUMENT_LABELS);

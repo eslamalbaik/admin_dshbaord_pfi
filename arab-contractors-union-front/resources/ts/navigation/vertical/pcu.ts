@@ -114,6 +114,11 @@ export function buildPcuNav(user: NavUser): VerticalNavItems {
       icon: { icon: 'tabler-headset' },
       to: 'support-tickets',
     })
+    menuItems.push({
+      title: 'رسائل تواصل معنا',
+      icon: { icon: 'tabler-mail' },
+      to: 'contact-messages',
+    })
   }
 
   // 3. الشؤون المالية (مشتركة، مباشرة بعد المقاولين)

@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\BankAccountController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\CertificateRequestController;
 use App\Http\Controllers\Api\SupportTicketController;
+use App\Http\Controllers\Api\ContactMessageController;
 use App\Http\Controllers\Api\ContractorHomeController;
 
 // ============================================================
@@ -274,6 +275,7 @@ Route::prefix('v1')->group(function () {
     //  App Contact Info (شاشة الدعم) — Public (no auth)
     // --------------------------------------------------------
     Route::get('app/contact', [SettingController::class, 'contact']);
+    Route::post('contact-messages', [ContactMessageController::class, 'store'])->middleware('throttle:5,1');
 
     // --------------------------------------------------------
     //  About the Union (شاشة عن الاتحاد) — Public (no auth)
@@ -556,6 +558,9 @@ Route::prefix('v1')->group(function () {
         //  Support Tickets — Admin (الدعم الفني، أُعيد تفعيلها بتصميم جديد)
         // --------------------------------------------------------
         Route::middleware('role:admin')->group(function () {
+            Route::get('dashboard/contact-messages',                    [ContactMessageController::class, 'index'])->middleware('perm:services.support_tickets');
+            Route::patch('dashboard/contact-messages/{message}/read',   [ContactMessageController::class, 'markRead'])->middleware('perm:services.support_tickets');
+            Route::delete('dashboard/contact-messages/{message}',       [ContactMessageController::class, 'destroy'])->middleware('perm:services.support_tickets');
             Route::get('dashboard/support-tickets',                     [SupportTicketController::class, 'index'])->middleware('perm:services.support_tickets');
             Route::get('dashboard/support-tickets/{ticket}',             [SupportTicketController::class, 'show'])->middleware('perm:services.support_tickets');
             Route::post('dashboard/support-tickets/{ticket}/reply',      [SupportTicketController::class, 'reply'])->middleware('perm:services.support_tickets,update');

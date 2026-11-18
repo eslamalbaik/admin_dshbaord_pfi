@@ -177,12 +177,26 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); document.b
     <Teleport to="body">
       <div v-if="selected" class="bm-overlay" dir="rtl" role="dialog" aria-modal="true" :aria-label="selected.name" @click.self="closeMember">
         <div class="bm-dialog">
-          <button type="button" class="bm-close" aria-label="إغلاق" @click="closeMember"><X :size="18" /></button>
-          <img :src="selected.photo" :alt="selected.name" class="bm-photo">
-          <span class="bm-pill">{{ selected.position || 'رئيس مجلس الإدارة' }}</span>
-          <h3 class="bm-name">{{ selected.name }}</h3>
-          <p v-if="selected.company" class="bm-company"><Building2 :size="14" /> {{ selected.company }}</p>
-          <p class="bm-text">{{ selected.details || selected.bio }}</p>
+          <div class="bm-head">
+            <button type="button" class="bm-close" aria-label="إغلاق" @click="closeMember"><X :size="18" /></button>
+          </div>
+          <div class="bm-body">
+            <img :src="selected.photo" :alt="selected.name" class="bm-photo">
+            <h3 class="bm-name">{{ selected.name }}</h3>
+            <span class="bm-pill">{{ selected.position || 'رئيس مجلس الإدارة' }}</span>
+            <p v-if="selected.subPosition" class="bm-sub">{{ selected.subPosition }}</p>
+            <p v-if="selected.company" class="bm-company"><Building2 :size="15" /> {{ selected.company }}</p>
+
+            <div class="bm-about">
+              <h4 class="bm-about-title">نبذة تعريفية</h4>
+              <p class="bm-text">{{ selected.details || selected.bio }}</p>
+            </div>
+
+            <div v-if="selected.phone || selected.email" class="bm-contacts">
+              <a v-if="selected.phone" :href="`tel:${selected.phone}`" class="bm-contact" dir="ltr"><Phone :size="15" /> {{ selected.phone }}</a>
+              <a v-if="selected.email" :href="`mailto:${selected.email}`" class="bm-contact" dir="ltr"><Mail :size="15" /> {{ selected.email }}</a>
+            </div>
+          </div>
         </div>
       </div>
     </Teleport>
@@ -312,11 +326,22 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); document.b
 .info-btn:hover { background: #1a237e; border-color: #1a237e; color: #fff; }
 .info-btn-sm { padding: .3rem .8rem; font-size: .78rem; }
 .bm-overlay { position: fixed; inset: 0; z-index: 2000; background: rgba(13, 27, 62, .6); display: grid; place-items: center; padding: 1rem; font-family: 'Tajawal', 'Cairo', sans-serif; }
-.bm-dialog { position: relative; background: #fff; border-radius: 20px; width: min(520px, 100%); max-height: 90vh; overflow-y: auto; padding: 2rem 1.75rem 1.75rem; text-align: center; box-shadow: 0 24px 60px rgba(0, 0, 0, .3); }
-.bm-close { position: absolute; top: .9rem; inset-inline-start: .9rem; width: 34px; height: 34px; border-radius: 50%; border: 0; background: #eef0f7; color: #1a237e; cursor: pointer; display: grid; place-items: center; }
-.bm-photo { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 4px solid #e8eaf6; margin-bottom: .8rem; }
-.bm-pill { display: inline-block; background: #fff4dc; color: #b26a00; border: 1px solid #ffe0a3; border-radius: 50px; padding: .2rem .9rem; font-size: .75rem; font-weight: 700; }
-.bm-name { font-size: 1.3rem; font-weight: 900; color: #0d1b3e; margin: .6rem 0 .3rem; }
-.bm-company { display: inline-flex; align-items: center; gap: .4rem; color: #6b7280; font-size: .88rem; margin-bottom: .8rem; }
-.bm-text { color: #4b5563; font-size: .98rem; line-height: 2; text-align: start; white-space: pre-line; }
+.bm-dialog { position: relative; background: #fff; border-radius: 22px; width: min(540px, 100%); max-height: 90vh; overflow-y: auto; text-align: center; box-shadow: 0 24px 60px rgba(0, 0, 0, .3); }
+.bm-head { height: 110px; background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); position: relative; }
+.bm-head::after { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 80% 20%, rgba(249, 168, 37, .22), transparent 55%); }
+.bm-close { position: absolute; z-index: 2; top: .9rem; inset-inline-start: .9rem; width: 34px; height: 34px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .18); color: #fff; cursor: pointer; display: grid; place-items: center; transition: background .2s; }
+.bm-close:hover { background: rgba(255, 255, 255, .32); }
+.bm-body { padding: 0 1.75rem 1.75rem; display: flex; flex-direction: column; align-items: center; }
+.bm-photo { width: 130px; height: 130px; border-radius: 50%; object-fit: cover; object-position: top; border: 5px solid #fff; box-shadow: 0 8px 22px rgba(13, 27, 75, .25); margin-top: -65px; background: #eef2fa; position: relative; z-index: 1; }
+.bm-name { font-family: 'Cairo', sans-serif; font-size: 1.45rem; font-weight: 900; color: #0d1b3e; margin: .8rem 0 .5rem; }
+.bm-pill { display: inline-block; background: #fff4dc; color: #b26a00; border: 1px solid #ffe0a3; border-radius: 50px; padding: .25rem 1rem; font-size: .8rem; font-weight: 700; }
+.bm-sub { font-size: .82rem; color: #6b7280; margin-top: .45rem; }
+.bm-company { display: inline-flex; align-items: center; gap: .4rem; background: #f4f6fa; color: #4b5563; border-radius: 50px; padding: .3rem .9rem; font-size: .86rem; margin-top: .7rem; }
+.bm-about { width: 100%; margin-top: 1.25rem; padding-top: 1.1rem; border-top: 1px solid #e8ecf5; text-align: start; }
+.bm-about-title { font-size: .95rem; font-weight: 800; color: #1a237e; margin-bottom: .5rem; display: flex; align-items: center; gap: .5rem; }
+.bm-about-title::before { content: ''; width: 4px; height: 16px; border-radius: 2px; background: #f9a825; }
+.bm-text { color: #4b5563; font-size: .96rem; line-height: 2; white-space: pre-line; }
+.bm-contacts { width: 100%; display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1.1rem; }
+.bm-contact { flex: 1 1 200px; display: inline-flex; align-items: center; justify-content: center; gap: .45rem; background: #f5f7ff; border: 1px solid #dde3f5; border-radius: 10px; padding: .5rem .8rem; font-size: .82rem; font-weight: 600; color: #1a237e; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: all .2s; }
+.bm-contact:hover { background: #1a237e; border-color: #1a237e; color: #fff; }
 </style>

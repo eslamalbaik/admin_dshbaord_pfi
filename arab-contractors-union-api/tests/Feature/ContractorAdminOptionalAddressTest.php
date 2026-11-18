@@ -28,7 +28,7 @@ class ContractorAdminOptionalAddressTest extends TestCase
     {
         $this->postJson('/api/v1/contractors', [
             'name'                => 'شركة بدون عنوان',
-            'membership_number'   => '971_g',
+            'membership_number'   => '971_g', 'authorized_person_phone' => '+970599123456',
             'commercial_register' => '563971123',
         ])->assertStatus(201);
 

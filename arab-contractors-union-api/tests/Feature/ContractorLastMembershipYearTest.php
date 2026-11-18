@@ -28,7 +28,7 @@ class ContractorLastMembershipYearTest extends TestCase
     {
         return $this->post('/api/v1/contractors', array_merge([
             'name'                => 'شركة اختبار للمقاولات',
-            'membership_number'   => '961_g',
+            'membership_number'   => '961_g', 'authorized_person_phone' => '+970599123456',
             'commercial_register' => '563961123',
             'governorate_id'      => 1,
             'city_id'             => 1,

@@ -290,6 +290,7 @@ const blockingMissing = (s: number): string[] => {
     if (!membershipValid(f.membership_number)) missing.push('رقم العضوية')
     if (f.is_existing_member && !lastMembershipYearValid(f.last_membership_year)) missing.push('آخر سنة عضوية')
   }
+  if (s === 2 && !filled(f.authorized_person_phone)) missing.push('رقم جوال المفوض')
   // خانات اختيارية لكن معبّأة بصيغة خاطئة (حروف بخانة أرقام، هوية ليست 9 أرقام...) — الخادم سيرفضها
   missing.push(...invalidFormatFields(f, s))
 
@@ -301,7 +302,7 @@ const starredChecks = computed<Record<number, boolean[]>>(() => {
   const f = form.value
   return {
     1: [filled(f.name), membershipValid(f.membership_number)],
-    2: [],
+    2: [filled(f.authorized_person_phone)],
     3: [
       f.specialties.every(sp => !!sp.field_lk_type && !!sp.specialization_lk_type && !!sp.classification),
     ],
@@ -1031,7 +1032,8 @@ const submit = async () => {
             >
               <PhoneInput
                 v-model="form.authorized_person_phone"
-                label="رقم جوال المفوض"
+                label="رقم جوال المفوض *"
+                required
                 icon="tabler-phone"
                 :error-messages="validationErrors.authorized_person_phone"
               />

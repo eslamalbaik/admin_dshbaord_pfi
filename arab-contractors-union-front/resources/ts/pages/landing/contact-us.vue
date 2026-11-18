@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { PUBLIC_SOCIAL_LINKS } from '@/utils/publicSocialLinks'
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
+import PublicSocialIcon from '@/components/PublicSocialIcon.vue'
 import { ref } from 'vue'
 import { MapPin, Phone, Mail, Clock, Send, CheckCircle } from 'lucide-vue-next'
 
@@ -9,17 +10,35 @@ definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false
 const form = ref({ name: '', email: '', phone: '', subject: '', message: '', type: '' })
 const sent = ref(false)
 const loading = ref(false)
+const errorMsg = ref('')
+const BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
 async function submit() {
-  if (!form.value.name || !form.value.email || !form.value.message) return
+  if (!form.value.name || !form.value.email || !form.value.subject || !form.value.message) return
   loading.value = true
-  await new Promise(r => setTimeout(r, 1500))
-  loading.value = false
-  sent.value = true
+  errorMsg.value = ''
+  try {
+    const r = await fetch(`${BASE}/api/v1/contact-messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(form.value),
+    })
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}))
+      throw new Error(d.message || 'تعذّر إرسال الرسالة، حاول مرة أخرى.')
+    }
+    sent.value = true
+  }
+  catch (e: any) {
+    errorMsg.value = e?.message || 'تعذّر إرسال الرسالة، حاول مرة أخرى.'
+  }
+  finally {
+    loading.value = false
+  }
 }
 
 const contacts = [
-  { icon: MapPin,  label: 'العنوان',         value: 'رام الله، فلسطين — شارع الإرسال، مبنى الاتحاد' },
+  { icon: MapPin,  label: 'العنوان',         value: 'غزة — الكتيبة — عمارة النجمة' },
   { icon: Phone,   label: 'هاتف المقر',      value: '+970 2 000 0000', href: 'tel:+97020000000' },
   { icon: Phone,   label: 'رقم الجوال',      value: '+970 597 233 422', href: 'tel:+970597233422' },
   { icon: Mail,    label: 'البريد الإلكتروني', value: 'info@pcu.org.ps', href: 'mailto:info@pcu.org.ps' },
@@ -65,7 +84,7 @@ const inquiryTypes = ['استفسار عام','الانضمام والعضوية
           <div class="social-section">
             <p class="social-title">تابعونا على</p>
             <div class="social-btns">
-              <a v-for="s in PUBLIC_SOCIAL_LINKS" :key="s.key" :href="s.href" target="_blank" rel="noopener noreferrer" class="social-btn" :class="s.key" :aria-label="s.label">{{ s.label }}</a>
+              <a v-for="s in PUBLIC_SOCIAL_LINKS" :key="s.key" :href="s.href" target="_blank" rel="noopener noreferrer" class="social-btn" :class="s.key" :aria-label="s.label" :title="s.label"><PublicSocialIcon :name="s.key" :size="20" /></a>
             </div>
           </div>
         </div>
@@ -103,6 +122,7 @@ const inquiryTypes = ['استفسار عام','الانضمام والعضوية
                 <textarea v-model="form.message" rows="6" placeholder="اكتب رسالتك هنا..." class="form-input form-textarea" />
               </div>
             </div>
+            <p v-if="errorMsg" class="form-error" role="alert">{{ errorMsg }}</p>
             <button class="form-submit" @click="submit" :disabled="loading">
               <Send :size="16" /> {{ loading ? 'جاري الإرسال...' : 'إرسال الرسالة' }}
             </button>
@@ -125,7 +145,7 @@ const inquiryTypes = ['استفسار عام','الانضمام والعضوية
     <div class="map-section">
       <div class="map-placeholder">
         <MapPin :size="48" style="color:#1a237e;margin-bottom:.75rem" />
-        <p>اتحاد المقاولين الفلسطينيين — رام الله، شارع الإرسال</p>
+        <p>اتحاد المقاولين الفلسطينيين — غزة، الكتيبة، عمارة النجمة</p>
         <a href="https://maps.google.com" target="_blank" class="map-link">افتح في خرائط جوجل</a>
       </div>
     </div>
@@ -164,7 +184,8 @@ const inquiryTypes = ['استفسار عام','الانضمام والعضوية
 
 .social-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: .85rem; font-weight: 700; color: #6b7280; margin-bottom: .875rem; }
 .social-btns { display: flex; gap: .5rem; flex-wrap: wrap; }
-.social-btn { display: flex; align-items: center; border-radius: 9px; padding: .5rem 1rem; font-size: .78rem; font-weight: 700; text-decoration: none; border: 1.5px solid; transition: all .2s; }
+.form-error { color: #d32f2f; font-size: .85rem; font-weight: 600; margin-bottom: .75rem; }
+.social-btn { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; font-size: .78rem; font-weight: 700; text-decoration: none; border: 1.5px solid; transition: all .2s; }
 .social-btn.facebook { background: #e7f0fd; color: #1877f2; border-color: #1877f2; }
 .social-btn.instagram { background: #fdeef6; color: #c13584; border-color: #c13584; }
 .social-btn.whatsapp { background: #e8f8f0; color: #25d366; border-color: #25d366; }

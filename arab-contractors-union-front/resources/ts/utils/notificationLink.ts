@@ -39,6 +39,9 @@ export function notificationLink(d: Record<string, any> | null | undefined): str
     case 'support_ticket_contractor_replied':
       return `/support-tickets${q({ ticket: d.ticket_id })}`
 
+    case 'contact_message_received':
+      return `/contact-messages${q({ id: d.message_id })}`
+
     case 'certificate_request_submitted':
       return `/certificate-requests${q({ id: d.request_id })}`
 

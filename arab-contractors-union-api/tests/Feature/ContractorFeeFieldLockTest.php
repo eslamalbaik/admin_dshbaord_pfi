@@ -34,7 +34,7 @@ class ContractorFeeFieldLockTest extends TestCase
     {
         return Contractor::create([
             'name'               => 'شركة اختبار للمقاولات',
-            'membership_number'  => '928_g',
+            'membership_number'  => '928_g', 'authorized_person_phone' => '+970599123456',
             'status'             => 'active',
             'is_frozen'          => false,
             'phone'              => '0590000001',

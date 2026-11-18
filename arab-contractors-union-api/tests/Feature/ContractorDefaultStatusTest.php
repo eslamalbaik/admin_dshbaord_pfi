@@ -28,7 +28,7 @@ class ContractorDefaultStatusTest extends TestCase
     {
         $this->postJson('/api/v1/contractors', [
             'name'                => 'شركة اختبار للمقاولات',
-            'membership_number'   => '961_g',
+            'membership_number'   => '961_g', 'authorized_person_phone' => '+970599123456',
             'commercial_register' => '563961123',
             'governorate_id'      => 1,
             'city_id'             => 1,
@@ -59,7 +59,7 @@ class ContractorDefaultStatusTest extends TestCase
     {
         $contractor = Contractor::create([
             'name'                => 'شركة',
-            'membership_number'   => '962_g',
+            'membership_number'   => '962_g', 'authorized_person_phone' => '+970599123456',
             'commercial_register' => '563962123',
             'status'              => 'active',
         ]);

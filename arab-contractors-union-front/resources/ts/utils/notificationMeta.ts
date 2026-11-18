@@ -45,6 +45,7 @@ const TYPE_MAP: Record<string, Omit<NotificationMeta, 'financial'> & { financial
 
   // فعاليات ودعم
   event_joined: { title: 'تسجيل حضور فعالية', icon: 'tabler-calendar-event', color: 'primary' },
+  contact_message_received: { title: 'رسالة جديدة من الموقع', icon: 'tabler-mail', color: 'info' },
   support_ticket_created: { title: 'طلب دعم جديد', icon: 'tabler-lifebuoy', color: 'warning' },
   support_ticket_replied: { title: 'رد على طلب دعم', icon: 'tabler-message-reply', color: 'info' },
   support_ticket_contractor_replied: { title: 'رد المقاول على طلب دعم', icon: 'tabler-message-reply', color: 'warning' },
@@ -65,6 +66,7 @@ const CLASS_TO_TYPE: Record<string, string> = {
   EventJoinedNotification: 'event_joined',
   AdminBroadcastNotification: 'admin_broadcast',
   CertificateRequestSubmittedNotification: 'certificate_request_submitted',
+  ContactMessageReceivedNotification: 'contact_message_received',
   SupportTicketCreatedNotification: 'support_ticket_created',
   SupportTicketContractorRepliedNotification: 'support_ticket_contractor_replied',
 }

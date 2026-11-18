@@ -34,7 +34,7 @@ class ContractorRegistrationDateTest extends TestCase
     {
         return $this->post('/api/v1/contractors', [
             'name'                => 'شركة اختبار للمقاولات',
-            'membership_number'   => '971_g',
+            'membership_number'   => '971_g', 'authorized_person_phone' => '+970599123456',
             'commercial_register' => '563971123',
             'governorate_id'      => 1,
             'city_id'             => 1,

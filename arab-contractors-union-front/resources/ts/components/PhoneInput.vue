@@ -52,7 +52,7 @@ watch([dial, national], () => {
 
 const rule = (v: string) => {
   if (!v)
-    return props.required ? `${props.label ?? 'الرقم'} مطلوب` : true
+    return props.required ? `${(props.label ?? 'الرقم').replace(/\s*\*$/, '')} مطلوب` : true
   if (!selected.value)
     return 'اختر مقدمة الدولة'
 
