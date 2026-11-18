@@ -271,9 +271,9 @@ async function handleReset() {
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap');
 
 :global(:root) {
-  --navy:        var(--pcu-brand);
-  --navy-mid:    var(--pcu-brand-deep);
-  --navy-bright: var(--pcu-brand-soft);
+  --navy:        #0f1f5c;
+  --navy-mid:    #17307e;
+  --navy-bright: #2b4bb0;
   --navy-light:  #e8eaf6;
   --navy-soft:   #f5f7ff;
   --gold:        #d9a441;
@@ -303,7 +303,7 @@ async function handleReset() {
   width: 100%; max-width: 1040px;
   display: grid; grid-template-columns: 2fr 3fr;
   border-radius: 24px; overflow: hidden;
-  box-shadow: 0 30px 90px rgba(var(--pcu-brand-deep-rgb), .2);
+  box-shadow: 0 30px 90px rgba(15,31,92,.2);
   background: #fff;
   min-height: 620px;
 }
@@ -331,7 +331,7 @@ async function handleReset() {
 .rg-perks li:hover .rg-perk-ico { background: var(--navy-mid); color: #fff; transform: scale(1.08) rotate(-6deg); }
 
 .rg-back { display: inline-flex; align-items: center; gap: .4rem; color: var(--text-m); font-size: .82rem; text-decoration: none; font-weight: 600; transition: color .2s; }
-.rg-back:hover { color: var(--pcu-brand-ink); }
+.rg-back:hover { color: var(--navy); }
 
 .rg-card {
   background: linear-gradient(160deg, var(--navy) 0%, var(--navy-mid) 100%);

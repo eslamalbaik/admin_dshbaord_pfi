@@ -39,13 +39,13 @@ definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false
 .pub-cont { max-width: 1240px; margin: 0 auto; padding: 0 1.5rem; }
 .pub-section { padding: 5rem 0; }
 .bg-soft { background: #f5f7ff; }
-.pub-sec-label { display: inline-block; background: #e8eaf6; color: var(--pcu-brand-ink); border: 1px solid #c5cae9; border-radius: 50px; padding: .28rem 1.1rem; font-size: .77rem; font-weight: 700; letter-spacing: .05em; }
+.pub-sec-label { display: inline-block; background: #e8eaf6; color: #1a237e; border: 1px solid #c5cae9; border-radius: 50px; padding: .28rem 1.1rem; font-size: .77rem; font-weight: 700; letter-spacing: .05em; }
 .pub-sec-h { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: clamp(1.6rem,3.5vw,2.3rem); font-weight: 900; color: #0d1b3e; padding-bottom: .7rem; position: relative; }
 .pub-sec-h::after { content: ''; position: absolute; bottom: 0; right: 0; width: 48px; height: 4px; background: linear-gradient(90deg,#f9a825,#e65100); border-radius: 2px; }
 .pub-sec-h.center { text-align: center; }
 .pub-sec-h.center::after { right: 50%; transform: translateX(50%); }
 .pub-sec-header-c { text-align: center; margin-bottom: 3rem; }
-.page-hero { background: linear-gradient(145deg, var(--pcu-brand-deep) 0%, var(--pcu-brand) 60%, var(--pcu-brand-soft) 100%); margin-top: calc(-1 * var(--pub-nav-h, 114px)); padding: calc(var(--pub-nav-h, 114px) + 2.5rem) 0 3rem; position: relative; overflow: hidden; }
+.page-hero { background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); margin-top: calc(-1 * var(--pub-nav-h, 114px)); padding: calc(var(--pub-nav-h, 114px) + 2.5rem) 0 3rem; position: relative; overflow: hidden; }
 .page-hero-shapes { position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; }
 .ph-s { position: absolute; border-radius: 50%; }
 .ph-s1 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(249,168,37,.12), transparent 65%); top: -100px; left: 5%; }

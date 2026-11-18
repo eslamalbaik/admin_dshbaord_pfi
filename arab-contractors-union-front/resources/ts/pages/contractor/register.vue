@@ -378,9 +378,9 @@ async function handleResendOtp() {
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap');
 
 :global(:root) {
-  --navy:        var(--pcu-brand);
-  --navy-mid:    var(--pcu-brand-deep);
-  --navy-bright: var(--pcu-brand-soft);
+  --navy:        #0f1f5c;
+  --navy-mid:    #17307e;
+  --navy-bright: #2b4bb0;
   --navy-light:  #e8eaf6;
   --navy-soft:   #f5f7ff;
   --gold:        #d9a441;
@@ -410,7 +410,7 @@ async function handleResendOtp() {
   width: 100%; max-width: 1040px;
   display: grid; grid-template-columns: 2fr 3fr;
   border-radius: 24px; overflow: hidden;
-  box-shadow: 0 30px 90px rgba(var(--pcu-brand-deep-rgb), .2);
+  box-shadow: 0 30px 90px rgba(15,31,92,.2);
   background: #fff;
   min-height: 620px;
 }
@@ -439,7 +439,7 @@ async function handleResendOtp() {
 .rg-perks li:hover .rg-perk-ico { background: var(--navy-mid); color: #fff; transform: scale(1.08) rotate(-6deg); }
 
 .rg-back { display: inline-flex; align-items: center; gap: .4rem; color: var(--text-m); font-size: .82rem; text-decoration: none; font-weight: 600; transition: color .2s; }
-.rg-back:hover { color: var(--pcu-brand-ink); }
+.rg-back:hover { color: var(--navy); }
 
 /* ─── Form card (غامق) ────────────────────────────────────── */
 .rg-card {
@@ -511,7 +511,7 @@ async function handleResendOtp() {
 
 .rg-found-banner { display: flex; align-items: center; gap: 1rem; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18); border-radius: 14px; padding: 1rem; margin-bottom: 1.5rem; }
 .rg-found-banner.rg-found-success { background: rgba(46,125,50,.2); border-color: rgba(165,214,167,.4); }
-.rg-found-av { width: 46px; height: 46px; border-radius: 50%; background: linear-gradient(135deg, var(--gold), var(--gold-dark)); color: var(--pcu-brand-ink); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 800; flex-shrink: 0; font-family: 'Cairo', sans-serif; }
+.rg-found-av { width: 46px; height: 46px; border-radius: 50%; background: linear-gradient(135deg, var(--gold), var(--gold-dark)); color: var(--navy); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 800; flex-shrink: 0; font-family: 'Cairo', sans-serif; }
 .rg-found-banner strong { display: block; font-weight: 800; font-size: .92rem; color: #fff; }
 .rg-found-banner p { margin: .2rem 0 0; font-size: .8rem; color: rgba(255,255,255,.7); }
 
@@ -534,7 +534,7 @@ async function handleResendOtp() {
 
 /* ─── Modal Styles ────────────────────────────────────────── */
 .rg-modal-overlay {
-  position: fixed; inset: 0; background: rgba(var(--pcu-brand-deep-rgb), .8); backdrop-filter: blur(4px);
+  position: fixed; inset: 0; background: rgba(15,31,92,.8); backdrop-filter: blur(4px);
   display: flex; align-items: center; justify-content: center; z-index: 9999;
   padding: 1rem; animation: rgFadeIn .25s ease;
 }
@@ -554,7 +554,7 @@ async function handleResendOtp() {
 .rg-modal-title { font-size: 1.15rem; font-weight: 800; color: var(--text-h); margin: 0; font-family: 'Cairo', sans-serif; }
 .rg-modal-close {
   background: var(--navy-light); border: none; width: 32px; height: 32px; border-radius: 50%;
-  font-size: 1.2rem; color: var(--pcu-brand-ink); display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem; color: var(--navy); display: flex; align-items: center; justify-content: center;
   cursor: pointer; transition: background .2s;
 }
 .rg-modal-close:hover { background: var(--border); }

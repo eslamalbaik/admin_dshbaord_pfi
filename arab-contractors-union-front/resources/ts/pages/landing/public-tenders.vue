@@ -401,7 +401,7 @@ function openTender(t: Tender) {
 .pub-page { font-family: 'Tajawal', 'Cairo', sans-serif; direction: rtl; color: #374151; background: #fff; }
 .pub-cont { max-width: 1240px; margin: 0 auto; padding: 0 1.5rem; }
 .pub-section { padding: 5rem 0; }
-.page-hero { background: linear-gradient(145deg, var(--pcu-brand-deep) 0%, var(--pcu-brand) 60%, var(--pcu-brand-soft) 100%); margin-top: calc(-1 * var(--pub-nav-h, 114px)); padding: calc(var(--pub-nav-h, 114px) + 2.5rem) 0 3rem; position: relative; overflow: hidden; }
+.page-hero { background: linear-gradient(145deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); margin-top: calc(-1 * var(--pub-nav-h, 114px)); padding: calc(var(--pub-nav-h, 114px) + 2.5rem) 0 3rem; position: relative; overflow: hidden; }
 .page-hero-shapes { position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; }
 .ph-s { position: absolute; border-radius: 50%; }
 .ph-s1 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(249,168,37,.12), transparent 65%); top: -100px; left: 5%; }
@@ -417,38 +417,38 @@ function openTender(t: Tender) {
 .tenders-skyline { position: absolute; left: 0; bottom: 0; width: 340px; opacity: .8; pointer-events: none; }
 
 /* الفلاتر: شريط أبيض واحد بعناصر دائرية */
-.tender-filters { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; background: #fff; border-radius: 20px; padding: .8rem 1rem; margin-bottom: 1.5rem; box-shadow: 0 8px 28px rgba(var(--pcu-brand-rgb), .08); }
+.tender-filters { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; background: #fff; border-radius: 20px; padding: .8rem 1rem; margin-bottom: 1.5rem; box-shadow: 0 8px 28px rgba(26, 35, 126, .08); }
 .search-wrap { position: relative; flex: 1.6 1 240px; }
-.search-ico { position: absolute; top: 50%; left: 1rem; transform: translateY(-50%); color: var(--pcu-brand-ink); pointer-events: none; }
+.search-ico { position: absolute; top: 50%; left: 1rem; transform: translateY(-50%); color: #1a237e; pointer-events: none; }
 .search-input { width: 100%; border: 1.5px solid #e5e9f2; border-radius: 50px; padding: .65rem 1.1rem .65rem 2.8rem; font-size: .88rem; font-family: 'Tajawal', sans-serif; color: #374151; background: #fff; outline: none; transition: border-color .2s; }
-.search-input:focus { border-color: var(--pcu-brand); }
+.search-input:focus { border-color: #1a237e; }
 .sel-wrap { position: relative; flex: 1 1 150px; }
 .filter-sel { width: 100%; appearance: none; -webkit-appearance: none; border: 1.5px solid #e5e9f2; border-radius: 50px; padding: .65rem 2.4rem .65rem 2.2rem; font-size: .85rem; font-family: 'Tajawal', sans-serif; color: #374151; background: #fff; outline: none; cursor: pointer; transition: border-color .2s; }
-.filter-sel:focus { border-color: var(--pcu-brand); }
+.filter-sel:focus { border-color: #1a237e; }
 .filter-date { padding-left: 2.2rem; padding-right: 2.6rem; }
 .sel-wrap.date-wrap { flex: 1 1 170px; }
-.date-lbl { position: absolute; top: 50%; right: .95rem; transform: translateY(-50%); font-size: .78rem; font-weight: 700; color: var(--pcu-brand-ink); pointer-events: none; z-index: 1; }
+.date-lbl { position: absolute; top: 50%; right: .95rem; transform: translateY(-50%); font-size: .78rem; font-weight: 700; color: #1a237e; pointer-events: none; z-index: 1; }
 .sel-ico { position: absolute; top: 50%; right: .9rem; transform: translateY(-50%); color: #6b7280; pointer-events: none; }
 .sel-chev { position: absolute; top: 50%; left: .9rem; transform: translateY(-50%); color: #6b7280; pointer-events: none; }
 .sel-wrap:has(.filter-date) .sel-ico { right: auto; left: .9rem; }
 .date-wrap .filter-date { padding-right: 2.6rem; }
-.adv-btn { display: inline-flex; align-items: center; justify-content: center; gap: .45rem; background: linear-gradient(145deg, var(--pcu-brand), var(--pcu-brand-deep)); color: #fff; border: none; border-radius: 50px; padding: .7rem 1.5rem; font-size: .85rem; font-weight: 700; font-family: 'Tajawal', sans-serif; cursor: pointer; white-space: nowrap; box-shadow: 0 6px 16px rgba(var(--pcu-brand-deep-rgb), .3); transition: transform .2s, filter .2s; }
+.adv-btn { display: inline-flex; align-items: center; justify-content: center; gap: .45rem; background: linear-gradient(145deg, #1a237e, #0d1b4b); color: #fff; border: none; border-radius: 50px; padding: .7rem 1.5rem; font-size: .85rem; font-weight: 700; font-family: 'Tajawal', sans-serif; cursor: pointer; white-space: nowrap; box-shadow: 0 6px 16px rgba(13, 27, 75, .3); transition: transform .2s, filter .2s; }
 .adv-btn:hover { transform: translateY(-1px); filter: brightness(1.12); }
-.filter-reset { display: flex; align-items: center; gap: .4rem; background: #e8eaf6; color: var(--pcu-brand-ink); border: 1.5px solid #c5cae9; border-radius: 9px; padding: .55rem 1rem; font-size: .83rem; font-weight: 600; cursor: pointer; font-family: 'Tajawal', sans-serif; }
-.filter-reset:hover { background: var(--pcu-brand); color: #fff; }
+.filter-reset { display: flex; align-items: center; gap: .4rem; background: #e8eaf6; color: #1a237e; border: 1.5px solid #c5cae9; border-radius: 9px; padding: .55rem 1rem; font-size: .83rem; font-weight: 600; cursor: pointer; font-family: 'Tajawal', sans-serif; }
+.filter-reset:hover { background: #1a237e; color: #fff; }
 
 .results-bar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 0 .5rem 1rem; }
 .results-count { font-size: .85rem; font-weight: 700; color: #374151; }
 .sort-wrap { display: inline-flex; align-items: center; gap: .4rem; font-size: .82rem; color: #374151; font-weight: 600; }
-.sort-sel { border: none; background: transparent; font-size: .82rem; font-weight: 700; font-family: 'Tajawal', sans-serif; color: var(--pcu-brand-ink); cursor: pointer; outline: none; }
+.sort-sel { border: none; background: transparent; font-size: .82rem; font-weight: 700; font-family: 'Tajawal', sans-serif; color: #1a237e; cursor: pointer; outline: none; }
 
 /* بطاقات العطاءات */
 .tenders-list { display: flex; flex-direction: column; gap: .9rem; }
-.tender-card { display: flex; gap: 1.1rem; align-items: center; background: #fff; border-radius: 16px; padding: .7rem .9rem; box-shadow: 0 5px 20px rgba(var(--pcu-brand-rgb), .07); transition: transform .25s, box-shadow .25s; }
-.tender-card:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(var(--pcu-brand-rgb), .13); }
+.tender-card { display: flex; gap: 1.1rem; align-items: center; background: #fff; border-radius: 16px; padding: .7rem .9rem; box-shadow: 0 5px 20px rgba(26, 35, 126, .07); transition: transform .25s, box-shadow .25s; }
+.tender-card:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(26, 35, 126, .13); }
 .tender-thumb { width: 118px; height: 82px; flex-shrink: 0; border-radius: 12px; overflow: hidden; background: #eef2fa; }
 .tender-thumb.is-link { cursor: pointer; }
-.tender-thumb.is-link:focus-visible { outline: 2px solid var(--pcu-brand); outline-offset: 2px; }
+.tender-thumb.is-link:focus-visible { outline: 2px solid #1a237e; outline-offset: 2px; }
 .tender-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .tender-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .7rem; }
 .tender-headline { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
@@ -462,15 +462,15 @@ function openTender(t: Tender) {
 .fact { display: inline-flex; align-items: center; gap: .4rem; font-size: .8rem; color: #4b5563; }
 .fact svg { color: #6b7280; }
 .fact-sep { width: 1px; height: 14px; background: #d5dae6; margin: 0 .9rem; }
-.tender-btn { display: inline-flex; align-items: center; gap: .4rem; border: none; border-radius: 50px; padding: .65rem 1.4rem; font-size: .83rem; font-weight: 700; color: #fff; background: linear-gradient(145deg, var(--pcu-brand), var(--pcu-brand-deep)); cursor: pointer; font-family: 'Tajawal', sans-serif; transition: transform .2s, filter .2s; white-space: nowrap; flex-shrink: 0; box-shadow: 0 5px 14px rgba(var(--pcu-brand-deep-rgb), .28); }
+.tender-btn { display: inline-flex; align-items: center; gap: .4rem; border: none; border-radius: 50px; padding: .65rem 1.4rem; font-size: .83rem; font-weight: 700; color: #fff; background: linear-gradient(145deg, #1a237e, #0d1b4b); cursor: pointer; font-family: 'Tajawal', sans-serif; transition: transform .2s, filter .2s; white-space: nowrap; flex-shrink: 0; box-shadow: 0 5px 14px rgba(13, 27, 75, .28); }
 .tender-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
 
 /* التقسيم */
 .pager { display: flex; align-items: center; justify-content: center; gap: .55rem; margin-top: 2rem; }
 .pg-btn { width: 38px; height: 38px; border-radius: 50%; border: 1.5px solid #e1e6f1; background: #fff; color: #14275f; font-size: .85rem; font-weight: 700; font-family: 'Tajawal', sans-serif; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: all .2s; }
-.pg-btn:hover:not(:disabled) { border-color: var(--pcu-brand); }
+.pg-btn:hover:not(:disabled) { border-color: #1a237e; }
 .pg-btn:disabled { opacity: .45; cursor: not-allowed; }
-.pg-num.active { background: var(--pcu-brand); border-color: var(--pcu-brand); color: #fff; box-shadow: 0 5px 14px rgba(var(--pcu-brand-rgb), .3); }
+.pg-num.active { background: #1a237e; border-color: #1a237e; color: #fff; box-shadow: 0 5px 14px rgba(26, 35, 126, .3); }
 .pg-dots { color: #9ca3af; padding: 0 .2rem; }
 
 /* عناصر مشتركة مع لوحة تفاصيل العطاء */
@@ -484,24 +484,24 @@ function openTender(t: Tender) {
 .tender-info { display: flex; gap: 1.25rem; flex-wrap: wrap; }
 .tender-info span { display: flex; align-items: center; gap: .35rem; font-size: .8rem; color: #6b7280; }
 .tender-details { margin-top: .75rem; padding-top: .75rem; border-top: 1px dashed #e5e7eb; font-size: .85rem; color: #6b7280; line-height: 1.8; }
-.tender-details a { color: var(--pcu-brand-ink); display: inline-flex; align-items: center; gap: .3rem; }
+.tender-details a { color: #1a237e; display: inline-flex; align-items: center; gap: .3rem; }
 .tender-attachments { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
-.tender-attachment { display: flex; align-items: center; gap: .4rem; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 8px; padding: .3rem .6rem; font-size: .78rem; color: var(--pcu-brand-ink); text-decoration: none; }
+.tender-attachment { display: flex; align-items: center; gap: .4rem; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 8px; padding: .3rem .6rem; font-size: .78rem; color: #1a237e; text-decoration: none; }
 .tender-attachment:hover { background: #e8eaf6; }
 .tender-attachment-img { width: 18px; height: 18px; object-fit: cover; border-radius: 4px; }
-.tender-detail { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); background: #fff; border: 1.5px solid #e5e7eb; border-radius: 18px; overflow: hidden; margin-bottom: 2.5rem; box-shadow: 0 10px 30px rgba(var(--pcu-brand-deep-rgb), .08); scroll-margin-top: calc(var(--pub-nav-h, 114px) + 1rem); }
+.tender-detail { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); background: #fff; border: 1.5px solid #e5e7eb; border-radius: 18px; overflow: hidden; margin-bottom: 2.5rem; box-shadow: 0 10px 30px rgba(13, 27, 75, .08); scroll-margin-top: calc(var(--pub-nav-h, 114px) + 1rem); }
 .detail-msg { grid-column: 1 / -1; text-align: center; padding: 3rem 1.5rem; color: #6b7280; display: flex; flex-direction: column; align-items: center; }
 .detail-img { min-height: 260px; }
 .detail-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .detail-body { padding: 1.75rem; display: flex; flex-direction: column; gap: .9rem; }
-.detail-sector { background: #e8eaf6; color: var(--pcu-brand-ink); border-color: #c5cae9; }
+.detail-sector { background: #e8eaf6; color: #1a237e; border-color: #c5cae9; }
 .detail-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: clamp(1.25rem, 2.4vw, 1.6rem); font-weight: 800; color: #0d1b3e; line-height: 1.5; }
 .detail-entity { font-size: .9rem; color: #374151; font-weight: 600; }
 .detail-desc { font-size: .95rem; color: #4b5563; line-height: 1.9; white-space: pre-line; }
 .detail-contact { font-size: .85rem; }
-.detail-contact a { color: var(--pcu-brand-ink); display: inline-flex; align-items: center; gap: .3rem; font-size: .8rem; }
+.detail-contact a { color: #1a237e; display: inline-flex; align-items: center; gap: .3rem; font-size: .8rem; }
 .detail-actions { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: .5rem; }
-.detail-btn { display: inline-flex; align-items: center; gap: .4rem; background: var(--pcu-brand); color: #fff; border-radius: 9px; padding: .55rem 1.1rem; font-size: .85rem; font-weight: 700; text-decoration: none; }
+.detail-btn { display: inline-flex; align-items: center; gap: .4rem; background: #1a237e; color: #fff; border-radius: 9px; padding: .55rem 1.1rem; font-size: .85rem; font-weight: 700; text-decoration: none; }
 @media (max-width: 860px) { .tender-detail { grid-template-columns: 1fr; } .detail-img { min-height: 0; height: 220px; } .detail-body { padding: 1.25rem; } }
 .empty-state { text-align: center; padding: 4rem 2rem; color: #9ca3af; }
 .empty-state p { font-size: 1rem; margin-top: 1rem; }

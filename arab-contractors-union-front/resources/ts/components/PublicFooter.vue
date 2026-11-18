@@ -95,7 +95,7 @@ const branch = ref<keyof typeof branches>('gaza')
 
 <style scoped>
 
-.pub-footer { background: var(--pcu-brand); color: #fff; font-family: 'Tajawal', 'Cairo', sans-serif; }
+.pub-footer { background: #000068; color: #fff; font-family: 'Tajawal', 'Cairo', sans-serif; }
 .pub-footer p { margin: 0; }
 .pub-container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
 .pub-footer-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, .8fr) minmax(0, .9fr) minmax(0, 1fr); gap: 40px; padding: 40px 24px 30px; }
