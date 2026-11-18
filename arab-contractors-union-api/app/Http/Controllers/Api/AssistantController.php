@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\AssistantLogService;
 use App\Support\AssistantKnowledge;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -25,6 +26,8 @@ class AssistantController extends Controller
             'history'        => 'nullable|array|max:6',
             'history.*.role' => 'required|in:user,bot',
             'history.*.text' => 'required|string|max:600',
+            'session_id'     => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9-]+$/'],
+            'page'           => 'nullable|string|max:255',
         ]);
 
         $key = config('services.gemini.key');
@@ -32,7 +35,7 @@ class AssistantController extends Controller
             return response()->json(['available' => false]);
         }
 
-        $system = "أنت المساعد الافتراضي (نسخة تجريبية) لاتحاد المقاولين الفلسطينيين على موقعه الرسمي.\n"
+        $system = "اسمك سامي، وأنت المساعد الافتراضي (نسخة تجريبية) لاتحاد المقاولين الفلسطينيين على موقعه الرسمي.\n"
             . "- أجب بالعربية فقط، بإيجاز ووضوح (حتى 5 جمل)، وبلهجة مهذبة. يمكنك استخدام نقاط قصيرة للقوائم.\n"
             . "- أجب فقط اعتماداً على المعلومات التالية (بيانات الموقع ونتائج دليل الشركات). إن لم تجد الجواب فيها قل بصدق إنك لا تملك هذه المعلومة وانصح بالتواصل مع الاتحاد، ولا تخمّن ولا تخترع أسماء أو أرقاماً أو رسوماً أو مواعيد.\n"
             . "- عند ذكر صفحة من الموقع اذكر اسمها فقط ولا تكتب الروابط.\n"
@@ -77,6 +80,11 @@ class AssistantController extends Controller
 
             $text = trim((string) $r->json('candidates.0.content.parts.0.text', ''));
             if ($r->ok() && $text !== '') {
+                AssistantLogService::record($request, $data['session_id'] ?? null, [
+                    ['role' => 'user', 'text' => $data['message'], 'source' => null],
+                    ['role' => 'bot', 'text' => $text, 'source' => 'ai'],
+                ], $data['page'] ?? null);
+
                 return response()->json(['available' => true, 'reply' => $text]);
             }
 
@@ -84,6 +92,23 @@ class AssistantController extends Controller
         }
 
         return response()->json(['available' => false]);
+    }
+
+    // POST /api/v1/assistant/log — الردود اللي انجابت بالمتصفح (تحية، سؤال شائع، اقتراحات) بتنحفظ بسجل المحادثات
+    public function log(Request $request)
+    {
+        $data = $request->validate([
+            'session_id'        => ['required', 'string', 'max:64', 'regex:/^[A-Za-z0-9-]+$/'],
+            'page'              => 'nullable|string|max:255',
+            'messages'          => 'required|array|min:1|max:4',
+            'messages.*.role'   => 'required|in:user,bot',
+            'messages.*.text'   => 'required|string|max:2000',
+            'messages.*.source' => 'nullable|in:faq,smalltalk,page,fallback',
+        ]);
+
+        AssistantLogService::record($request, $data['session_id'], $data['messages'], $data['page'] ?? null);
+
+        return response()->json(['ok' => true]);
     }
 
     /**

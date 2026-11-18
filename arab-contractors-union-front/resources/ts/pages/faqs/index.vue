@@ -46,7 +46,10 @@ const confirmDelete = (f: any) => { if (confirm('Delete this FAQ?')) deleteMutat
         <h1 class="text-h4 font-weight-bold">{{ $t('FAQ') }}</h1>
         <p class="text-body-2 text-medium-emphasis mb-0">{{ $t('Questions shown on the landing page') }}</p>
       </div>
-      <VBtn color="primary" prepend-icon="tabler-plus" @click="openCreate">{{ $t('New Question') }}</VBtn>
+      <div class="d-flex gap-2 flex-wrap">
+        <VBtn variant="tonal" prepend-icon="tabler-messages" :to="{ name: 'assistant-conversations' }">سجل محادثات المساعد</VBtn>
+        <VBtn color="primary" prepend-icon="tabler-plus" @click="openCreate">{{ $t('New Question') }}</VBtn>
+      </div>
     </div>
 
     <VProgressLinear v-if="isLoading" indeterminate color="primary" />

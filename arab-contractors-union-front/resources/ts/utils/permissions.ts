@@ -54,6 +54,7 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
   'announcements-categories': 'content.announcement_categories',
   'analytics': 'reports.analytics',
   'faqs': 'settings.faqs',
+  'assistant-conversations': 'settings.faqs',
   'settings-terms': 'settings.terms',
   'settings-privacy-policy': 'settings.terms',
   'settings-app-settings': 'settings.app',

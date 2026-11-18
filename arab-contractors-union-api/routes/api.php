@@ -228,6 +228,7 @@ Route::prefix('v1')->group(function () {
     // --------------------------------------------------------
     Route::get('faqs', [\App\Http\Controllers\Api\FaqController::class, 'public']);
     Route::post('assistant/chat', [\App\Http\Controllers\Api\AssistantController::class, 'chat'])->middleware('throttle:20,1');
+    Route::post('assistant/log', [\App\Http\Controllers\Api\AssistantController::class, 'log'])->middleware('throttle:40,1');
 
     // --------------------------------------------------------
     //  Legal Library — Public (no auth)
@@ -407,6 +408,11 @@ Route::prefix('v1')->group(function () {
             Route::post('dashboard/faqs',         [\App\Http\Controllers\Api\FaqController::class, 'store'])->middleware('perm:settings.faqs');
             Route::put('dashboard/faqs/{faq}',    [\App\Http\Controllers\Api\FaqController::class, 'update'])->middleware('perm:settings.faqs');
             Route::delete('dashboard/faqs/{faq}', [\App\Http\Controllers\Api\FaqController::class, 'destroy'])->middleware('perm:settings.faqs');
+
+            // سجل محادثات المساعد الافتراضي
+            Route::get('dashboard/assistant-conversations',                          [\App\Http\Controllers\Api\AssistantConversationController::class, 'index'])->middleware('perm:settings.faqs');
+            Route::get('dashboard/assistant-conversations/{assistantConversation}',  [\App\Http\Controllers\Api\AssistantConversationController::class, 'show'])->middleware('perm:settings.faqs');
+            Route::delete('dashboard/assistant-conversations/{assistantConversation}', [\App\Http\Controllers\Api\AssistantConversationController::class, 'destroy'])->middleware('perm:settings.faqs');
         });
 
         // --------------------------------------------------------

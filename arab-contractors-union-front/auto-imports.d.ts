@@ -37,7 +37,10 @@ declare global {
   const computedEager: typeof import('@vueuse/core')['computedEager']
   const computedInject: typeof import('@vueuse/core')['computedInject']
   const computedWithControl: typeof import('@vueuse/core')['computedWithControl']
+  const condolences: typeof import('./resources/ts/utils/socialData')['condolences']
   const confirmedValidator: typeof import('./resources/ts/@core/utils/validators')['confirmedValidator']
+  const congratulationCategories: typeof import('./resources/ts/utils/socialData')['congratulationCategories']
+  const congratulations: typeof import('./resources/ts/utils/socialData')['congratulations']
   const contractorDocumentLabels: typeof import('./resources/ts/utils/contractorDocuments')['contractorDocumentLabels']
   const contractorRules: typeof import('./resources/ts/utils/contractorValidation')['contractorRules']
   const controlledComputed: typeof import('@vueuse/core')['controlledComputed']
@@ -83,6 +86,7 @@ declare global {
   const formatDateToMonthShort: typeof import('./resources/ts/@core/utils/formatters')['formatDateToMonthShort']
   const formatNumber: typeof import('./resources/ts/utils/activityLogDetails')['formatNumber']
   const formatPhone: typeof import('./resources/ts/utils/dialCodes')['formatPhone']
+  const formatSocialDate: typeof import('./resources/ts/utils/socialData')['formatSocialDate']
   const formatValue: typeof import('./resources/ts/utils/activityLogDetails')['formatValue']
   const getActivePinia: typeof import('pinia')['getActivePinia']
   const getCurrentInstance: typeof import('vue')['getCurrentInstance']
@@ -126,6 +130,7 @@ declare global {
   const mapStores: typeof import('pinia')['mapStores']
   const mapWritableState: typeof import('pinia')['mapWritableState']
   const markRaw: typeof import('vue')['markRaw']
+  const martyrs: typeof import('./resources/ts/utils/socialData')['martyrs']
   const nextTick: typeof import('vue')['nextTick']
   const normalizeNotificationType: typeof import('./resources/ts/utils/notificationMeta')['normalizeNotificationType']
   const normalizeUser: typeof import('./resources/ts/utils/normalizeUser')['normalizeUser']
@@ -474,7 +479,10 @@ declare module 'vue' {
     readonly computedEager: UnwrapRef<typeof import('@vueuse/core')['computedEager']>
     readonly computedInject: UnwrapRef<typeof import('@vueuse/core')['computedInject']>
     readonly computedWithControl: UnwrapRef<typeof import('@vueuse/core')['computedWithControl']>
+    readonly condolences: UnwrapRef<typeof import('./resources/ts/utils/socialData')['condolences']>
     readonly confirmedValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['confirmedValidator']>
+    readonly congratulationCategories: UnwrapRef<typeof import('./resources/ts/utils/socialData')['congratulationCategories']>
+    readonly congratulations: UnwrapRef<typeof import('./resources/ts/utils/socialData')['congratulations']>
     readonly contractorDocumentLabels: UnwrapRef<typeof import('./resources/ts/utils/contractorDocuments')['contractorDocumentLabels']>
     readonly contractorRules: UnwrapRef<typeof import('./resources/ts/utils/contractorValidation')['contractorRules']>
     readonly controlledComputed: UnwrapRef<typeof import('@vueuse/core')['controlledComputed']>
@@ -519,6 +527,7 @@ declare module 'vue' {
     readonly formatDateToMonthShort: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['formatDateToMonthShort']>
     readonly formatNumber: UnwrapRef<typeof import('./resources/ts/utils/activityLogDetails')['formatNumber']>
     readonly formatPhone: UnwrapRef<typeof import('./resources/ts/utils/dialCodes')['formatPhone']>
+    readonly formatSocialDate: UnwrapRef<typeof import('./resources/ts/utils/socialData')['formatSocialDate']>
     readonly formatValue: UnwrapRef<typeof import('./resources/ts/utils/activityLogDetails')['formatValue']>
     readonly getActivePinia: UnwrapRef<typeof import('pinia')['getActivePinia']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
@@ -561,6 +570,7 @@ declare module 'vue' {
     readonly mapStores: UnwrapRef<typeof import('pinia')['mapStores']>
     readonly mapWritableState: UnwrapRef<typeof import('pinia')['mapWritableState']>
     readonly markRaw: UnwrapRef<typeof import('vue')['markRaw']>
+    readonly martyrs: UnwrapRef<typeof import('./resources/ts/utils/socialData')['martyrs']>
     readonly nextTick: UnwrapRef<typeof import('vue')['nextTick']>
     readonly normalizeNotificationType: UnwrapRef<typeof import('./resources/ts/utils/notificationMeta')['normalizeNotificationType']>
     readonly normalizeUser: UnwrapRef<typeof import('./resources/ts/utils/normalizeUser')['normalizeUser']>
