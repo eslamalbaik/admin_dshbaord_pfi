@@ -300,7 +300,15 @@ class CertificateSerialVerificationTest extends TestCase
             ->assertJsonPath('items.serial_number', fn ($s) => is_string($s) && strlen($s) === 12);
 
         $serial = $cert->fresh()->serial_number;
+        $this->assertSame($serial, ActivityLog::where('action', 'certificate.generated')->first()->meta['serial_number']);
+        // قبل الموافقة النهائية (الملف الموقّع) الرقم ما بيتحقق
+        $this->check($serial)->assertJsonPath('items.state', 'not_found');
+
+        $this->post("/api/v1/dashboard/certificate-requests/{$cert->id}/issue", [
+            'certificate' => \Illuminate\Http\UploadedFile::fake()->create('signed.pdf', 50, 'application/pdf'),
+        ], ['Accept' => 'application/json'])->assertOk();
+
+        $this->assertSame($serial, $cert->fresh()->serial_number);
         $this->check($serial)->assertJsonPath('items.state', 'valid');
-        $this->assertSame($serial, ActivityLog::where('action', 'certificate.issued')->first()->meta['serial_number']);
     }
 }

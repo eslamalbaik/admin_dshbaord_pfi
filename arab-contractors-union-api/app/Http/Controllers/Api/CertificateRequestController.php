@@ -504,6 +504,17 @@ class CertificateRequestController extends Controller
         $oldPath     = $certificateRequest->certificate_path;
         $oldIssuedAt = $certificateRequest->issued_at;
         $generated   = ! $request->hasFile('certificate');
+        // شهادة مولَّدة بانتظار التوقيع + رفع النسخة الموقّعة = الموافقة النهائية (طلب المالك 18/11)
+        $finalizingDraft = ! $generated && $certificateRequest->isAwaitingSignature();
+
+        // النسخة الإنجليزية المولَّدة كمان بدها توقيع قبل ما توصل المقاول
+        if ($finalizingDraft && filled($certificateRequest->certificate_path_en) && ! $request->hasFile('certificate_en')) {
+            return $this->error(
+                'ارفع النسخة الإنجليزية الموقّعة كمان، أو أعد توليد الشهادة بدون نسخة إنجليزية.',
+                422,
+                ['certificate_en' => ['النسخة الإنجليزية الموقّعة مطلوبة.']],
+            );
+        }
 
         if ($generated && $blocked = $this->blockedEnglishWithoutName($certificateRequest, $request->validated())) {
             return $blocked;
@@ -534,6 +545,33 @@ class CertificateRequestController extends Controller
             Storage::disk('public')->delete($oldPath);
         }
 
+        // التوليد ما بيوصل المقاول: الشهادة بتضل "موافق عليه" بانتظار التوقيع، والأدمن بينزّلها
+        // ويوقّعها ويرفعها — الرفع هو اللي بيصدرها وبيبعت الإشعار
+        if ($generated) {
+            $certificateRequest->update([
+                'status'           => 'approved',
+                'certificate_path' => $path,
+                'issued_at'        => null,
+                'reviewed_by'      => Auth::id(),
+                'reviewed_at'      => now(),
+            ] + $fields);
+
+            if ($certificateRequest->type === 'membership') {
+                $certificateRequest->ensureSerialNumber();
+            }
+            $this->syncEnglishCertificate($certificateRequest, $this->englishWanted($request->validated()));
+
+            AuditLogService::record(Auth::user(), 'certificate.generated', $certificateRequest, [
+                'contractor_id' => $certificateRequest->contractor_id,
+                'serial_number' => $certificateRequest->serial_number,
+            ]);
+
+            return $this->success(
+                $this->issuedPayload($certificateRequest),
+                'تم توليد الشهادة — نزّلها ووقّعها وارفعها للموافقة النهائية. ما وصلت المقاول لسا.',
+            );
+        }
+
         $certificateRequest->update([
             'status'           => 'issued',
             'certificate_path' => $path,
@@ -550,17 +588,35 @@ class CertificateRequestController extends Controller
             $certificateRequest->ensureSerialNumber();
         }
 
-        // النسخة الإنجليزية: بس للشهادة المولَّدة — الملف المرفوع يدوياً ما إله نسخة إنجليزية
-        $this->syncEnglishCertificate($certificateRequest, $generated ? $this->englishWanted($request->validated()) : false);
+        if ($finalizingDraft && $request->hasFile('certificate_en')) {
+            // النسخة الإنجليزية الموقّعة بتحلّ محل المولَّدة
+            $oldEn = $certificateRequest->certificate_path_en;
+            $enPath = $request->file('certificate_en')->store('certificates/membership', 'public');
+            if ($oldEn && $oldEn !== $enPath) {
+                Storage::disk('public')->delete($oldEn);
+            }
+            $certificateRequest->forceFill(['certificate_path_en' => $enPath])->saveQuietly();
+        } else {
+            // ملف مرفوع يدوياً بدون نسخة إنجليزية موقّعة — ما في نسخة إنجليزية
+            $this->syncEnglishCertificate($certificateRequest, false);
+        }
 
         $certificateRequest->contractor?->notify(
             new CertificateRequestStatusNotification($certificateRequest)
         );
 
+        if ($finalizingDraft) {
+            AuditLogService::record(Auth::user(), 'certificate.signed_issued', $certificateRequest, [
+                'contractor_id' => $certificateRequest->contractor_id,
+                'serial_number' => $certificateRequest->serial_number,
+                'english'       => filled($certificateRequest->certificate_path_en),
+            ]);
+
+            return $this->success($this->issuedPayload($certificateRequest), 'تمت الموافقة النهائية وإرسال الشهادة الموقّعة للمقاول.');
+        }
+
         // بيانات مطبوعة تخالف ملف المقاول — سجل المحددات الهامة، زي الإصدار المباشر
-        [$diffBefore, $diffAfter] = $generated
-            ? $this->certificateOverrideDiff($certificateRequest->contractor, $certificateRequest->certificateOverrides())
-            : [[], []];
+        [$diffBefore, $diffAfter] = [[], []];
 
         if ($oldPath || $diffAfter) {
             // سجل المحددات الهامة — استبدال ملف شهادة كانت صادرة مسبقاً، و/أو بيانات مخالفة لملف المقاول
@@ -578,14 +634,14 @@ class CertificateRequestController extends Controller
         } else {
             AuditLogService::record(Auth::user(), 'certificate.issued', $certificateRequest, [
                 'contractor_id' => $certificateRequest->contractor_id,
-                'generated'     => $generated,
+                'generated'     => false,
                 'serial_number' => $certificateRequest->serial_number,
             ]);
         }
 
         return $this->success(
             $this->issuedPayload($certificateRequest),
-            $generated ? 'تم توليد الشهادة وإرسالها للمقاول.' : 'تم إصدار الشهادة بنجاح.',
+            'تم إصدار الشهادة بنجاح.',
         );
     }
 
@@ -714,10 +770,11 @@ class CertificateRequestController extends Controller
             Storage::disk('public')->delete($oldPath);
         }
 
+        // الملف الجديد مش موقّع: بيرجع "بانتظار التوقيع" وما بيوصل المقاول لحتى يترفع موقّع
         $certificateRequest->update([
-            'status'           => 'issued',
+            'status'           => 'approved',
             'certificate_path' => $path,
-            'issued_at'        => now(),
+            'issued_at'        => null,
             'reviewed_by'      => Auth::id(),
             'reviewed_at'      => now(),
         ]);
@@ -731,12 +788,12 @@ class CertificateRequestController extends Controller
             'certificate.regenerated',
             $certificateRequest,
             before: $before + ['issued_at' => $oldIssuedAt?->toDateTimeString()],
-            after: $after + ['issued_at' => $certificateRequest->issued_at?->toDateTimeString()],
+            after: $after + ['generated_at' => now()->toDateTimeString()],
             reason: $data['reason'] ?? null,
             context: $this->certificateLogContext($certificateRequest),
         );
 
-        return $this->success($this->issuedPayload($certificateRequest), 'تمت إعادة إصدار الشهادة بنجاح.');
+        return $this->success($this->issuedPayload($certificateRequest), 'تم توليد الشهادة من جديد — نزّلها ووقّعها وارفعها للموافقة النهائية.');
     }
 
     /** POST /api/v1/dashboard/certificate-requests/issue-membership */
@@ -762,19 +819,15 @@ class CertificateRequestController extends Controller
             throw $e;
         }
 
+        // بانتظار التوقيع: ما في إشعار للمقاول لحتى يترفع الملف الموقّع (الموافقة النهائية)
         $certRequest->update([
-            'status'           => 'issued',
+            'status'           => 'approved',
             'certificate_path' => $path,
-            'issued_at'        => now(),
             'reviewed_by'      => Auth::id(),
             'reviewed_at'      => now(),
         ]);
 
         $this->syncEnglishCertificate($certRequest, $this->englishWanted($data));
-
-        $certRequest->contractor?->notify(
-            new CertificateRequestStatusNotification($certRequest)
-        );
 
         [$before, $after] = $this->certificateOverrideDiff($contractor, $data);
         if ($after) {
@@ -799,7 +852,7 @@ class CertificateRequestController extends Controller
 
         return $this->success(
             $this->issuedPayload($certRequest),
-            'تم إصدار شهادة العضوية بنجاح.',
+            'تم توليد شهادة العضوية — نزّلها ووقّعها وارفعها من طلبات الشهادات للموافقة النهائية.',
             201,
         );
     }

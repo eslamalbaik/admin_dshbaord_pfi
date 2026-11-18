@@ -16,6 +16,8 @@ class IssueCertificateRequestRequest extends FormRequest
         return [
             // اختياري: بدونه شهادة العضوية بتتولّد تلقائياً (CertificateRequestController::issue)
             'certificate' => 'nullable|file|mimes:pdf|max:10240', // 10 MB
+            // النسخة الإنجليزية الموقّعة — عند الموافقة النهائية على شهادة مولَّدة بإنجليزي
+            'certificate_en' => 'nullable|file|mimes:pdf|max:10240',
             // بيانات الشهادة المولَّدة تلقائياً — فارغها بيرجع لقيم الموافقة ثم لملف المقاول
             'address'         => 'nullable|string|max:255',
             // النسخة الإنجليزية: العنوان بالإنجليزي، و include_english (فاضي = تلقائي إذا للمقاول اسم إنجليزي)

@@ -118,9 +118,24 @@ class MembershipCertificateEnglishTest extends TestCase
         $this->assertSame("certificates/membership/MC-" . str_pad((string) $cert->id, 6, '0', STR_PAD_LEFT) . '-en.pdf', $cert->certificate_path_en);
         Storage::disk('public')->assertExists($cert->certificate_path_en);
         $this->assertSame('Gaza City', $cert->certificate_address_en);
+        $this->assertNotNull($cert->serial_number);
+        // بانتظار التوقيع: اللوحة بتنزّل الإنجليزية المولَّدة، والمقاول ما بياخد رابط
+        $this->assertTrue($res->json('items.awaiting_signature'));
+        $this->assertNotNull($res->json('items.draft_certificate_url_en'));
+        $this->assertNull($res->json('items.certificate_url_en'));
+
+        $pdf = fn () => \Illuminate\Http\UploadedFile::fake()->create('signed.pdf', 50, 'application/pdf');
+        // الموافقة النهائية بدها النسخة الإنجليزية الموقّعة كمان
+        $this->post("/api/v1/dashboard/certificate-requests/{$cert->id}/issue", ['certificate' => $pdf()], ['Accept' => 'application/json'])
+            ->assertStatus(422);
+        $res = $this->post("/api/v1/dashboard/certificate-requests/{$cert->id}/issue", [
+            'certificate' => $pdf(), 'certificate_en' => $pdf(),
+        ], ['Accept' => 'application/json'])->assertOk()->assertJsonPath('items.status', 'issued');
+
+        $cert->refresh();
+        Storage::disk('public')->assertExists($cert->certificate_path_en);
         $this->assertTrue($res->json('items.english_available'));
         $this->assertNotNull($res->json('items.certificate_url_en'));
-        $this->assertNotNull($cert->serial_number);
 
         // رابط اللوحة (track=0) بيفتح الملف بدون ما يحسبها فتح على المقاول
         $this->get($this->relative($res->json('items.certificate_url_en')))

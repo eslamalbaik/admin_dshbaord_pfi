@@ -133,7 +133,7 @@ class CriticalActivityLogTest extends TestCase
         $this->assertTrue($log->is_critical);
         $this->assertSame('خانيونس', $log->meta['before']['address']);
         $this->assertSame('رفح', $log->meta['after']['address']);
-        $this->assertArrayHasKey('issued_at', $log->meta['after']);
+        $this->assertArrayHasKey('generated_at', $log->meta['after']);
     }
 
     public function test_reupload_over_issued_certificate_is_critical_first_upload_is_not(): void

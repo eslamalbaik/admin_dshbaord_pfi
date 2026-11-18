@@ -114,9 +114,10 @@ const issueMutation = useMutation({
   onSuccess: (data: any) => {
     queryClient.invalidateQueries({ queryKey: ['issued-certificates'] })
 
+    // الشهادة المولَّدة بانتظار التوقيع — بنفتح طلبها لتنزيلها ورفع الموقّعة (الموافقة النهائية)
     if (data?.items?.id) {
       isIssueOpen.value = false
-      openPreview(data.items.id)
+      router.push({ path: '/certificate-requests', query: { id: data.items.id } })
     }
   },
   onError: (e: any) => {
@@ -141,6 +142,8 @@ const certStatusOptions = [
   { value: 'issued', title: 'تم الإصدار' },
   { value: 'rejected', title: 'مرفوض' },
 ]
+
+const router = useRouter()
 
 const certStatusColor: Record<string, string> = {
   pending: 'warning',
@@ -245,7 +248,7 @@ const regenerateMutation = useMutation({
 
     queryClient.invalidateQueries({ queryKey: ['certificate-request'] })
     if (data?.items?.id)
-      openPreview(data.items.id)
+      router.push({ path: '/certificate-requests', query: { id: data.items.id } })
   },
   onError: (e: any) => {
     regenerateError.value = e?.response?.data?.message ?? 'تعذّرت إعادة إصدار الشهادة.'
@@ -564,7 +567,17 @@ const contractorStatusLabel: Record<string, string> = {
               <td class="text-body-2">{{ fmtDate(r.request_date) }}</td>
               <td class="text-body-2">{{ fmtDate(r.issue_date) }}</td>
               <td class="text-center">
-                <VTooltip v-if="r.certificate_url" text="عرض الشهادة وحالة وصولها" location="top">
+                <VBtn
+                  v-if="r.awaiting_signature"
+                  size="x-small"
+                  variant="tonal"
+                  color="warning"
+                  prepend-icon="tabler-signature"
+                  @click="router.push({ path: '/certificate-requests', query: { id: r.id } })"
+                >
+                  توقيع ورفع
+                </VBtn>
+                <VTooltip v-else-if="r.certificate_url" text="عرض الشهادة وحالة وصولها" location="top">
                   <template #activator="{ props }">
                     <VBtn
                       v-bind="props"
@@ -576,7 +589,7 @@ const contractorStatusLabel: Record<string, string> = {
                     />
                   </template>
                 </VTooltip>
-                <VTooltip v-if="r.certificate_url" :text="r.viewed_at ? 'فتحها المقاول' : 'لم يفتحها المقاول بعد'" location="top">
+                <VTooltip v-if="r.certificate_url && !r.awaiting_signature" :text="r.viewed_at ? 'فتحها المقاول' : 'لم يفتحها المقاول بعد'" location="top">
                   <template #activator="{ props }">
                     <VIcon
                       v-bind="props"
@@ -587,10 +600,10 @@ const contractorStatusLabel: Record<string, string> = {
                     />
                   </template>
                 </VTooltip>
-                <VChip v-else size="x-small" color="warning" variant="tonal">
+                <VChip v-else-if="!r.awaiting_signature" size="x-small" color="warning" variant="tonal">
                   لم تُصدر بعد
                 </VChip>
-                <VTooltip text="إعادة إصدار الشهادة بنفس الرقم" location="top">
+                <VTooltip text="إعادة توليد الشهادة بنفس الرقم — بترجع بانتظار التوقيع" location="top">
                   <template #activator="{ props }">
                     <VBtn v-if="$can('services.membership_certificates', 'update')"
                       v-bind="props"
@@ -677,7 +690,7 @@ const contractorStatusLabel: Record<string, string> = {
             إصدار شهادة عضوية
           </VCardTitle>
           <VCardSubtitle>
-            سيتم إنشاء شهادة عضوية PDF تلقائياً وإرسال إشعار للمقاول.
+            بتتولّد شهادة عضوية PDF وبتضل بانتظار التوقيع — ما بتوصل المقاول لحتى ترفعها موقّعة وتعمل موافقة نهائية.
           </VCardSubtitle>
         </VCardItem>
 

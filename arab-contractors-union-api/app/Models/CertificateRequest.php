@@ -62,6 +62,12 @@ class CertificateRequest extends Model
         throw new \RuntimeException('تعذّر توليد رقم تسلسلي فريد للشهادة.');
     }
 
+    /** شهادة انولّدت بس لسا ما انرفعت موقّعة — ما بتوصل المقاول قبل الموافقة النهائية */
+    public function isAwaitingSignature(): bool
+    {
+        return $this->status === 'approved' && filled($this->certificate_path);
+    }
+
     public function isRevoked(): bool
     {
         return $this->revoked_at !== null;
@@ -217,6 +223,10 @@ class CertificateRequest extends Model
 
     public function getStatusLabelAttribute(): string
     {
+        if ($this->isAwaitingSignature()) {
+            return 'بانتظار التوقيع';
+        }
+
         return [
             'pending'  => 'قيد المراجعة',
             'approved' => 'موافق عليه',

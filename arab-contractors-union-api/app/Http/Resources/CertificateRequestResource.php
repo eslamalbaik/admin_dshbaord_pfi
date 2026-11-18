@@ -40,7 +40,16 @@ class CertificateRequestResource extends JsonResource
             'attachment_url'    => $this->attachment_url,
             'reject_reason'     => $this->reject_reason,
             // المقاول بياخد الرابط المتتبَّع (فتحه بيتسجّل)، واللوحة الرابط المباشر
-            'certificate_url'   => $forContractor ? $this->tracked_certificate_url : $this->certificate_url,
+            // الشهادة المولَّدة بانتظار التوقيع ما بتوصل المقاول — اللوحة بس بتنزّلها
+            'certificate_url'   => $forContractor
+                ? ($this->status === 'issued' ? $this->tracked_certificate_url : null)
+                : $this->certificate_url,
+            'awaiting_signature' => $this->isAwaitingSignature(),
+            // النسخة الإنجليزية المولَّدة (للّوحة بس) لتنزيلها وتوقيعها قبل الموافقة النهائية
+            'draft_certificate_url_en' => $this->when(
+                ! $forContractor && $this->isAwaitingSignature() && filled($this->certificate_path_en),
+                fn () => \Illuminate\Support\Facades\Storage::disk('public')->url($this->certificate_path_en),
+            ),
             // النسخة الإنجليزية من شهادة العضوية (نفس الرقم التسلسلي) — null = ما في نسخة إنجليزية
             'certificate_url_en' => $this->englishCertificateUrl(track: $forContractor),
             'english_available'  => $this->englishCertificateUrl() !== null,
