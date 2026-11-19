@@ -26,6 +26,9 @@ class TenderController extends Controller
     /** [اسم التصنيف => رابط صورته] — يُحمَّل مرة واحدة لكل طلب عند تنسيق قائمة عطاءات */
     private ?array $categoryImages = null;
 
+    /** تصنيف صورته بتنعرض لأي عطاء تصنيفه بلا صورة أو بلا تصنيف أصلاً */
+    private const FALLBACK_IMAGE_CATEGORY = 'الاسكان والتطوير';
+
     // GET /api/tenders
     public function index(Request $request)
     {
@@ -406,10 +409,9 @@ class TenderController extends Controller
             'description'         => $t->description,
             'union_notes'         => $forContractor ? $t->union_notes : null,
             'category'            => $t->category,
-            // العطاء نفسه بلا صورة خاصة به — صورة تصنيفه الافتراضية (REQ-07 #7) إن وُجدت
-            'category_image'      => $t->category
-                ? ($this->categoryImages ??= TenderCategory::imageMap())[$t->category] ?? null
-                : null,
+            // العطاء نفسه بلا صورة خاصة به — صورة تصنيفه الافتراضية (REQ-07 #7)، وإلا صورة تصنيف "الاسكان والتطوير"
+            'category_image'      => ($this->categoryImages ??= TenderCategory::imageMap())[$t->category ?? '']
+                ?? $this->categoryImages[self::FALLBACK_IMAGE_CATEGORY] ?? null,
             'budget'              => $t->budget,
             'deadline'            => $t->deadline?->toIso8601String(),
             'published_at'        => $t->published_at?->toDateString(),

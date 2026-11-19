@@ -150,7 +150,7 @@ onMounted(() => {
 onUnmounted(() => { cancelAnimationFrame(statsRaf); statsObserver?.disconnect() })
 
 // ─── Tenders ─────────────────────────────────────────────────────────────────
-interface TenderCard { id: number | null; title: string; desc: string; category: string; image: string; closingSoon: boolean; deadline: string }
+interface TenderCard { id: number | null; title: string; desc: string; category: string; image: string; closingSoon: boolean; closed?: boolean; deadline: string }
 // صورة العطاء = صورة تصنيفه الحالية من لوحة التحكم (category_image)، و/tenders.webp فقط لو التصنيف بلا صورة
 const TENDER_PLACEHOLDER = '/tenders.webp'
 const sampleTender = (closingSoon: boolean): TenderCard => ({
@@ -279,7 +279,13 @@ async function loadHome() {
 async function loadTenders() {
   try {
     const r = await api.get('/api/v1/tenders-public', { params: { status: 'open', per_page: 6 } })
-    const items = (r.data.items ?? []).filter((t: any) => t.deadline)
+    let items = (r.data.items ?? []).filter((t: any) => t.deadline)
+
+    // ما في عطاءات مفتوحة: آخر العطاءات (أي حالة) بدل البطاقات النموذجية
+    if (!items.length) {
+      const latest = await api.get('/api/v1/tenders-public', { params: { per_page: 6, sort: 'latest' } })
+      items = (latest.data.items ?? []).filter((t: any) => t.deadline)
+    }
     if (items.length) {
       tenders.value = items.map((t: any) => ({
         id: t.id,
@@ -287,7 +293,8 @@ async function loadTenders() {
         desc: plainText(t.description, 140),
         category: t.category || 'عطاء عام',
         image: t.category_image || TENDER_PLACEHOLDER,
-        closingSoon: !!t.closing_soon,
+        closingSoon: t.status === 'open' && !!t.closing_soon,
+        closed: t.status !== 'open',
         deadline: fmtDate(t.deadline),
       }))
     }
@@ -393,18 +400,19 @@ onMounted(() => {
 
         <div class="cards-grid">
           <article v-for="(t, i) in visibleTenders" :key="`${t.id}-${i}`" v-reveal v-hover-card :delay="i * 120" class="tender-card">
-            <div class="tender-img hc-media">
+            <div class="tender-img hc-media is-link" @click="openTender(t)">
               <img :src="t.image" :alt="t.title" loading="lazy">
-              <span v-if="t.closingSoon" class="status status-soon"><Hourglass :size="13" /> قريب الاغلاق</span>
+              <span v-if="t.closed" class="status status-closed"><i />مغلق</span>
+              <span v-else-if="t.closingSoon" class="status status-soon"><Hourglass :size="13" /> قريب الاغلاق</span>
               <span v-else class="status status-open"><i />مفتوح لتقديم</span>
-              <button class="bookmark" aria-label="حفظ العطاء" @click="router.push('/contractor/login')"><Bookmark :size="20" /></button>
+              <button class="bookmark" aria-label="حفظ العطاء" @click.stop="router.push('/contractor/login')"><Bookmark :size="20" /></button>
               <span class="tender-cat">{{ t.category }}</span>
             </div>
             <div class="tender-body">
-              <h3 class="hc-title">{{ t.title }}</h3>
+              <h3 class="hc-title is-link" @click="openTender(t)">{{ t.title }}</h3>
               <p class="clamp-2">{{ t.desc }}</p>
               <div class="deadline" :class="{ soon: t.closingSoon }">
-                <span class="deadline-label"><Clock :size="18" /> {{ t.closingSoon ? 'ينتهي قريبا :' : 'الموعد النهائي :' }}</span>
+                <span class="deadline-label"><Clock :size="18" /> {{ t.closed ? 'انتهى في :' : t.closingSoon ? 'ينتهي قريبا :' : 'الموعد النهائي :' }}</span>
                 <span class="deadline-date">{{ t.deadline }}</span>
               </div>
               <button class="btn-navy tender-btn" @click="openTender(t)">عرض التفاصيل <ChevronLeft :size="18" class="hc-arrow" /></button>
@@ -485,13 +493,13 @@ onMounted(() => {
 
         <div class="cards-grid">
           <article v-for="(n, i) in visibleNews" :key="n.key" v-reveal v-hover-card :delay="i * 120" class="news-card">
-            <div class="hc-media news-media">
+            <div class="hc-media news-media is-link" @click="router.push(n.to)">
               <img :src="n.image" :alt="n.title" class="news-img" loading="lazy">
               <span v-if="n.category && NEWS_CATEGORY[n.category]" class="news-cat">{{ NEWS_CATEGORY[n.category] }}</span>
             </div>
             <div class="news-body">
               <span v-if="n.date" class="news-date"><CalendarDays :size="14" /> {{ fmtDate(n.date) }}</span>
-              <h3 class="hc-title clamp-2">{{ n.title }}</h3>
+              <h3 class="hc-title clamp-2 is-link" @click="router.push(n.to)">{{ n.title }}</h3>
               <p class="clamp-3">{{ n.excerpt }}</p>
               <RouterLink :to="n.to" class="read-more">أقرأ المزيد <ArrowLeft :size="16" class="hc-arrow" /></RouterLink>
             </div>
@@ -732,6 +740,7 @@ onMounted(() => {
 .status i { width: 7px; height: 7px; border-radius: 50%; background: #fff; }
 .status-open { background: #1b9e5a; }
 .status-soon { background: var(--orange); }
+.status-closed { background: #6b7280; }
 .bookmark {
   position: absolute; top: 24px; left: 16px; z-index: 1; width: 44px; height: 44px; border-radius: 8px; border: none;
   background: #fff; color: var(--navy); display: grid; place-items: center; cursor: pointer;
@@ -814,6 +823,7 @@ onMounted(() => {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ══ NEWS ══ */
+.is-link { cursor: pointer; }
 .news-card { border: 1px solid #dfe2ea; border-radius: 14px; overflow: hidden; background: #fff; display: flex; flex-direction: column; }
 .news-img { width: 100%; height: 198px; object-fit: cover; display: block; }
 .news-body { padding: 22px 16px 22px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
