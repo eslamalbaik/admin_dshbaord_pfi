@@ -42,7 +42,7 @@ const contacts = [
   { icon: MapPin,  label: 'العنوان',         value: 'غزة — الكتيبة — عمارة النجمة' },
   { icon: Phone,   label: 'رقم الجوال',      value: '+970 597 233 422', href: 'tel:+970597233422', ltr: true },
   { icon: Mail,    label: 'البريد الإلكتروني', value: 'info@pcu.org.ps', href: 'mailto:info@pcu.org.ps' },
-  { icon: Clock,   label: 'ساعات العمل',      value: 'الأحد — الخميس: ٨ص — ٤م' },
+  { icon: Clock,   label: 'ساعات العمل',      value: 'الأحد — الخميس: 9ص — 3م' },
 ]
 
 const inquiryTypes = ['استفسار عام','الانضمام والعضوية','التصنيف','العطاءات','التدريب','الشكاوى والنزاعات','التعاون والشراكات','أخرى']

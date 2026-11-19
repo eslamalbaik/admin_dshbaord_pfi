@@ -18,7 +18,7 @@ class AssistantKnowledge
     public const CONTACT = <<<'TXT'
 اتحاد المقاولين الفلسطينيين: المظلة المهنية والوطنية الجامعة لشركات المقاولات الفلسطينية، تأسس عام 1994، ويمثل شركات المقاولات ويطوّر قدراتها ويدافع عن مصالحها ويسهّل وصولها للعطاءات والمناقصات.
 مقر غزة: الرمال. الجوال: +970597233422. البريد: info@pcu.org.ps. فرع رام الله: شارع الإرسال، البريد: info@pcu.ps.
-أوقات الدوام: الأحد إلى الخميس من 8 صباحاً إلى 4 عصراً.
+أوقات الدوام: الأحد — الخميس: 9ص — 3م.
 صفحات الموقع: /landing/about (عن الاتحاد)، /landing/board (مجلس الإدارة)، /landing/committees (اللجان)، /landing/members (دليل شركات المقاولات)، /landing/services (الخدمات)، /landing/training-center (التدريب)، /landing/public-tenders (المناقصات والعطاءات)، /landing/legislation (التشريعات)، /landing/library (مكتبة الملفات)، /landing/news (الأخبار)، /landing/events (الفعاليات)، /landing/verify-certificate (التحقق من شهادة)، /landing/contact-us (التواصل)، /landing/faq-public (الأسئلة الشائعة)، /contractor/login (دخول الأعضاء).
 TXT;
 

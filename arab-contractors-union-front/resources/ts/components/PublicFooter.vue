@@ -43,11 +43,11 @@ const branch = ref<keyof typeof branches>('gaza')
           <img src="/images/landing/logo-white.png" alt="اتحاد المقاولين الفلسطينيين" class="pub-footer-logo">
           <div>
             <p class="pub-footer-name">اتحاد المقاولين الفلسطينيين</p>
-            <p class="pub-footer-en">Palestinian Contractor Union - PCU</p>
+            <p class="pub-footer-en">Palestinian Contractors Union - PCU</p>
           </div>
         </div>
         <p class="pub-footer-bio">
-          اتحاد المقاولين الفلسطينيين: المظلة المهنية والوطنية الجامعة لشركات المقاولات الفلسطينية، نعمل على تمثيل مصالحها، وتطوير قدراتها، وتعزيز دورها في التنمية الوطنية وإعادة الإعمار، وحماية حقوق أعضائها منذ تأسيس الاتحاد عام 1994.
+          هو المظلة المهنية والوطنية الجامعة لشركات المقاولات الفلسطينية، نعمل على تمثيل مصالحها، وتطوير قدراتها، وتعزيز دورها في التنمية الوطنية وإعادة الإعمار، وحماية حقوق أعضائها منذ تأسيس الاتحاد عام 1994.
         </p>
         <div class="pub-footer-social">
           <a v-for="s in PUBLIC_SOCIAL_LINKS" :key="s.key" :href="s.href" target="_blank" rel="noopener noreferrer" class="pub-fsoc" :aria-label="s.label">
@@ -75,7 +75,7 @@ const branch = ref<keyof typeof branches>('gaza')
         <p class="pub-footer-contact"><span class="pub-fco-ico"><MapPin :size="20" /></span>{{ branches[branch].address }}</p>
         <p class="pub-footer-contact"><span class="pub-fco-ico"><Phone :size="20" /></span><span dir="ltr">{{ branches[branch].phone }}</span></p>
         <p class="pub-footer-contact"><span class="pub-fco-ico"><Mail :size="20" /></span>{{ branches[branch].email }}</p>
-        <p class="pub-footer-contact"><span class="pub-fco-ico"><Clock :size="20" /></span>الاحد - الخميس : 8ص - 4م</p>
+        <p class="pub-footer-contact"><span class="pub-fco-ico"><Clock :size="20" /></span>الأحد — الخميس: 9ص — 3م</p>
       </div>
     </div>
 

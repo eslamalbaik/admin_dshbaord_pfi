@@ -2,7 +2,7 @@
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Search, Calendar, CalendarDays, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, ArrowUpDown, Clock, Tag, ExternalLink, FileText } from 'lucide-vue-next'
+import { Search, Calendar, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, ArrowUpDown, Clock, Tag, ExternalLink, FileText } from 'lucide-vue-next'
 import { vHoverCard } from '@/utils/hoverCard'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
@@ -70,9 +70,12 @@ const statuses = [
 ]
 
 const sorts = [
-  { value: 'latest', label: 'الأحدث إضافة' },
-  { value: 'updated_desc', label: 'آخر تحديث' },
-  { value: 'deadline_asc', label: 'الأقرب موعداً' },
+  { value: 'latest', label: 'تاريخ الإضافة: الأحدث أولاً (تنازلي)' },
+  { value: 'oldest', label: 'تاريخ الإضافة: الأقدم أولاً (تصاعدي)' },
+  { value: 'deadline_asc', label: 'آخر موعد: الأقرب أولاً (تصاعدي)' },
+  { value: 'deadline_desc', label: 'آخر موعد: الأبعد أولاً (تنازلي)' },
+  { value: 'updated_desc', label: 'آخر تحديث: الأحدث أولاً (تنازلي)' },
+  { value: 'updated_asc', label: 'آخر تحديث: الأقدم أولاً (تصاعدي)' },
 ]
 
 // الفئات المتاحة تُجمع من النتائج (لا endpoint مخصص لها)
@@ -312,13 +315,11 @@ function openTender(t: Tender) {
           </div>
           <div class="sel-wrap date-wrap" title="تاريخ العطاء: من">
             <span class="date-lbl">من</span>
-            <input v-model="filterDateFrom" type="date" :max="filterDateTo || undefined" class="filter-sel filter-date" aria-label="تاريخ العطاء من" />
-            <CalendarDays :size="15" class="sel-ico" />
+            <input v-model="filterDateFrom" type="date" :max="filterDateTo || undefined" class="filter-sel filter-date" aria-label="تاريخ العطاء من" @click="($event.target as HTMLInputElement).showPicker?.()" />
           </div>
           <div class="sel-wrap date-wrap" title="تاريخ العطاء: إلى">
             <span class="date-lbl">إلى</span>
-            <input v-model="filterDateTo" type="date" :min="filterDateFrom || undefined" class="filter-sel filter-date" aria-label="تاريخ العطاء إلى" />
-            <CalendarDays :size="15" class="sel-ico" />
+            <input v-model="filterDateTo" type="date" :min="filterDateFrom || undefined" class="filter-sel filter-date" aria-label="تاريخ العطاء إلى" @click="($event.target as HTMLInputElement).showPicker?.()" />
           </div>
           <button class="adv-btn" @click="resetFilters">
             <SlidersHorizontal :size="16" /> إعادة تعيين
@@ -355,7 +356,7 @@ function openTender(t: Tender) {
             </div>
             <div class="tender-body">
               <div class="tender-headline">
-                <h3 class="tender-title hc-title">{{ t.title }}</h3>
+                <h3 class="tender-title hc-title is-link" @click="openTender(t)">{{ t.title }}</h3>
                 <span class="card-status" :class="cardStatusClass[t.status]"><i />{{ cardStatusLabel[t.status] ?? t.status }}</span>
                 <span v-if="t.closing_soon" class="card-status cs-soon"><i />ينتهي قريباً</span>
               </div>
@@ -425,6 +426,7 @@ function openTender(t: Tender) {
 .sel-wrap { position: relative; flex: 1 1 150px; }
 .filter-sel { width: 100%; appearance: none; -webkit-appearance: none; border: 1.5px solid #e5e9f2; border-radius: 50px; padding: .65rem 2.4rem .65rem 2.2rem; font-size: .85rem; font-family: 'Tajawal', sans-serif; color: #374151; background: #fff; outline: none; cursor: pointer; transition: border-color .2s; }
 .filter-sel:focus { border-color: #1a237e; }
+.filter-date::-webkit-calendar-picker-indicator { display: none; }
 .filter-date { padding-left: 2.2rem; padding-right: 2.6rem; }
 .sel-wrap.date-wrap { flex: 1 1 170px; }
 .date-lbl { position: absolute; top: 50%; right: .95rem; transform: translateY(-50%); font-size: .78rem; font-weight: 700; color: #1a237e; pointer-events: none; z-index: 1; }
@@ -447,7 +449,7 @@ function openTender(t: Tender) {
 .tender-card { display: flex; gap: 1.1rem; align-items: center; background: #fff; border-radius: 16px; padding: .7rem .9rem; box-shadow: 0 5px 20px rgba(26, 35, 126, .07); transition: transform .25s, box-shadow .25s; }
 .tender-card:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(26, 35, 126, .13); }
 .tender-thumb { width: 118px; height: 82px; flex-shrink: 0; border-radius: 12px; overflow: hidden; background: #eef2fa; }
-.tender-thumb.is-link { cursor: pointer; }
+.tender-thumb.is-link, .tender-title.is-link { cursor: pointer; }
 .tender-thumb.is-link:focus-visible { outline: 2px solid #1a237e; outline-offset: 2px; }
 .tender-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .tender-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .7rem; }

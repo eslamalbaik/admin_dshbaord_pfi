@@ -125,6 +125,79 @@ class LandingController extends Controller
         return $url ? rtrim($url, '/') : null;
     }
 
+    /** تطبيع نص للبحث: أ/إ/آ=ا، ة=ه، ى=ي، بدون تشكيل أو تطويل، أرقام هندية=لاتينية، وكل فاصل = مسافة. */
+    private static function normalizeSearch(string $s): string
+    {
+        $s = preg_replace('/[\x{0640}\x{064B}-\x{0652}]/u', '', $s);
+        $s = str_replace(
+            ['أ', 'إ', 'آ', 'ٱ', 'ة', 'ى', 'ؤ', 'ئ', '٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'],
+            ['ا', 'ا', 'ا', 'ا', 'ه', 'ي', 'و', 'ي', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
+            mb_strtolower($s),
+        );
+
+        return trim(preg_replace('/[^\p{L}\p{N}]+/u', ' ', $s));
+    }
+
+    /**
+     * هل الشركة تطابق نص البحث؟ كل كلمة بالبحث لازم تنوجد (بأي ترتيب) بأي حقل: اسم الشركة، رقم العضوية،
+     * المدينة، المفوض، الجوال، المجالات، الاختصاصات والدرجات. أرقام قصيرة بتطابق بداية كلمة بس.
+     */
+    private static function matchesSearch(array $m, string $q): bool
+    {
+        $norm = self::normalizeSearch($q);
+        if ($norm === '') {
+            return true;
+        }
+
+        $number = (string) ($m['membership_number'] ?? '');
+        if ($number !== '' && in_array($number, [$q, MembershipNumber::normalize($q)], true)) {
+            return true;
+        }
+
+        $phone = (string) ($m['phone'] ?? '');
+        $parts = [
+            $m['name'] ?? '', $number, $m['city'] ?? '', $m['authorized_person'] ?? '', $phone, ltrim($phone, '0+'),
+        ];
+        foreach ($m['fields'] ?? [] as $f) {
+            $parts[] = $f['name'] ?? '';
+            array_push($parts, ...($f['grades'] ?? []));
+            foreach ($f['specializations'] ?? [] as $s) {
+                $parts[] = $s['name'] ?? '';
+            }
+        }
+        foreach ($m['specializations'] ?? [] as $s) {
+            $parts[] = $s['name'] ?? '';
+        }
+
+        $hay   = ' ' . self::normalizeSearch(implode(' ', array_map('strval', $parts))) . ' ';
+        $local = ltrim($phone, '0+');
+
+        foreach (explode(' ', $norm) as $t) {
+            $t = mb_strlen($t) > 3 && str_starts_with($t, 'ال') ? mb_substr($t, 2) : $t;
+            $found = ctype_digit($t)
+                ? str_contains($hay, ' ' . $t) || ($local !== '' && str_contains(preg_replace('/\D/', '', $local), ltrim($t, '0')) && strlen($t) >= 5)
+                : str_contains($hay, $t);
+            if (! $found) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** تطبيع اسم عربي للمقارنة فقط: أسماء المجالات تختلف بحرف بين قاعدة الإنتاج وstaging ("طرق" = "الطرق"، "ابنية" = "الأبنية"). */
+    private static function normalizeName(string $s): string
+    {
+        $s = preg_replace('/[\x{0640}\x{064B}-\x{0652}]/u', '', $s);
+        $s = str_replace(['أ', 'إ', 'آ', 'ة', 'ى'], ['ا', 'ا', 'ا', 'ه', 'ي'], $s);
+        $words = preg_split('/[\s\/\\\\,،\-–—_()]+/u', $s, -1, PREG_SPLIT_NO_EMPTY);
+
+        return implode('', array_map(
+            fn ($w) => mb_strlen($w) > 3 && str_starts_with($w, 'ال') ? mb_substr($w, 2) : $w,
+            $words,
+        ));
+    }
+
     /**
      * دليل الإنتاج العام (اسم، رقم عضوية، مدينة، حالة، مجالات ودرجات — بدون أي بيانات خاصة)، بنجلبه
      * كامل مرة كل 10 دقائق وبنفلتر محلياً. الإنتاج ما فيه كودات الاختصاصات، فالاختصاص بيفلتر على مجاله.
@@ -172,11 +245,10 @@ class LandingController extends Controller
         $items = collect($all)
             ->reject(fn ($m) => in_array($m['membership_number'] ?? '', self::HIDDEN_FROM_DIRECTORY, true))
             ->filter(fn ($m) => $f['status'] === '' || ($m['membership_status'] ?? '') === $f['status'])
-            ->filter(fn ($m) => $fieldName === null || collect($m['fields'] ?? [])->contains(fn ($x) => ($x['name'] ?? '') === $fieldName))
+            ->filter(fn ($m) => $fieldName === null || collect($m['fields'] ?? [])->contains(fn ($x) => self::normalizeName($x['name'] ?? '') === self::normalizeName($fieldName)))
             ->filter(fn ($m) => $gradeLabel === null || collect($m['fields'] ?? [])->contains(fn ($x) => in_array($gradeLabel, $x['grades'] ?? [], true)))
-            ->filter(fn ($m) => $q === '' || str_contains($m['name'] ?? '', $q)
-                || in_array($m['membership_number'] ?? '', [$q, MembershipNumber::normalize($q)], true))
-            ->map(fn ($m) => $m + ['phone' => null, 'logo_url' => null, 'member_since' => null, 'specializations' => []])
+            ->filter(fn ($m) => self::matchesSearch($m, $q))
+            ->map(fn ($m) => $m + ['authorized_person' => null, 'phone_is_mobile' => false, 'phone' => null, 'logo_url' => null, 'member_since' => null, 'specializations' => []])
             ->values();
 
         return $this->paginated(new LengthAwarePaginator(
@@ -213,18 +285,9 @@ class LandingController extends Controller
         $query = Contractor::query()
             ->whereIn('status', ['active', 'expired', 'suspended'])
             ->whereNotIn('membership_number', self::HIDDEN_FROM_DIRECTORY)
-            ->select(['id', 'name', 'membership_number', 'city', 'phone', 'status', 'specialties', 'logo', 'registration_date', 'created_at']);
+            ->select(['id', 'name', 'membership_number', 'city', 'phone', 'authorized_person', 'authorized_person_phone', 'status', 'specialties', 'logo', 'registration_date', 'created_at']);
 
-        if ($search !== '') {
-            $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $search) . '%';
-            $query->where(function ($q) use ($search, $like) {
-                $q->where('name', 'like', $like)
-                  // "184" أو "184_g" — نفس قاعدة تسجيل الدخول
-                  ->orWhere('membership_number', MembershipNumber::normalize($search))
-                  ->orWhere('membership_number', $search);
-            });
-        }
-
+        // البحث بيصير بالذاكرة بعد بناء الصفوف (نفس طريقة الفلاتر) عشان يغطي كل الحقول ويتجاهل الهمزات
         $contractors = $query->orderBy('name')->get();
 
         // نفس "حالة العضوية" المعروضة بصفحة الأرصدة وقائمة المقاولين
@@ -235,6 +298,8 @@ class LandingController extends Controller
         $labels = ['active' => 'عضوية سارية', 'expired' => 'عضوية منتهية', 'suspended' => 'موقوفة'];
 
         $items = $contractors->map(function (Contractor $c) use ($rows, $balances, $labels) {
+            $phone = $c->phone ?: $c->authorized_person_phone ?: null;
+
             $memberStatus = $c->status === 'suspended' || ! isset($rows[$c->id])
                 ? $c->status
                 : $balances->membershipStatus($rows[$c->id]);
@@ -247,7 +312,9 @@ class LandingController extends Controller
                 'name'              => $c->name,
                 'membership_number' => $c->membership_number,
                 'city'              => $c->city,
-                'phone'             => $c->phone ?: null,
+                'authorized_person' => $c->authorized_person ?: null,
+                'phone'             => $phone,
+                'phone_is_mobile'   => $phone !== null && \App\Support\PhoneNumber::looksLikeMobile($phone),
                 'logo_url'          => $c->logo ? $c->logo_url : null,
                 'member_since'      => $since ? (int) \Carbon\Carbon::parse($since)->year : null,
                 'membership_status' => $memberStatus,
@@ -268,8 +335,9 @@ class LandingController extends Controller
                 '_spec_ids'  => $specs->pluck('specialization_lk_type')->filter()->map(fn ($v) => (int) $v)->all(),
                 '_grades'    => $specs->pluck('classification')->filter()->all(),
             ];
-        })->filter(function ($m) use ($status, $field, $spec, $grade) {
+        })->filter(function ($m) use ($status, $field, $spec, $grade, $search) {
             return ($status === '' || $m['membership_status'] === $status)
+                && self::matchesSearch($m, $search)
                 && ($field === null || in_array($field, $m['_field_ids'], true))
                 && ($spec === null || in_array($spec, $m['_spec_ids'], true))
                 && ($grade === '' || in_array($grade, $m['_grades'], true));

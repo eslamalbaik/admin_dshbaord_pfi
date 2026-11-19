@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
-import { ClipboardCheck, Award, FileCheck, Scale, GraduationCap, ShieldCheck, Megaphone, ChartColumn, Check } from 'lucide-vue-next'
+import { ClipboardCheck, Award, FileCheck, Scale, GraduationCap, ShieldCheck, Megaphone, ChartColumn, Check, LogIn, Headset } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
@@ -91,12 +91,26 @@ const services = [
 
     <!-- CTA -->
     <section class="cta-section">
-      <div class="pub-cont cta-inner">
-        <h2 class="cta-title">هل أنت عضو في الاتحاد؟</h2>
-        <p class="cta-sub">سجّل الدخول للاستفادة من جميع الخدمات والتواصل مع فريق الدعم</p>
-        <div class="cta-actions">
-          <RouterLink to="/landing" class="cta-btn-p">تسجيل الدخول</RouterLink>
-          <RouterLink to="/contact-us" class="cta-btn-s">تواصل معنا</RouterLink>
+      <div class="pub-cont">
+        <div class="cta-card">
+          <span class="cta-orb cta-orb-1" aria-hidden="true" />
+          <span class="cta-orb cta-orb-2" aria-hidden="true" />
+
+          <div class="cta-text">
+            <span class="cta-badge"><ShieldCheck :size="15" /> بوابة الأعضاء</span>
+            <h2 class="cta-title">هل أنت عضو في الاتحاد؟</h2>
+            <p class="cta-sub">سجّل الدخول للاستفادة من جميع الخدمات والتواصل مع فريق الدعم</p>
+            <ul class="cta-points">
+              <li><Check :size="15" /> متابعة العضوية والتصنيف</li>
+              <li><Check :size="15" /> طلب الشهادات والخدمات</li>
+              <li><Check :size="15" /> دعم مباشر من فريق الاتحاد</li>
+            </ul>
+          </div>
+
+          <div class="cta-actions">
+            <RouterLink to="/contractor/login" class="cta-btn-p"><LogIn :size="18" /> تسجيل الدخول</RouterLink>
+            <RouterLink to="/landing/contact-us" class="cta-btn-s"><Headset :size="18" /> تواصل معنا</RouterLink>
+          </div>
         </div>
       </div>
     </section>
@@ -148,15 +162,31 @@ const services = [
 .svc-features li { display: flex; align-items: center; gap: .5rem; font-size: .8rem; color: #374151; }
 .svc-check { flex-shrink: 0; color: var(--c); }
 
-.cta-section { background: linear-gradient(145deg, #0d1b4b, #1a237e); padding: 4rem 0; }
-.cta-inner { text-align: center; }
-.cta-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 1.75rem; font-weight: 900; color: #fff; margin-bottom: .65rem; }
-.cta-sub { font-size: 1rem; color: rgba(255,255,255,.7); margin-bottom: 2rem; }
-.cta-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
-.cta-btn-p { display: inline-flex; align-items: center; background: linear-gradient(135deg,#f9a825,#e65100); color: #fff; border-radius: 10px; padding: .875rem 2rem; font-size: .95rem; font-weight: 800; text-decoration: none; font-family: 'Tajawal', sans-serif; transition: all .25s; }
-.cta-btn-p:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(249,168,37,.4); }
-.cta-btn-s { display: inline-flex; align-items: center; background: rgba(255,255,255,.15); color: #fff; border: 1.5px solid rgba(255,255,255,.4); border-radius: 10px; padding: .875rem 2rem; font-size: .95rem; font-weight: 700; text-decoration: none; font-family: 'Tajawal', sans-serif; transition: all .25s; }
-.cta-btn-s:hover { background: rgba(255,255,255,.25); transform: translateY(-2px); }
+.cta-section { background: #f5f6fb; padding: 4.5rem 0; }
+.cta-card { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: space-between; gap: 2.5rem; background: linear-gradient(135deg, #0d1b4b 0%, #1a237e 60%, #283593 100%); border-radius: 28px; padding: 3rem 3.25rem; box-shadow: 0 24px 56px rgba(13,27,75,.28); }
+.cta-card::before { content: ''; position: absolute; top: 0; inset-inline-start: 0; width: 6px; height: 100%; background: linear-gradient(to bottom, #f9a825, #e65100); }
+.cta-orb { position: absolute; border-radius: 50%; pointer-events: none; }
+.cta-orb-1 { width: 320px; height: 320px; top: -140px; inset-inline-end: -80px; background: radial-gradient(circle, rgba(249,168,37,.22), transparent 68%); }
+.cta-orb-2 { width: 240px; height: 240px; bottom: -120px; inset-inline-start: 30%; background: radial-gradient(circle, rgba(255,255,255,.08), transparent 68%); }
+.cta-text { position: relative; z-index: 1; flex: 1; min-width: 0; }
+.cta-badge { display: inline-flex; align-items: center; gap: .4rem; background: rgba(249,168,37,.15); color: #f9a825; border: 1px solid rgba(249,168,37,.35); border-radius: 50px; padding: .28rem .9rem; font-size: .78rem; font-weight: 800; margin-bottom: 1rem; }
+.cta-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 900; color: #fff; margin-bottom: .6rem; }
+.cta-sub { font-size: 1rem; color: rgba(255,255,255,.75); line-height: 1.8; max-width: 520px; margin-bottom: 1.25rem; }
+.cta-points { list-style: none; display: flex; flex-wrap: wrap; gap: .6rem 1.4rem; }
+.cta-points li { display: inline-flex; align-items: center; gap: .4rem; font-size: .88rem; font-weight: 700; color: rgba(255,255,255,.88); }
+.cta-points li svg { color: #f9a825; background: rgba(249,168,37,.16); border-radius: 50%; padding: 3px; box-sizing: content-box; }
+.cta-actions { position: relative; z-index: 1; display: flex; flex-direction: column; gap: .85rem; min-width: 230px; }
+.cta-btn-p, .cta-btn-s { display: inline-flex; align-items: center; justify-content: center; gap: .55rem; border-radius: 14px; padding: 1rem 2rem; font-size: 1rem; text-decoration: none; font-family: 'Tajawal', sans-serif; transition: all .25s; }
+.cta-btn-p { background: linear-gradient(135deg,#f9a825,#e65100); color: #fff; font-weight: 800; box-shadow: 0 10px 24px rgba(230,81,0,.35); }
+.cta-btn-p:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(249,168,37,.5); }
+.cta-btn-s { background: #fff; color: #1a237e; font-weight: 800; }
+.cta-btn-s:hover { background: #e8eaf6; transform: translateY(-2px); }
+@media (max-width: 820px) {
+  .cta-card { flex-direction: column; align-items: stretch; text-align: center; padding: 2.25rem 1.5rem; gap: 1.75rem; }
+  .cta-sub { margin-inline: auto; }
+  .cta-points { justify-content: center; }
+  .cta-actions { min-width: 0; }
+}
 
 @media (max-width: 1100px) { .services-grid { grid-template-columns: repeat(3,1fr); } }
 @media (max-width: 800px) { .services-grid { grid-template-columns: repeat(2,1fr); } }

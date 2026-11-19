@@ -3,7 +3,7 @@ import PublicSocialIcon from '@/components/PublicSocialIcon.vue'
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import api from '@/plugins/axios'
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { Search, Award, Filter, ChevronDown, ChevronLeft, ChevronUp, Building2, X, Hash, CalendarDays, MapPin, Layers, CircleCheck, HardHat, Route, Droplets, Zap, Wrench, Factory } from 'lucide-vue-next'
+import { UserRound, Search, Award, Filter, ChevronDown, ChevronLeft, ChevronUp, Building2, X, Hash, CalendarDays, MapPin, Layers, CircleCheck, HardHat, Route, Droplets, Zap, Wrench, Factory } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
@@ -13,6 +13,8 @@ interface Member {
   membership_number: string
   city: string | null
   phone?: string | null
+  phone_is_mobile?: boolean
+  authorized_person?: string | null
   logo_url: string | null
   member_since: number | null
   membership_status: 'active' | 'expired' | 'suspended'
@@ -273,7 +275,7 @@ onMounted(async () => {
         <div class="filters-bar">
           <div class="search-wrap">
             <Search :size="17" class="search-ico" />
-            <input v-model="searchQ" type="text" placeholder="ابحث باسم الشركة أو رقم العضوية..." class="search-input" />
+            <input v-model="searchQ" type="text" placeholder="ابحث باسم الشركة أو رقم العضوية أو اسم المفوض أو الجوال..." class="search-input" />
           </div>
           <div class="filters-row">
             <select v-model="filterStatus" class="filter-sel">
@@ -365,7 +367,10 @@ onMounted(async () => {
                   <CircleCheck v-if="selected.membership_status === 'active'" :size="15" />
                   {{ selected.status_label }}
                 </span>
-                <a v-if="selected.phone" :href="`https://wa.me/${waNumber(selected.phone)}`" target="_blank" rel="noopener noreferrer" class="mm-wa" aria-label="تواصل عبر واتساب" title="تواصل عبر واتساب"><PublicSocialIcon name="whatsapp" :size="20" /></a>
+                <div v-if="selected.phone" class="mm-contact">
+                <a :href="`https://wa.me/${waNumber(selected.phone)}`" target="_blank" rel="noopener noreferrer" class="mm-wa" aria-label="تواصل عبر واتساب" title="تواصل عبر واتساب"><PublicSocialIcon name="whatsapp" :size="20" /></a>
+                <a v-if="selected.phone_is_mobile" :href="`tel:+${waNumber(selected.phone)}`" class="mm-phone" dir="ltr">{{ selected.phone }}</a>
+                </div>
               </div>
               <button type="button" class="mm-close" aria-label="إغلاق" @click="closeMember"><X :size="22" :stroke-width="2.5" /></button>
             </div>
@@ -379,6 +384,10 @@ onMounted(async () => {
                 <div v-if="selected.member_since" class="mm-info-item">
                   <span class="mm-info-ico"><CalendarDays :size="20" :stroke-width="2.2" /></span>
                   <div><span class="mm-lbl">تاريخ المنح</span><span class="mm-val">{{ selected.member_since }}</span></div>
+                </div>
+                <div v-if="selected.authorized_person" class="mm-info-item">
+                  <span class="mm-info-ico"><UserRound :size="20" :stroke-width="2.2" /></span>
+                  <div><span class="mm-lbl">المفوض بالتوقيع</span><span class="mm-val">{{ selected.authorized_person }}</span></div>
                 </div>
                 <div v-if="selected.city" class="mm-info-item">
                   <span class="mm-info-ico"><MapPin :size="20" :stroke-width="2.2" /></span>
@@ -516,7 +525,10 @@ onMounted(async () => {
 .mm-count { display: inline-flex; align-items: center; gap: .4rem; font-size: .85rem; font-weight: 800; color: #1a237e; }
 .mm-caret { transition: transform .2s; }
 .mm-caret.open { transform: rotate(180deg); }
-.mm-wa { display: inline-grid; place-items: center; width: 36px; height: 36px; margin-top: .5rem; border-radius: 50%; background: #25d366; color: #fff; transition: transform .2s, box-shadow .2s; }
+.mm-contact { display: flex; align-items: center; gap: .6rem; margin-top: .5rem; }
+.mm-phone { font-size: .95rem; font-weight: 800; color: #fff; text-decoration: none; letter-spacing: .02em; }
+.mm-phone:hover { color: #f9a825; }
+.mm-wa { display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: #25d366; color: #fff; transition: transform .2s, box-shadow .2s; }
 .mm-wa:hover { transform: scale(1.1); box-shadow: 0 4px 12px rgba(37, 211, 102, .45); }
 .mm-grades { display: flex; flex-wrap: wrap; gap: .4rem; }
 .mm-specs { list-style: none; }

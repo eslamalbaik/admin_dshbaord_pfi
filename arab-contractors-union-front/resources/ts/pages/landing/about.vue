@@ -126,7 +126,7 @@ const facts = [
             </li>
           </ol>
           <div class="goals-photo">
-            <img src="/images/landing/goals-workers.jpg" alt="مهندسون في موقع إنشاءات" loading="lazy">
+            <img src="/images/landing/goals-workers.webp" alt="مهندسون في موقع إنشاءات" loading="lazy">
             <div class="goals-photo-cap">
               <span class="goals-photo-bar" />
               <p>معاً .. نحو قطاع إنشائي قوي ومستدام في فلسطين</p>
@@ -233,16 +233,16 @@ const facts = [
 .values-label { background: rgba(249,168,37,.12); color: #f9a825; border-color: rgba(249,168,37,.35); }
 .values-h { color: #fff; }
 .values-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
-.value-card { position: relative; overflow: hidden; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); border-radius: 18px; padding: 1.75rem; transition: transform .25s, background .25s, border-color .25s, box-shadow .25s; }
+.value-card { position: relative; overflow: hidden; background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; padding: 1.75rem; transition: transform .25s, background .25s, border-color .25s, box-shadow .25s; }
 .value-card::before { content: ''; position: absolute; top: 0; inset-inline-start: 0; width: 48px; height: 3px; background: linear-gradient(90deg,#f9a825,#e65100); transition: width .35s; }
-.value-card:hover { transform: translateY(-5px); background: rgba(255,255,255,.1); border-color: rgba(249,168,37,.45); box-shadow: 0 16px 36px rgba(0,0,0,.25); }
+.value-card:hover { transform: translateY(-5px); background: #fff; border-color: rgba(249,168,37,.45); box-shadow: 0 16px 36px rgba(0,0,0,.25); }
 .value-card:hover::before { width: 100%; }
 .value-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
 .value-icon { width: 52px; height: 52px; border-radius: 14px; background: rgba(249,168,37,.14); border: 1px solid rgba(249,168,37,.3); color: #f9a825; display: flex; align-items: center; justify-content: center; transition: background .25s, color .25s; }
 .value-card:hover .value-icon { background: #f9a825; color: #0d1b3e; }
-.value-num { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 2.2rem; font-weight: 900; line-height: 1; color: rgba(255,255,255,.16); }
-.value-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 1.08rem; font-weight: 800; color: #fff; margin-bottom: .5rem; }
-.value-desc { font-size: .88rem; color: rgba(255,255,255,.72); line-height: 1.85; }
+.value-num { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 2.2rem; font-weight: 900; line-height: 1; color: #e5e7eb; }
+.value-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: 1.08rem; font-weight: 800; color: #1a237e; margin-bottom: .5rem; }
+.value-desc { font-size: .88rem; color: #4b5563; line-height: 1.85; }
 
 /* extra */
 .about-hq { grid-column: 1 / -1; width: 100%; border-radius: 16px; object-fit: cover; max-height: 280px; }
