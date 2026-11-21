@@ -693,7 +693,36 @@ onMounted(() => {
 .cards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
 
 .tender-card { border: 1px solid #dfe2ea; border-radius: 14px; overflow: hidden; background: #fff; display: flex; flex-direction: column; }
-.tender-img { position: relative; height: 198f7c3c8; }
+.tender-img { position: relative; height: 198px; }
+.tender-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tender-img::after { content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, .78) 100%); }
+.status {
+  position: absolute; top: 24px; right: 16px; z-index: 1; display: inline-flex; align-items: center; gap: 6px;
+  color: #fff; font-size: 13px; font-weight: 700; border-radius: 6px; padding: 4px 10px;
+}
+.status i { width: 7px; height: 7px; border-radius: 50%; background: #fff; }
+.status-open { background: #1b9e5a; }
+.status-soon { background: var(--orange); }
+.status-closed { background: #6b7280; }
+.bookmark {
+  position: absolute; top: 24px; left: 16px; z-index: 1; width: 44px; height: 44px; border-radius: 8px; border: none;
+  background: #fff; color: var(--navy); display: grid; place-items: center; cursor: pointer;
+}
+.tender-cat {
+  position: absolute; bottom: 24px; right: 16px; z-index: 1; color: var(--orange); font-weight: 800; font-size: 15px;
+  background: rgba(0, 0, 0, .3); border-radius: 6px; padding: 4px 12px;
+}
+.tender-body { padding: 20px 16px 22px; display: flex; flex-direction: column; gap: 14px; flex: 1; }
+.tender-body h3, .news-body h3 { font-size: 17px; font-weight: 800; line-height: 1.45; }
+.tender-body p, .news-body p { color: var(--muted); font-size: 14px; line-height: 1.75; }
+.deadline {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  background: #f4f5f8; border: 1px solid #e3e5eb; border-radius: 12px; padding: 10px 16px; margin-top: auto;
+}
+.deadline-label { display: inline-flex; align-items: center; gap: 6px; color: #6b7280; font-size: 13px; font-weight: 700; }
+.deadline-label svg { color: var(--orange); }
+.deadline-date { background: #fff; border: 1px solid #e3e5eb; border-radius: 8px; padding: 6px 14px; font-size: 13px; font-weight: 800; }
+.deadline.soon { background: #fde8ea; border-color: #f7c3c8; }
 .deadline.soon .deadline-label, .deadline.soon .deadline-label svg, .deadline.soon .deadline-date { color: #d6142b; }
 .tender-btn { width: 100%; padding: 12px; font-size: 15px; }
 
