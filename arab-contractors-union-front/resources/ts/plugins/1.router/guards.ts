@@ -172,5 +172,21 @@ export const setupGuards = (router: _RouterTyped<RouteNamedMap & { [key: string]
     routeLoading.done(to.path.startsWith('/landing') ? 1100 : undefined)
   })
 
-  router.onError(() => routeLoading.done())
+  router.onError((error, to) => {
+    routeLoading.done()
+
+    // بعد كل نشر بتتغيّر أسماء ملفات الصفحات (hash)، فالتبويب المفتوح من النسخة القديمة بيفشل بتحميل الصفحة التالية
+    // والضغط على الرابط "ما بيفتح". نعمل إعادة تحميل كاملة للوجهة (مرة وحدة لكل وجهة لتجنّب حلقة لا نهائية).
+    const msg = String((error as Error)?.message ?? error)
+    if (/dynamically imported module|Importing a module script failed|Loading chunk|error loading dynamically/i.test(msg)) {
+      const key = `chunk-reload:${to.fullPath}`
+      try {
+        if (sessionStorage.getItem(key))
+          return
+        sessionStorage.setItem(key, '1')
+      }
+      catch { /* sessionStorage غير متاح: نكمّل بإعادة التحميل */ }
+      window.location.assign(to.fullPath)
+    }
+  })
 }

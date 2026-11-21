@@ -20,7 +20,7 @@ definePage({
 const router = useRouter()
 const route = useRoute()
 
-// ─── فيديو "كيف تسجّل دخولك" (نافذة منبثقة) ──────────────────────────────────
+// ─── فيديو "كيف تسجل دخولك" (نافذة منبثقة) ──────────────────────────────────
 // الرابط اللي بينسخه الزائر /landing?video=login بيفتح الصفحة والنافذة مفتوحة
 const loginVideoOpen = ref(route.query.video === 'login')
 watch(() => route.query.video, v => { if (v === 'login') loginVideoOpen.value = true })
@@ -500,13 +500,13 @@ onMounted(() => {
       <section v-reveal class="guide">
         <div class="guide-text">
           <span class="eyebrow"><i />دليل المقاول</span>
-          <h2 class="heading">كيف تسجّل دخولك <span class="underlined navy">للتطبيق؟</span></h2>
+          <h2 class="heading">كيف تسجل دخولك <span class="underlined navy">للتطبيق؟</span></h2>
           <p>شاهد الفيديو الإرشادي القصير، وتعرّف على خطوات تفعيل حسابك وتسجيل الدخول إلى تطبيق اتحاد المقاولين الفلسطينيين.</p>
           <button type="button" class="guide-btn" @click="loginVideoOpen = true">
             <Play :size="16" fill="currentColor" /> شاهد الفيديو
           </button>
         </div>
-        <button type="button" class="guide-poster" aria-label="تشغيل فيديو كيف تسجّل دخولك" @click="loginVideoOpen = true">
+        <button type="button" class="guide-poster" aria-label="تشغيل فيديو كيف تسجل دخولك" @click="loginVideoOpen = true">
           <img src="/videos/login-guide-poster.jpg" alt="" loading="lazy">
           <span class="guide-play"><Play :size="30" fill="currentColor" /></span>
         </button>

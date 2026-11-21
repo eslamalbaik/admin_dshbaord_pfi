@@ -4,7 +4,7 @@ import { Check, Copy, Eye, Gauge, Link2, Share2, X } from 'lucide-vue-next'
 import api from '@/plugins/axios'
 
 /**
- * نافذة فيديو "كيف تسجّل دخولك" بالصفحة الرئيسية.
+ * نافذة فيديو "كيف تسجل دخولك" بالصفحة الرئيسية.
  * - الفيديو ملف عام على الموقع: /videos/login-guide.mp4
  * - بيشتغل افتراضياً على سرعة 1.2 (المستخدم بيقدر يغيّرها)
  * - رابط المشاركة بيفتح الصفحة الرئيسية والنافذة مفتوحة: /landing?video=login
@@ -122,7 +122,7 @@ const shareTargets = computed(() => {
 async function share() {
   if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
     try {
-      await navigator.share({ title: 'كيف تسجّل دخولك', text: shareText, url: shareUrl.value })
+      await navigator.share({ title: 'كيف تسجل دخولك', text: shareText, url: shareUrl.value })
 
       return
     }
@@ -186,7 +186,7 @@ onUnmounted(() => {
             <div class="lgv-head-text">
               <span class="lgv-kicker"><i />دليل المقاول</span>
               <h2 id="lgv-title">
-                كيف تسجّل دخولك؟
+                كيف تسجل دخولك؟
               </h2>
               <p>خطوات تفعيل الحساب وتسجيل الدخول في تطبيق اتحاد المقاولين الفلسطينيين</p>
             </div>
