@@ -598,10 +598,6 @@ onMounted(() => {
 
 
 
-  position: relative; overflow: hidden; display: grid; grid-template-columns: auto 1.5fr 1fr; gap: 2rem; align-items: center;
-  background: linear-gradient(135deg, #f5f7ff 0%, #fff 60%); border: 1.5px solid #c5cae9; border-radius: 20px; padding: 2rem 2.25rem;
-  box-shadow: 0 10px 30px rgba(13, 27, 75, .07);
-}
 /* category tabs */
 .cat-tabs { display: flex; gap: .5rem; flex-wrap: wrap; }
 .cat-tab { border: 1.5px solid #c5cae9; background: #fff; color: #1a237e; border-radius: 50px; padding: .4rem 1.1rem; font-size: .88rem; font-weight: 700; font-family: inherit; cursor: pointer; transition: all .2s; }
