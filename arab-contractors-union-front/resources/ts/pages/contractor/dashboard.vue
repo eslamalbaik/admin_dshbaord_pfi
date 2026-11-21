@@ -109,7 +109,11 @@ async function fetchDashboard() {
     membership.value = r.data.items.membership
     stats.value      = r.data.items.stats
   } catch (e: any) {
-    if (e?.response?.status === 401) authError.value = true
+    if (e?.response?.status === 401) {
+      // توكن منتهي/غير صالح: نمسحه، وإلا صفحتا الدخول والتفعيل بتحوّلانك للوحة من جديد (حلقة "يجب تسجيل الدخول")
+      localStorage.removeItem('contractor_token')
+      authError.value = true
+    }
   }
 }
 
