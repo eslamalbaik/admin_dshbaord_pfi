@@ -1,35 +1,29 @@
 <script setup lang="ts">
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
+import { ref, computed, watch } from 'vue'
 import { FileText, Download, ExternalLink, Calendar } from 'lucide-vue-next'
+import { usePublicLegalFiles, fileExt } from '@/composables/usePublicLegalFiles'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
-const categories = [
-  { key:'laws',      label:'القوانين والتشريعات' },
-  { key:'contracts', label:'عقود الفيديك FIDIC' },
-  { key:'procurement', label:'تعليمات الشراء العام' },
-  { key:'guides',    label:'الأدلة الإرشادية' },
-  { key:'decisions', label:'القرارات واللوائح' },
+// الملفات الحقيقية من "المكتبة القانونية" بلوحة التحكم، بدل القائمة الثابتة القديمة
+const { files, categories, isLoading, isError } = usePublicLegalFiles()
+
+const palette = [
+  { color: '#1a237e', bg: '#e8eaf6' }, { color: '#c62828', bg: '#fce4ec' }, { color: '#2e7d32', bg: '#e8f5e9' },
+  { color: '#e65100', bg: '#fff8e1' }, { color: '#6a1b9a', bg: '#f3e5f5' }, { color: '#00695c', bg: '#e0f2f1' },
+  { color: '#0277bd', bg: '#e3f2fd' }, { color: '#ad1457', bg: '#fce4ec' },
 ]
 
-const docs = [
-  { id:1, cat:'laws',      title:'قانون المقاولات الفلسطيني',                    year:'٢٠١٨', type:'PDF', pages:45, color:'#1a237e', bg:'#e8eaf6' },
-  { id:2, cat:'laws',      title:'قانون الشراء العام',                          year:'٢٠١٩', type:'PDF', pages:32, color:'#c62828', bg:'#fce4ec' },
-  { id:3, cat:'laws',      title:'قانون التسوية والتحكيم',                       year:'٢٠١٧', type:'PDF', pages:28, color:'#2e7d32', bg:'#e8f5e9' },
-  { id:4, cat:'contracts', title:'عقد الفيديك الأحمر - إنشاء المشاريع',         year:'٢٠١٧', type:'PDF', pages:160, color:'#e65100', bg:'#fff8e1' },
-  { id:5, cat:'contracts', title:'عقد الفيديك الأصفر - التصميم والبناء',        year:'٢٠١٧', type:'PDF', pages:144, color:'#f9a825', bg:'#fff8e1' },
-  { id:6, cat:'contracts', title:'عقد الفيديك الفضي - المحطات الإنشائية',       year:'٢٠١٧', type:'PDF', pages:128, color:'#607d8b', bg:'#eceff1' },
-  { id:7, cat:'procurement', title:'تعليمات الشراء العام للأشغال الحكومية',     year:'٢٠٢٠', type:'PDF', pages:56, color:'#6a1b9a', bg:'#f3e5f5' },
-  { id:8, cat:'procurement', title:'دليل إعداد وثائق العطاءات',                 year:'٢٠٢١', type:'PDF', pages:38, color:'#00695c', bg:'#e0f2f1' },
-  { id:9, cat:'guides',   title:'الدليل الإرشادي لتصنيف المقاولين',             year:'٢٠٢٣', type:'PDF', pages:42, color:'#0277bd', bg:'#e3f2fd' },
-  { id:10, cat:'guides',  title:'دليل السلامة المهنية في مواقع البناء',          year:'٢٠٢٢', type:'PDF', pages:64, color:'#558b2f', bg:'#f1f8e9' },
-  { id:11, cat:'decisions', title:'لائحة تسجيل شركات المقاولات',               year:'٢٠٢١', type:'PDF', pages:24, color:'#ad1457', bg:'#fce4ec' },
-  { id:12, cat:'decisions', title:'قرار مجلس الوزراء رقم ٢٠٢٢/٤٥ — رسوم التصنيف', year:'٢٠٢٢', type:'PDF', pages:8, color:'#e65100', bg:'#fff8e1' },
-]
+const activecat = ref('')
+watch(categories, cats => {
+  if (!cats.some(c => c.value === activecat.value))
+    activecat.value = cats[0]?.value ?? ''
+}, { immediate: true })
 
-import { ref, computed } from 'vue'
-const activecat = ref('laws')
-const filteredDocs = computed(() => docs.filter(d => d.cat === activecat.value))
+const filteredDocs = computed(() => files.value
+  .filter(f => f.category === activecat.value)
+  .map((f, i) => ({ ...f, ext: fileExt(f), year: new Date(f.created_at).getFullYear(), ...palette[i % palette.length] })))
 </script>
 
 <template>
@@ -52,13 +46,16 @@ const filteredDocs = computed(() => docs.filter(d => d.cat === activecat.value))
           <!-- Sidebar -->
           <div class="leg-sidebar">
             <h3 class="sidebar-title">التصنيفات</h3>
-            <button v-for="c in categories" :key="c.key" class="sidebar-btn" :class="{ active: activecat === c.key }" @click="activecat = c.key">
-              <FileText :size="15" /> {{ c.label }}
+            <button v-for="c in categories" :key="c.value" class="sidebar-btn" :class="{ active: activecat === c.value }" @click="activecat = c.value">
+              <FileText :size="15" /> {{ c.label }} <span class="sidebar-count">{{ c.count }}</span>
             </button>
           </div>
 
           <!-- Docs List -->
           <div class="leg-content">
+            <p v-if="isLoading" class="leg-state">جاري تحميل الملفات...</p>
+            <p v-else-if="isError" class="leg-state">تعذّر تحميل الملفات، حاول مرة أخرى لاحقاً.</p>
+            <p v-else-if="!filteredDocs.length" class="leg-state">لا توجد ملفات منشورة حالياً.</p>
             <div class="docs-grid">
               <div v-for="d in filteredDocs" :key="d.id" class="doc-card">
                 <div class="doc-icon" :style="`background:${d.bg};color:${d.color};border-color:${d.color}`">
@@ -66,19 +63,20 @@ const filteredDocs = computed(() => docs.filter(d => d.cat === activecat.value))
                 </div>
                 <div class="doc-body">
                   <h3 class="doc-title">{{ d.title }}</h3>
+                  <p v-if="d.description" class="doc-desc">{{ d.description }}</p>
                   <div class="doc-meta">
                     <span><Calendar :size="12" /> {{ d.year }}</span>
-                    <span>{{ d.pages }} صفحة</span>
-                    <span class="doc-type">{{ d.type }}</span>
+                    <span v-if="d.formatted_size">{{ d.formatted_size }}</span>
+                    <span class="doc-type">{{ d.ext }}</span>
                   </div>
                 </div>
                 <div class="doc-actions">
-                  <button class="doc-btn download" :style="`color:${d.color};border-color:${d.color}`">
+                  <a class="doc-btn download" :href="d.url" download target="_blank" rel="noopener noreferrer" :style="`color:${d.color};border-color:${d.color}`">
                     <Download :size="14" /> تحميل
-                  </button>
-                  <button class="doc-btn view">
+                  </a>
+                  <a class="doc-btn view" :href="d.url" target="_blank" rel="noopener noreferrer">
                     <ExternalLink :size="14" /> عرض
-                  </button>
+                  </a>
                 </div>
               </div>
             </div>
@@ -123,7 +121,10 @@ const filteredDocs = computed(() => docs.filter(d => d.cat === activecat.value))
 .doc-meta span { display: flex; align-items: center; gap: .3rem; font-size: .77rem; color: #9ca3af; font-weight: 500; }
 .doc-type { background: #e8eaf6; color: #1a237e; border-radius: 50px; padding: .1rem .55rem; font-weight: 700 !important; }
 .doc-actions { display: flex; gap: .5rem; flex-shrink: 0; }
-.doc-btn { display: flex; align-items: center; gap: .3rem; border-radius: 8px; padding: .45rem .875rem; font-size: .8rem; font-weight: 700; cursor: pointer; font-family: 'Tajawal', sans-serif; transition: all .2s; white-space: nowrap; }
+.sidebar-count { margin-inline-start: auto; font-size: .72rem; opacity: .75; }
+.leg-state { color: #9ca3af; font-size: .95rem; padding: 2rem 0; text-align: center; }
+.doc-desc { font-size: .8rem; color: #6b7280; line-height: 1.6; margin-bottom: .45rem; }
+.doc-btn { display: flex; align-items: center; gap: .3rem; border-radius: 8px; text-decoration: none; padding: .45rem .875rem; font-size: .8rem; font-weight: 700; cursor: pointer; font-family: 'Tajawal', sans-serif; transition: all .2s; white-space: nowrap; }
 .doc-btn.download { background: transparent; border: 1.5px solid; }
 .doc-btn.download:hover { color: #fff !important; }
 .doc-btn.view { background: #f3f4f6; color: #6b7280; border: 1.5px solid #e5e7eb; }
