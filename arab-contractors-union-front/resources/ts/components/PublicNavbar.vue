@@ -4,7 +4,6 @@ import { PUBLIC_SOCIAL_LINKS } from '@/utils/publicSocialLinks'
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Menu, X, ChevronDown, LayoutDashboard, User, LogOut, Bell, Mail, Phone, MapPin } from 'lucide-vue-next'
-import api from '@/plugins/axios'
 import PublicLoginButton from '@/components/PublicLoginButton.vue'
 import axios from 'axios'
 
@@ -126,8 +125,10 @@ async function fetchMe() {
   const savedToken = localStorage.getItem('contractor_token')
   if (savedToken) {
     try {
-      const r = await api.get('/api/v1/contractor/auth/profile', {
-        headers: { Authorization: `Bearer ${savedToken}` },
+      // axios مباشرة مش `api`: interceptor الـapi بيستبدل الـAuthorization بتوكن المشرف (accessToken) إن وُجد،
+      // فطلب البروفايل كان يفشل (401) وبيضل زر "دخول" ظاهر بالهيدر رغم إن المقاول مسجّل دخول
+      const r = await axios.get(`${BASE}/api/v1/contractor/auth/profile`, {
+        headers: { Authorization: `Bearer ${savedToken}`, Accept: 'application/json' },
       })
       localProfile.value = r.data.items ?? r.data
       fetchNotifications()
