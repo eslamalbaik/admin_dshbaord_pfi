@@ -66,6 +66,27 @@ class ContractorPaymentTest extends TestCase
             ->assertJsonPath('items.0.reference_number', 'REF-1');
     }
 
+    /** تحويل بالشيكل بينحفظ معه مبلغ تقريبي بالدينار بآخر سعر، بدل "بانتظار سعر الصرف" لحد الاعتماد */
+    public function test_submit_transfer_in_foreign_currency_stores_an_estimated_jod_amount(): void
+    {
+        \App\Models\ExchangeRate::create(['currency' => 'ILS', 'rate_to_jod' => 0.2, 'fetched_at' => now(), 'source' => 'api']);
+        $contractor = $this->createContractor();
+        Sanctum::actingAs($contractor, ['*']);
+
+        $this->postJson('/api/v1/contractor/payments/transfer', [
+            'amount'        => 3200,
+            'currency'      => 'ILS',
+            'receipt_image' => UploadedFile::fake()->image('receipt.jpg'),
+            'type'          => 'membership_fee',
+        ])->assertStatus(201);
+
+        $payment = Payment::first();
+        $this->assertSame('pending', $payment->status);
+        $this->assertEquals(640, (float) $payment->amount_jod);
+        $this->assertEquals(0.2, (float) $payment->exchange_rate);
+        $this->assertSame('api', $payment->rate_source);
+    }
+
     public function test_submit_transfer_fails_validation_without_receipt_image(): void
     {
         $contractor = $this->createContractor();

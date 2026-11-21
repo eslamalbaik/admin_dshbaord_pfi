@@ -108,6 +108,11 @@ class PaymentController extends Controller
 
         $path = $request->file('receipt_image')->store('payment-receipts', 'public');
 
+        // تحويل بالشيكل/الدولار: مبلغ تقريبي بالدينار بآخر سعر، عشان ما يضل "بانتظار سعر الصرف" بصفحة
+        // المعاملات وما يطلع برّا مجموع المعلّق. الاعتماد (PaymentConfirmationService) بيعيد حسابه بسعر يومه.
+        $currency = strtoupper($data['currency'] ?? 'JOD');
+        $rate = $currency === 'JOD' ? null : $this->exchangeRateService->latest($currency);
+
         $payment = Payment::create([
             'contractor_id'        => $contractor->id,
             'membership_id'        => $data['membership_id'] ?? null,
@@ -116,7 +121,12 @@ class PaymentController extends Controller
             'penalty_id'           => $penalty?->id,
             'bank_account_id'      => $data['bank_account_id'] ?? null,
             'amount'               => $data['amount'],
-            'currency'             => $data['currency'] ?? 'JOD',
+            'currency'             => $currency,
+            'exchange_rate'        => $rate?->rate_to_jod,
+            'amount_jod'           => $currency === 'JOD' || $rate
+                ? $this->exchangeRateService->convertToJod((float) $data['amount'], $currency, (float) ($rate?->rate_to_jod ?? 1))
+                : null,
+            'rate_source'          => $rate?->source,
             'type'                 => $type,
             'status'               => 'pending',
             'method'               => 'bank_transfer',
