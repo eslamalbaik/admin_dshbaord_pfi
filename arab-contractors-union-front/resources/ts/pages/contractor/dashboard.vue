@@ -22,6 +22,8 @@ const router = useRouter()
 // ─── Auth ───
 const token = ref<string | null>(null)
 const authError = ref(false)
+// بدل ما نعرض شاشة "يجب تسجيل الدخول أولاً": ننقل المقاول مباشرة لصفحة الدخول (التوكن المنتهي بينمسح قبلها)
+watch(authError, (v) => { if (v) router.replace('/contractor/login') })
 
 function getToken() { return localStorage.getItem('contractor_token') }
 function apiHeaders() { return { Authorization: `Bearer ${token.value}` } }

@@ -131,9 +131,13 @@ async function fetchMe() {
       })
       localProfile.value = r.data.items ?? r.data
       fetchNotifications()
-    } catch {
-      localStorage.removeItem('contractor_token')
-      localProfile.value = null
+    } catch (e: any) {
+      // نمسح التوكن بس لو السيرفر رفضه فعلاً (401)؛ فشل مؤقت (شبكة/500) ما لازم يطلّع المقاول من جلسته
+      // (كان بيمسحه بأي خطأ، فبعد التفعيل مباشرة كانت اللوحة تلاقي التوكن راح وتعرض "يجب تسجيل الدخول")
+      if (e?.response?.status === 401) {
+        localStorage.removeItem('contractor_token')
+        localProfile.value = null
+      }
     }
   } else {
     localProfile.value = null
@@ -195,9 +199,13 @@ function handleLogout() {
 onMounted(() => {
   fetchMe()
   window.addEventListener('contractor-logged-in', fetchMe)
-  window.addEventListener('contractor-logged-out', () => {
-    localProfile.value = null
-  })
+  window.addEventListener('contractor-logged-out', onContractorLoggedOut)
+})
+function onContractorLoggedOut() { localProfile.value = null }
+onUnmounted(() => {
+  // بدون إزالة الـlisteners كان الهيدر القديم (بعد مغادرة الصفحة) يضل يسمع ويمسح التوكن
+  window.removeEventListener('contractor-logged-in', fetchMe)
+  window.removeEventListener('contractor-logged-out', onContractorLoggedOut)
 })
 </script>
 
