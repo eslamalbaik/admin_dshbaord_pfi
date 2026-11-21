@@ -61,6 +61,16 @@ const navLinks = [
   { label: 'تواصل معنا', href: '/landing/contact-us' },
 ]
 
+// تاريخ انتهاء العضوية (آخر عضوية) — بيظهر بالهيدر لما تكون منتهية
+const membershipExpiry = computed(() => {
+  const m = localProfile.value?.membership
+  const expired = m?.is_expired || localProfile.value?.status === 'expired'
+  if (!expired || !m?.expires_at) return ''
+  const d = new Date(m.expires_at)
+
+  return Number.isNaN(d.getTime()) ? '' : `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
+})
+
 const initials = (name?: string) => (name ?? '').trim().charAt(0)
 
 const openDropdown = ref<string | null>(null)
@@ -263,6 +273,7 @@ onUnmounted(() => {
         <div class="pub-nb-actions">
           <PublicLoginButton v-if="!localProfile" class="pub-btn-register" @click="handleRegisterClick" />
           <span v-if="localProfile?.status === 'active'" class="pub-member-pill"><i />عضوية سارية</span>
+          <span v-else-if="localProfile && membershipExpiry" class="pub-member-pill pub-member-expired" :title="`انتهت العضوية بتاريخ ${membershipExpiry}`"><i />عضوية منتهية · {{ membershipExpiry }}</span>
           <div v-if="localProfile" class="pub-nb-notif" @click.stop="toggleNotifDropdown">
             <Bell :size="24" fill="currentColor" />
             <span v-if="unreadCount > 0" class="pub-nb-notif-badge">{{ unreadCount > 9 ? '9+' : unreadCount }}</span>
@@ -397,8 +408,15 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
   font-size: .95rem; font-weight: 700; line-height: 1.2; white-space: nowrap;
 }
 .pub-brand-name small { color: #0b0b0f; font-size: .82rem; font-weight: 500; direction: ltr; text-align: right; letter-spacing: .02em; }
-@media (min-width: 1101px) and (max-width: 1199px) {
+@media (min-width: 1101px) and (max-width: 1399px) {
   .pub-brand-name { display: none; }
+}
+/* شاشات متوسطة: قائمة وسطية مضغوطة عشان أزرار الحساب (العضوية/الإشعارات/الصورة) ما تطلع برا الشاشة */
+@media (min-width: 1101px) and (max-width: 1320px) {
+  .pub-nav-links { gap: .9rem; margin-inline-start: .5rem; }
+  .pub-nav-link { font-size: .86rem !important; }
+  .pub-nb-actions { gap: .55rem; }
+  .pub-member-pill { padding: .45rem .75rem; font-size: .82rem; }
 }
 @media (max-width: 420px) {
   .pub-brand-name small { display: none; }
@@ -409,7 +427,7 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
   .pub-tb-soc { width: 24px; height: 24px; }
 }
 
-.pub-nav-links { position: relative; display: flex; align-self: stretch; gap: 1.9rem; margin-inline-start: 3.2rem; margin-inline-end: auto; }
+.pub-nav-links { position: relative; display: flex; align-self: stretch; gap: 1.35rem; margin-inline-start: 1.5rem; margin-inline-end: auto; min-width: 0; }
 .pub-nav-item { display: flex; align-items: center; }
 .pub-nav-item { position: relative; }
 .pub-nav-link {
@@ -435,6 +453,8 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
   display: inline-flex; align-items: center; gap: .5rem; background: #e3f6e8; color: #11903a;
   border-radius: 14px; padding: .6rem 1.1rem; font-size: .95rem; font-weight: 600; white-space: nowrap;
 }
+.pub-member-expired { background: #fdecea; color: #c62828; }
+.pub-member-expired i { background: #c62828; }
 .pub-member-pill i { width: 9px; height: 9px; border-radius: 50%; background: #11903a; }
 .pub-nav-chevron { transition: transform .25s; flex-shrink: 0; }
 .pub-nav-chevron.open { transform: rotate(-180deg); }
@@ -526,7 +546,7 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
 .pub-mob-sub-link:hover { background: #e8eaf6; color: #1a237e; }
 .pub-mob-cta { width: 100%; justify-content: center; margin-top: .75rem; border-radius: 9px; padding: .65rem 1.5rem; }
 
-.pub-nb-actions { display: flex; align-items: center; gap: 1.4rem; flex-shrink: 0; }
+.pub-nb-actions { display: flex; align-items: center; gap: .9rem; flex-shrink: 0; }
 .pub-nb-notif { position: relative; display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; color: #9aa1ad; transition: background .2s; }
 .pub-nb-notif:hover { background: #f3f4f6; }
 .pub-nb-notif-badge {

@@ -8,8 +8,8 @@ import {
   User, ClipboardList, CreditCard, FileText,
   Award, Phone, Mail, Building2,
   CalendarDays, CheckCircle, AlertCircle,
-  Download, RefreshCw, ChevronRight, Wallet,
-  FileCheck, FileClock, MessageSquare, Truck, HelpCircle, Camera,
+  Download, RefreshCw, ChevronRight,
+  FileCheck, FileClock, MessageSquare, Camera,
   Pencil, X, UploadCloud, Save, Paperclip, Check,
 } from 'lucide-vue-next'
 
@@ -703,42 +703,7 @@ async function deleteTenderDocument(id: number) {
           </div>
         </div>
 
-        <!-- KPIs Grid (ثابتة فوق كل التبويبات) -->
-        <div class="page-title-area">
-          <h2>مؤشرات الأداء</h2>
-        </div>
-        <div class="md-kpi-grid">
-          <div class="kpi-card">
-            <div class="kpi-icon blue"><Truck :size="24" /></div>
-            <div class="kpi-data">
-              <span class="kpi-val">{{ stats?.total_equipment || 0 }}</span>
-              <span class="kpi-lbl">الآليات المُسجلة</span>
-            </div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-icon green"><Award :size="24" /></div>
-            <div class="kpi-data">
-              <span class="kpi-val">{{ stats?.certificate_requests || 0 }}</span>
-              <span class="kpi-lbl">طلبات التراخيص والشهادات</span>
-            </div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-icon purple"><HelpCircle :size="24" /></div>
-            <div class="kpi-data">
-              <span class="kpi-val">{{ stats?.open_tickets || 0 }}</span>
-              <span class="kpi-lbl">تذاكر الدعم المفتوحة</span>
-            </div>
-          </div>
-          <div class="kpi-card" :class="{ 'warning-kpi': outstandingDues > 0 }">
-            <div class="kpi-icon red"><Wallet :size="24" /></div>
-            <div class="kpi-data">
-              <span class="kpi-val">{{ outstandingDues }} د.أ</span>
-              <span class="kpi-lbl">الذمم المستحقة</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Navigation Pills (تحت مؤشرات الأداء) -->
+        <!-- Navigation Pills -->
         <nav class="md-nav-pills">
           <button
             v-for="tab in tabs" :key="tab.id"
