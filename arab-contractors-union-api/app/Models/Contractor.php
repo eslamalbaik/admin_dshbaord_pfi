@@ -31,7 +31,7 @@ class Contractor extends Authenticatable
         'license_number', 'classification', 'owner_name',
         'email', 'phone', 'phone_verified_at', 'city', 'governorate_id', 'city_id', 'district', 'address',
         'classification_decision_number', 'classification_decision_date',
-        'status', 'is_frozen', 'profile_completed', 'profile_approved_by',
+        'status', 'status_override', 'status_override_year', 'is_frozen', 'profile_completed', 'profile_approved_by',
         'cr_file', 'id_file', 'notes',
         'password', 'remember_token', 'last_login_at', 'fcm_token',
         // New Extended Fields

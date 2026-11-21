@@ -522,7 +522,13 @@ class ContractorController extends Controller
 
         $oldStatus = $contractor->status;
 
-        $contractor->update($validated);
+        // فعّالة/منتهية من هون اختيار يدوي بيغلب الحالة المحسوبة من الرصيد لهالسنة (membershipStatus)؛
+        // "موقوف" بيلغي الاختيار لأنه بينعرض كما هو أصلاً
+        $manual = in_array($validated['status'], ['active', 'expired'], true);
+        $contractor->update($validated + [
+            'status_override'      => $manual ? $validated['status'] : null,
+            'status_override_year' => $manual ? now()->year : null,
+        ]);
 
         \App\Services\AuditLogService::record($request->user(), 'contractor.status_changed', $contractor, ['old_status' => $oldStatus, 'new_status' => $contractor->status]);
 

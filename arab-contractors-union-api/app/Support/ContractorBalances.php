@@ -43,6 +43,7 @@ class ContractorBalances
         // الصافي بكسوره (خانتان عشريتان)، بدون جبر لدينار صحيح (قاعدة eslam 31/10): 114.50 بتضل 114.50.
         return Contractor::query()->toBase()->select([
             'contractors.id', 'contractors.name', 'contractors.membership_number', 'contractors.status',
+            'contractors.status_override', 'contractors.status_override_year',
         ])->selectRaw("ROUND({$credit}, 2) AS credit_jod")
             ->selectRaw("ROUND({$dues}, 2) AS dues_jod")
             ->selectRaw("ROUND({$penalties}, 2) AS penalties_jod")

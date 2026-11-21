@@ -243,6 +243,14 @@ class ContractorBalanceController extends Controller
      */
     public function membershipStatus(object $row): string
     {
+        // اختيار الإدارة اليدوي من قائمة المقاولين (changeStatus) بيغلب الحساب لنفس السنة، وإلا كان
+        // تغيير "منتهية" لـ"فعّالة" بيرجع ينحسب "منتهية" وكأنه ما صار
+        if (in_array($row->status, ['active', 'expired'], true)
+            && in_array($row->status_override ?? null, ['active', 'expired'], true)
+            && (int) ($row->status_override_year ?? 0) === now()->year) {
+            return $row->status_override;
+        }
+
         // "منتهية" إدارياً كمان بتمشي على قاعدة الـ95% إذا انحسبت عليه رسوم السنة الحالية:
         // المقاول اللي سدّد 95% من كل اللي عليه (ومنها رسوم هالسنة) عضويته سارية، حتى لو ما
         // انعملّه تجديد يدوي (حالة 9565_g: 608 من 640). بدون ذمة للسنة الحالية بتضل "منتهية"،
@@ -260,10 +268,37 @@ class ContractorBalanceController extends Controller
             return 'active';
         }
 
-        $allowed = round((float) ($row->dues_obligations_jod ?? 0) * (1 - self::ACTIVE_PAID_RATIO), 2);
+        if ($this->withinAllowance($owed, (float) ($row->dues_obligations_jod ?? 0))) {
+            return 'active';
+        }
+
+        // المستورد من كشف دفعات 2026 مسجّل فيه المتبقي بس (0.50 من 75 مثلاً لحالة 7_g)، فمجموع ذممه
+        // بالنظام أصغر من رسمه الحقيقي والـ5% بتطلع من المتبقي نفسه. الأساس الصحيح رسم السنة حسب تصنيفه.
+        return $this->withinAllowance($owed, $this->currentYearFeeJod((int) $row->id)) ? 'active' : 'expired';
+    }
+
+    private function withinAllowance(float $owed, float $base): bool
+    {
+        $allowed = round($base * (1 - self::ACTIVE_PAID_RATIO), 2);
 
         // مقارنة بالقروش (أعداد صحيحة) عشان حالة الـ95% بالضبط ما تفشل بفرق كسور عشرية
-        return (int) round($owed * 100) <= (int) round($allowed * 100) ? 'active' : 'expired';
+        return (int) round($owed * 100) <= (int) round($allowed * 100);
+    }
+
+    /** @var array<int, float> رسم السنة لكل مقاول، محسوب مرة وحدة بالطلب (صفحة الأرصدة بتمرّ على مئات الصفوف) */
+    private array $feeCache = [];
+
+    /** رسم اشتراك السنة الحالية حسب التصنيف (المادة 37)؛ صفر لو التصنيف ناقص وما بينحسب */
+    private function currentYearFeeJod(int $contractorId): float
+    {
+        if (! array_key_exists($contractorId, $this->feeCache)) {
+            $contractor = Contractor::find($contractorId);
+            $fee = $contractor ? app(\App\Services\MembershipFeeCalculator::class)->calculate($contractor, now()->year) : null;
+
+            $this->feeCache[$contractorId] = $fee && ! $fee['unresolvable'] ? (float) $fee['total_before_discount_jod'] : 0.0;
+        }
+
+        return $this->feeCache[$contractorId];
     }
 
     /**

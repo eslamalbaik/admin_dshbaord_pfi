@@ -174,6 +174,63 @@ class DiscountPreviewAndActive95ScenarioTest extends TestCase
             ->assertJsonPath('items.0.status', 'expired');
     }
 
+    /**
+     * المستورد من كشف دفعات 2026 مسجّل فيه المتبقي بس (حالة 7_g: ذمة 0.50 والمدفوع قبل النظام مش
+     * مسجّل)، فالـ5% بتنحسب من رسم السنة حسب التصنيف مش من مجموع الذمم بالنظام.
+     */
+    public function test_imported_remainder_is_measured_against_the_classification_fee(): void
+    {
+        $c = $this->contractor();
+        $c->update(['specialties' => [
+            ['field_lk_type' => 20, 'specialization_lk_type' => 20, 'classification' => 'خامسة'],
+            ['field_lk_type' => 30, 'specialization_lk_type' => 60, 'classification' => 'خامسة'],
+        ]]);
+        $fee = app(\App\Services\MembershipFeeCalculator::class)->calculate($c->fresh(), 2026);
+        $this->assertFalse($fee['unresolvable']);
+        $allowed = round($fee['total_before_discount_jod'] * 0.05, 2);
+
+        $remainder = ContractorDue::create(['contractor_id' => $c->id, 'year' => 2026, 'description' => 'المتبقي من رسوم عضوية 2026',
+            'amount_jod' => 0.50, 'paid_jod' => 0, 'status' => 'unpaid', 'source' => 'manual']);
+
+        $this->getJson('/api/v1/dashboard/balances?search=9565_g')->assertOk()
+            ->assertJsonPath('items.0.net_jod', -0.5)
+            ->assertJsonPath('items.0.status', 'active');
+        $this->getJson('/api/v1/contractors?search=9565_g')->assertJsonPath('items.0.membership_status', 'active');
+
+        // متبقي أكبر من 5% من رسم التصنيف بيضل "منتهية"
+        $remainder->update(['amount_jod' => $allowed + 1]);
+        $this->getJson('/api/v1/dashboard/balances?search=9565_g')->assertOk()->assertJsonPath('items.0.status', 'expired');
+    }
+
+    /**
+     * تغيير الحالة يدوياً من قائمة المقاولين بيغلب الحساب لهالسنة: قبلها كان "فعّال" لشركة محفوظة
+     * فعّال ومعروضة منتهية ما بيعمل شي، وبعد السنة بيرجع الحساب الآلي.
+     */
+    public function test_manual_status_change_overrides_the_computed_status_for_the_year(): void
+    {
+        $c = $this->contractor();
+        ContractorDue::create(['contractor_id' => $c->id, 'year' => 2026, 'description' => 'رسوم عضوية (2026)',
+            'amount_jod' => 340, 'paid_jod' => 0, 'status' => 'unpaid', 'source' => 'manual']);
+        $this->getJson('/api/v1/contractors?search=9565_g')->assertJsonPath('items.0.membership_status', 'expired');
+
+        $this->patchJson("/api/v1/contractors/{$c->id}/status", ['status' => 'active'])->assertOk();
+        $this->getJson('/api/v1/contractors?search=9565_g')->assertJsonPath('items.0.membership_status', 'active');
+        $this->getJson('/api/v1/dashboard/balances?search=9565_g')->assertJsonPath('items.0.status', 'active');
+
+        // والعكس: منتهية يدوياً رغم إنه مسدّد
+        $c->dues()->update(['paid_jod' => 340, 'status' => 'paid']);
+        $this->patchJson("/api/v1/contractors/{$c->id}/status", ['status' => 'expired'])->assertOk();
+        $this->getJson('/api/v1/contractors?search=9565_g')->assertJsonPath('items.0.membership_status', 'expired');
+
+        // موقوف بيلغي الاختيار اليدوي
+        $this->patchJson("/api/v1/contractors/{$c->id}/status", ['status' => 'suspended'])->assertOk();
+        $this->assertNull($c->fresh()->status_override);
+
+        // الاختيار اليدوي لسنة فاتت ما بيأثر
+        $c->fresh()->update(['status' => 'active', 'status_override' => 'expired', 'status_override_year' => 2025]);
+        $this->getJson('/api/v1/contractors?search=9565_g')->assertJsonPath('items.0.membership_status', 'active');
+    }
+
     /** منتهي قديم ما عليه ولا ذمة لهالسنة بيضل "منتهية" حتى لو رصيده صفر */
     public function test_expired_without_current_year_dues_stays_expired(): void
     {
