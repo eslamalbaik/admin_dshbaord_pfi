@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getTurnstileToken } from '@/composables/useTurnstile'
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/plugins/axios'
@@ -65,6 +66,7 @@ async function handleSendOtp() {
   try {
     const r = await api.post('/api/v1/contractor/auth/forgot-password/send-otp', {
       phone: phoneForm.value.phone,
+      cf_turnstile_token: await getTurnstileToken(),
     })
     otpPreview.value = r.data.items?.otp_preview ?? ''
     otpForm.value = { otp: '' }
@@ -94,6 +96,7 @@ async function handleResendOtp() {
   try {
     const r = await api.post('/api/v1/contractor/auth/forgot-password/send-otp', {
       phone: phoneForm.value.phone,
+      cf_turnstile_token: await getTurnstileToken(),
     })
     otpPreview.value = r.data.items?.otp_preview ?? otpPreview.value
     if (r.data.items?.expires_in) startResendTimer(r.data.items.expires_in)

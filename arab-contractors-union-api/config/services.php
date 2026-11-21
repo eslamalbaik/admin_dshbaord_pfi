@@ -83,6 +83,12 @@ return [
         'credentials' => env('FIREBASE_CREDENTIALS'),
     ],
 
+    // Cloudflare Turnstile (حماية البوتات). المفتاح السري فاضي = معطّل. strict = حتى الطلبات بدون Origin (تطبيق الجوال) لازم تحمل توكن
+    'turnstile' => [
+        'secret' => env('TURNSTILE_SECRET_KEY'),
+        'strict' => (bool) env('TURNSTILE_STRICT', false),
+    ],
+
     // تحويل شهادات DOCX إلى PDF — على لينكس soffice غالباً بالـ PATH، وعلى ويندوز
     // بالمسار الافتراضي لتثبيت LibreOffice
     'libreoffice' => [

@@ -41,6 +41,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'supervisor.scope' => \App\Http\Middleware\RestrictSupervisor::class,
             'tenant' => \App\Http\Middleware\TenantMiddleware::class,
             'contractor.active' => \App\Http\Middleware\EnsureContractorIsActive::class,
+            'turnstile' => \App\Http\Middleware\VerifyTurnstile::class,
         ]);
         $middleware->appendToGroup('api', [
             \App\Http\Middleware\NoCacheHeaders::class,

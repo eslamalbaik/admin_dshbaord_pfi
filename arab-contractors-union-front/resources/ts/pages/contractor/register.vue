@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getTurnstileToken } from '@/composables/useTurnstile'
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/plugins/axios'
@@ -77,7 +78,7 @@ async function handleVerify() {
     
   isLoading.value = true
   try {
-    const payload = { phone: verifyForm.value.phone, terms_accepted: 1 }
+    const payload = { phone: verifyForm.value.phone, terms_accepted: 1, cf_turnstile_token: await getTurnstileToken() }
     const r = await api.post('/api/v1/contractor/auth/verify-identity', payload)
     foundContractor.value = r.data.items
     
@@ -110,6 +111,7 @@ async function handleLogin() {
     const r = await api.post('/api/v1/contractor/auth/login', {
       membership_number: foundContractor.value?.membership_number,
       password: loginForm.value.password,
+      cf_turnstile_token: await getTurnstileToken(),
     })
     await persistLogin(r.data.items?.token)
     router.push('/contractor/dashboard')
@@ -161,6 +163,7 @@ async function handleResendOtp() {
   try {
     const r = await api.post('/api/v1/contractor/auth/resend-otp', {
       phone: verifyForm.value.phone,
+      cf_turnstile_token: await getTurnstileToken(),
     })
     otpPreview.value = r.data.items?.otp_preview ?? otpPreview.value
     if (r.data.items?.expires_in) startResendTimer(r.data.items.expires_in)

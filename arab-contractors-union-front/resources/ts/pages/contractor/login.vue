@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getTurnstileToken } from '@/composables/useTurnstile'
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
@@ -34,6 +35,7 @@ async function submitLogin() {
     const r = await axios.post(`${BASE}/api/v1/contractor/auth/login`, {
       membership_number: form.value.membership_number.trim(),
       password: form.value.password,
+      cf_turnstile_token: await getTurnstileToken(),
     }, { headers: { Accept: 'application/json' } })
 
     const token = r.data.items?.token

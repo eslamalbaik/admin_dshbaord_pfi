@@ -39,15 +39,15 @@ Route::prefix('v1')->group(function () {
     // --------------------------------------------------------
     Route::prefix('contractor/auth')->group(function () {
         // throttle:auth (5 محاولات كل دقيقة) لمنع brute force
-        Route::middleware('throttle:auth')->post('login', [ContractorAuthController::class, 'login']);
+        Route::middleware(['throttle:auth', 'turnstile'])->post('login', [ContractorAuthController::class, 'login']);
 
         // تسجيل العضو (خطوتان): التحقق من الهوية ثم تعيين كلمة المرور
         Route::middleware('throttle:auth')->group(function () {
-            Route::post('verify-identity', [ContractorRegisterController::class, 'verifyIdentity']);
+            Route::post('verify-identity', [ContractorRegisterController::class, 'verifyIdentity'])->middleware('turnstile');
             Route::post('set-password',    [ContractorRegisterController::class, 'setPassword']);
             Route::post('verify-otp',      [ContractorRegisterController::class, 'verifyOtp']);
-            Route::post('resend-otp',      [ContractorRegisterController::class, 'resendOtp']);
-            Route::post('forgot-password/send-otp', [ContractorRegisterController::class, 'forgotPasswordSendOtp']);
+            Route::post('resend-otp',      [ContractorRegisterController::class, 'resendOtp'])->middleware('turnstile');
+            Route::post('forgot-password/send-otp', [ContractorRegisterController::class, 'forgotPasswordSendOtp'])->middleware('turnstile');
             Route::post('forgot-password/reset',    [ContractorRegisterController::class, 'forgotPasswordReset']);
         });
     });
