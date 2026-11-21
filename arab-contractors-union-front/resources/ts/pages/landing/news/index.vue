@@ -3,8 +3,9 @@ import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import { ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/plugins/axios'
-import { Search, Inbox, Play, Images, CalendarDays, FolderOpen, Newspaper, Megaphone, Users, Building2, Landmark, Info, ListChecks, Workflow, Sparkles } from 'lucide-vue-next'
+import { Search, Inbox, Play, Images, CalendarDays, FolderOpen, Newspaper } from 'lucide-vue-next'
 import { vHoverCard } from '@/utils/hoverCard'
+import { highlightText, searchTerms } from '@/utils/highlight'
 
 definePage({
   meta: {
@@ -19,6 +20,7 @@ interface NewsItem {
   title: string
   slug: string
   excerpt: string | null
+  snippet?: string | null
   category?: 'union' | 'local' | 'international' | null
   image: string | null
   video_url: string | null
@@ -37,24 +39,18 @@ interface Pagination {
 const router = useRouter()
 const route = useRoute()
 
-// قسم التعاميم والإعلانات الرسمية: من يخاطب، وما الذي يصدر فيه
-const circularAudience = [
-  { icon: Users, label: 'أعضاء الهيئة العامة' },
-  { icon: Building2, label: 'شركات المقاولات' },
-  { icon: Landmark, label: 'الجهات المعنية والمهتمون بخدمات الاتحاد' },
-]
-const circularContents = [
-  { icon: Info, label: 'المعلومات' },
-  { icon: ListChecks, label: 'التعليمات' },
-  { icon: Workflow, label: 'الإجراءات' },
-  { icon: Sparkles, label: 'الفرص والأنشطة' },
-]
+// رقم الصفحة محفوظ بالرابط (?page=N) عشان زر الرجوع بالمتصفح يرجّع للصفحة السابقة
+const routePage = () => Math.max(1, Number.parseInt(String(route.query.page ?? '1'), 10) || 1)
 
 const news = ref<NewsItem[]>([])
 const pagination = ref<Pagination | null>(null)
 const isLoading = ref(false)
 const search = ref('')
 const currentPage = ref(1)
+// الكلمات اللي انبحث عنها فعلياً (بتتحدّث مع آخر طلب) — لتمييزها بالنتائج وتمريرها لصفحة الخبر
+const activeTerms = ref<string[]>([])
+const hl = (t: string) => highlightText(t, activeTerms.value)
+const itemLink = (slug: string) => ({ path: `/landing/news/${slug}`, query: activeTerms.value.length ? { q: lastSearch } : {} })
 const categoryTabs = [
   { value: '', label: 'الكل' },
   { value: 'union', label: 'أخبار الاتحاد' },
@@ -74,8 +70,7 @@ async function fetchLatest() {
 }
 function selectCategory(v: string) {
   category.value = v
-  currentPage.value = 1
-  fetchNews()
+  resetPage()
 }
 
 function formatDate(dateStr: string): string {
@@ -88,6 +83,8 @@ async function fetchNews() {
   isLoading.value = true
   try {
     const params: Record<string, any> = { page: currentPage.value, per_page: 9 }
+    lastSearch = search.value.trim()
+    activeTerms.value = searchTerms(lastSearch)
     if (search.value.trim()) params.search = search.value.trim()
     if (category.value) params.category = category.value
 
@@ -108,17 +105,30 @@ async function fetchNews() {
 }
 
 function goToPage(page: number) {
-  currentPage.value = page
-  fetchNews()
-  window.scrollTo({ top: 0, behavior: 'smooth' })
+  router.push({ query: { ...route.query, page: page > 1 ? String(page) : undefined } })
 }
 
+// تغيير البحث أو التصنيف بيرجّع للصفحة الأولى
+function resetPage() {
+  currentPage.value = 1
+  if (routePage() > 1)
+    router.replace({ query: { ...route.query, page: undefined } })
+  else
+    fetchNews()
+}
+
+watch(() => route.query.page, () => {
+  currentPage.value = routePage()
+  fetchNews()
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+})
+
 let searchTimer: ReturnType<typeof setTimeout>
+let lastSearch = ''
 watch(search, () => {
   clearTimeout(searchTimer)
   searchTimer = setTimeout(() => {
-    currentPage.value = 1
-    fetchNews()
+    if (search.value.trim() !== lastSearch) resetPage()
   }, 400)
 })
 
@@ -127,6 +137,7 @@ onMounted(() => {
   const qc = String(route.query.category ?? '')
   if (categoryTabs.some(t => t.value && t.value === qc)) category.value = qc
   if (route.query.search) search.value = String(route.query.search)
+  currentPage.value = routePage()
   fetchNews()
   fetchLatest()
 })
@@ -145,39 +156,6 @@ onMounted(() => {
       </div>
       <div class="pub-follow-slot"><PublicSocialFollow /></div>
     </div>
-
-    <!-- Official circulars & announcements -->
-    <section class="circ-sec" aria-labelledby="circ-title">
-      <div class="container">
-        <div class="circ-card">
-          <div class="circ-icon"><Megaphone :size="34" :stroke-width="1.8" /></div>
-          <div class="circ-main">
-            <span class="circ-label">الاتحاد يخاطبكم</span>
-            <h2 id="circ-title" class="circ-title">التعاميم والإعلانات الرسمية</h2>
-            <p class="circ-text">
-              هذا القسم مخصص لإبلاغ أعضاء الهيئة العامة وشركات المقاولات والجهات المعنية بالمعلومات والتعليمات والإجراءات والفرص والأنشطة التي يصدرها الاتحاد.
-            </p>
-            <p class="circ-text circ-sub">
-              يخاطب بالدرجة الأولى الأعضاء والشركات والمنتسبين والمهتمين بخدمات الاتحاد.
-            </p>
-          </div>
-          <div class="circ-side">
-            <div class="circ-group">
-              <h3>يخاطب</h3>
-              <ul>
-                <li v-for="a in circularAudience" :key="a.label"><component :is="a.icon" :size="16" /> {{ a.label }}</li>
-              </ul>
-            </div>
-            <div class="circ-group">
-              <h3>يتضمن</h3>
-              <div class="circ-chips">
-                <span v-for="c in circularContents" :key="c.label" class="circ-chip"><component :is="c.icon" :size="14" /> {{ c.label }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
 
     <!-- Content -->
     <div class="container content-area">
@@ -202,7 +180,7 @@ onMounted(() => {
           <RouterLink
             v-for="item in news"
             :key="item.id"
-            :to="`/landing/news/${item.slug}`"
+            :to="itemLink(item.slug)"
             class="news-card"
           >
             <div class="news-img-wrap">
@@ -218,8 +196,9 @@ onMounted(() => {
                 <span v-if="item.category && CATEGORY_LABEL[item.category]" class="news-cat">{{ CATEGORY_LABEL[item.category] }}</span>
                 <span class="news-date"><CalendarDays :size="14" /> {{ formatDate(item.published_at) }}</span>
               </div>
-              <h2 class="news-title">{{ item.title }}</h2>
-              <p v-if="item.excerpt" class="news-excerpt">{{ item.excerpt }}</p>
+              <h2 class="news-title" v-html="hl(item.title)" />
+              <p v-if="item.excerpt" class="news-excerpt" v-html="hl(item.excerpt)" />
+              <p v-if="item.snippet" class="news-snippet"><span class="snip-lbl">في نص الخبر:</span> <span v-html="hl(item.snippet)" /></p>
               <div class="news-foot"><span class="news-read-more">اقرأ المزيد <span class="hc-arrow">←</span></span></div>
             </div>
           </RouterLink>
@@ -619,31 +598,10 @@ onMounted(() => {
 
 
 
-/* Official circulars & announcements */
-.circ-sec { padding: 2.25rem 0 0; }
-.circ-card {
   position: relative; overflow: hidden; display: grid; grid-template-columns: auto 1.5fr 1fr; gap: 2rem; align-items: center;
   background: linear-gradient(135deg, #f5f7ff 0%, #fff 60%); border: 1.5px solid #c5cae9; border-radius: 20px; padding: 2rem 2.25rem;
   box-shadow: 0 10px 30px rgba(13, 27, 75, .07);
 }
-.circ-card::before { content: ''; position: absolute; top: 0; bottom: 0; right: 0; width: 6px; background: linear-gradient(180deg, #f9a825, #e65100); }
-.circ-icon { width: 76px; height: 76px; border-radius: 20px; display: grid; place-items: center; color: #fff; background: linear-gradient(145deg, #1a237e, #283593); box-shadow: 0 10px 22px rgba(26, 35, 126, .3); }
-.circ-label { display: inline-block; background: #fff4dc; color: #b26a00; border: 1px solid #ffe0a3; border-radius: 50px; padding: .2rem .9rem; font-size: .75rem; font-weight: 700; margin-bottom: .55rem; }
-.circ-title { font-family: 'Tajawal', 'Cairo', sans-serif; font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 900; color: #0d1b3e; margin: 0 0 .6rem; }
-.circ-text { color: #4b5563; font-size: .98rem; line-height: 1.95; margin: 0; }
-.circ-sub { color: #6b7280; font-size: .9rem; margin-top: .35rem; }
-.circ-side { display: flex; flex-direction: column; gap: 1.1rem; border-inline-start: 1.5px dashed #c5cae9; padding-inline-start: 1.75rem; }
-.circ-group h3 { font-size: .8rem; font-weight: 800; color: #1a237e; margin: 0 0 .5rem; }
-.circ-group ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .4rem; }
-.circ-group li { display: flex; align-items: center; gap: .5rem; font-size: .88rem; color: #374151; font-weight: 600; }
-.circ-group li svg { color: #e65100; flex-shrink: 0; }
-.circ-chips { display: flex; flex-wrap: wrap; gap: .45rem; }
-.circ-chip { display: inline-flex; align-items: center; gap: .35rem; background: #e8eaf6; color: #1a237e; border-radius: 50px; padding: .3rem .8rem; font-size: .8rem; font-weight: 700; }
-@media (max-width: 960px) {
-  .circ-card { grid-template-columns: 1fr; gap: 1.25rem; padding: 1.5rem 1.4rem; }
-  .circ-side { border-inline-start: 0; padding-inline-start: 0; border-top: 1.5px dashed #c5cae9; padding-top: 1.1rem; }
-}
-
 /* category tabs */
 .cat-tabs { display: flex; gap: .5rem; flex-wrap: wrap; }
 .cat-tab { border: 1.5px solid #c5cae9; background: #fff; color: #1a237e; border-radius: 50px; padding: .4rem 1.1rem; font-size: .88rem; font-weight: 700; font-family: inherit; cursor: pointer; transition: all .2s; }
@@ -682,4 +640,10 @@ onMounted(() => {
 .aside-post-date { font-size: .74rem; color: #9aa3b5; font-weight: 700; }
 .aside-post-title { font-size: .88rem; font-weight: 700; line-height: 1.55; color: #0d1b3e; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .aside-post:hover .aside-post-title { color: #1a237e; }
+.news-snippet { margin-top: .5rem; padding: .6rem .8rem; background: #f8f9fc; border-inline-start: 3px solid #f9a825; border-radius: 8px; color: #4b5563; font-size: .88rem; line-height: 1.8; }
+.snip-lbl { font-weight: 800; color: #1a237e; }
+</style>
+
+<style>
+.search-mark { background: #ffe14d; color: inherit; border-radius: 3px; padding: 0 .12em; box-shadow: 0 0 0 1px rgba(249, 168, 37, .35); }
 </style>

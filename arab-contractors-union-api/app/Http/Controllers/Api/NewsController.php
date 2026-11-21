@@ -59,19 +59,91 @@ class NewsController extends Controller
             return $remote;
         }
 
-        $query = News::published()->latest('published_at');
+        $query = News::published();
+        $terms = self::searchTerms((string) $request->query('search', ''));
 
-        if ($request->filled('search'))
-            $query->where('title', 'like', '%' . $request->search . '%');
+        if ($terms) {
+            // كل كلمة لازم تكون موجودة بالعنوان أو المقدمة أو نص الخبر (بغض النظر عن الهمزات والتاء المربوطة والياء)
+            foreach ($terms as $t) {
+                $p = self::termRegex($t);
+                $query->where(fn ($q) => $q->whereRaw('title REGEXP ?', [$p])
+                    ->orWhereRaw('excerpt REGEXP ?', [$p])
+                    ->orWhereRaw('body REGEXP ?', [$p]));
+            }
+            // الأخبار اللي العنوان فيها بيطابق أولاً، وبعدها الأحدث
+            $query->orderByRaw(
+                '(' . implode(' + ', array_fill(0, count($terms), '(title REGEXP ?)')) . ') DESC',
+                array_map([self::class, 'termRegex'], $terms),
+            );
+        }
+
+        $query->latest('published_at');
 
         if ($request->filled('category') && in_array($request->category, News::CATEGORIES, true))
             $query->where('category', $request->category);
 
+        $columns = ['id', 'title', 'slug', 'excerpt', 'category', 'image', 'video_url', 'external_url', 'gallery', 'convened_at', 'published_at'];
         $paginator = $query
-            ->select(['id', 'title', 'slug', 'excerpt', 'category', 'image', 'video_url', 'external_url', 'gallery', 'convened_at', 'published_at'])
+            ->select($terms ? [...$columns, 'body'] : $columns)
             ->paginate($request->integer('per_page', 9));
 
+        if ($terms) {
+            // مقتطف من نص الخبر حول أول كلمة مطابقة (للعرض بنتائج البحث)، والنص الكامل ما بيطلع بالقائمة
+            $paginator->getCollection()->transform(function (News $n) use ($terms) {
+                $n->setAttribute('snippet', self::snippet((string) $n->body, $terms));
+                $n->makeHidden('body');
+
+                return $n;
+            });
+        }
+
         return $this->paginated($paginator);
+    }
+
+    /** كلمات البحث (حتى 6، بطول حرفين فأكثر). */
+    private static function searchTerms(string $q): array
+    {
+        $parts = preg_split('/[\s\p{P}]+/u', trim($q), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        return array_slice(array_values(array_unique(array_filter($parts, fn ($t) => mb_strlen($t) >= 2))), 0, 6);
+    }
+
+    /** تعبير نمطي للكلمة بيتجاهل فروقات الهمزات (أإآا) والتاء المربوطة (ةه) والياء (يى) والتشكيل. */
+    private static function termRegex(string $term, ?string $delim = null): string
+    {
+        $term = preg_replace('/[\x{0640}\x{064B}-\x{0652}]/u', '', $term);
+        $out = '';
+        foreach (mb_str_split($term) as $c) {
+            $out .= match (true) {
+                in_array($c, ['أ', 'إ', 'آ', 'ا', 'ٱ'], true) => '[أإآاٱ]',
+                in_array($c, ['ة', 'ه'], true) => '[ةه]',
+                in_array($c, ['ى', 'ي'], true) => '[ىي]',
+                default => preg_quote($c, $delim),
+            };
+        }
+
+        return $out;
+    }
+
+    /** مقتطف نظيف (~180 حرف) من نص الخبر حول أول مطابقة؛ null إن ما في مطابقة بالنص. */
+    private static function snippet(string $html, array $terms): ?string
+    {
+        $spaced = preg_replace('/<\/(p|div|li|h\d)>|<br\s*\/?>/i', ' ', $html);
+        $text = trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($spaced), ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+        $pos = null;
+        foreach ($terms as $t) {
+            if (preg_match('/' . self::termRegex($t, '/') . '/iu', $text, $m, PREG_OFFSET_CAPTURE)) {
+                $at = mb_strlen(substr($text, 0, $m[0][1]));
+                $pos = $pos === null ? $at : min($pos, $at);
+            }
+        }
+        if ($pos === null) {
+            return null;
+        }
+        $start = max(0, $pos - 70);
+        $piece = mb_substr($text, $start, 180);
+
+        return ($start > 0 ? '… ' : '') . $piece . ($start + 180 < mb_strlen($text) ? ' …' : '');
     }
 
     // GET /api/v1/news/latest

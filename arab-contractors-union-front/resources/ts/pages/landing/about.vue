@@ -1,8 +1,23 @@
 <script setup lang="ts">
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
+import LandingStats from '@/components/LandingStats.vue'
+import api from '@/plugins/axios'
+import { onMounted, ref } from 'vue'
 import { Award, ChevronLeft, Eye, GraduationCap, Handshake, Scale, Shield, Target, Users } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
+
+// أرقام الإحصائيات الحيّة (سنوات/اختصاصات) من نفس API الصفحة الرئيسية؛ القيم الافتراضية بتظهر لو فشل الطلب
+const unionStats = ref({ years: 30, specializations: 0 })
+onMounted(async () => {
+  try {
+    const r = await api.get('/api/v1/landing/home')
+    const st = r.data.items?.stats ?? {}
+    if (st.years) unionStats.value.years = st.years
+    if (st.specializations_count) unionStats.value.specializations = st.specializations_count
+  }
+  catch { /* الإحصائيات بتبقى بقيمها الافتراضية */ }
+})
 
 // المصدر: التقرير الإداري لاتحاد المقاولين الفلسطينيين — المحافظات الجنوبية (الدورة الانتخابية الثانية عشرة)
 const goals = [
@@ -81,6 +96,9 @@ const facts = [
             <span class="ach-lbl">{{ a.label }}</span>
           </div>
         </div>
+      </div>
+      <div class="pub-cont about-stats-wrap">
+        <LandingStats :years="unionStats.years" :specializations="unionStats.specializations" />
       </div>
     </section>
 
@@ -189,6 +207,7 @@ const facts = [
 
 /* About */
 .about-two-col { display: grid; grid-template-columns: 1.2fr 1fr; gap: 5rem; align-items: center; }
+.about-stats-wrap { --stats-mt: 3.5rem; }
 .about-stats-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .ach-card { background: linear-gradient(135deg, #e8eaf6, #f5f7ff); border: 1.5px solid #c5cae9; border-radius: 16px; padding: 1.75rem 1.25rem; text-align: center; transition: transform .2s; }
 .ach-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(13,27,75,.1); }

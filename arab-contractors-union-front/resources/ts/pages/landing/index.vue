@@ -5,11 +5,12 @@ import api from '@/plugins/axios'
 import PublicNewsTicker from '@/components/PublicNewsTicker.vue'
 import PublicSocialIcon from '@/components/PublicSocialIcon.vue'
 import LoginGuideVideoDialog from '@/components/LoginGuideVideoDialog.vue'
+import LandingStats from '@/components/LandingStats.vue'
 import { MotionDirective } from '@vueuse/motion'
 import { vHoverCard } from '@/utils/hoverCard'
 import {
-  ArrowLeft, Award, BadgeCheck, Bookmark, Building2, CalendarDays, ChevronLeft, ChevronRight, Clock,
-  FileText, Hourglass, Layers, Loader2, MapPin, Play, Search, SearchX, ShieldCheck, UserCheck,
+  ArrowLeft, BadgeCheck, Bookmark, Building2, CalendarDays, ChevronLeft, ChevronRight, Clock,
+  FileText, Hourglass, Loader2, MapPin, Play, Search, SearchX, ShieldCheck, UserCheck, UserRound,
 } from 'lucide-vue-next'
 
 definePage({
@@ -108,46 +109,6 @@ const aboutFeatures = [
 ]
 
 const unionStats = ref({ years: 30, specializations: 0 })
-// الأرقام بتعدّ من صفر لقيمتها أول ما القسم يبين بالشاشة (ومرة ثانية لو تغيّرت القيمة بعد وصول بيانات الـ API)
-const stats = computed(() => [
-  { icon: Building2, num: 350, suffix: '+', label: 'شركة مقاولات مصنفة', tone: 'navy' },
-  { icon: Award, num: 5, suffix: '', label: 'مجالات تصنيف معتمدة', tone: 'orange' },
-  { icon: Layers, num: unionStats.value.specializations || 40, suffix: unionStats.value.specializations ? '' : '+', label: 'اختصاصاً معتمداً', tone: 'navy' },
-  { icon: CalendarDays, num: unionStats.value.years, suffix: '+', label: 'عاماً من العمل المؤسسي والمهني', tone: 'orange' },
-])
-const statsEl = ref<HTMLElement | null>(null)
-const statShown = ref<number[]>([0, 0, 0, 0])
-let statsStarted = false
-let statsRaf = 0
-function countStats() {
-  cancelAnimationFrame(statsRaf)
-  const from = [...statShown.value]
-  const to = stats.value.map(x => x.num)
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { statShown.value = to; return }
-  const t0 = performance.now()
-  const dur = 1800
-  const tick = (now: number) => {
-    const t = Math.min(1, (now - t0) / dur)
-    const e = 1 - Math.pow(1 - t, 3) // easeOutCubic
-    statShown.value = to.map((v, i) => Math.round(from[i] + (v - from[i]) * e))
-    if (t < 1) statsRaf = requestAnimationFrame(tick)
-  }
-  statsRaf = requestAnimationFrame(tick)
-}
-watch(() => stats.value.map(x => x.num).join(), () => { if (statsStarted) countStats() })
-let statsObserver: IntersectionObserver | undefined
-onMounted(() => {
-  if (!statsEl.value) return
-  statsObserver = new IntersectionObserver((entries) => {
-    if (entries.some(e => e.isIntersecting) && !statsStarted) {
-      statsStarted = true
-      countStats()
-      statsObserver?.disconnect()
-    }
-  }, { threshold: 0.35 })
-  statsObserver.observe(statsEl.value)
-})
-onUnmounted(() => { cancelAnimationFrame(statsRaf); statsObserver?.disconnect() })
 
 // ─── Tenders ─────────────────────────────────────────────────────────────────
 interface TenderCard { id: number | null; title: string; desc: string; category: string; image: string; closingSoon: boolean; closed?: boolean; deadline: string }
@@ -179,7 +140,7 @@ function openTender(t: TenderCard) {
 }
 
 // ─── Directory search ────────────────────────────────────────────────────────
-interface DirectoryItem { name: string; membership_number: string; city: string | null; phone?: string | null; membership_status: string; status_label: string; fields: { name: string; grades: string[] }[] }
+interface DirectoryItem { name: string; membership_number: string; city: string | null; phone?: string | null; phone_is_mobile?: boolean; authorized_person?: string | null; membership_status: string; status_label: string; fields: { name: string; grades: string[] }[] }
 const searchQuery = ref('')
 const directory = ref<DirectoryItem[]>([])
 const directoryTotal = ref(0)
@@ -328,9 +289,6 @@ onMounted(() => {
           <RouterLink to="/landing/members" class="hero-btn hero-btn-solid">
             تصفّح دليل شركات المقاولات <ChevronLeft :size="18" />
           </RouterLink>
-          <button type="button" class="hero-btn hero-btn-ghost" @click="loginVideoOpen = true">
-            <span class="play"><Play :size="14" fill="currentColor" /></span> كيف تسجّل دخولك
-          </button>
         </div>
       </div>
     </section>
@@ -371,13 +329,7 @@ onMounted(() => {
       </div>
 
       <div class="container">
-        <div ref="statsEl" v-reveal class="stats">
-          <div v-for="(s, i) in stats" :key="s.label" class="stat" :class="`stat-${s.tone}`" :style="{ '--d': `${i * 90}ms` }">
-            <span class="stat-icon"><component :is="s.icon" :size="26" :stroke-width="1.8" /></span>
-            <strong><span class="stat-num" dir="ltr">{{ statShown[i] }}{{ s.suffix }}</span></strong>
-            <span class="stat-label">{{ s.label }}</span>
-          </div>
-        </div>
+        <LandingStats :years="unionStats.years" :specializations="unionStats.specializations" />
       </div>
     </section>
 
@@ -460,6 +412,10 @@ onMounted(() => {
                     <span v-if="f.grades.length" class="dfield-grades"><b v-for="g in f.grades" :key="g">{{ g }}</b></span>
                   </div>
                 </div>
+                <div v-if="c.authorized_person || (c.phone && c.phone_is_mobile)" class="dcard-auth">
+                  <span v-if="c.authorized_person" class="dcard-auth-name"><UserRound :size="15" /> المفوض: <b>{{ c.authorized_person }}</b></span>
+                  <a v-if="c.phone && c.phone_is_mobile" :href="`tel:+${waNumber(c.phone)}`" class="dcard-auth-phone" dir="ltr">{{ c.phone }}</a>
+                </div>
                 <div v-if="c.city || c.phone" class="dcard-meta">
                   <span v-if="c.city" class="dcard-city"><MapPin :size="15" /> {{ c.city }}</span>
                   <a v-if="c.phone" :href="`https://wa.me/${waNumber(c.phone)}`" target="_blank" rel="noopener noreferrer" class="dcard-wa" aria-label="تواصل عبر واتساب" title="تواصل عبر واتساب"><PublicSocialIcon name="whatsapp" :size="17" /> واتساب</a>
@@ -536,6 +492,24 @@ onMounted(() => {
         <div class="app-visual" @mouseenter="stopSlides" @mouseleave="startSlides">
           <img v-for="(sl, i) in appSlides" :key="sl.img" :src="sl.img" :alt="sl.alt" class="app-phone" :class="{ on: i === slideIdx }" :loading="i ? 'lazy' : undefined">
         </div>
+      </section>
+    </div>
+
+    <!-- ══ LOGIN GUIDE VIDEO ══ -->
+    <div class="container guide-wrap">
+      <section v-reveal class="guide">
+        <div class="guide-text">
+          <span class="eyebrow"><i />دليل المقاول</span>
+          <h2 class="heading">كيف تسجّل دخولك <span class="underlined navy">للتطبيق؟</span></h2>
+          <p>شاهد الفيديو الإرشادي القصير، وتعرّف على خطوات تفعيل حسابك وتسجيل الدخول إلى تطبيق اتحاد المقاولين الفلسطينيين.</p>
+          <button type="button" class="guide-btn" @click="loginVideoOpen = true">
+            <Play :size="16" fill="currentColor" /> شاهد الفيديو
+          </button>
+        </div>
+        <button type="button" class="guide-poster" aria-label="تشغيل فيديو كيف تسجّل دخولك" @click="loginVideoOpen = true">
+          <img src="/videos/login-guide-poster.jpg" alt="" loading="lazy">
+          <span class="guide-play"><Play :size="30" fill="currentColor" /></span>
+        </button>
       </section>
     </div>
 
@@ -653,6 +627,18 @@ onMounted(() => {
 .play { width: 28px; height: 28px; border-radius: 50%; background: var(--yellow); color: var(--navy); display: grid; place-items: center; }
 
 /* ══ PARTNERS ══ */
+.guide-wrap { padding-bottom: 88px; }
+.guide { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 40px; background: #f4f5fd; border: 1px solid #e3e7f5; border-radius: 28px; padding: 40px 48px; }
+.guide-text p { color: var(--muted); font-size: 16px; line-height: 1.9; margin: 18px 0 24px; }
+.guide-btn { display: inline-flex; align-items: center; gap: 10px; background: var(--navy); color: #fff; border: 0; border-radius: 999px; padding: 13px 28px; font: inherit; font-weight: 800; cursor: pointer; transition: transform .2s, background .2s; }
+.guide-btn:hover { background: #0a0a9a; transform: translateY(-2px); }
+.guide-poster { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; padding: 0; border: 0; border-radius: 20px; overflow: hidden; cursor: pointer; background: #0d1b4b; box-shadow: 0 18px 40px rgba(13, 27, 75, .25); }
+.guide-poster img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .4s; }
+.guide-poster:hover img { transform: scale(1.04); }
+.guide-play { position: absolute; top: 50%; left: 50%; width: 76px; height: 76px; margin: -38px 0 0 -38px; border-radius: 50%; background: rgba(255, 255, 255, .95); color: var(--navy); display: grid; place-items: center; box-shadow: 0 8px 24px rgba(0, 0, 0, .3); transition: transform .2s; }
+.guide-play svg { margin-inline-start: -3px; }
+.guide-poster:hover .guide-play { transform: scale(1.1); }
+@media (max-width: 860px) { .guide { grid-template-columns: 1fr; padding: 28px 20px; gap: 24px; } .guide-wrap { padding-bottom: 56px; } }
 .partners-wrap { padding-bottom: 72px; }
 .partners {
   display: flex; align-items: center; gap: 18px 28px; flex-wrap: wrap;
@@ -703,63 +689,11 @@ onMounted(() => {
   border: 8px solid #fff; box-shadow: 0 14px 34px rgba(15, 23, 60, .14);
 }
 
-.stats {
-  position: relative; overflow: hidden; display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-top: 72px; padding: 22px;
-  border-radius: 24px; background: linear-gradient(135deg, #00004f 0%, #00006e 55%, #1a1a8f 100%);
-  box-shadow: 0 22px 50px rgba(0, 0, 110, .25);
-}
-.stats::before, .stats::after { content: ''; position: absolute; border-radius: 50%; pointer-events: none; }
-.stats::before { width: 260px; height: 260px; top: -120px; inset-inline-start: -60px; background: radial-gradient(circle, rgba(255, 182, 26, .25), transparent 70%); }
-.stats::after { width: 220px; height: 220px; bottom: -110px; inset-inline-end: -40px; background: radial-gradient(circle, rgba(255, 255, 255, .12), transparent 70%); }
-.stat {
-  position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px;
-  padding: 26px 14px 22px; border-radius: 18px; background: rgba(255, 255, 255, .07); border: 1px solid rgba(255, 255, 255, .14);
-  backdrop-filter: blur(4px); transition: transform .3s ease, background .3s ease;
-}
-.stat:hover { transform: translateY(-6px); background: rgba(255, 255, 255, .12); }
-.stat::after { content: ''; position: absolute; bottom: 0; left: 24%; right: 24%; height: 3px; border-radius: 3px 3px 0 0; background: linear-gradient(90deg, var(--orange), var(--yellow)); opacity: .9; }
-.stat-icon { width: 58px; height: 58px; border-radius: 16px; display: grid; place-items: center; margin-bottom: 6px; background: #fff; box-shadow: 0 8px 20px rgba(0, 0, 0, .2); }
-.stat strong { font-size: clamp(34px, 3.2vw, 46px); font-weight: 900; line-height: 1.1; color: #fff; direction: ltr; font-variant-numeric: tabular-nums; }
-.stat-num { display: inline-block; }
-.stat-label { color: rgba(255, 255, 255, .8); font-size: 14.5px; font-weight: 700; }
-.stat-navy .stat-icon { color: var(--navy); }
-.stat-orange .stat-icon { color: var(--orange); }
-.stat-orange strong { color: var(--yellow); }
-
 /* ══ CARDS ══ */
 .cards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
 
 .tender-card { border: 1px solid #dfe2ea; border-radius: 14px; overflow: hidden; background: #fff; display: flex; flex-direction: column; }
-.tender-img { position: relative; height: 198px; }
-.tender-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.tender-img::after { content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, .78) 100%); }
-.status {
-  position: absolute; top: 24px; right: 16px; z-index: 1; display: inline-flex; align-items: center; gap: 6px;
-  color: #fff; font-size: 13px; font-weight: 700; border-radius: 6px; padding: 4px 10px;
-}
-.status i { width: 7px; height: 7px; border-radius: 50%; background: #fff; }
-.status-open { background: #1b9e5a; }
-.status-soon { background: var(--orange); }
-.status-closed { background: #6b7280; }
-.bookmark {
-  position: absolute; top: 24px; left: 16px; z-index: 1; width: 44px; height: 44px; border-radius: 8px; border: none;
-  background: #fff; color: var(--navy); display: grid; place-items: center; cursor: pointer;
-}
-.tender-cat {
-  position: absolute; bottom: 24px; right: 16px; z-index: 1; color: var(--orange); font-weight: 800; font-size: 15px;
-  background: rgba(0, 0, 0, .3); border-radius: 6px; padding: 4px 12px;
-}
-.tender-body { padding: 20px 16px 22px; display: flex; flex-direction: column; gap: 14px; flex: 1; }
-.tender-body h3, .news-body h3 { font-size: 17px; font-weight: 800; line-height: 1.45; }
-.tender-body p, .news-body p { color: var(--muted); font-size: 14px; line-height: 1.75; }
-.deadline {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
-  background: #f4f5f8; border: 1px solid #e3e5eb; border-radius: 12px; padding: 10px 16px; margin-top: auto;
-}
-.deadline-label { display: inline-flex; align-items: center; gap: 6px; color: #6b7280; font-size: 13px; font-weight: 700; }
-.deadline-label svg { color: var(--orange); }
-.deadline-date { background: #fff; border: 1px solid #e3e5eb; border-radius: 8px; padding: 6px 14px; font-size: 13px; font-weight: 800; }
-.deadline.soon { background: #fde8ea; border-color: #f7c3c8; }
+.tender-img { position: relative; height: 198f7c3c8; }
 .deadline.soon .deadline-label, .deadline.soon .deadline-label svg, .deadline.soon .deadline-date { color: #d6142b; }
 .tender-btn { width: 100%; padding: 12px; font-size: 15px; }
 
@@ -812,6 +746,11 @@ onMounted(() => {
 .dfield-grades { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
 .dfield-grades b { background: var(--orange-soft); color: var(--orange); border-radius: 8px; padding: 2px 9px; font-size: 11.5px; font-weight: 800; }
 .dcard-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 12px; border-top: 1px dashed #dfe2ea; }
+.dcard-auth { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; font-size: 13px; color: var(--muted); }
+.dcard-auth-name { display: flex; align-items: center; gap: 6px; line-height: 1.5; }
+.dcard-auth-name svg { color: var(--orange); flex-shrink: 0; }
+.dcard-auth-name b { color: var(--navy); font-weight: 800; }
+.dcard-auth-phone { align-self: flex-start; color: var(--navy); font-weight: 800; text-decoration: none; }
 .dcard-city { display: flex; align-items: center; gap: 6px; color: var(--muted) !important; font-size: 13px !important; font-weight: 700; margin: 0 !important; line-height: 1.4 !important; }
 .dcard-city svg { color: var(--orange); }
 .dcard-wa { display: inline-flex; align-items: center; gap: 7px; background: #25d366; color: #fff; border-radius: 999px; padding: 7px 16px; font-size: 13px; font-weight: 800; transition: transform .2s, box-shadow .2s; }
@@ -873,7 +812,6 @@ onMounted(() => {
   .about-grid { grid-template-columns: 1fr; gap: 40px; }
   .about-visual { max-width: 420px; margin: 0 auto; }
   .about-btn { float: none; }
-  .stats { grid-template-columns: repeat(2, 1fr); }
   .cards-grid { grid-template-columns: repeat(2, 1fr); }
   .app { grid-template-columns: 1fr; padding: 40px 28px 0; text-align: center; }
   .app-text p { margin-inline: auto; }
@@ -889,8 +827,6 @@ onMounted(() => {
   .partner { min-width: 130px; }
   .partner img { height: 60px; max-width: 150px; }
   .feature { padding: 18px; gap: 14px; }
-  .stats { grid-template-columns: 1fr 1fr; gap: 12px; padding: 14px; margin-top: 48px; }
-  .stat { padding: 20px 8px 18px; }
   .cards-grid { grid-template-columns: 1fr; }
   .directory-grid { grid-template-columns: 1fr; }
   .section { padding-top: 100px; }

@@ -341,7 +341,18 @@ class LandingController extends Controller
                 && ($field === null || in_array($field, $m['_field_ids'], true))
                 && ($spec === null || in_array($spec, $m['_spec_ids'], true))
                 && ($grade === '' || in_array($grade, $m['_grades'], true));
-        })
+        });
+
+        // لو في شركات اسمها نفسه بيطابق البحث نعرضها لحالها؛ المطابقة على باقي الحقول
+        // (المفوض، المجالات...) بتوزّع كلمات البحث على حقول مختلفة وبتطلّع شركات ما إلها علاقة
+        if ($search !== '') {
+            $byName = $items->filter(fn ($m) => self::matchesSearch(['name' => $m['name']], $search));
+            if ($byName->isNotEmpty()) {
+                $items = $byName;
+            }
+        }
+
+        $items = $items
             // الفعّالة أولاً ثم أبجدياً
             ->sortBy(fn ($m) => ($m['membership_status'] === 'active' ? '0' : '1') . $m['name'])
             ->map(fn ($m) => array_diff_key($m, array_flip(['_field_ids', '_spec_ids', '_grades'])))

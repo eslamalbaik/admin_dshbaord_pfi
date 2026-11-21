@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/plugins/axios'
-import { CalendarDays, ChevronLeft, ChevronRight, FolderOpen, Newspaper, Search, UserRound } from 'lucide-vue-next'
+import PublicSocialIcon from '@/components/PublicSocialIcon.vue'
+import { highlightDom, highlightText, searchTerms } from '@/utils/highlight'
+import { CalendarDays, ChevronLeft, ChevronRight, FolderOpen, Newspaper, Printer, Search, Share2, UserRound } from 'lucide-vue-next'
 
 definePage({
   meta: {
@@ -40,6 +42,48 @@ function goSearch() { router.push({ path: '/landing/news', query: searchText.val
 function shortDate(d: string) { return new Date(d).toLocaleDateString('ar-PS', { year: 'numeric', month: 'long', day: 'numeric' }) }
 
 const news = ref<NewsDetail | null>(null)
+
+// تمييز كلمات البحث (?q=) بعلامة صفراء داخل العنوان والمقدمة ونص الخبر، مع التنقل بين المطابقات
+const articleEl = ref<HTMLElement | null>(null)
+const terms = searchTerms(String(route.query.q ?? ''))
+const marks = ref<HTMLElement[]>([])
+const markIdx = ref(0)
+const hl = (t: string) => highlightText(t, terms)
+function focusMark(i: number) {
+  if (!marks.value.length) return
+  markIdx.value = (i + marks.value.length) % marks.value.length
+  marks.value.forEach((m, k) => m.classList.toggle('search-mark-cur', k === markIdx.value))
+  marks.value[markIdx.value].scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+function clearMarks() {
+  articleEl.value?.querySelectorAll('mark.search-mark').forEach((m) => { m.replaceWith(document.createTextNode(m.textContent ?? '')) })
+  articleEl.value?.normalize()
+  marks.value = []
+  terms.length = 0
+  router.replace({ query: { ...route.query, q: undefined } })
+}
+async function applyMarks() {
+  if (!terms.length || !news.value) return
+  await nextTick()
+  if (!articleEl.value) return
+  highlightDom(articleEl.value.querySelector('.article-body') as HTMLElement, terms)
+  marks.value = [...articleEl.value.querySelectorAll<HTMLElement>('mark.search-mark')]
+  focusMark(0)
+}
+
+// مشاركة الخبر: روابط مشاركة المنصات بتاخد رابط الصفحة الحالية وعنوان الخبر
+const shareUrl = () => window.location.href.split('#')[0]
+function shareTo(platform: 'facebook' | 'twitter' | 'linkedin') {
+  const u = encodeURIComponent(shareUrl())
+  const t = encodeURIComponent(news.value?.title ?? '')
+  const target = {
+    facebook: `https://www.facebook.com/sharer/sharer.php?u=${u}`,
+    twitter: `https://twitter.com/intent/tweet?url=${u}&text=${t}`,
+    linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${u}`,
+  }[platform]
+  window.open(target, '_blank', 'noopener,noreferrer,width=640,height=560')
+}
+const printNews = () => window.print()
 const isLoading = ref(true)
 const notFound = ref(false)
 
@@ -67,6 +111,7 @@ onMounted(async () => {
     const slug = route.params.slug as string
     const res = await api.get(`/api/v1/news/${slug}`)
     news.value = res.data.items
+    applyMarks()
   } catch (err: any) {
     if (err?.response?.status === 404) notFound.value = true
   } finally {
@@ -106,15 +151,23 @@ onMounted(async () => {
     <template v-else-if="news">
       <div class="container article-wrap">
         <div class="detail-layout">
-          <article class="article-col">
+          <article ref="articleEl" class="article-col">
             <!-- Meta -->
+            <div v-if="terms.length" class="mark-bar">
+              <span class="mark-info"><Search :size="15" /> نتائج البحث عن «{{ terms.join(' ') }}»: <b>{{ marks.length }}</b> {{ marks.length ? `(${markIdx + 1}/${marks.length})` : '— لا توجد مطابقات في النص' }}</span>
+              <span class="mark-actions">
+                <button v-if="marks.length > 1" type="button" aria-label="المطابقة السابقة" @click="focusMark(markIdx - 1)"><ChevronRight :size="16" /></button>
+                <button v-if="marks.length > 1" type="button" aria-label="المطابقة التالية" @click="focusMark(markIdx + 1)"><ChevronLeft :size="16" /></button>
+                <button type="button" class="mark-clear" @click="clearMarks">إزالة التمييز</button>
+              </span>
+            </div>
             <div class="article-meta">
               <span v-if="news.category && CATEGORY_LABEL[news.category]" class="article-cat">{{ CATEGORY_LABEL[news.category] }}</span>
               <span class="article-date"><CalendarDays :size="14" /> {{ formatDate(news.published_at) }}</span>
               <span v-if="news.author" class="article-author"><UserRound :size="14" /> بواسطة {{ news.author.name }}</span>
             </div>
 
-            <h1 class="article-title">{{ news.title }}</h1>
+            <h1 class="article-title" v-html="hl(news.title)" />
 
             <!-- Main image -->
             <div v-if="news.image" class="article-cover">
@@ -123,7 +176,7 @@ onMounted(async () => {
 
             <!-- Content card -->
             <div class="article-card">
-              <p v-if="news.excerpt" class="article-excerpt">{{ news.excerpt }}</p>
+              <p v-if="news.excerpt" class="article-excerpt" v-html="hl(news.excerpt)" />
 
               <div v-if="news.video_url" class="article-video">
                 <iframe
@@ -145,6 +198,21 @@ onMounted(async () => {
               </div>
 
               <div class="article-body" v-html="news.body" />
+            </div>
+
+            <!-- Share / print -->
+            <div class="share-bar">
+              <div class="share-group">
+                <span class="share-label"><Share2 :size="16" /> مشاركة الخبر</span>
+                <button type="button" class="share-btn share-fb" aria-label="مشاركة على فيسبوك" title="فيسبوك" @click="shareTo('facebook')"><PublicSocialIcon name="facebook" :size="18" /></button>
+                <button type="button" class="share-btn share-tw" aria-label="مشاركة على تويتر" title="تويتر" @click="shareTo('twitter')">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
+                </button>
+                <button type="button" class="share-btn share-in" aria-label="مشاركة على لينكدإن" title="لينكدإن" @click="shareTo('linkedin')">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0z" /></svg>
+                </button>
+              </div>
+              <button type="button" class="print-btn" @click="printNews"><Printer :size="16" /> طباعة الخبر</button>
             </div>
 
             <!-- Previous / next -->
@@ -470,6 +538,20 @@ onMounted(async () => {
 .article-cover img { display: block; width: 100%; max-height: 520px; object-fit: cover; }
 .article-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 20px; padding: 1.75rem 1.9rem; box-shadow: 0 6px 22px rgba(13, 27, 75, .05); }
 .article-card .article-excerpt { margin-top: 0; }
+.mark-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .6rem; margin-bottom: 1rem; padding: .6rem 1rem; background: #fff8e1; border: 1px solid #ffe08a; border-radius: 12px; font-size: .88rem; color: #5b4a00; }
+.mark-info { display: inline-flex; align-items: center; gap: .4rem; font-weight: 700; }
+.mark-actions { display: inline-flex; align-items: center; gap: .4rem; }
+.mark-actions button { display: inline-grid; place-items: center; min-width: 32px; height: 32px; border: 1px solid #f0c860; background: #fff; border-radius: 8px; cursor: pointer; color: #5b4a00; font: inherit; }
+.mark-actions button:hover { background: #ffe14d; }
+.mark-clear { padding: 0 .8rem; font-weight: 700; }
+.share-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin: 1.5rem 0; padding: 1rem 1.25rem; background: #f8f9fc; border: 1px solid #e5e7eb; border-radius: 14px; }
+.share-group { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.share-label { display: inline-flex; align-items: center; gap: .4rem; font-weight: 800; color: #0d1b3e; margin-inline-end: .4rem; }
+.share-btn { width: 40px; height: 40px; border: 0; border-radius: 50%; display: grid; place-items: center; color: #fff; cursor: pointer; transition: transform .2s, box-shadow .2s; }
+.share-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 14px rgba(0, 0, 0, .2); }
+.share-fb { background: #1877f2; } .share-tw { background: #0f1419; } .share-in { background: #0a66c2; }
+.print-btn { display: inline-flex; align-items: center; gap: .45rem; border: 1.5px solid #c5cae9; background: #fff; color: #1a237e; border-radius: 50px; padding: .5rem 1.2rem; font: inherit; font-weight: 700; cursor: pointer; transition: all .2s; }
+.print-btn:hover { background: #1a237e; color: #fff; border-color: #1a237e; }
 .article-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .nav-card { display: flex; flex-direction: column; gap: .4rem; background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 1rem 1.2rem; text-decoration: none; color: inherit; transition: box-shadow .25s, transform .25s, border-color .25s; }
 .nav-card:hover { box-shadow: 0 12px 28px rgba(13, 27, 75, .12); transform: translateY(-2px); border-color: #c5cae9; }
@@ -502,5 +584,14 @@ onMounted(async () => {
   .detail-aside { position: static; }
   .article-nav { grid-template-columns: 1fr; }
   .article-card { padding: 1.25rem; }
+}
+</style>
+
+<style>
+.search-mark { background: #ffe14d; color: inherit; border-radius: 3px; padding: 0 .12em; box-shadow: 0 0 0 1px rgba(249, 168, 37, .35); }
+.search-mark.search-mark-cur { background: #ffb300; box-shadow: 0 0 0 2px #e65100; }
+@media print {
+  .mark-bar { display: none !important; }
+  .share-bar, .article-nav, .article-footer, .news-aside, header, nav, footer { display: none !important; }
 }
 </style>

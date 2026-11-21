@@ -3,7 +3,8 @@ import PublicSocialIcon from '@/components/PublicSocialIcon.vue'
 import PublicSocialFollow from '@/components/PublicSocialFollow.vue'
 import api from '@/plugins/axios'
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { UserRound, Search, Award, Filter, ChevronDown, ChevronLeft, ChevronUp, Building2, X, Hash, CalendarDays, MapPin, Layers, CircleCheck, HardHat, Route, Droplets, Zap, Wrench, Factory } from 'lucide-vue-next'
+import { useRoute, useRouter } from 'vue-router'
+import { UserRound, Search, Award, Filter, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Building2, X, Hash, CalendarDays, MapPin, Layers, CircleCheck, HardHat, Route, Droplets, Zap, Wrench, Factory } from 'lucide-vue-next'
 
 definePage({ meta: { layout: 'landing', public: true, unauthenticatedOnly: false } })
 
@@ -23,7 +24,12 @@ interface Member {
   specializations: { name: string; grade: string | null }[]
 }
 
-const PER_PAGE = 50
+const PER_PAGE = 24
+
+const route = useRoute()
+const router = useRouter()
+// رقم الصفحة محفوظ بالرابط (?page=N) عشان زر الرجوع بالمتصفح يرجّع للصفحة السابقة
+const routePage = computed(() => Math.max(1, Number.parseInt(String(route.query.page ?? '1'), 10) || 1))
 
 const searchQ = ref('')
 const filterStatus = ref('')
@@ -172,59 +178,67 @@ function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape' && selected.value) closeMember()
 }
 
-const loadingMore = ref(false)
-
-async function fetchPage(p: number, id: number) {
-  const r = await api.get('/api/v1/contractors-directory', {
-    params: {
-      search: searchQ.value.trim() || undefined,
-      status: filterStatus.value || undefined,
-      field: filterField.value || undefined,
-      specialization: filterSpec.value || undefined,
-      grade: filterGrade.value || undefined,
-      page: p,
-      per_page: PER_PAGE,
-    },
-  })
-  if (id !== requestId) return null
-
-  return r.data
-}
-
-// أول 50 بتنعرض فوراً، وبعدها باقي الشركات بتنضاف تلقائياً بالخلفية (صفحة صفحة) بدون ما الزائر يضغط شي
 async function load(p = 1) {
   const id = ++requestId
   loading.value = true
-  loadingMore.value = false
   try {
-    const first = await fetchPage(p, id)
-    if (!first) return
-    const items: Member[] = first.items ?? []
-    members.value = p === 1 ? items : [...members.value, ...items]
-    total.value = first.meta?.total ?? items.length
-    page.value = first.meta?.current_page ?? p
-    lastPage.value = first.meta?.last_page ?? p
-    loading.value = false
-
-    while (page.value < lastPage.value && id === requestId) {
-      loadingMore.value = true
-      const next = await fetchPage(page.value + 1, id)
-      if (!next) return
-      members.value = [...members.value, ...(next.items ?? [])]
-      page.value = next.meta?.current_page ?? page.value + 1
-      lastPage.value = next.meta?.last_page ?? lastPage.value
-    }
+    const r = await api.get('/api/v1/contractors-directory', {
+      params: {
+        search: searchQ.value.trim() || undefined,
+        status: filterStatus.value || undefined,
+        field: filterField.value || undefined,
+        specialization: filterSpec.value || undefined,
+        grade: filterGrade.value || undefined,
+        page: p,
+        per_page: PER_PAGE,
+      },
+    })
+    if (id !== requestId) return
+    members.value = r.data.items ?? []
+    total.value = r.data.meta?.total ?? members.value.length
+    page.value = r.data.meta?.current_page ?? p
+    lastPage.value = r.data.meta?.last_page ?? 1
   }
   catch {
-    if (id === requestId) {
-      // فشلت صفحة بالنص: بنخلي زر "عرض المزيد" يكمّل من حيث وقفنا
-      if (!members.value.length) { total.value = 0; lastPage.value = 1 }
-    }
+    if (id === requestId) { members.value = []; total.value = 0; lastPage.value = 1 }
   }
   finally {
-    if (id === requestId) { loading.value = false; loadingMore.value = false }
+    if (id === requestId) loading.value = false
   }
 }
+
+// الانتقال بين الصفحات بيضيف خطوة بسجل المتصفح
+function goTo(p: number) {
+  if (p < 1 || p > lastPage.value || p === page.value) return
+  router.push({ query: { ...route.query, page: p > 1 ? String(p) : undefined } })
+}
+
+// أي تغيير بالفلاتر بيرجّع للصفحة الأولى
+function applyFilters() {
+  if (routePage.value > 1)
+    router.replace({ query: { ...route.query, page: undefined } })
+  else
+    load(1)
+}
+
+watch(routePage, (p) => {
+  load(p)
+  document.querySelector('.filters-bar')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+})
+
+const pageItems = computed(() => {
+  const last = lastPage.value
+  const cur = page.value
+  const set = new Set([1, last, cur - 1, cur, cur + 1])
+  const nums = [...set].filter(n => n >= 1 && n <= last).sort((x, y) => x - y)
+  const out: (number | string)[] = []
+  nums.forEach((n, i) => {
+    if (i && n - nums[i - 1] > 1) out.push(`gap${i}`)
+    out.push(n)
+  })
+
+  return out
+})
 
 function reset() {
   searchQ.value = ''; filterStatus.value = ''; filterField.value = ''; filterSpec.value = ''; filterGrade.value = ''
@@ -234,8 +248,8 @@ function reset() {
 watch(filterField, () => {
   if (filterSpec.value && !specOptions.value.some(s => String(s.value) === filterSpec.value)) filterSpec.value = ''
 })
-watch([filterStatus, filterField, filterSpec, filterGrade], () => load(1))
-watch(searchQ, () => { clearTimeout(timer); timer = setTimeout(() => load(1), 350) })
+watch([filterStatus, filterField, filterSpec, filterGrade], applyFilters)
+watch(searchQ, () => { clearTimeout(timer); timer = setTimeout(applyFilters, 350) })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKey)
@@ -244,7 +258,7 @@ onBeforeUnmount(() => {
 
 onMounted(async () => {
   window.addEventListener('keydown', onKey)
-  load(1)
+  load(routePage.value)
   try {
     const r = await api.get('/api/v1/contractors-directory/filters')
     fieldOptions.value = r.data.items?.fields ?? []
@@ -302,7 +316,7 @@ onMounted(async () => {
 
         <p v-if="!(loading && !members.length)" class="results-count">
           عُثر على <strong>{{ total }}</strong> شركة
-          <span v-if="loadingMore" class="results-more"><i class="results-spin" /> جارٍ تحميل بقية الشركات ({{ members.length }} / {{ total }})</span>
+          <span v-if="lastPage > 1" class="results-more">— صفحة {{ page }} من {{ lastPage }}</span>
         </p>
 
         <div class="members-grid">
@@ -344,9 +358,18 @@ onMounted(async () => {
           <button v-if="hasFilters" @click="reset">إعادة تعيين الفلاتر</button>
         </div>
 
-        <div v-if="page < lastPage && !loading && !loadingMore" class="load-more-wrap">
-          <button class="load-more" @click="load(page + 1)">عرض المزيد</button>
-        </div>
+        <nav v-if="lastPage > 1" class="pager" aria-label="التنقل بين الصفحات">
+          <button type="button" class="pager-btn" :disabled="page <= 1 || loading" @click="goTo(page - 1)">
+            <ChevronRight :size="16" /> السابق
+          </button>
+          <template v-for="it in pageItems" :key="it">
+            <span v-if="typeof it === 'string'" class="pager-gap">…</span>
+            <button v-else type="button" class="pager-num" :class="{ on: it === page }" :aria-current="it === page ? 'page' : undefined" :disabled="loading" @click="goTo(it)">{{ it }}</button>
+          </template>
+          <button type="button" class="pager-btn" :disabled="page >= lastPage || loading" @click="goTo(page + 1)">
+            التالي <ChevronLeft :size="16" />
+          </button>
+        </nav>
       </div>
     </section>
 
@@ -385,7 +408,7 @@ onMounted(async () => {
                   <span class="mm-info-ico"><CalendarDays :size="20" :stroke-width="2.2" /></span>
                   <div><span class="mm-lbl">تاريخ المنح</span><span class="mm-val">{{ selected.member_since }}</span></div>
                 </div>
-                <div v-if="selected.authorized_person" class="mm-info-item">
+                <div v-if="selected.authorized_person" class="mm-info-item mm-info-wide">
                   <span class="mm-info-ico"><UserRound :size="20" :stroke-width="2.2" /></span>
                   <div><span class="mm-lbl">المفوض بالتوقيع</span><span class="mm-val">{{ selected.authorized_person }}</span></div>
                 </div>
@@ -485,9 +508,13 @@ onMounted(async () => {
 .member-since { font-size: .72rem; color: #9ca3af; white-space: nowrap; }
 .member-more { display: inline-flex; align-items: center; gap: .2rem; align-self: flex-start; margin-top: .15rem; font-size: .76rem; font-weight: 700; color: #1a237e; transition: color .2s, gap .2s; }
 .member-card:hover .member-more { color: #f9a825; gap: .45rem; }
-.load-more-wrap { text-align: center; margin-top: 2rem; }
-.load-more { background: #1a237e; color: #fff; border: none; border-radius: 9px; padding: .7rem 2rem; font-size: .9rem; cursor: pointer; font-family: 'Tajawal', sans-serif; }
-.load-more:disabled { opacity: .6; cursor: default; }
+.pager { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: .4rem; margin-top: 2rem; }
+.pager-btn, .pager-num { display: inline-flex; align-items: center; justify-content: center; gap: .25rem; min-width: 40px; height: 40px; padding: 0 .9rem; border: 1.5px solid #e5e7eb; border-radius: 9px; background: #fff; color: #1a237e; font-size: .88rem; font-weight: 700; font-family: 'Tajawal', sans-serif; cursor: pointer; transition: all .2s; }
+.pager-num { padding: 0; }
+.pager-btn:hover:not(:disabled), .pager-num:hover:not(:disabled) { background: #e8eaf6; border-color: #c5cae9; }
+.pager-num.on { background: #1a237e; border-color: #1a237e; color: #fff; }
+.pager-btn:disabled { opacity: .45; cursor: default; }
+.pager-gap { color: #9ca3af; padding: 0 .25rem; }
 
 /* نافذة بيانات التصنيف */
 .mm-overlay { position: fixed; inset: 0; z-index: 2000; background: rgba(13,27,75,.55); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 1rem; font-family: 'Tajawal', 'Cairo', sans-serif; direction: rtl; }
@@ -496,7 +523,7 @@ onMounted(async () => {
 .mm-head-photo { position: absolute; top: 0; bottom: 0; left: 0; width: 55%; background: url('/images/landing/inner-hero-sm.webp') 100% 20% / 240% auto no-repeat; opacity: .42; mix-blend-mode: luminosity; -webkit-mask-image: linear-gradient(90deg, #000 30%, transparent 100%); mask-image: linear-gradient(90deg, #000 30%, transparent 100%); }
 .mm-head-swoosh { position: absolute; left: 0; bottom: 0; width: 42%; height: 34px; }
 .mm-head > :not(.mm-head-photo):not(.mm-head-swoosh) { position: relative; z-index: 1; }
-.mm-icon { width: 72px; height: 72px; border-radius: 18px; background: rgba(13,27,75,.55); color: #f9a825; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 2px solid rgba(249,168,37,.75); }
+.mm-icon { width: 72px; height: 72px; border-radius: 18px; background: rgba(13,27,75,.55); color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 2px solid rgba(249,168,37,.75); }
 .mm-head-text { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: .6rem; }
 .mm-title { font-size: 1.2rem; font-weight: 800; color: #fff; line-height: 1.6; overflow-wrap: anywhere; }
 .mm-status { display: inline-flex; align-items: center; gap: .35rem; font-size: .8rem; font-weight: 800; border-radius: 50px; padding: .3rem .85rem; background: #e8f5e9; color: #2e7d32; }
@@ -509,6 +536,7 @@ onMounted(async () => {
 .mm-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1rem; margin-bottom: 1.6rem; }
 .mm-info-item { display: flex; align-items: center; gap: .85rem; min-width: 0; background: #f8f9fe; border: 1.5px solid #e6e9f5; border-radius: 14px; padding: .85rem 1rem; }
 .mm-info-ico { width: 46px; height: 46px; border-radius: 50%; background: #e8ecfb; color: #1a237e; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.mm-info-wide { grid-column: 1 / -1; }
 .mm-info-item > div { display: flex; flex-direction: column; min-width: 0; }
 .mm-lbl { font-size: .8rem; color: #4b5563; }
 .mm-val { font-size: 1.15rem; font-weight: 800; color: #0d1b3e; overflow-wrap: anywhere; }
@@ -583,8 +611,6 @@ onMounted(async () => {
   .mm-grade { min-width: 84px; font-size: .78rem; padding: .25rem .6rem; }
 }
 .results-more { display: inline-flex; align-items: center; gap: .5rem; margin-inline-start: .9rem; font-size: .82rem; color: #6b7280; font-weight: 600; }
-.results-spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #c5cae9; border-top-color: #1a237e; animation: mspin .8s linear infinite; }
-@keyframes mspin { to { transform: rotate(360deg); } }
 .member-skel { height: 170px; border-radius: 16px; background: linear-gradient(90deg, #eef0f6 25%, #f7f8fc 50%, #eef0f6 75%); background-size: 200% 100%; animation: mskel 1.3s ease-in-out infinite; }
 @keyframes mskel { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 </style>

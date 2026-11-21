@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import PublicSocialIcon from '@/components/PublicSocialIcon.vue'
 import { PUBLIC_SOCIAL_LINKS } from '@/utils/publicSocialLinks'
-import { ref, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { Menu, X, ChevronDown, LayoutDashboard, User, LogOut, Bell, Mail, Phone, MapPin } from 'lucide-vue-next'
 import api from '@/plugins/axios'
 import PublicLoginButton from '@/components/PublicLoginButton.vue'
@@ -22,6 +22,7 @@ const contact = {
 }
 
 const router = useRouter()
+const route = useRoute()
 const mobileOpen = ref(false)
 
 const localProfile = ref<any>(null)
@@ -42,7 +43,7 @@ const navLinks = [
     label: 'خدمات الاتحاد', href: '#',
     children: [
       { label: 'الخدمات الإلكترونية', href: '/landing/services' },
-      { label: 'التدريب وبناء القدرات', href: '/landing/training-center' },
+      { label: 'التدريب والتأهيل', href: '/landing/training-center' },
       { label: 'التشريعات', href: '/landing/legislation' },
       { label: 'مكتبة الملفات', href: '/landing/library' },
     ],
@@ -68,6 +69,29 @@ const showUserMenu = ref(false)
 function toggleDropdown(label: string) {
   openDropdown.value = openDropdown.value === label ? null : label
 }
+
+// الخط البرتقالي أسفل الهيدر: شريط واحد بينزلق بين العناصر (بدل ما يظهر ويختفي عند كل عنصر).
+// مكانه: العنصر تحت الماوس، وإلا القائمة المفتوحة (الماوس على قائمتها الفرعية بيبقي الخط على أبوها)، وإلا الصفحة الحالية
+const hoveredLabel = ref<string | null>(null)
+const itemEls = new Map<string, HTMLElement>()
+const setItemEl = (label: string, el: any) => { if (el) itemEls.set(label, el as HTMLElement); else itemEls.delete(label) }
+const activeLabel = computed(() => {
+  const path = route.path
+  const hit = navLinks.find(l => l.children
+    ? l.children.some(c => path === c.href || path.startsWith(`${c.href}/`))
+    : l.href === path || (l.href !== '/landing' && path.startsWith(`${l.href}/`)))
+
+  return hit?.label ?? null
+})
+const barLabel = computed(() => hoveredLabel.value ?? openDropdown.value ?? activeLabel.value)
+const bar = ref({ x: 0, w: 0, show: false, anim: false })
+function placeBar() {
+  const el = barLabel.value ? itemEls.get(barLabel.value) : undefined
+  if (!el) { bar.value = { ...bar.value, show: false }; return }
+  const wasShown = bar.value.show
+  bar.value = { x: el.offsetLeft, w: el.offsetWidth, show: true, anim: wasShown }
+}
+watch(barLabel, () => nextTick(placeBar))
 function closeDropdowns() { openDropdown.value = null; showUserMenu.value = false; showNotifDropdown.value = false }
 
 // the white bar sticks to the top; a stronger shadow once the page has scrolled under it
@@ -75,11 +99,15 @@ const scrolled = ref(false)
 function onScroll() { scrolled.value = window.scrollY > 40 }
 
 onMounted(() => {
+  nextTick(placeBar)
+  window.addEventListener('resize', placeBar)
+  document.fonts?.ready.then(placeBar)
   document.addEventListener('click', closeDropdowns)
   window.addEventListener('scroll', onScroll, { passive: true })
   onScroll()
 })
 onUnmounted(() => {
+  window.removeEventListener('resize', placeBar)
   document.removeEventListener('click', closeDropdowns)
   window.removeEventListener('scroll', onScroll)
 })
@@ -197,9 +225,13 @@ onMounted(() => {
         </RouterLink>
 
         <div class="pub-nav-links">
+          <span class="pub-nav-bar" :class="{ show: bar.show, anim: bar.anim }" :style="{ width: `${bar.w}px`, transform: `translateX(${bar.x}px)` }" aria-hidden="true" />
           <div
             v-for="l in navLinks" :key="l.label"
+            :ref="(el: any) => setItemEl(l.label, el)"
             class="pub-nav-item"
+            @mouseenter="hoveredLabel = l.label"
+            @mouseleave="hoveredLabel = null"
             @click.stop="l.children ? toggleDropdown(l.label) : navigate(l.href)"
           >
             <RouterLink v-if="!l.children" :to="l.href" class="pub-nav-link">{{ l.label }}</RouterLink>
@@ -368,7 +400,7 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
   .pub-tb-soc { width: 24px; height: 24px; }
 }
 
-.pub-nav-links { display: flex; align-self: stretch; gap: 1.9rem; margin-inline-start: 3.2rem; margin-inline-end: auto; }
+.pub-nav-links { position: relative; display: flex; align-self: stretch; gap: 1.9rem; margin-inline-start: 3.2rem; margin-inline-end: auto; }
 .pub-nav-item { display: flex; align-items: center; }
 .pub-nav-item { position: relative; }
 .pub-nav-link {
@@ -381,12 +413,14 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
 .pub-nav-link { font-family: 'Tajawal', sans-serif; font-size: .92rem; color: #2b2f3a; }
 .pub-nav-link:hover, .router-link-exact-active.pub-nav-link { color: #00006e; }
 .router-link-exact-active.pub-nav-link { font-weight: 700; }
-/* orange bar on the bottom edge of the header: grows in on hover / open menu, stays under the current page */
-.pub-nav-link::after {
-  content: ''; position: absolute; bottom: 0; right: 0; left: 0; height: 4px; border-radius: 4px 4px 0 0; background: #d67a00;
-  transform: scaleX(0); transition: transform .3s cubic-bezier(.2, .8, .3, 1);
+/* orange bar on the bottom edge of the header: one bar that slides to the hovered / open / current item */
+.pub-nav-bar {
+  position: absolute; bottom: 0; left: 0; height: 4px; border-radius: 4px 4px 0 0; background: #d67a00;
+  opacity: 0; pointer-events: none;
 }
-.pub-nav-link:hover::after, .pub-nav-btn.is-open::after, .router-link-exact-active.pub-nav-link::after { transform: scaleX(1); }
+.pub-nav-bar.show { opacity: 1; }
+.pub-nav-bar.anim { transition: transform .35s cubic-bezier(.2, .8, .3, 1), width .35s cubic-bezier(.2, .8, .3, 1), opacity .2s; }
+.router-link-exact-active.pub-nav-link { color: #00006e; }
 .pub-nav-btn.is-open { color: #00006e; }
 .pub-member-pill {
   display: inline-flex; align-items: center; gap: .5rem; background: #e3f6e8; color: #11903a;
@@ -526,7 +560,7 @@ a.pub-tb-item:hover { color: #fff; text-decoration: underline; }
   .pub-mob-sub-enter-active, .pub-mob-sub-leave-active,
   .pub-mob-enter-active, .pub-mob-leave-active { transition: none; }
   .pub-dd-stagger .pub-dd-link, .pub-mob-sub-enter-active .pub-mob-sub-link, .pub-dd-stagger::before { animation: none; }
-  .pub-nav-link::after, .pub-dd-stagger .pub-dd-link { transition: none; }
+  .pub-nav-bar.anim, .pub-dd-stagger .pub-dd-link { transition: none; }
 }
 
 @media (max-width: 1100px) {
